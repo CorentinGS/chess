@@ -1,7 +1,7 @@
 package chess
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -12,46 +12,44 @@ type pgnTest struct {
 	PGN     string
 }
 
-var (
-	validPGNs = []pgnTest{
-		{
-			PostPos: unsafeFEN("4r3/6P1/2p2P1k/1p6/pP2p1R1/P1B5/2P2K2/3r4 b - - 0 45"),
-			PGN:     mustParsePGN("fixtures/pgns/0001.pgn"),
-		},
-		{
-			PostPos: unsafeFEN("4r3/6P1/2p2P1k/1p6/pP2p1R1/P1B5/2P2K2/3r4 b - - 0 45"),
-			PGN:     mustParsePGN("fixtures/pgns/0002.pgn"),
-		},
-		{
-			PostPos: unsafeFEN("2r2rk1/pp1bBpp1/2np4/2pp2p1/1bP5/1P4P1/P1QPPPBP/3R1RK1 b - - 0 3"),
-			PGN:     mustParsePGN("fixtures/pgns/0003.pgn"),
-		},
-		{
-			PostPos: unsafeFEN("r3kb1r/2qp1pp1/b1n1p2p/pp2P3/5n1B/1PPQ1N2/P1BN1PPP/R3K2R w KQkq - 1 14"),
-			PGN:     mustParsePGN("fixtures/pgns/0004.pgn"),
-		},
-		{
-			PostPos: unsafeFEN("rnbqkbnr/ppp2ppp/4p3/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq d6 0 3"),
-			PGN:     mustParsePGN("fixtures/pgns/0008.pgn"),
-		},
-		{
-			PostPos: unsafeFEN("r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4"),
-			PGN:     mustParsePGN("fixtures/pgns/0009.pgn"),
-		},
-		{
-			PostPos: unsafeFEN("r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4"),
-			PGN:     mustParsePGN("fixtures/pgns/0010.pgn"),
-		},
-		{
-			PostPos: unsafeFEN("8/8/6p1/4R3/6kQ/r2P1pP1/5P2/6K1 b - - 3 42"),
-			PGN:     mustParsePGN("fixtures/pgns/0011.pgn"),
-		},
-		{
-			PostPos: StartingPosition(),
-			PGN:     mustParsePGN("fixtures/pgns/0012.pgn"),
-		},
-	}
-)
+var validPGNs = []pgnTest{
+	{
+		PostPos: unsafeFEN("4r3/6P1/2p2P1k/1p6/pP2p1R1/P1B5/2P2K2/3r4 b - - 0 45"),
+		PGN:     mustParsePGN("fixtures/pgns/0001.pgn"),
+	},
+	{
+		PostPos: unsafeFEN("4r3/6P1/2p2P1k/1p6/pP2p1R1/P1B5/2P2K2/3r4 b - - 0 45"),
+		PGN:     mustParsePGN("fixtures/pgns/0002.pgn"),
+	},
+	{
+		PostPos: unsafeFEN("2r2rk1/pp1bBpp1/2np4/2pp2p1/1bP5/1P4P1/P1QPPPBP/3R1RK1 b - - 0 3"),
+		PGN:     mustParsePGN("fixtures/pgns/0003.pgn"),
+	},
+	{
+		PostPos: unsafeFEN("r3kb1r/2qp1pp1/b1n1p2p/pp2P3/5n1B/1PPQ1N2/P1BN1PPP/R3K2R w KQkq - 1 14"),
+		PGN:     mustParsePGN("fixtures/pgns/0004.pgn"),
+	},
+	{
+		PostPos: unsafeFEN("rnbqkbnr/ppp2ppp/4p3/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq d6 0 3"),
+		PGN:     mustParsePGN("fixtures/pgns/0008.pgn"),
+	},
+	{
+		PostPos: unsafeFEN("r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4"),
+		PGN:     mustParsePGN("fixtures/pgns/0009.pgn"),
+	},
+	{
+		PostPos: unsafeFEN("r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4"),
+		PGN:     mustParsePGN("fixtures/pgns/0010.pgn"),
+	},
+	{
+		PostPos: unsafeFEN("8/8/6p1/4R3/6kQ/r2P1pP1/5P2/6K1 b - - 3 42"),
+		PGN:     mustParsePGN("fixtures/pgns/0011.pgn"),
+	},
+	{
+		PostPos: StartingPosition(),
+		PGN:     mustParsePGN("fixtures/pgns/0012.pgn"),
+	},
+}
 
 func TestValidPGNs(t *testing.T) {
 	for _, test := range validPGNs {
@@ -73,25 +71,23 @@ type commentTest struct {
 	CommentText string
 }
 
-var (
-	commentTests = []commentTest{
-		{
-			PGN:         mustParsePGN("fixtures/pgns/0005.pgn"),
-			MoveNumber:  7,
-			CommentText: `(-0.25 → 0.39) Inaccuracy. cxd4 was best. [%eval 0.39] [%clk 0:05:05]`,
-		},
-		{
-			PGN:         mustParsePGN("fixtures/pgns/0009.pgn"),
-			MoveNumber:  5,
-			CommentText: `This opening is called the Ruy Lopez.`,
-		},
-		{
-			PGN:         mustParsePGN("fixtures/pgns/0010.pgn"),
-			MoveNumber:  5,
-			CommentText: `This opening is called the Ruy Lopez.`,
-		},
-	}
-)
+var commentTests = []commentTest{
+	{
+		PGN:         mustParsePGN("fixtures/pgns/0005.pgn"),
+		MoveNumber:  7,
+		CommentText: `(-0.25 → 0.39) Inaccuracy. cxd4 was best. [%eval 0.39] [%clk 0:05:05]`,
+	},
+	{
+		PGN:         mustParsePGN("fixtures/pgns/0009.pgn"),
+		MoveNumber:  5,
+		CommentText: `This opening is called the Ruy Lopez.`,
+	},
+	{
+		PGN:         mustParsePGN("fixtures/pgns/0010.pgn"),
+		MoveNumber:  5,
+		CommentText: `This opening is called the Ruy Lopez.`,
+	},
+}
 
 func TestCommentsDetection(t *testing.T) {
 	for _, test := range commentTests {
@@ -169,12 +165,13 @@ func mustParsePGN(fname string) string {
 		panic(err)
 	}
 	defer f.Close()
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	if err != nil {
 		panic(err)
 	}
 	return string(b)
 }
+
 func TestGamesFromPGN(t *testing.T) {
 	for _, test := range validPGNs {
 		reader := strings.NewReader(test.PGN)

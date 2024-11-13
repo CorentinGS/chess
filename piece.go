@@ -121,12 +121,10 @@ const (
 	BlackPawn
 )
 
-var (
-	allPieces = []Piece{
-		WhiteKing, WhiteQueen, WhiteRook, WhiteBishop, WhiteKnight, WhitePawn,
-		BlackKing, BlackQueen, BlackRook, BlackBishop, BlackKnight, BlackPawn,
-	}
-)
+var allPieces = []Piece{
+	WhiteKing, WhiteQueen, WhiteRook, WhiteBishop, WhiteKnight, WhitePawn,
+	BlackKing, BlackQueen, BlackRook, BlackBishop, BlackKnight, BlackPawn,
+}
 
 // NewPiece returns the piece matching the PieceType and Color.
 // NoPiece is returned if the PieceType or Color isn't valid.
@@ -174,9 +172,7 @@ func (p Piece) String() string {
 	return pieceUnicodes[int(p)]
 }
 
-var (
-	pieceUnicodes = []string{" ", "♔", "♕", "♖", "♗", "♘", "♙", "♚", "♛", "♜", "♝", "♞", "♟"}
-)
+var pieceUnicodes = []string{" ", "♔", "♕", "♖", "♗", "♘", "♙", "♚", "♛", "♜", "♝", "♞", "♟"}
 
 func (p Piece) getFENChar() string {
 	for key, piece := range fenPieceMap {

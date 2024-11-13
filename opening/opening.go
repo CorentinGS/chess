@@ -4,15 +4,15 @@ package opening
 import (
 	"bytes"
 
-	"github.com/notnil/chess"
+	"github.com/corentings/chess/v2"
 )
 
 // A Opening represents a specific sequence of moves from the staring position.
 type Opening struct {
+	game  *chess.Game
 	code  string
 	title string
 	pgn   string
-	game  *chess.Game
 }
 
 // Code returns the Encyclopaedia of Chess Openings (ECO) code.

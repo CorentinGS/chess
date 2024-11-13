@@ -184,8 +184,10 @@ func (b *Board) UnmarshalText(text []byte) error {
 // in the following order: WhiteKing, WhiteQueen, WhiteRook, WhiteBishop, WhiteKnight
 // WhitePawn, BlackKing, BlackQueen, BlackRook, BlackBishop, BlackKnight, BlackPawn
 func (b *Board) MarshalBinary() (data []byte, err error) {
-	bbs := []bitboard{b.bbWhiteKing, b.bbWhiteQueen, b.bbWhiteRook, b.bbWhiteBishop, b.bbWhiteKnight, b.bbWhitePawn,
-		b.bbBlackKing, b.bbBlackQueen, b.bbBlackRook, b.bbBlackBishop, b.bbBlackKnight, b.bbBlackPawn}
+	bbs := []bitboard{
+		b.bbWhiteKing, b.bbWhiteQueen, b.bbWhiteRook, b.bbWhiteBishop, b.bbWhiteKnight, b.bbWhitePawn,
+		b.bbBlackKing, b.bbBlackQueen, b.bbBlackRook, b.bbBlackBishop, b.bbBlackKnight, b.bbBlackPawn,
+	}
 	buf := new(bytes.Buffer)
 	err = binary.Write(buf, binary.BigEndian, bbs)
 	return buf.Bytes(), err

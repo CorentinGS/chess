@@ -45,13 +45,13 @@ func (cr CastleRights) String() string {
 // to its outcome.  Position is translatable to FEN notation.
 type Position struct {
 	board           *Board
-	turn            Color
 	castleRights    CastleRights
-	enPassantSquare Square
+	validMoves      []*Move
 	halfMoveClock   int
 	moveCount       int
+	turn            Color
+	enPassantSquare Square
 	inCheck         bool
-	validMoves      []*Move
 }
 
 const (

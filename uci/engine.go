@@ -16,12 +16,12 @@ type Engine struct {
 	cmd     *exec.Cmd
 	in      *io.PipeWriter
 	out     *io.PipeReader
-	debug   bool
 	logger  *log.Logger
 	id      map[string]string
 	options map[string]Option
-	results SearchResults
 	mu      *sync.RWMutex
+	results SearchResults
+	debug   bool
 }
 
 // Debug is an option for the New function to add logging for debugging.  This will
@@ -55,7 +55,9 @@ func New(path string, opts ...func(e *Engine)) (*Engine, error) {
 	for _, opt := range opts {
 		opt(e)
 	}
-	go e.cmd.Run()
+	go func() {
+		_ = e.cmd.Run()
+	}()
 	return e, nil
 }
 

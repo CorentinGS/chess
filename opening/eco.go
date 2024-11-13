@@ -8,7 +8,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/notnil/chess"
+	"github.com/corentings/chess/v2"
 )
 
 // BookECO represents the Encyclopedia of Chess Openings https://en.wikipedia.org/wiki/Encyclopaedia_of_Chess_Openings
@@ -44,7 +44,7 @@ func NewBookECO() *BookECO {
 			continue
 		}
 		o := &Opening{code: row[0], title: row[1], pgn: row[3]}
-		b.insert(o)
+		_ = b.insert(o)
 	}
 	return b
 }
@@ -62,7 +62,7 @@ func (b *BookECO) Find(moves []*chess.Move) *Opening {
 // Possible implements the Book interface
 func (b *BookECO) Possible(moves []*chess.Move) []*Opening {
 	n := b.followPath(b.root, moves)
-	openings := []*Opening{}
+	var openings []*Opening
 	for _, n := range b.nodeList(n) {
 		if n.opening != nil {
 			openings = append(openings, n.opening)
@@ -84,7 +84,7 @@ func (b *BookECO) followPath(n *node, moves []*chess.Move) *node {
 
 func (b *BookECO) insert(o *Opening) error {
 	posList := []*chess.Position{b.startingPosition}
-	moves := []*chess.Move{}
+	var moves []*chess.Move
 	for _, s := range parseMoveList(o.pgn) {
 		pos := posList[len(posList)-1]
 		m, err := chess.UCINotation{}.Decode(pos, s)
@@ -188,7 +188,7 @@ func label() string {
 // 1.b2b4 e7e5 2.c1b2 f7f6 3.e2e4 f8b4 4.f1c4 b8c6 5.f2f4 d8e7 6.f4f5 g7g6
 func parseMoveList(pgn string) []string {
 	strs := strings.Split(pgn, " ")
-	cp := []string{}
+	var cp []string
 	for _, s := range strs {
 		i := strings.Index(s, ".")
 		if i == -1 {

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/notnil/chess"
-	"github.com/notnil/chess/uci"
+	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v2/uci"
 )
 
 var StockfishPath string
@@ -125,9 +125,7 @@ func TestLogger(t *testing.T) {
 	}
 }
 
-var (
-	infoRegex = regexp.MustCompile("(?m)[\r\n]+^.*info.*$")
-)
+var infoRegex = regexp.MustCompile("(?m)[\r\n]+^.*info.*$")
 
 const (
 	logOutput = `uci

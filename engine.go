@@ -24,9 +24,7 @@ func (engine) Status(pos *Position) Method {
 	return NoMethod
 }
 
-var (
-	promoPieceTypes = []PieceType{Queen, Rook, Bishop, Knight}
-)
+var promoPieceTypes = []PieceType{Queen, Rook, Bishop, Knight}
 
 func standardMoves(pos *Position, first bool) []*Move {
 	// compute allowed destination bitboard

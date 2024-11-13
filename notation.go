@@ -251,7 +251,7 @@ func formS1(pos *Position, m *Move) string {
 		}
 	}
 
-	var s1 = ""
+	s1 := ""
 
 	if fileReq || !rankReq && req {
 		s1 = m.s1.File().String()

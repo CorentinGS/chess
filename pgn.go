@@ -204,9 +204,7 @@ func encodePGN(g *Game) string {
 	return s
 }
 
-var (
-	tagPairRegex = regexp.MustCompile(`\[(.*)\s\"(.*)\"\]`)
-)
+var tagPairRegex = regexp.MustCompile(`\[(.*)\s\"(.*)\"\]`)
 
 func getTagPairs(pgn string) []*TagPair {
 	tagPairs := []*TagPair{}

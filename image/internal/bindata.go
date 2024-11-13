@@ -50,32 +50,37 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 }
 
 type asset struct {
-	bytes []byte
 	info  os.FileInfo
+	bytes []byte
 }
 
 type bindataFileInfo struct {
+	modTime time.Time
 	name    string
 	size    int64
 	mode    os.FileMode
-	modTime time.Time
 }
 
 func (fi bindataFileInfo) Name() string {
 	return fi.name
 }
+
 func (fi bindataFileInfo) Size() int64 {
 	return fi.size
 }
+
 func (fi bindataFileInfo) Mode() os.FileMode {
 	return fi.mode
 }
+
 func (fi bindataFileInfo) ModTime() time.Time {
 	return fi.modTime
 }
+
 func (fi bindataFileInfo) IsDir() bool {
 	return false
 }
+
 func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
@@ -90,13 +95,13 @@ func piecesDs_storeBytes() ([]byte, error) {
 }
 
 func piecesDs_store() (*asset, error) {
-	bytes, err := piecesDs_storeBytes()
+	storeBytes, err := piecesDs_storeBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/.DS_Store", size: 6148, mode: os.FileMode(420), modTime: time.Unix(1445781173, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: storeBytes, info: info}
 	return a, nil
 }
 
@@ -110,13 +115,13 @@ func piecesBbSvgBytes() ([]byte, error) {
 }
 
 func piecesBbSvg() (*asset, error) {
-	bytes, err := piecesBbSvgBytes()
+	bbSvgBytes, err := piecesBbSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/bB.svg", size: 1132, mode: os.FileMode(420), modTime: time.Unix(1445797333, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: bbSvgBytes, info: info}
 	return a, nil
 }
 
@@ -130,13 +135,13 @@ func piecesBkSvgBytes() ([]byte, error) {
 }
 
 func piecesBkSvg() (*asset, error) {
-	bytes, err := piecesBkSvgBytes()
+	bkSvgBytes, err := piecesBkSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/bK.svg", size: 1415, mode: os.FileMode(420), modTime: time.Unix(1445797339, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: bkSvgBytes, info: info}
 	return a, nil
 }
 
@@ -150,13 +155,13 @@ func piecesBnSvgBytes() ([]byte, error) {
 }
 
 func piecesBnSvg() (*asset, error) {
-	bytes, err := piecesBnSvgBytes()
+	bnSvgBytes, err := piecesBnSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/bN.svg", size: 1415, mode: os.FileMode(420), modTime: time.Unix(1445797343, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: bnSvgBytes, info: info}
 	return a, nil
 }
 
@@ -170,13 +175,13 @@ func piecesBpSvgBytes() ([]byte, error) {
 }
 
 func piecesBpSvg() (*asset, error) {
-	bytes, err := piecesBpSvgBytes()
+	bpSvgBytes, err := piecesBpSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/bP.svg", size: 662, mode: os.FileMode(420), modTime: time.Unix(1445797348, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: bpSvgBytes, info: info}
 	return a, nil
 }
 
@@ -190,13 +195,13 @@ func piecesBqSvgBytes() ([]byte, error) {
 }
 
 func piecesBqSvg() (*asset, error) {
-	bytes, err := piecesBqSvgBytes()
+	bqSvgBytes, err := piecesBqSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/bQ.svg", size: 1630, mode: os.FileMode(420), modTime: time.Unix(1445797352, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: bqSvgBytes, info: info}
 	return a, nil
 }
 
@@ -210,13 +215,13 @@ func piecesBrSvgBytes() ([]byte, error) {
 }
 
 func piecesBrSvg() (*asset, error) {
-	bytes, err := piecesBrSvgBytes()
+	brSvgBytes, err := piecesBrSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/bR.svg", size: 1634, mode: os.FileMode(420), modTime: time.Unix(1445797357, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: brSvgBytes, info: info}
 	return a, nil
 }
 
@@ -230,13 +235,13 @@ func piecesWbSvgBytes() ([]byte, error) {
 }
 
 func piecesWbSvg() (*asset, error) {
-	bytes, err := piecesWbSvgBytes()
+	wbSvgBytes, err := piecesWbSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/wB.svg", size: 1130, mode: os.FileMode(420), modTime: time.Unix(1445797361, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: wbSvgBytes, info: info}
 	return a, nil
 }
 
@@ -250,13 +255,13 @@ func piecesWkSvgBytes() ([]byte, error) {
 }
 
 func piecesWkSvg() (*asset, error) {
-	bytes, err := piecesWkSvgBytes()
+	wkSvgBytes, err := piecesWkSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/wK.svg", size: 1289, mode: os.FileMode(420), modTime: time.Unix(1445797369, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: wkSvgBytes, info: info}
 	return a, nil
 }
 
@@ -270,13 +275,13 @@ func piecesWnSvgBytes() ([]byte, error) {
 }
 
 func piecesWnSvg() (*asset, error) {
-	bytes, err := piecesWnSvgBytes()
+	wnSvgBytes, err := piecesWnSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/wN.svg", size: 1123, mode: os.FileMode(420), modTime: time.Unix(1445797366, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: wnSvgBytes, info: info}
 	return a, nil
 }
 
@@ -290,13 +295,13 @@ func piecesWpSvgBytes() ([]byte, error) {
 }
 
 func piecesWpSvg() (*asset, error) {
-	bytes, err := piecesWpSvgBytes()
+	wpSvgBytes, err := piecesWpSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/wP.svg", size: 662, mode: os.FileMode(420), modTime: time.Unix(1445797373, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: wpSvgBytes, info: info}
 	return a, nil
 }
 
@@ -310,13 +315,13 @@ func piecesWqSvgBytes() ([]byte, error) {
 }
 
 func piecesWqSvg() (*asset, error) {
-	bytes, err := piecesWqSvgBytes()
+	wqSvgBytes, err := piecesWqSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/wQ.svg", size: 1505, mode: os.FileMode(420), modTime: time.Unix(1445797377, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: wqSvgBytes, info: info}
 	return a, nil
 }
 
@@ -330,13 +335,13 @@ func piecesWrSvgBytes() ([]byte, error) {
 }
 
 func piecesWrSvg() (*asset, error) {
-	bytes, err := piecesWrSvgBytes()
+	wrSvgBytes, err := piecesWrSvgBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	info := bindataFileInfo{name: "pieces/wR.svg", size: 990, mode: os.FileMode(420), modTime: time.Unix(1445797380, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: wrSvgBytes, info: info}
 	return a, nil
 }
 
@@ -411,11 +416,13 @@ var _bindata = map[string]func() (*asset, error){
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"}
 // AssetDir("data/img") would return []string{"a.png", "b.png"}
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error
@@ -448,20 +455,20 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"pieces": &bintree{nil, map[string]*bintree{
-		".DS_Store": &bintree{piecesDs_store, map[string]*bintree{}},
-		"bB.svg":    &bintree{piecesBbSvg, map[string]*bintree{}},
-		"bK.svg":    &bintree{piecesBkSvg, map[string]*bintree{}},
-		"bN.svg":    &bintree{piecesBnSvg, map[string]*bintree{}},
-		"bP.svg":    &bintree{piecesBpSvg, map[string]*bintree{}},
-		"bQ.svg":    &bintree{piecesBqSvg, map[string]*bintree{}},
-		"bR.svg":    &bintree{piecesBrSvg, map[string]*bintree{}},
-		"wB.svg":    &bintree{piecesWbSvg, map[string]*bintree{}},
-		"wK.svg":    &bintree{piecesWkSvg, map[string]*bintree{}},
-		"wN.svg":    &bintree{piecesWnSvg, map[string]*bintree{}},
-		"wP.svg":    &bintree{piecesWpSvg, map[string]*bintree{}},
-		"wQ.svg":    &bintree{piecesWqSvg, map[string]*bintree{}},
-		"wR.svg":    &bintree{piecesWrSvg, map[string]*bintree{}},
+	"pieces": {nil, map[string]*bintree{
+		".DS_Store": {piecesDs_store, map[string]*bintree{}},
+		"bB.svg":    {piecesBbSvg, map[string]*bintree{}},
+		"bK.svg":    {piecesBkSvg, map[string]*bintree{}},
+		"bN.svg":    {piecesBnSvg, map[string]*bintree{}},
+		"bP.svg":    {piecesBpSvg, map[string]*bintree{}},
+		"bQ.svg":    {piecesBqSvg, map[string]*bintree{}},
+		"bR.svg":    {piecesBrSvg, map[string]*bintree{}},
+		"wB.svg":    {piecesWbSvg, map[string]*bintree{}},
+		"wK.svg":    {piecesWkSvg, map[string]*bintree{}},
+		"wN.svg":    {piecesWnSvg, map[string]*bintree{}},
+		"wP.svg":    {piecesWpSvg, map[string]*bintree{}},
+		"wQ.svg":    {piecesWqSvg, map[string]*bintree{}},
+		"wR.svg":    {piecesWrSvg, map[string]*bintree{}},
 	}},
 }}
 
@@ -475,7 +482,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(_filePath(dir, filepath.Dir(name)), os.FileMode(0755))
+	err = os.MkdirAll(_filePath(dir, filepath.Dir(name)), os.FileMode(0o755))
 	if err != nil {
 		return err
 	}

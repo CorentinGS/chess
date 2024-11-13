@@ -8,15 +8,15 @@ import (
 	"strings"
 
 	svg "github.com/ajstarks/svgo"
-	"github.com/notnil/chess"
-	"github.com/notnil/chess/image/internal"
+	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v2/image/internal"
 )
 
 // SVG writes the board SVG representation into the writer.
 // An error is returned if there is there is an error writing data.
 // SVG also takes options which can customize the image output.
 func SVG(w io.Writer, b *chess.Board, opts ...func(*encoder)) error {
-	e := new(w, opts)
+	e := newEncoder(w, opts)
 	return e.EncodeSVG(b)
 }
 
@@ -56,14 +56,14 @@ type encoder struct {
 	w           io.Writer
 	light       color.Color
 	dark        color.Color
-	perspective chess.Color
 	marks       map[chess.Square]color.Color
+	perspective chess.Color
 }
 
-// New returns an encoder that writes to the given writer.
-// New also takes options which can customize the image
+// newEncoder returns an encoder that writes to the given writer.
+// newEncoder also takes options which can customize the image
 // output.
-func new(w io.Writer, options []func(*encoder)) *encoder {
+func newEncoder(w io.Writer, options []func(*encoder)) *encoder {
 	e := &encoder{
 		w:           w,
 		light:       color.RGBA{235, 209, 166, 1},
@@ -167,17 +167,15 @@ func pieceXML(x, y int, p chess.Piece) string {
 	fileName := fmt.Sprintf("pieces/%s%s.svg", p.Color().String(), pieceTypeMap[p.Type()])
 	svgStr := string(internal.MustAsset(fileName))
 	old := `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="45" height="45">`
-	new := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="360" height="360" viewBox="%d %d 360 360">`, (-1 * x), (-1 * y))
-	return strings.Replace(svgStr, old, new, 1)
+	sprintf := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="360" height="360" viewBox="%d %d 360 360">`, -1*x, -1*y)
+	return strings.Replace(svgStr, old, sprintf, 1)
 }
 
-var (
-	pieceTypeMap = map[chess.PieceType]string{
-		chess.King:   "K",
-		chess.Queen:  "Q",
-		chess.Rook:   "R",
-		chess.Bishop: "B",
-		chess.Knight: "N",
-		chess.Pawn:   "P",
-	}
-)
+var pieceTypeMap = map[chess.PieceType]string{
+	chess.King:   "K",
+	chess.Queen:  "Q",
+	chess.Rook:   "R",
+	chess.Bishop: "B",
+	chess.Knight: "N",
+	chess.Pawn:   "P",
+}
