@@ -1,4 +1,4 @@
-module github.com/corentings/chess
+module github.com/corentings/chess/v2
 
 go 1.22
 
