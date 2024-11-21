@@ -67,7 +67,7 @@ type Game struct {
 	notation             Notation
 	pos                  *Position
 	outcome              Outcome
-	tagPairs             []*TagPair
+	tagPairs             []TagPair
 	moves                []*Move
 	comments             [][]string
 	positions            []*Position
@@ -115,9 +115,9 @@ func FEN(fen string) (func(*Game), error) {
 // TagPairs returns a function that sets the tag pairs
 // to the given value.  The returned function is designed
 // to be used in the NewGame constructor.
-func TagPairs(tagPairs []*TagPair) func(*Game) {
+func TagPairs(tagPairs []TagPair) func(*Game) {
 	return func(g *Game) {
-		g.tagPairs = append([]*TagPair(nil), tagPairs...)
+		g.tagPairs = append([]TagPair(nil), tagPairs...)
 	}
 }
 
@@ -200,8 +200,8 @@ func (g *Game) Comments() [][]string {
 }
 
 // TagPairs returns the game's tag pairs.
-func (g *Game) TagPairs() []*TagPair {
-	return append([]*TagPair(nil), g.tagPairs...)
+func (g *Game) TagPairs() []TagPair {
+	return append([]TagPair(nil), g.tagPairs...)
 }
 
 // Position returns the game's current position.
@@ -304,7 +304,7 @@ func (g *Game) AddTagPair(k, v string) bool {
 			return true
 		}
 	}
-	g.tagPairs = append(g.tagPairs, &TagPair{Key: k, Value: v})
+	g.tagPairs = append(g.tagPairs, TagPair{Key: k, Value: v})
 	return false
 }
 
@@ -313,7 +313,7 @@ func (g *Game) AddTagPair(k, v string) bool {
 func (g *Game) GetTagPair(k string) *TagPair {
 	for _, tag := range g.tagPairs {
 		if tag.Key == k {
-			return tag
+			return &tag
 		}
 	}
 	return nil
@@ -322,7 +322,7 @@ func (g *Game) GetTagPair(k string) *TagPair {
 // RemoveTagPair removes the tag pair for the given key and
 // returns true if a tag pair was removed.
 func (g *Game) RemoveTagPair(k string) bool {
-	var cp []*TagPair
+	var cp []TagPair
 	found := false
 	for _, tag := range g.tagPairs {
 		if tag.Key == k {

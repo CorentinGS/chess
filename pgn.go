@@ -52,6 +52,7 @@ func (s *Scanner) Scan() bool {
 		s.game = game
 		return true
 	}
+	// Scan the PGN file
 	for {
 		scan := s.scanr.Scan()
 		if !scan {
@@ -62,7 +63,9 @@ func (s *Scanner) Scan() bool {
 			}
 			return setGame()
 		}
+		// Trim whitespace
 		line := strings.TrimSpace(s.scanr.Text())
+		// Determine if we are in a tag pair, move sequence, or not in PGN
 		isTagPair := strings.HasPrefix(line, "[")
 		isMoveSeq := strings.HasPrefix(line, "1. ")
 		switch state {
@@ -92,7 +95,7 @@ func (s *Scanner) Next() *Game {
 }
 
 // Err returns an error encountered during scanning.
-// Typically this will be a PGN parsing error or an
+// Typically, this will be a PGN parsing error or an
 // io.EOF.
 func (s *Scanner) Err() error {
 	return s.err
@@ -104,7 +107,7 @@ func (s *Scanner) Err() error {
 // issue parsing the PGNs.
 // Deprecated: Use Scanner instead.
 func GamesFromPGN(r io.Reader) ([]*Game, error) {
-	games := []*Game{}
+	var games []*Game
 	current := ""
 	count := 0
 	totalCount := 0
@@ -148,11 +151,13 @@ func (a multiDecoder) Decode(pos *Position, s string) (*Move, error) {
 	return nil, fmt.Errorf(`chess: failed to decode notation text "%s" for position %s`, s, pos)
 }
 
+// decodePGN decodes a PGN string into a Game.
 func decodePGN(pgn string) (*Game, error) {
-	tagPairs := getTagPairs(pgn)
-	moveComments, outcome := moveListWithComments(pgn)
-	gameFuncs := []func(*Game){}
+	tagPairs := getTagPairs(pgn)                       // get tag pairs
+	moveComments, outcome := moveListWithComments(pgn) // get moves and comments
+	var gameFuncs []func(*Game)                        // functions to apply to the game
 	for _, tp := range tagPairs {
+		// Decode detected FEN tag as starting position
 		if strings.ToLower(tp.Key) == "fen" {
 			fenFunc, err := FEN(tp.Value)
 			if err != nil {
@@ -162,10 +167,12 @@ func decodePGN(pgn string) (*Game, error) {
 			break
 		}
 	}
+	// Add tag pairs to game
 	gameFuncs = append(gameFuncs, TagPairs(tagPairs))
 	g := NewGame(gameFuncs...)
 	g.ignoreAutomaticDraws = true
 	decoder := multiDecoder([]Decoder{AlgebraicNotation{}, LongAlgebraicNotation{}, UCINotation{}})
+	// Apply moves to game
 	for _, move := range moveComments {
 		m, err := decoder.Decode(g.Position(), move.MoveStr)
 		if err != nil {
@@ -204,15 +211,16 @@ func encodePGN(g *Game) string {
 	return s
 }
 
-var tagPairRegex = regexp.MustCompile(`\[(.*)\s\"(.*)\"\]`)
+var tagPairRegex = regexp.MustCompile(`\[(.*)\s"(.*)"]`)
 
-func getTagPairs(pgn string) []*TagPair {
-	tagPairs := []*TagPair{}
+// getTagPairs returns the tag pairs from a PGN string.
+func getTagPairs(pgn string) []TagPair {
+	var tagPairs []TagPair
 	matches := tagPairRegex.FindAllString(pgn, -1)
 	for _, m := range matches {
 		results := tagPairRegex.FindStringSubmatch(m)
 		if len(results) == 3 {
-			pair := &TagPair{
+			pair := TagPair{
 				Key:   results[1],
 				Value: results[2],
 			}
@@ -227,28 +235,33 @@ type moveWithComment struct {
 	Comments []string
 }
 
-var moveListTokenRe = regexp.MustCompile(`(?:\d+\.)|(O-O(?:-O)?|\w*[abcdefgh][12345678]\w*(?:=[QRBN])?(?:\+|#)?)|(?:\{([^}]*)\})|(?:\([^)]*\))|(\*|0-1|1-0|1\/2-1\/2)`)
+var moveListTokenRe = regexp.MustCompile(`\d+\.|(O-O(?:-O)?|\w*[abcdefgh][12345678]\w*(?:=[QRBN])?[+#]?)|\{([^}]*)}|\([^)]*\)|(\*|0-1|1-0|1/2-1/2)`)
 
+// moveListWithComments returns a list of moves with comments and the outcome.
 func moveListWithComments(pgn string) ([]moveWithComment, Outcome) {
-	pgn = stripTagPairs(pgn)
+	pgn = stripTagPairs(pgn) // remove tag pairs
 	var outcome Outcome
-	moves := []moveWithComment{}
+	var moves []moveWithComment
 
+	// Find all move tokens
 	for _, match := range moveListTokenRe.FindAllStringSubmatch(pgn, -1) {
-		move, commentText, outcomeText := match[1], match[2], match[3]
+		move, commentText, outcomeText := match[1], match[2], match[3] // move, comment, outcome
 		if len(move+commentText+outcomeText) == 0 {
 			continue
 		}
 
+		// If we have an outcome, we're done
 		if outcomeText != "" {
 			outcome = Outcome(outcomeText)
 			break
 		}
 
+		// If we have a comment, add it to the last move
 		if commentText != "" {
 			moves[len(moves)-1].Comments = append(moves[len(moves)-1].Comments, strings.TrimSpace(commentText))
 		}
 
+		// If we have a move, add it to the list
 		if move != "" {
 			moves = append(moves, moveWithComment{MoveStr: move})
 		}
@@ -258,7 +271,7 @@ func moveListWithComments(pgn string) ([]moveWithComment, Outcome) {
 
 func stripTagPairs(pgn string) string {
 	lines := strings.Split(pgn, "\n")
-	cp := []string{}
+	var cp []string
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line != "" && !strings.HasPrefix(line, "[") {

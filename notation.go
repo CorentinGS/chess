@@ -19,9 +19,7 @@ type moveComponents struct {
 	castles    string
 }
 
-var (
-	emptyComponents = moveComponents{}
-)
+var emptyComponents = moveComponents{}
 
 var pgnRegex = regexp.MustCompile(`^(?:([RNBQKP]?)([abcdefgh]?)(\d?)(x?)([abcdefgh])(\d)(=[QRBN])?|(O-O(?:-O)?))([+#!?]|e\.p\.)*$`)
 
@@ -224,7 +222,6 @@ func (AlgebraicNotation) Encode(pos *Position, m *Move) string {
 
 	sb.WriteString(getCheckChar(pos, m))
 	return sb.String()
-
 }
 
 // algebraicNotationParts parses a move string into its components
@@ -351,19 +348,19 @@ func (AlgebraicNotation) Decode(pos *Position, s string) (*Move, error) {
 		moveStr := AlgebraicNotation{}.Encode(pos, &m)
 
 		// Parse and clean encoded move
-		moveComponents, err := algebraicNotationParts(moveStr)
+		notationParts, err := algebraicNotationParts(moveStr)
 		if err != nil {
 			continue // Skip invalid moves
 		}
 
 		// Compare cleaned versions
-		if cleanedInput == moveComponents.clean() {
+		if cleanedInput == notationParts.clean() {
 			return &m, nil
 		}
 
 		// Try alternative notations
 		for _, opt := range components.generateOptions() {
-			if opt == moveComponents.clean() {
+			if opt == notationParts.clean() {
 				return &m, nil
 			}
 		}
