@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"log"
 	"sync"
 )
 
@@ -461,6 +462,6 @@ func (b *Board) setBBForPiece(p Piece, bb bitboard) {
 	case BlackPawn:
 		b.bbBlackPawn = bb
 	default:
-		panic("invalid piece")
+		log.Panicf("invalid piece %s", p)
 	}
 }
