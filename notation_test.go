@@ -114,3 +114,191 @@ func TestInvalidDecoding(t *testing.T) {
 		}
 	}
 }
+
+// Common test positions for consistent benchmarking
+var (
+	// Initial position
+	startPos = unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+	// Middle game position
+	midPos = unsafeFEN("r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQK2R w KQkq - 0 6")
+	// Complex position with multiple piece interactions
+	complexPos = unsafeFEN("r1n1k2r/pP1pqpb1/b3pnp1/2pPN3/1p2P3/2N2Q1p/PP1BBPPP/R3K2R w KQkq c6 0 2")
+)
+
+// Test moves for each position
+var (
+	startMoves = []*Move{
+		{s1: E2, s2: E4}, // e4
+		{s1: G1, s2: F3}, // Nf3
+		{s1: B1, s2: C3}, // Nc3
+	}
+	midMoves = []*Move{
+		{s1: E1, s2: G1, tags: KingSideCastle},  // O-O
+		{s1: F3, s2: E5, tags: Capture},         // Nxe5
+		{s1: C4, s2: F7, tags: Check | Capture}, // d4+
+	}
+	complexMoves = []*Move{
+		{s1: B7, s2: B8, promo: Knight},                // b8=N
+		{s1: B7, s2: A8, promo: Bishop, tags: Capture}, // bxa8=B
+		{s1: B7, s2: C8, promo: Rook, tags: Check},     // bxc8=R+
+		{s1: D5, s2: C6, tags: EnPassant},              // dxc6
+
+	}
+)
+
+// Benchmarks for UCI Notation
+func BenchmarkUCIEncode(b *testing.B) {
+	notation := UCINotation{}
+	positions := []*Position{startPos, midPos, complexPos}
+	moves := [][]*Move{startMoves, midMoves, complexMoves}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		pos := positions[i%len(positions)]
+		move := moves[i%len(moves)][i%len(moves[i%len(moves)])]
+		notation.Encode(pos, move)
+	}
+}
+
+func BenchmarkUCIDecode(b *testing.B) {
+	notation := UCINotation{}
+	samples := []struct {
+		pos  *Position
+		text string
+	}{
+		{startPos, "e2e4"},
+		{midPos, "e1g1"},
+		{complexPos, "e5f7"},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		sample := samples[i%len(samples)]
+		_, err := notation.Decode(sample.pos, sample.text)
+		if err != nil {
+			b.Fatalf("error decoding %s: %s", sample.text, err)
+		}
+	}
+}
+
+// Benchmarks for Algebraic Notation
+func BenchmarkAlgebraicEncode(b *testing.B) {
+	notation := AlgebraicNotation{}
+	positions := []*Position{startPos, midPos, complexPos}
+	moves := [][]*Move{startMoves, midMoves, complexMoves}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		pos := positions[i%len(positions)]
+		move := moves[i%len(moves)][i%len(moves[i%len(moves)])]
+		notation.Encode(pos, move)
+	}
+}
+
+func BenchmarkAlgebraicDecode(b *testing.B) {
+	notation := AlgebraicNotation{}
+	samples := []struct {
+		pos  *Position
+		text string
+	}{
+		{startPos, "e4"},
+		{midPos, "O-O"},
+		{complexPos, "Nxf7+"},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		sample := samples[i%len(samples)]
+		_, err := notation.Decode(sample.pos, sample.text)
+		if err != nil {
+			b.Fatalf("error decoding %s: %s", sample.text, err)
+		}
+	}
+}
+
+// Benchmarks for Long Algebraic Notation
+func BenchmarkLongAlgebraicEncode(b *testing.B) {
+	notation := LongAlgebraicNotation{}
+	positions := []*Position{startPos, midPos, complexPos}
+	moves := [][]*Move{startMoves, midMoves, complexMoves}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		pos := positions[i%len(positions)]
+		move := moves[i%len(moves)][i%len(moves[i%len(moves)])]
+		notation.Encode(pos, move)
+	}
+}
+
+func BenchmarkLongAlgebraicDecode(b *testing.B) {
+	notation := LongAlgebraicNotation{}
+	samples := []struct {
+		pos  *Position
+		text string
+	}{
+		{startPos, "e2e4"},
+		{midPos, "O-O"},
+		{complexPos, "Ne5xf7"},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		sample := samples[i%len(samples)]
+		_, err := notation.Decode(sample.pos, sample.text)
+		if err != nil {
+			b.Fatalf("error decoding %s: %s", sample.text, err)
+		}
+	}
+}
+
+// Benchmark specific scenarios
+func BenchmarkAlgebraicDecodeComplex(b *testing.B) {
+	notation := AlgebraicNotation{}
+	pos := complexPos
+	moves := []string{
+		"Nxf7",    // Capture with check
+		"O-O-O",   // Castling
+		"bxc8=Q+", // Promotion with check
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := notation.Decode(pos, moves[i%len(moves)])
+		if err != nil {
+			b.Fatalf("error decoding %s: %s", moves[i%len(moves)], err)
+		}
+	}
+}
+
+// Benchmark promotion scenarios
+func BenchmarkPromotionEncoding(b *testing.B) {
+	promoPos := unsafeFEN("rnbqkbnr/pPpppppp/8/8/8/8/P1PPPPPP/RNBQKBNR w KQkq - 0 1")
+	promoMove := &Move{s1: B7, s2: B8, promo: Queen, tags: Check}
+	notations := []Notation{
+		UCINotation{},
+		AlgebraicNotation{},
+		LongAlgebraicNotation{},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		notation := notations[i%len(notations)]
+		notation.Encode(promoPos, promoMove)
+	}
+}
