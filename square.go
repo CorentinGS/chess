@@ -22,6 +22,10 @@ func (sq Square) String() string {
 	return sq.File().String() + sq.Rank().String()
 }
 
+func (sq Square) Bytes() []byte {
+	return []byte{sq.File().Byte(), sq.Rank().Byte()}
+}
+
 // NewSquare creates a new Square from a File and a Rank
 func NewSquare(f File, r Rank) Square {
 	return Square(int8(r)*numOfSquaresInRow + int8(f))
@@ -122,7 +126,11 @@ const (
 )
 
 func (r Rank) String() string {
-	return rankChars[r : r+1]
+	return rankChars[r : r+1] // r+1 is exclusive
+}
+
+func (r Rank) Byte() byte {
+	return rankChars[r]
 }
 
 // A File is the file of a square.
@@ -141,6 +149,10 @@ const (
 
 func (f File) String() string {
 	return fileChars[f : f+1]
+}
+
+func (f File) Byte() byte {
+	return fileChars[f]
 }
 
 var strToSquareMap = map[string]Square{

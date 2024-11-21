@@ -89,6 +89,26 @@ func (p PieceType) String() string {
 	return ""
 }
 
+func (p PieceType) Bytes() []byte {
+	switch p {
+	case King:
+		return []byte{'k'}
+	case Queen:
+		return []byte{'q'}
+	case Rook:
+		return []byte{'r'}
+	case Bishop:
+		return []byte{'b'}
+	case Knight:
+		return []byte{'n'}
+	case Pawn:
+		return []byte{'p'}
+	case NoPieceType:
+		return []byte{}
+	}
+	return []byte{}
+}
+
 // Piece is a piece type with a color.
 type Piece int8
 

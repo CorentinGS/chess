@@ -109,6 +109,7 @@ func (pos *Position) Update(m *Move) *Position {
 }
 
 // ValidMoves returns a list of valid moves for the position.
+// TODO: Can we make this more efficient? Maybe using an iterator?
 func (pos *Position) ValidMoves() []Move {
 	if pos.validMoves != nil {
 		return append([]Move(nil), pos.validMoves...)

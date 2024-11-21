@@ -115,6 +115,39 @@ func TestInvalidDecoding(t *testing.T) {
 	}
 }
 
+func TestEncodeUCINotation(t *testing.T) {
+	notation := UCINotation{}
+	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+	move := &Move{s1: E2, s2: E4}
+	expected := "e2e4"
+	result := notation.Encode(pos, move)
+	if result != expected {
+		t.Fatalf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestEncodeUCINotationWithPromotion(t *testing.T) {
+	notation := UCINotation{}
+	pos := unsafeFEN("8/P7/8/8/8/8/8/8 w - - 0 1")
+	move := &Move{s1: A7, s2: A8, promo: Queen}
+	expected := "a7a8q"
+	result := notation.Encode(pos, move)
+	if result != expected {
+		t.Fatalf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestEncodeUCINotationWithInvalidMove(t *testing.T) {
+	notation := UCINotation{}
+	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+	move := &Move{s1: E2, s2: E5}
+	expected := "e2e5"
+	result := notation.Encode(pos, move)
+	if result != expected {
+		t.Fatalf("expected %s, got %s", expected, result)
+	}
+}
+
 // Common test positions for consistent benchmarking
 var (
 	// Initial position
