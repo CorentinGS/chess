@@ -1,7 +1,5 @@
 # chess
-[![Build and Test](https://github.com/corentings/chess/actions/workflows/build-and-test.yaml/badge.svg)](https://github.com/corentings/chess/actions/workflows/build-and-test.yaml)
 [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/corentings/chess)
-[![Coverage Status](https://coveralls.io/repos/corentings/chess/badge.svg?branch=master&service=github)](https://coveralls.io/github/corentings/chess?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/corentings/chess)](https://goreportcard.com/report/corentings/chess)
 [![License](http://img.shields.io/badge/license-mit-blue.svg?style=flat-square)](https://raw.githubusercontent.com/corentings/chess/master/LICENSE)
 
