@@ -11,6 +11,41 @@
 
 ![rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1](example.png)    
 
+## Why I Forked
+I forked the original notnil/chess package for several reasons:
+
+- Update Rate: The original package was not being updated at the pace I needed for my projects. 
+- Pending PRs: There were numerous pull requests that needed to be merged to make the package production-ready for my work.
+-  Performance and Allocations: I wanted to improve overall performance and reduce memory allocations.
+- Customization: I had specific changes in mind that would not be easily integrated into the original package.
+
+## Credits
+I want to extend my gratitude to the original author of notnil/chess for their amazing work.
+This fork is not intended to steal or replace their work but to build upon it, providing an alternative for the open-source community and allowing for faster development.
+
+
+## Disclaimer
+**Breaking Changes**: This package is under the `/v2` namespace to signify that it might not be backward compatible with the original package. 
+While some parts might work as plug-and-play, others might require changes. 
+Unfortunately, I do not plan to maintain a breaking change list at this time, but I expect in-code comments and the compiler/linter to assist with migration.
+
+**Maintenance**: This package is primarily maintained for my current work and projects.
+It is shared as a respect for the original work and to contribute to the community. My main focus is:
+- Rewriting code to reduce allocations
+- Replacing strings with more efficient data structures where possible
+- Improving performance
+- Expanding test coverage and benchmarks
+- Rewriting the parser for better performance and more features
+    - Potential major changes to the game representation to support variations
+
+## Contributions
+I am open to suggestions, pull requests, and contributions from anyone interested in improving this library. 
+If you have ideas or want to help make this package more robust and widely usable, please feel free to:
+- Open issues for bugs or feature requests
+- Submit pull requests with improvements or fixes
+- Contact me directly for discussions or ideas
+
+
 
 ## Repo Structure
 
@@ -26,7 +61,7 @@
 **chess** can be installed using "go get".
 
 ```bash
-go get -u github.com/corentings/chess
+go get -u github.com/corentings/chess/v2
 ``` 
 
 ## Usage
@@ -40,7 +75,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/corentings/chess"
+	"github.com/corentings/chess/v2"
 )
 
 func main() {
@@ -84,8 +119,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/corentings/chess"
-	"github.com/corentings/chess/uci"
+	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v2/uci"
 )
 
 func main() {
@@ -457,7 +492,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/corentings/chess"
+	"github.com/corentings/chess/v2"
 )
 
 func main() {
