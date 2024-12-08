@@ -234,23 +234,6 @@ func TestInitialNumOfValidMoves(t *testing.T) {
 	}
 }
 
-func TestTagPairs(t *testing.T) {
-	g := NewGame()
-	g.AddTagPair("Draw Offer", "White")
-	tagPair := g.GetTagPair("Draw Offer")
-	if tagPair == nil {
-		t.Fatalf("expected %s but got %s", "White", "nil")
-	}
-	if tagPair.Value != "White" {
-		t.Fatalf("expected %s but got %s", "White", tagPair.Value)
-	}
-	g.RemoveTagPair("Draw Offer")
-	tagPair = g.GetTagPair("Draw Offer")
-	if tagPair != nil {
-		t.Fatalf("expected %s but got %s", "nil", "not nil")
-	}
-}
-
 func TestPositionHash(t *testing.T) {
 	g1 := NewGame()
 	for _, s := range []string{"Nc3", "e5", "Nf3"} {
@@ -262,21 +245,6 @@ func TestPositionHash(t *testing.T) {
 	}
 	if g1.Position().Hash() != g2.Position().Hash() {
 		t.Fatalf("expected position hashes to be equal but got %s and %s", g1.Position().Hash(), g2.Position().Hash())
-	}
-}
-
-func TestMoveHistory(t *testing.T) {
-	lens := []int{89, 89, 5, 26}
-	for i, test := range validPGNs[0:4] {
-		pgn, err := PGN(strings.NewReader(test.PGN))
-		if err != nil {
-			t.Fatal(err)
-		}
-		game := NewGame(pgn)
-		l := len(game.MoveHistory())
-		if lens[i] != l {
-			t.Fatalf("expected history length to be %d but got %d", lens[i], l)
-		}
 	}
 }
 

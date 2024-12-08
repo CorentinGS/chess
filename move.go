@@ -21,10 +21,17 @@ const (
 
 // A Move is the movement of a piece from one square to another.
 type Move struct {
-	s1    Square
-	s2    Square
-	promo PieceType
-	tags  MoveTag
+	s1       Square
+	s2       Square
+	promo    PieceType
+	tags     MoveTag
+	parent   *Move
+	children []*Move // Main line and variations
+	nag      string
+	comments string
+	command  string
+	number   uint
+	position *Position
 }
 
 // String returns a string useful for debugging.  String doesn't return
