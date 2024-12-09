@@ -1,5 +1,7 @@
 package chess
 
+import "strings"
+
 // Color represents the color of a chess piece.
 type Color int8
 
@@ -69,6 +71,31 @@ const (
 // PieceTypes returns a slice of all piece types.
 func PieceTypes() [6]PieceType {
 	return [6]PieceType{King, Queen, Rook, Bishop, Knight, Pawn}
+}
+
+func PieceTypeFromByte(b byte) PieceType {
+	switch b {
+	case 'k':
+		return King
+	case 'q':
+		return Queen
+	case 'r':
+		return Rook
+	case 'b':
+		return Bishop
+	case 'n':
+		return Knight
+	case 'p':
+		return Pawn
+	}
+	return NoPieceType
+}
+
+func PieceTypeFromString(s string) PieceType {
+	if len(s) != 1 {
+		return NoPieceType
+	}
+	return PieceTypeFromByte(strings.ToLower(s)[0])
 }
 
 func (p PieceType) String() string {
