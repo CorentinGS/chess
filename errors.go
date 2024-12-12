@@ -1,5 +1,7 @@
 package chess
 
+import "errors"
+
 // PGNError custom error types for different PGN errors.
 type PGNError struct {
 	msg string
@@ -11,7 +13,8 @@ func (e *PGNError) Error() string {
 }
 
 func (e *PGNError) Is(target error) bool {
-	t, ok := target.(*PGNError)
+	var t *PGNError
+	ok := errors.As(target, &t)
 	if !ok {
 		return false
 	}
