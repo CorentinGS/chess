@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
-	"io"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/corentings/chess/v2"
@@ -49,7 +49,7 @@ func NewBookECO() *BookECO {
 	return b
 }
 
-// Find implements the Book interface
+// Find implements the Book interface.
 func (b *BookECO) Find(moves []*chess.Move) *Opening {
 	for n := b.followPath(b.root, moves); n != nil; n = n.parent {
 		if n.opening != nil {
@@ -59,7 +59,7 @@ func (b *BookECO) Find(moves []*chess.Move) *Opening {
 	return nil
 }
 
-// Possible implements the Book interface
+// Possible implements the Book interface.
 func (b *BookECO) Possible(moves []*chess.Move) []*Opening {
 	n := b.followPath(b.root, moves)
 	var openings []*Opening
@@ -89,7 +89,7 @@ func (b *BookECO) insert(o *Opening) error {
 		pos := posList[len(posList)-1]
 		m, err := chess.UCINotation{}.Decode(pos, s)
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("error decoding move %s: %w", s, err)
 		}
 		moves = append(moves, m)
 		posList = append(posList, pos.Update(m))
@@ -134,26 +134,6 @@ type node struct {
 	label    string
 }
 
-func (b *BookECO) draw(w io.Writer) error {
-	s := "digraph g {\n"
-	for _, n := range b.nodeList(b.root) {
-		title := ""
-		if n.opening != nil {
-			title = n.opening.title
-		}
-		if !strings.Contains(title, "French Defense") {
-			continue
-		}
-		s += fmt.Sprintf(`%s [label="%s"];`+"\n", n.label, title)
-		for m, c := range n.children {
-			s += fmt.Sprintf(`%s -> %s [label="%s"];`+"\n", n.label, c.label, m)
-		}
-	}
-	s += "}"
-	_, err := w.Write([]byte(s))
-	return err
-}
-
 func (b *BookECO) nodes(root *node, ch chan *node) {
 	ch <- root
 	for _, c := range root.children {
@@ -175,17 +155,17 @@ func (b *BookECO) nodeList(root *node) []*node {
 }
 
 var (
-	labelCount = 0
-	alphabet   = "abcdefghijklmnopqrstuvwxyz"
+	//TODO: This is a legacy counter for generating unique labels. (will be removed in the future)
+	labelCount = 0 //nolint:gochecknoglobals // this is a counter for generating unique labels. (will be removed in the future)
 )
 
 func label() string {
-	s := "a" + fmt.Sprint(labelCount)
+	s := "a" + strconv.Itoa(labelCount)
 	labelCount++
 	return s
 }
 
-// 1.b2b4 e7e5 2.c1b2 f7f6 3.e2e4 f8b4 4.f1c4 b8c6 5.f2f4 d8e7 6.f4f5 g7g6
+// 1.b2b4 e7e5 2.c1b2 f7f6 3.e2e4 f8b4 4.f1c4 b8c6 5.f2f4 d8e7 6.f4f5 g7g6.
 func parseMoveList(pgn string) []string {
 	strs := strings.Split(pgn, " ")
 	var cp []string

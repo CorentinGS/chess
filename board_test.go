@@ -46,7 +46,7 @@ func TestBoardRotation(t *testing.T) {
 	}
 	g := NewGame()
 	board := g.Position().Board()
-	for i := 0; i < 4; i++ {
+	for i := range fens {
 		board = board.Rotate()
 		if fens[i] != board.String() {
 			t.Fatalf("expected board string %s but got %s", fens[i], board.String())

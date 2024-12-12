@@ -61,7 +61,7 @@ func (m *Move) HasTag(tag MoveTag) bool {
 }
 
 func (m *Move) addTag(tag MoveTag) {
-	m.tags = m.tags | tag
+	m.tags |= tag
 }
 
 type moveSlice []Move

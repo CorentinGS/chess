@@ -2,7 +2,6 @@ package uci_test
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,36 +16,10 @@ import (
 
 var StockfishPath string
 
+//nolint:gochecknoinits // This is a test file
 func init() {
 	dir, _ := os.Getwd()
 	StockfishPath = filepath.Join(dir, "..", "stockfish")
-}
-
-func Example() {
-	// set up engine to use stockfish exe
-	eng, err := uci.New(StockfishPath)
-	if err != nil {
-		panic(err)
-	}
-	defer eng.Close()
-	// initialize uci with new game
-	if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame); err != nil {
-		panic(err)
-	}
-	// have stockfish play speed chess against itself (10 msec per move)
-	game := chess.NewGame()
-	for game.Outcome() == chess.NoOutcome {
-		cmdPos := uci.CmdPosition{Position: game.Position()}
-		cmdGo := uci.CmdGo{MoveTime: time.Second / 100}
-		if err := eng.Run(cmdPos, cmdGo); err != nil {
-			panic(err)
-		}
-		move := eng.SearchResults().BestMove
-		if err := game.Move(move); err != nil {
-			panic(err)
-		}
-	}
-	fmt.Println(game.String())
 }
 
 func TestLogger(t *testing.T) {
@@ -70,11 +43,12 @@ func TestLogger(t *testing.T) {
 	actual := b.String()
 	actual = infoRegex.ReplaceAllString(actual, "")
 	actualSplit := strings.Split(actual, "\n")
-	for i := 0; i < len(expectedSplit); i++ {
-		expected = strings.TrimSpace(expectedSplit[i])
-		actual = strings.TrimSpace(actualSplit[i])
-		if expected != actual {
-			t.Fatalf("expected %s but got %s", expected, actual)
+
+	for i, expectedSplitted := range expectedSplit {
+		expectedSplitted = strings.TrimSpace(expectedSplitted)
+		actual := strings.TrimSpace(actualSplit[i])
+		if expectedSplitted != actual {
+			t.Fatalf("expected %s but got %s", expectedSplitted, actual)
 		}
 	}
 }

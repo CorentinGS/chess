@@ -45,7 +45,7 @@ type commentTest struct {
 	CommentText string
 }
 
-var commentTests = []commentTest{
+var _ = []commentTest{
 	{
 		PGN:         mustParsePGN("fixtures/pgns/0005.pgn"),
 		MoveNumber:  7,
@@ -180,5 +180,4 @@ func TestSingleGameFromPGN(t *testing.T) {
 	if moves[4].comments == "" {
 		t.Fatalf("game move 6 is not correct, expected comment, got %s", moves[5].comments)
 	}
-
 }

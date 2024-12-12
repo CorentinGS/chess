@@ -20,7 +20,7 @@ const (
 	Draw Outcome = "1/2-1/2"
 )
 
-// String implements the fmt.Stringer interface
+// String implements the fmt.Stringer interface.
 func (o Outcome) String() string {
 	return string(o)
 }
@@ -101,9 +101,7 @@ func PGN(r io.Reader) (func(*Game), error) {
 		return func(g *Game) {
 			g.copy(game)
 		}, nil
-
 	}
-
 	return nil, nil
 }
 
@@ -231,7 +229,7 @@ func (g *Game) ValidMoves() []Move {
 	return g.pos.ValidMoves()
 }
 
-// Moves returns the move history of the game following the main line
+// Moves returns the move history of the game following the main line.
 func (g *Game) Moves() []*Move {
 	if g.rootMove == nil {
 		return nil
@@ -253,7 +251,7 @@ func (g *Game) Moves() []*Move {
 	return moves[1:] // Skip the root move
 }
 
-// Variations returns all alternative moves at the given position
+// Variations returns all alternative moves at the given position.
 func (g *Game) Variations(move *Move) []*Move {
 	if move == nil || len(move.children) <= 1 {
 		return nil
@@ -295,32 +293,35 @@ func (g *Game) String() string {
 
 // MarshalText implements the encoding.TextMarshaler interface and
 // encodes the game's PGN.
-func (g *Game) MarshalText() (text []byte, err error) {
+func (g *Game) MarshalText() ([]byte, error) {
 	return []byte(g.String()), nil
 }
 
 // UnmarshalText implements the encoding.TextUnarshaler interface and
 // assumes the data is in the PGN format.
-func (g *Game) UnmarshalText(text []byte) error {
-	return fmt.Errorf("chess: unmarshal text not implemented")
+func (g *Game) UnmarshalText(_ []byte) error {
+	return errors.New("chess: unmarshal text not implemented")
 }
 
 // Draw attempts to draw the game by the given method.  If the
 // method is valid, then the game is updated to a draw by that
 // method.  If the method isn't valid then an error is returned.
 func (g *Game) Draw(method Method) error {
+	const halfMoveClockForFiftyMoveRule = 100
+	const numOfRepetitionsForThreefoldRepetition = 3
+
 	switch method {
 	case ThreefoldRepetition:
-		if g.numOfRepetitions() < 3 {
+		if g.numOfRepetitions() < numOfRepetitionsForThreefoldRepetition {
 			return errors.New("chess: draw by ThreefoldRepetition requires at least three repetitions of the current board state")
 		}
 	case FiftyMoveRule:
-		if g.pos.halfMoveClock < 100 {
-			return fmt.Errorf("chess: draw by FiftyMoveRule requires the half move clock to be at 100 or greater but is %d", g.pos.halfMoveClock)
+		if g.pos.halfMoveClock < halfMoveClockForFiftyMoveRule {
+			return errors.New("chess: draw by FiftyMoveRule requires a half move clock of 100 or greater")
 		}
 	case DrawOffer:
 	default:
-		return fmt.Errorf("chess: unsupported draw method %s", method.String())
+		return errors.New("chess: invalid draw method")
 	}
 	g.outcome = Draw
 	g.method = method
@@ -343,11 +344,14 @@ func (g *Game) Resign(color Color) {
 
 // EligibleDraws returns valid inputs for the Draw() method.
 func (g *Game) EligibleDraws() []Method {
+	const halfMoveClockForFiftyMoveRule = 100
+	const numOfRepetitionsForThreefoldRepetition = 3
+
 	draws := []Method{DrawOffer}
-	if g.numOfRepetitions() >= 3 {
+	if g.numOfRepetitions() >= numOfRepetitionsForThreefoldRepetition {
 		draws = append(draws, ThreefoldRepetition)
 	}
-	if g.pos.halfMoveClock >= 100 {
+	if g.pos.halfMoveClock >= halfMoveClockForFiftyMoveRule {
 		draws = append(draws, FiftyMoveRule)
 	}
 	return draws

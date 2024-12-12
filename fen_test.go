@@ -5,6 +5,8 @@ import (
 )
 
 var (
+	//noline:gochecknoglobals // This is a test file
+	// TODO: This is a legacy counter for generating unique labels. (will be removed in the future)
 	validFENs = []string{
 		"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
 		"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
@@ -21,6 +23,8 @@ var (
 		"5k2/ppp5/4P3/3R3p/6P1/1K2Nr2/PP3P2/8 b - - 1 32",
 	}
 
+	//nolint:gochecknoglobals // test data
+	// TODO: This is a legacy counter for generating unique labels. (will be removed in the future)
 	invalidFENs = []string{
 		"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPP/RNBQKBNR w KQkq - 0 1",
 		"rnbqkbnr/pppppppp/8/8/4P2/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",

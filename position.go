@@ -36,7 +36,7 @@ func (cr CastleRights) CanCastle(c Color, side Side) bool {
 }
 
 // String implements the fmt.Stringer interface and returns
-// a FEN compatible string.  Ex. KQq
+// a FEN compatible string.  Ex. KQq.
 func (cr CastleRights) String() string {
 	return string(cr)
 }
@@ -59,7 +59,7 @@ const (
 )
 
 // StartingPosition returns the starting position
-// rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+// rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1.
 func StartingPosition() *Position {
 	pos, _ := decodeFEN(startFEN)
 	return pos
@@ -156,7 +156,7 @@ func (pos *Position) CastleRights() CastleRights {
 }
 
 // String implements the fmt.Stringer interface and returns a
-// string with the FEN format: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+// string with the FEN format: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1.
 func (pos *Position) String() string {
 	b := pos.board.String()
 	t := pos.turn.String()
@@ -168,7 +168,7 @@ func (pos *Position) String() string {
 	return fmt.Sprintf("%s %s %s %s %d %d", b, t, c, sq, pos.halfMoveClock, pos.moveCount)
 }
 
-// Hash returns a unique hash of the position
+// Hash returns a unique hash of the position.
 func (pos *Position) Hash() [16]byte {
 	b, _ := pos.MarshalBinary()
 	return md5.Sum(b)
@@ -176,7 +176,7 @@ func (pos *Position) Hash() [16]byte {
 
 // MarshalText implements the encoding.TextMarshaler interface and
 // encodes the position's FEN.
-func (pos *Position) MarshalText() (text []byte, err error) {
+func (pos *Position) MarshalText() ([]byte, error) {
 	return []byte(pos.String()), nil
 }
 
@@ -206,50 +206,51 @@ const (
 	bitsHasEnPassant
 )
 
-// MarshalBinary implements the encoding.BinaryMarshaler interface
-func (pos *Position) MarshalBinary() (data []byte, err error) {
+// MarshalBinary implements the encoding.BinaryMarshaler interface.
+func (pos *Position) MarshalBinary() ([]byte, error) {
 	boardBytes, err := pos.board.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
 	buf := bytes.NewBuffer(boardBytes)
-	if err := binary.Write(buf, binary.BigEndian, uint8(pos.halfMoveClock)); err != nil {
+	if err = binary.Write(buf, binary.BigEndian, uint8(pos.halfMoveClock)); err != nil {
 		return nil, err
 	}
-	if err := binary.Write(buf, binary.BigEndian, uint16(pos.moveCount)); err != nil {
+	if err = binary.Write(buf, binary.BigEndian, uint16(pos.moveCount)); err != nil {
 		return nil, err
 	}
-	if err := binary.Write(buf, binary.BigEndian, pos.enPassantSquare); err != nil {
+	if err = binary.Write(buf, binary.BigEndian, pos.enPassantSquare); err != nil {
 		return nil, err
 	}
 	var b uint8
 	if pos.castleRights.CanCastle(White, KingSide) {
-		b = b | bitsCastleWhiteKing
+		b |= bitsCastleWhiteKing
 	}
 	if pos.castleRights.CanCastle(White, QueenSide) {
-		b = b | bitsCastleWhiteQueen
+		b |= bitsCastleWhiteQueen
 	}
 	if pos.castleRights.CanCastle(Black, KingSide) {
-		b = b | bitsCastleBlackKing
+		b |= bitsCastleBlackKing
 	}
 	if pos.castleRights.CanCastle(Black, QueenSide) {
-		b = b | bitsCastleBlackQueen
+		b |= bitsCastleBlackQueen
 	}
 	if pos.turn == Black {
-		b = b | bitsTurn
+		b |= bitsTurn
 	}
 	if pos.enPassantSquare != NoSquare {
-		b = b | bitsHasEnPassant
+		b |= bitsHasEnPassant
 	}
-	if err := binary.Write(buf, binary.BigEndian, b); err != nil {
+	if err = binary.Write(buf, binary.BigEndian, b); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), err
 }
 
-// UnmarshalBinary implements the encoding.BinaryMarshaler interface
+// UnmarshalBinary implements the encoding.BinaryMarshaler interface.
 func (pos *Position) UnmarshalBinary(data []byte) error {
-	if len(data) != 101 {
+	const size = 101
+	if len(data) != size {
 		return errors.New("chess: position binary data should consist of 101 bytes")
 	}
 	board := &Board{}
@@ -318,16 +319,16 @@ func (pos *Position) updateCastleRights(m *Move) CastleRights {
 	cr := string(pos.castleRights)
 	p := pos.board.Piece(m.s1)
 	if p == WhiteKing || m.s1 == H1 || m.s2 == H1 {
-		cr = strings.Replace(cr, "K", "", -1)
+		cr = strings.ReplaceAll(cr, "K", "")
 	}
 	if p == WhiteKing || m.s1 == A1 || m.s2 == A1 {
-		cr = strings.Replace(cr, "Q", "", -1)
+		cr = strings.ReplaceAll(cr, "Q", "")
 	}
 	if p == BlackKing || m.s1 == H8 || m.s2 == H8 {
-		cr = strings.Replace(cr, "k", "", -1)
+		cr = strings.ReplaceAll(cr, "k", "")
 	}
 	if p == BlackKing || m.s1 == A8 || m.s2 == A8 {
-		cr = strings.Replace(cr, "q", "", -1)
+		cr = strings.ReplaceAll(cr, "q", "")
 	}
 	if cr == "" {
 		cr = "-"
@@ -343,11 +344,11 @@ func (pos *Position) updateEnPassantSquare(m *Move) Square {
 	if pos.turn == White &&
 		(bbForSquare(m.s1)&bbRank2) != 0 &&
 		(bbForSquare(m.s2)&bbRank4) != 0 {
-		return Square(m.s2 - 8)
+		return m.s2 - 8
 	} else if pos.turn == Black &&
 		(bbForSquare(m.s1)&bbRank7) != 0 &&
 		(bbForSquare(m.s2)&bbRank5) != 0 {
-		return Square(m.s2 + 8)
+		return m.s2 + 8
 	}
 	return NoSquare
 }

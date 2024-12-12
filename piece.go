@@ -6,11 +6,11 @@ import "strings"
 type Color int8
 
 const (
-	// NoColor represents no color
+	// NoColor represents no color.
 	NoColor Color = iota
-	// White represents the color white
+	// White represents the color white.
 	White
-	// Black represents the color black
+	// Black represents the color black.
 	Black
 )
 
@@ -25,7 +25,7 @@ func (c Color) Other() Color {
 	return NoColor
 }
 
-// String implements the fmt.Stringer interface and returns
+// String implements the fmt.Stringer interface and returns.
 // the color's FEN compatible notation.
 func (c Color) String() string {
 	switch c {
@@ -52,19 +52,19 @@ func (c Color) Name() string {
 type PieceType int8
 
 const (
-	// NoPieceType represents a lack of piece type
+	// NoPieceType represents a lack of piece type.
 	NoPieceType PieceType = iota
-	// King represents a king
+	// King represents a king.
 	King
-	// Queen represents a queen
+	// Queen represents a queen.
 	Queen
-	// Rook represents a rook
+	// Rook represents a rook.
 	Rook
-	// Bishop represents a bishop
+	// Bishop represents a bishop.
 	Bishop
-	// Knight represents a knight
+	// Knight represents a knight.
 	Knight
-	// Pawn represents a pawn
+	// Pawn represents a pawn.
 	Pawn
 )
 
@@ -140,34 +140,37 @@ func (p PieceType) Bytes() []byte {
 type Piece int8
 
 const (
-	// NoPiece represents no piece
+	// NoPiece represents no piece.
 	NoPiece Piece = iota
-	// WhiteKing is a white king
+	// WhiteKing is a white king.
 	WhiteKing
-	// WhiteQueen is a white queen
+	// WhiteQueen is a white queen.
 	WhiteQueen
-	// WhiteRook is a white rook
+	// WhiteRook is a white rook.
 	WhiteRook
-	// WhiteBishop is a white bishop
+	// WhiteBishop is a white bishop.
 	WhiteBishop
-	// WhiteKnight is a white knight
+	// WhiteKnight is a white knight.
 	WhiteKnight
-	// WhitePawn is a white pawn
+	// WhitePawn is a white pawn.
 	WhitePawn
-	// BlackKing is a black king
+	// BlackKing is a black king.
 	BlackKing
-	// BlackQueen is a black queen
+	// BlackQueen is a black queen.
 	BlackQueen
-	// BlackRook is a black rook
+	// BlackRook is a black rook.
 	BlackRook
-	// BlackBishop is a black bishop
+	// BlackBishop is a black bishop.
 	BlackBishop
-	// BlackKnight is a black knight
+	// BlackKnight is a black knight.
 	BlackKnight
-	// BlackPawn is a black pawn
+	// BlackPawn is a black pawn.
 	BlackPawn
 )
 
+// TODO: This is a constant slice
+//
+//nolint:gochecknoglobals // This is a constant slice.
 var allPieces = []Piece{
 	WhiteKing, WhiteQueen, WhiteRook, WhiteBishop, WhiteKnight, WhitePawn,
 	BlackKing, BlackQueen, BlackRook, BlackBishop, BlackKnight, BlackPawn,
@@ -214,15 +217,18 @@ func (p Piece) Color() Color {
 	return NoColor
 }
 
-// String implements the fmt.Stringer interface
+// String implements the fmt.Stringer interface.
 func (p Piece) String() string {
 	return pieceUnicodes[int(p)]
 }
 
+// TODO: This is a constant slice
+//
+//nolint:gochecknoglobals // This is a constant slice.
 var pieceUnicodes = []string{" ", "♔", "♕", "♖", "♗", "♘", "♙", "♚", "♛", "♜", "♝", "♞", "♟"}
 
 // getFENChar returns the FEN character representation of a piece
-// Returns a single byte representing the piece
+// Returns a single byte representing the piece.
 func (p Piece) getFENChar() byte {
 	pieceType := p.Type()
 	if pieceType < 0 || pieceType > 6 {

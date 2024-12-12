@@ -17,6 +17,8 @@ func ExampleFind() {
 	book := opening.NewBookECO()
 	o := book.Find(g.Moves())
 	fmt.Println(o.Title())
+
+	// Output: French Defense
 }
 
 func ExamplePossible() {
@@ -27,8 +29,14 @@ func ExamplePossible() {
 	// print all variantions of the Scandinavian Defense
 	book := opening.NewBookECO()
 	for _, o := range book.Possible(g.Moves()) {
-		fmt.Println(o.Title())
+		if o.Title() == "Scandinavian Defense" {
+			fmt.Println(o.Title())
+		}
 	}
+
+	// Output:
+	// Scandinavian Defense
+	// Scandinavian Defense
 }
 
 func TestFind(t *testing.T) {

@@ -95,6 +95,7 @@ var (
 // the Encoder's writer.  An error is returned if there
 // is there is an error writing data.
 func (e *encoder) EncodeSVG(b *chess.Board) error {
+	const lastRank = 7
 	boardMap := b.SquareMap()
 	canvas := svg.New(e.w)
 	canvas.Start(boardWidth, boardHeight)
@@ -129,12 +130,12 @@ func (e *encoder) EncodeSVG(b *chess.Board) error {
 			txtColor := e.colorForText(sq)
 			if j == 0 {
 				style := "font-size:11px;fill: " + colorToHex(txtColor)
-				canvas.Text(x+(sqWidth*1/20), y+(sqHeight*5/20), sq.Rank().String(), style)
+				canvas.Text(x+(sqWidth*1/20), y+(sqHeight*5/20), sq.Rank().String(), style) //nolint:mnd // this is a magic number
 			}
 			// draw file text on rank 1
-			if i == 7 {
+			if i == lastRank {
 				style := "text-anchor:end;font-size:11px;fill: " + colorToHex(txtColor)
-				canvas.Text(x+(sqWidth*19/20), y+sqHeight-(sqHeight*1/15), sq.File().String(), style)
+				canvas.Text(x+(sqWidth*19/20), y+sqHeight-(sqHeight*1/15), sq.File().String(), style) //nolint:mnd // this is a magic number
 			}
 		}
 	}
@@ -160,7 +161,7 @@ func (e *encoder) colorForText(sq chess.Square) color.Color {
 
 func colorToHex(c color.Color) string {
 	r, g, b, _ := c.RGBA()
-	return fmt.Sprintf("#%02x%02x%02x", uint8(float64(r)+0.5), uint8(float64(g)*1.0+0.5), uint8(float64(b)*1.0+0.5))
+	return fmt.Sprintf("#%02x%02x%02x", uint8(float64(r)+0.5), uint8(float64(g)*1.0+0.5), uint8(float64(b)*1.0+0.5)) //nolint:mnd // this is a rounding factor
 }
 
 func pieceXML(x, y int, p chess.Piece) string {
@@ -172,10 +173,11 @@ func pieceXML(x, y int, p chess.Piece) string {
 }
 
 var pieceTypeMap = map[chess.PieceType]string{
-	chess.King:   "K",
-	chess.Queen:  "Q",
-	chess.Rook:   "R",
-	chess.Bishop: "B",
-	chess.Knight: "N",
-	chess.Pawn:   "P",
+	chess.King:        "K",
+	chess.Queen:       "Q",
+	chess.Rook:        "R",
+	chess.Bishop:      "B",
+	chess.Knight:      "N",
+	chess.Pawn:        "P",
+	chess.NoPieceType: "",
 }

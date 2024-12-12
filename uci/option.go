@@ -116,7 +116,7 @@ type Option struct {
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface and parses
 // data like the following:
-// option name EvalFile type string default nn-82215d0fd0df.nnue
+// option name EvalFile type string default nn-82215d0fd0df.nnue.
 func (o *Option) UnmarshalText(text []byte) error {
 	o.Type = OptionNoType
 	parts := strings.Split(string(text), " ")
@@ -177,17 +177,17 @@ func (o *Option) UnmarshalText(text []byte) error {
 type OptionType string
 
 const (
-	// OptionNoType indicates no option type
+	// OptionNoType indicates no option type.
 	OptionNoType OptionType = "notype"
-	// OptionCheck indicates check option type
+	// OptionCheck indicates check option type.
 	OptionCheck OptionType = "check"
-	// OptionSpin indicates spin option type
+	// OptionSpin indicates spin option type.
 	OptionSpin OptionType = "spin"
-	// OptionCombo indicates combo option type
+	// OptionCombo indicates combo option type.
 	OptionCombo OptionType = "combo"
-	// OptionButton indicates button option type
+	// OptionButton indicates button option type.
 	OptionButton OptionType = "button"
-	// OptionString indicates string option type
+	// OptionString indicates string option type.
 	OptionString OptionType = "string"
 )
 

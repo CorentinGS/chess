@@ -8,36 +8,36 @@ import (
 type TokenType int
 
 const (
-	EOF              TokenType = iota
-	TAG_START                  // [
-	TAG_END                    // ]
-	TAG_KEY                    // The key part of a tag (e.g., "Site")
-	TAG_VALUE                  // The value part of a tag (e.g., "Internet")
-	MOVE_NUMBER                // 1, 2, 3, etc.
-	DOT                        // .
-	ELLIPSIS                   // ...
-	PIECE                      // N, B, R, Q, K
-	SQUARE                     // e4, e5, etc.
-	COMMENT_START              // {
-	COMMENT_END                // }
-	COMMENT                    // The comment text
-	RESULT                     // 1-0, 0-1, 1/2-1/2
-	CAPTURE                    // 'x' in moves
-	FILE                       // a-h in moves when used as disambiguation
-	RANK                       // 1-8 in moves when used as disambiguation
-	KINGSIDE_CASTLE            // 0-0
-	QUEENSIDE_CASTLE           // 0-0-0
-	PROMOTION                  // = in moves
-	PROMOTION_PIECE            // The piece being promoted to (Q, R, B, N)
-	CHECK                      // + in moves
-	CHECKMATE                  // # in moves
-	NAG                        // Numeric Annotation Glyph (e.g., $1, $2, etc.)
-	VARIATION_START            // ( for starting a variation
-	VARIATION_END              // ) for ending a variation
-	COMMAND_START              // [%
-	COMMAND_NAME               // The command name (e.g., clk, eval)
-	COMMAND_PARAM              // Command parameter
-	COMMAND_END                // ]
+	EOF             TokenType = iota
+	TagStart                  // [
+	TagEnd                    // ]
+	TagKey                    // The key part of a tag (e.g., "Site")
+	TagValue                  // The value part of a tag (e.g., "Internet")
+	MoveNumber                // 1, 2, 3, etc.
+	DOT                       // .
+	ELLIPSIS                  // ...
+	PIECE                     // N, B, R, Q, K
+	SQUARE                    // e4, e5, etc.
+	CommentStart              // {
+	CommentEnd                // }
+	COMMENT                   // The comment text
+	RESULT                    // 1-0, 0-1, 1/2-1/2
+	CAPTURE                   // 'x' in moves
+	FILE                      // a-h in moves when used as disambiguation
+	RANK                      // 1-8 in moves when used as disambiguation
+	KingsideCastle            // 0-0
+	QueensideCastle           // 0-0-0
+	PROMOTION                 // = in moves
+	PromotionPiece            // The piece being promoted to (Q, R, B, N)
+	CHECK                     // + in moves
+	CHECKMATE                 // # in moves
+	NAG                       // Numeric Annotation Glyph (e.g., $1, $2, etc.)
+	VariationStart            // ( for starting a variation
+	VariationEnd              // ) for ending a variation
+	CommandStart              // [%
+	CommandName               // The command name (e.g., clk, eval)
+	CommandParam              // Command parameter
+	CommandEnd                // ]
 )
 
 type Token struct {
@@ -81,7 +81,7 @@ func (l *Lexer) readNumber() Token {
 	for isDigit(l.ch) {
 		l.readChar()
 	}
-	return Token{Type: MOVE_NUMBER, Value: l.input[position:l.position]}
+	return Token{Type: MoveNumber, Value: l.input[position:l.position]}
 }
 
 func (l *Lexer) readCommandName() Token {
@@ -91,7 +91,7 @@ func (l *Lexer) readCommandName() Token {
 		l.readChar()
 	}
 	l.inCommandParam = true
-	return Token{Type: COMMAND_NAME, Value: l.input[position:l.position]}
+	return Token{Type: CommandName, Value: l.input[position:l.position]}
 }
 
 func (l *Lexer) readCommandParam() Token {
@@ -115,7 +115,7 @@ func (l *Lexer) readCommandParam() Token {
 		}
 		value := l.input[position:l.position]
 		l.readChar() // skip closing quote
-		return Token{Type: COMMAND_PARAM, Value: value}
+		return Token{Type: CommandParam, Value: value}
 	}
 
 	// Read until comma or ] for non-quoted parameters
@@ -129,7 +129,7 @@ func (l *Lexer) readCommandParam() Token {
 	}
 
 	l.inCommandParam = l.ch == ',' // set flag if we are still in a command parameter
-	return Token{Type: COMMAND_PARAM, Value: strings.TrimSpace(l.input[position:l.position])}
+	return Token{Type: CommandParam, Value: strings.TrimSpace(l.input[position:l.position])}
 }
 
 func (l *Lexer) readNAG() Token {
@@ -157,7 +157,7 @@ func (l *Lexer) readResult() Token {
 	if isResult(result) {
 		return Token{Type: RESULT, Value: result}
 	}
-	return Token{Type: MOVE_NUMBER, Value: result}
+	return Token{Type: MoveNumber, Value: result}
 }
 
 func (l *Lexer) readRank() Token {
@@ -191,7 +191,7 @@ func (l *Lexer) readComment() Token {
 					Error: ErrInvalidCommand(l.position),
 				}
 			}
-			return Token{Type: COMMAND_START, Value: "[%"}
+			return Token{Type: CommandStart, Value: "[%"}
 		}
 		l.readChar()
 	}
@@ -210,10 +210,10 @@ func (l *Lexer) readComment() Token {
 		return Token{Type: COMMENT, Value: strings.TrimSpace(l.input[position:l.position])}
 	}
 
-	return Token{Type: COMMENT_END, Value: "}"}
+	return Token{Type: CommentEnd, Value: "}"}
 }
 
-// Update readPieceMove to handle piece moves
+// Update readPieceMove to handle piece moves.
 func (l *Lexer) readPieceMove() Token {
 	// Capture just the piece
 	piece := string(l.ch)
@@ -228,6 +228,8 @@ func (l *Lexer) readPieceMove() Token {
 }
 
 func (l *Lexer) readMove() Token {
+	const disambiguationLength = 3
+
 	position := l.position
 
 	// Check for EOF early
@@ -259,7 +261,7 @@ func (l *Lexer) readMove() Token {
 	length := l.position - position
 
 	// If we read 3 characters, first one is disambiguation
-	if length == 3 {
+	if length == disambiguationLength {
 		l.readPosition = position + 1
 		l.readChar()
 		// Return just the first character as disambiguation
@@ -279,10 +281,10 @@ func (l *Lexer) readPromotionPiece() Token {
 	piece := string(l.ch)
 	if !isPiece(l.ch) {
 		l.readChar()
-		return Token{Type: PROMOTION_PIECE, Error: ErrInvalidPiece(l.position), Value: piece}
+		return Token{Type: PromotionPiece, Error: ErrInvalidPiece(l.position), Value: piece}
 	}
 	l.readChar()
-	return Token{Type: PROMOTION_PIECE, Value: piece}
+	return Token{Type: PromotionPiece, Value: piece}
 }
 
 func (l *Lexer) readChar() {
@@ -292,7 +294,7 @@ func (l *Lexer) readChar() {
 		l.ch = l.input[l.readPosition]
 	}
 	l.position = l.readPosition
-	l.readPosition += 1
+	l.readPosition++
 }
 
 func (l *Lexer) readTagValue() Token {
@@ -303,7 +305,7 @@ func (l *Lexer) readTagValue() Token {
 	}
 	value := l.input[position:l.position]
 	l.readChar() // skip closing quote
-	return Token{Type: TAG_VALUE, Value: value}
+	return Token{Type: TagValue, Value: value}
 }
 
 func (l *Lexer) readTagKey() Token {
@@ -311,7 +313,7 @@ func (l *Lexer) readTagKey() Token {
 	for isLetter(l.ch) || isDigit(l.ch) {
 		l.readChar()
 	}
-	return Token{Type: TAG_KEY, Value: l.input[position:l.position]}
+	return Token{Type: TagKey, Value: l.input[position:l.position]}
 }
 
 func (l *Lexer) readCastling() (Token, bool) {
@@ -347,10 +349,10 @@ func (l *Lexer) readCastling() (Token, bool) {
 	if l.ch == '-' && l.peekChar() == 'O' {
 		l.readChar() // skip -
 		l.readChar() // skip O
-		return Token{Type: QUEENSIDE_CASTLE, Value: "O-O-O"}, true
+		return Token{Type: QueensideCastle, Value: "O-O-O"}, true
 	}
 
-	return Token{Type: KINGSIDE_CASTLE, Value: "O-O"}, true
+	return Token{Type: KingsideCastle, Value: "O-O"}, true
 }
 
 func (l *Lexer) NextToken() Token {
@@ -361,7 +363,7 @@ func (l *Lexer) NextToken() Token {
 		case ']':
 			l.inCommand = false
 			l.readChar()
-			return Token{Type: COMMAND_END, Value: "]"}
+			return Token{Type: CommandEnd, Value: "]"}
 		case ',':
 			l.readChar()
 			return l.readCommandParam()
@@ -378,7 +380,7 @@ func (l *Lexer) NextToken() Token {
 		if l.ch == '}' {
 			l.inComment = false
 			l.readChar()
-			return Token{Type: COMMENT_END, Value: "}"}
+			return Token{Type: CommentEnd, Value: "}"}
 		}
 		return l.readComment()
 	}
@@ -390,28 +392,28 @@ func (l *Lexer) NextToken() Token {
 	switch l.ch {
 	case '(':
 		l.readChar()
-		return Token{Type: VARIATION_START, Value: "("}
+		return Token{Type: VariationStart, Value: "("}
 
 	case ')':
 		l.readChar()
-		return Token{Type: VARIATION_END, Value: ")"}
+		return Token{Type: VariationEnd, Value: ")"}
 	case '[':
 		l.inTag = true
 		l.readChar()
-		return Token{Type: TAG_START, Value: "["}
+		return Token{Type: TagStart, Value: "["}
 	case ']':
 		l.inTag = false
 		l.readChar()
-		return Token{Type: TAG_END, Value: "]"}
+		return Token{Type: TagEnd, Value: "]"}
 	case '"':
 		return l.readTagValue()
 	case '{':
 		l.readChar()
 		l.inComment = true
-		return Token{Type: COMMENT_START, Value: "{"}
+		return Token{Type: CommentStart, Value: "{"}
 	case '}':
 		l.readChar()
-		return Token{Type: COMMENT_END, Value: "}"}
+		return Token{Type: CommentEnd, Value: "}"}
 	case '.':
 		if l.peekChar() == '.' && l.readPosition+1 < len(l.input) && l.input[l.readPosition+1] == '.' {
 			l.readChar()
@@ -461,7 +463,7 @@ func (l *Lexer) NextToken() Token {
 			l.readChar()
 		}
 		if l.ch == '.' {
-			return Token{Type: MOVE_NUMBER, Value: l.input[position:l.position]}
+			return Token{Type: MoveNumber, Value: l.input[position:l.position]}
 		} else if l.ch == '-' {
 			l.position = position
 			l.readPosition = position + 1

@@ -12,7 +12,7 @@ func (engine) CalcMoves(pos *Position, first bool) []Move {
 }
 
 func (engine) Status(pos *Position) Method {
-	hasMove := false
+	var hasMove bool
 	if pos.validMoves != nil {
 		hasMove = len(pos.validMoves) > 0
 	} else {
@@ -26,10 +26,17 @@ func (engine) Status(pos *Position) Method {
 	return NoMethod
 }
 
+// TODO: don't use globals
+//
+//nolint:gochecknoglobals // this is a lookup table
 var promoPieceTypes = []PieceType{Queen, Rook, Bishop, Knight}
 
 const maxPossibleMoves = 218 // Maximum possible moves in any chess position
 
+// movePool is a pool of Move arrays to reduce allocations
+// in the standardMoves function.
+//
+//nolint:gochecknoglobals // this is a sync pool
 var movePool = sync.Pool{
 	New: func() interface{} {
 		return &[maxPossibleMoves]Move{}
@@ -37,7 +44,7 @@ var movePool = sync.Pool{
 }
 
 func standardMoves(pos *Position, first bool) []Move {
-	moves := movePool.Get().(*[maxPossibleMoves]Move)
+	moves, _ := movePool.Get().(*[maxPossibleMoves]Move)
 	defer movePool.Put(moves)
 	count := 0
 
@@ -57,7 +64,7 @@ func standardMoves(pos *Position, first bool) []Move {
 		if s1BB == 0 {
 			continue
 		}
-		for s1 := 0; s1 < numOfSquaresInBoard; s1++ {
+		for s1 := range numOfSquaresInBoard {
 			if s1BB&bbForSquare(Square(s1)) == 0 {
 				continue
 			}
@@ -65,7 +72,7 @@ func standardMoves(pos *Position, first bool) []Move {
 			if s2BB == 0 {
 				continue
 			}
-			for s2 := 0; s2 < numOfSquaresInBoard; s2++ {
+			for s2 := range numOfSquaresInBoard {
 				if s2BB&bbForSquare(Square(s2)) == 0 {
 					continue
 				}
@@ -146,6 +153,7 @@ func isInCheck(pos *Position) bool {
 	return squaresAreAttacked(pos, kingSq)
 }
 
+//nolint:mnd // this is a formula to determine if a square is attacked
 func squaresAreAttacked(pos *Position, sqs ...Square) bool {
 	otherColor := pos.Turn().Other()
 	occ := ^pos.board.emptySqs
@@ -284,6 +292,7 @@ func castleMoves(pos *Position) []Move {
 	return moves[:count]
 }
 
+//nolint:mnd // this is a formula to determine the color of a square
 func pawnMoves(pos *Position, sq Square) bitboard {
 	bb := bbForSquare(sq)
 	var bbEnPassant bitboard
@@ -313,8 +322,8 @@ func diaAttack(occupied bitboard, sq Square) bitboard {
 
 func hvAttack(occupied bitboard, sq Square) bitboard {
 	pos := bbForSquare(sq)
-	rankMask := bbRanks[Square(sq).Rank()]
-	fileMask := bbFiles[Square(sq).File()]
+	rankMask := bbRanks[sq.Rank()]
+	fileMask := bbFiles[sq.File()]
 	return linearAttack(occupied, pos, rankMask) | linearAttack(occupied, pos, fileMask)
 }
 
@@ -348,6 +357,7 @@ func bbForSquare(sq Square) bitboard {
 	return bbSquares[sq]
 }
 
+//nolint:gochecknoglobals // this is a lookup table
 var (
 	bbFiles = [8]bitboard{bbFileA, bbFileB, bbFileC, bbFileD, bbFileE, bbFileF, bbFileG, bbFileH}
 	bbRanks = [8]bitboard{bbRank1, bbRank2, bbRank3, bbRank4, bbRank5, bbRank6, bbRank7, bbRank8}
@@ -369,8 +379,12 @@ var (
 	bbSquares = [64]bitboard{}
 )
 
+// TODO: remove this init function
+//
+//nolint:gochecknoinits // will be removed
 func init() {
-	for sq := 0; sq < 64; sq++ {
+	const numOfSquaresInBoard = 64
+	for sq := range numOfSquaresInBoard {
 		bbSquares[sq] = bitboard(uint64(1) << (uint8(63) - uint8(sq)))
 	}
 }

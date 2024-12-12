@@ -26,13 +26,13 @@ func (sq Square) Bytes() []byte {
 	return []byte{sq.File().Byte(), sq.Rank().Byte()}
 }
 
-// NewSquare creates a new Square from a File and a Rank
+// NewSquare creates a new Square from a File and a Rank.
 func NewSquare(f File, r Rank) Square {
 	return Square(int8(r)*numOfSquaresInRow + int8(f))
 }
 
 func (sq Square) color() Color {
-	if ((sq / 8) % 2) == (sq % 2) {
+	if ((sq / 8) % 2) == (sq % 2) { //nolint:mnd // this is a formula to determine the color of a square
 		return Black
 	}
 	return White
@@ -155,6 +155,9 @@ func (f File) Byte() byte {
 	return fileChars[f]
 }
 
+// TODO: This is a legacy map for converting strings to squares. (will be removed in the future)
+//
+//nolint:gochecknoglobals // this is a map of all squares
 var strToSquareMap = map[string]Square{
 	"a1": A1, "a2": A2, "a3": A3, "a4": A4, "a5": A5, "a6": A6, "a7": A7, "a8": A8,
 	"b1": B1, "b2": B2, "b3": B3, "b4": B4, "b5": B5, "b6": B6, "b7": B7, "b8": B8,

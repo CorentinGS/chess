@@ -10,7 +10,7 @@ type GameScanned struct {
 	Raw string
 }
 
-// TokenizeGame function to tokenize a PGN game
+// TokenizeGame function to tokenize a PGN game.
 func TokenizeGame(game *GameScanned) ([]Token, error) {
 	if game == nil {
 		return nil, nil
@@ -30,20 +30,21 @@ func TokenizeGame(game *GameScanned) ([]Token, error) {
 	return tokens, nil
 }
 
+// Scanner struct to scan PGN games.
 type Scanner struct {
 	scanner   *bufio.Scanner
 	nextGame  *GameScanned // Buffer for peeked game
 	lastError error        // Store last error
 }
 
-// NewScanner function to create a new PGN scanner
+// NewScanner function to create a new PGN scanner.
 func NewScanner(r io.Reader) *Scanner {
 	s := bufio.NewScanner(r)
 	s.Split(splitPGNGames)
 	return &Scanner{scanner: s}
 }
 
-// ScanGame function to scan the next PGN game
+// ScanGame function to scan the next PGN game.
 func (s *Scanner) ScanGame() (*GameScanned, error) {
 	// If we have a buffered game from HasNext(), return it
 	if s.nextGame != nil {
@@ -64,7 +65,7 @@ func (s *Scanner) ScanGame() (*GameScanned, error) {
 	return nil, io.EOF
 }
 
-// HasNext function to check if there is another game to read
+// HasNext function to check if there is another game to read.
 func (s *Scanner) HasNext() bool {
 	// If we already have a buffered game, return true
 	if s.nextGame != nil {
@@ -83,8 +84,8 @@ func (s *Scanner) HasNext() bool {
 	return false
 }
 
-// Split function for bufio.Scanner to split PGN games
-func splitPGNGames(data []byte, atEOF bool) (advance int, token []byte, err error) {
+// Split function for bufio.Scanner to split PGN games.
+func splitPGNGames(data []byte, atEOF bool) (int, []byte, error) {
 	// Skip leading whitespace
 	start := skipLeadingWhitespace(data)
 	if start == len(data) {
@@ -101,7 +102,7 @@ func splitPGNGames(data []byte, atEOF bool) (advance int, token []byte, err erro
 	return processGameContent(data, start, atEOF)
 }
 
-// Helper to skip leading whitespace
+// Helper to skip leading whitespace.
 func skipLeadingWhitespace(data []byte) int {
 	start := 0
 	for ; start < len(data); start++ {
@@ -112,7 +113,7 @@ func skipLeadingWhitespace(data []byte) int {
 	return start
 }
 
-// Helper to handle EOF scenarios
+// Helper to handle EOF scenarios.
 func handleEOF(data []byte, atEOF bool) (int, []byte, error) {
 	if atEOF {
 		return len(data), nil, nil
@@ -120,7 +121,7 @@ func handleEOF(data []byte, atEOF bool) (int, []byte, error) {
 	return 0, nil, nil
 }
 
-// Helper to find the start of a game (first '[' character)
+// Helper to find the start of a game (first '[' character).
 func findGameStart(data []byte, start int, atEOF bool) int {
 	// If the first character is not '[', find the next '[' character
 	if start < len(data) && data[start] != '[' {
@@ -136,8 +137,8 @@ func findGameStart(data []byte, start int, atEOF bool) int {
 	return start
 }
 
-// Helper to process the content of a game and return the token or advance position
-func processGameContent(data []byte, start int, atEOF bool) (advance int, token []byte, err error) {
+// Helper to process the content of a game and return the token or advance position.
+func processGameContent(data []byte, start int, atEOF bool) (int, []byte, error) {
 	var i int                                   // Loop variable
 	var inBrackets, inComment, foundResult bool // State variables
 	resultStart := -1                           // Start position of result token
@@ -176,7 +177,7 @@ func processGameContent(data []byte, start int, atEOF bool) (advance int, token 
 	return len(data), bytes.TrimSpace(data[start:]), nil
 }
 
-// Helper to update bracket state based on current character
+// Helper to update bracket state based on current character.
 func updateBracketState(ch byte, inBrackets bool, inComment bool) bool {
 	if ch == '[' && !inComment {
 		return true
@@ -186,7 +187,7 @@ func updateBracketState(ch byte, inBrackets bool, inComment bool) bool {
 	return inBrackets
 }
 
-// Helper to update comment state based on current character
+// Helper to update comment state based on current character.
 func updateCommentState(ch byte, inComment bool) bool {
 	if ch == '{' {
 		return true
@@ -196,7 +197,7 @@ func updateCommentState(ch byte, inComment bool) bool {
 	return inComment
 }
 
-// Helper to find the next game start after a newline character
+// Helper to find the next game start after a newline character.
 func findNextGameStart(data []byte) int {
 	nextGame := bytes.Index(data, []byte("[Event "))
 	if nextGame != -1 {
@@ -205,7 +206,7 @@ func findNextGameStart(data []byte) int {
 	return -1
 }
 
-// Helper to check for game result tokens (e.g., "1-0", "0-1", "1/2-1/2", "*")
+// Helper to check for game result tokens (e.g., "1-0", "0-1", "1/2-1/2", "*").
 func checkForResult(data []byte, i int) (bool, int) {
 	const minLength = 3        // Minimum length for results like "1-0"
 	const fullResultLength = 7 // Length for "1/2-1/2"

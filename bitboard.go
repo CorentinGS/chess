@@ -11,7 +11,7 @@ type bitboard uint64
 
 func newBitboard(m map[Square]bool) bitboard {
 	var bb uint64
-	for sq := 0; sq < numOfSquaresInBoard; sq++ {
+	for sq := range numOfSquaresInBoard {
 		bb <<= 1
 		if m[Square(sq)] {
 			bb |= 1
@@ -22,7 +22,7 @@ func newBitboard(m map[Square]bool) bitboard {
 
 func (b bitboard) Mapping() map[Square]bool {
 	m := map[Square]bool{}
-	for sq := 0; sq < numOfSquaresInBoard; sq++ {
+	for sq := range numOfSquaresInBoard {
 		if b&bbForSquare(Square(sq)) > 0 {
 			m[Square(sq)] = true
 		}
@@ -41,7 +41,7 @@ func (b bitboard) Draw() string {
 	s := "\n A B C D E F G H\n"
 	for r := 7; r >= 0; r-- {
 		s += Rank(r).String()
-		for f := 0; f < numOfSquaresInRow; f++ {
+		for f := range numOfSquaresInRow {
 			sq := NewSquare(File(f), Rank(r))
 			if b.Occupied(sq) {
 				s += "1"

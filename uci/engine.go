@@ -64,7 +64,7 @@ func New(path string, opts ...func(e *Engine)) (*Engine, error) {
 // ID returns the id values returned from the most recent CmdUCI invocation.  It includes
 // key value data such as the following:
 // id name Stockfish 12
-// id author the Stockfish developers (see AUTHORS file)
+// id author the Stockfish developers (see AUTHORS file).
 func (e *Engine) ID() map[string]string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -101,6 +101,7 @@ func (e *Engine) ID() map[string]string {
 // option name SyzygyProbeLimit type spin default 7 min 0 max 7
 // option name Use NNUE type check default true
 // option name EvalFile type string default nn-82215d0fd0df.nnue
+// The key is the option name and the value is the Option struct.
 func (e *Engine) Options() map[string]Option {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -115,7 +116,7 @@ func (e *Engine) Options() map[string]Option {
 // SearchResults returns results from the most recent CmdGo invocation.  It includes
 // data such as the following:
 // info depth 21 seldepth 31 multipv 1 score cp 39 nodes 862438 nps 860716 hashfull 409 tbhits 0 time 1002 pv e2e4
-// bestmove e2e4 ponder c7c5
+// bestmove e2e4 ponder c7c5.
 func (e *Engine) SearchResults() SearchResults {
 	e.mu.RLock()
 	defer e.mu.RUnlock()

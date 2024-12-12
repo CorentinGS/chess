@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,12 +10,14 @@ import (
 
 // Decodes FEN notation into a GameState.  An error is returned
 // if there is a parsing error.  FEN notation format:
-// rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+// rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1.
 func decodeFEN(fen string) (*Position, error) {
+	const minFENParts = 6
 	fen = strings.TrimSpace(fen)
 	parts := strings.Split(fen, " ")
-	if len(parts) != 6 {
-		return nil, fmt.Errorf("chess: fen invalid notation %s must have 6 sections", fen)
+
+	if len(parts) != minFENParts {
+		return nil, errors.New("chess: fen invalid format")
 	}
 	b, err := fenBoard(parts[0])
 	if err != nil {
@@ -22,7 +25,7 @@ func decodeFEN(fen string) (*Position, error) {
 	}
 	turn, ok := fenTurnMap[parts[1]]
 	if !ok {
-		return nil, fmt.Errorf("chess: fen invalid turn %s", parts[1])
+		return nil, errors.New("chess: fen invalid turn")
 	}
 	rights, err := formCastleRights(parts[2])
 	if err != nil {
@@ -34,11 +37,11 @@ func decodeFEN(fen string) (*Position, error) {
 	}
 	halfMoveClock, err := strconv.Atoi(parts[4])
 	if err != nil || halfMoveClock < 0 {
-		return nil, fmt.Errorf("chess: fen invalid half move clock %s", parts[4])
+		return nil, errors.New("chess: fen invalid half move clock")
 	}
 	moveCount, err := strconv.Atoi(parts[5])
 	if err != nil || moveCount < 1 {
-		return nil, fmt.Errorf("chess: fen invalid move count %s", parts[5])
+		return nil, errors.New("chess: fen invalid move count")
 	}
 	return &Position{
 		board:           b,
@@ -51,37 +54,50 @@ func decodeFEN(fen string) (*Position, error) {
 }
 
 // preallocated array to avoid strings.Split allocation
+//
+//nolint:gochecknoglobals // this is a preallocated array.
 var rankBuffer [8]string
 
-// pools for map reuse
+const (
+	fileMapSize  = 8
+	pieceMapSize = 32
+)
+
+// pools for map reuse.
 var (
 	// pool for the main piece map (32 pieces max)
+	//note: this is a sync.Pool
+	//nolint:gochecknoglobals // this is a pool.
 	pieceMapPool = sync.Pool{
 		New: func() interface{} {
-			return make(map[Square]Piece, 32)
+			return make(map[Square]Piece, pieceMapSize)
 		},
 	}
 
 	// pool for the file map (8 pieces per rank max)
+	//note: this is a sync.Pool
+	//nolint:gochecknoglobals // this is a pool.
 	fileMapPool = sync.Pool{
 		New: func() interface{} {
-			return make(map[File]Piece, 8)
+			return make(map[File]Piece, fileMapSize)
 		},
 	}
 )
 
-// clearMap helper to clear a map without deallocating
+// clearMap helper to clear a map without deallocating.
 func clearMap[K comparable, V any](m map[K]V) {
 	for k := range m {
 		delete(m, k)
 	}
 }
 
-// fenBoard generates board from FEN format while minimizing allocations
+// fenBoard generates board from FEN format while minimizing allocations.
 func fenBoard(boardStr string) (*Board, error) {
+	const maxRankLen = 8
+
 	// Get maps from pools
-	m := pieceMapPool.Get().(map[Square]Piece)
-	fileMap := fileMapPool.Get().(map[File]Piece)
+	m, _ := pieceMapPool.Get().(map[Square]Piece)
+	fileMap, _ := fileMapPool.Get().(map[File]Piece)
 
 	// Clear maps (in case they were reused)
 	clearMap(m)
@@ -96,10 +112,10 @@ func fenBoard(boardStr string) (*Board, error) {
 	// Split string into ranks without allocation
 	rankCount := 0
 	start := 0
-	for i := 0; i < len(boardStr); i++ {
+	for i := range len(boardStr) {
 		if boardStr[i] == '/' {
-			if rankCount >= 8 {
-				return nil, fmt.Errorf("chess: fen invalid board %s", boardStr)
+			if rankCount >= maxRankLen {
+				return nil, errors.New("chess: fen invalid board")
 			}
 			rankBuffer[rankCount] = boardStr[start:i]
 			rankCount++
@@ -109,18 +125,18 @@ func fenBoard(boardStr string) (*Board, error) {
 
 	// Handle last rank
 	if start < len(boardStr) {
-		if rankCount >= 8 {
-			return nil, fmt.Errorf("chess: fen invalid board %s", boardStr)
+		if rankCount >= maxRankLen {
+			return nil, errors.New("chess: fen invalid board")
 		}
 		rankBuffer[rankCount] = boardStr[start:]
 		rankCount++
 	}
 
-	if rankCount != 8 {
-		return nil, fmt.Errorf("chess: fen invalid board %s", boardStr)
+	if rankCount != maxRankLen {
+		return nil, errors.New("chess: fen invalid board")
 	}
 
-	for i := 0; i < 8; i++ {
+	for i := range maxRankLen {
 		rank := Rank(7 - i)
 
 		// Clear fileMap for reuse
@@ -142,11 +158,12 @@ func fenBoard(boardStr string) (*Board, error) {
 	return NewBoard(m), nil
 }
 
-// fenFormRank converts a FEN rank string to a map of pieces, reusing the provided map
+// fenFormRank converts a FEN rank string to a map of pieces, reusing the provided map.
 func fenFormRank(rankStr string, m map[File]Piece) error {
+	const maxRankLen = 8
 	var count int
 
-	for i := 0; i < len(rankStr); i++ {
+	for i := range len(rankStr) {
 		c := rankStr[i]
 
 		// Handle empty squares (digits 1-8)
@@ -158,15 +175,15 @@ func fenFormRank(rankStr string, m map[File]Piece) error {
 		// Get piece from lookup table
 		piece := fenCharToPiece[c]
 		if piece == NoPiece {
-			return fmt.Errorf("chess: invalid character in rank %q", rankStr)
+			return errors.New("chess: fen invalid piece")
 		}
 
 		m[File(count)] = piece
 		count++
 	}
 
-	if count != 8 {
-		return fmt.Errorf("chess: invalid rank %q", rankStr)
+	if count != maxRankLen {
+		return errors.New("chess: invalid rank length")
 	}
 
 	return nil
@@ -203,6 +220,7 @@ func formEnPassant(enPassant string) (Square, error) {
 
 var (
 	// whitePiecesToFEN provides direct mapping for white pieces to FEN characters
+	//nolint:gochecknoglobals // this is a lookup table.
 	whitePiecesToFEN = [7]byte{
 		0,   // NoType (index 0)
 		'K', // King   (index 1)
@@ -214,6 +232,7 @@ var (
 	}
 
 	// blackPiecesToFEN provides direct mapping for black pieces to FEN characters
+	//nolint:gochecknoglobals // this is a lookup table.
 	blackPiecesToFEN = [7]byte{
 		0,   // NoType (index 0)
 		'k', // King   (index 1)
@@ -224,12 +243,16 @@ var (
 		'p', // Pawn   (index 6)
 	}
 
+	// fenTurnMap provides direct mapping for FEN characters to colors
+	//nolint:gochecknoglobals // this is a lookup table.
 	fenTurnMap = map[string]Color{
 		"w": White,
 		"b": Black,
 	}
 
 	// Direct lookup array for FEN characters to pieces
+	// Note: NoPiece is used for invalid characters
+	//nolint:gochecknoglobals // this is a lookup table.
 	fenCharToPiece = [128]Piece{
 		'K': WhiteKing,
 		'Q': WhiteQueen,

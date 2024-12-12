@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -31,52 +32,52 @@ func TestScanner(t *testing.T) {
 		typ   TokenType
 		value string
 	}{
-		{TAG_START, "["},
-		{TAG_KEY, "Event"},
-		{TAG_VALUE, "Example"},
-		{TAG_END, "]"},
-		{TAG_START, "["},
-		{TAG_KEY, "Site"},
-		{TAG_VALUE, "Internet"},
-		{TAG_END, "]"},
-		{TAG_START, "["},
-		{TAG_KEY, "Date"},
-		{TAG_VALUE, "2023.12.06"},
-		{TAG_END, "]"},
-		{TAG_START, "["},
-		{TAG_KEY, "Round"},
-		{TAG_VALUE, "1"},
-		{TAG_END, "]"},
-		{TAG_START, "["},
-		{TAG_KEY, "White"},
-		{TAG_VALUE, "Player1"},
-		{TAG_END, "]"},
-		{TAG_START, "["},
-		{TAG_KEY, "Black"},
-		{TAG_VALUE, "Player2"},
-		{TAG_END, "]"},
-		{TAG_START, "["},
-		{TAG_KEY, "Result"},
-		{TAG_VALUE, "1-0"},
-		{TAG_END, "]"},
-		{MOVE_NUMBER, "1"},
+		{TagStart, "["},
+		{TagKey, "Event"},
+		{TagValue, "Example"},
+		{TagEnd, "]"},
+		{TagStart, "["},
+		{TagKey, "Site"},
+		{TagValue, "Internet"},
+		{TagEnd, "]"},
+		{TagStart, "["},
+		{TagKey, "Date"},
+		{TagValue, "2023.12.06"},
+		{TagEnd, "]"},
+		{TagStart, "["},
+		{TagKey, "Round"},
+		{TagValue, "1"},
+		{TagEnd, "]"},
+		{TagStart, "["},
+		{TagKey, "White"},
+		{TagValue, "Player1"},
+		{TagEnd, "]"},
+		{TagStart, "["},
+		{TagKey, "Black"},
+		{TagValue, "Player2"},
+		{TagEnd, "]"},
+		{TagStart, "["},
+		{TagKey, "Result"},
+		{TagValue, "1-0"},
+		{TagEnd, "]"},
+		{MoveNumber, "1"},
 		{DOT, "."},
 		{SQUARE, "e4"},
 		{SQUARE, "e5"},
-		{MOVE_NUMBER, "2"},
+		{MoveNumber, "2"},
 		{DOT, "."},
 		{PIECE, "N"},
 		{SQUARE, "f3"},
 		{PIECE, "N"},
 		{SQUARE, "c6"},
-		{MOVE_NUMBER, "3"},
+		{MoveNumber, "3"},
 		{DOT, "."},
 		{PIECE, "B"},
 		{SQUARE, "b5"},
-		{COMMENT_START, "{"},
+		{CommentStart, "{"},
 		{COMMENT, "This is the Ruy Lopez."},
-		{COMMENT_END, "}"},
-		{MOVE_NUMBER, "3"},
+		{CommentEnd, "}"},
+		{MoveNumber, "3"},
 		{ELLIPSIS, "..."},
 		{SQUARE, "a6"},
 		{RESULT, "1-0"},
@@ -100,8 +101,8 @@ func TestScanner(t *testing.T) {
 	}
 
 	// Test second game (if exists)
-	game, err = scanner.ScanGame()
-	if err != nil && err != io.EOF {
+	_, err = scanner.ScanGame()
+	if err != nil && !errors.Is(err, io.EOF) {
 		t.Errorf("Unexpected error reading second game: %v", err)
 	}
 
@@ -149,7 +150,7 @@ func TestScannerEmptyFile(t *testing.T) {
 	}
 
 	game, err := scanner.ScanGame()
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Errorf("Expected EOF error for empty file, got %v", err)
 	}
 	if game != nil {
@@ -171,7 +172,7 @@ func TestSequentialProcessing(t *testing.T) {
 	// Read all games using ScanGame in a loop
 	for {
 		game, err := scanner.ScanGame()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -197,7 +198,7 @@ func TestSequentialProcessing(t *testing.T) {
 	}
 }
 
-// Additional test to verify HasNext doesn't consume games
+// Additional test to verify HasNext doesn't consume games.
 func TestHasNextDoesntConsume(t *testing.T) {
 	file, err := os.Open(filepath.Join("fixtures/pgns", "multi_game.pgn"))
 	if err != nil {
@@ -208,7 +209,7 @@ func TestHasNextDoesntConsume(t *testing.T) {
 	scanner := NewScanner(file)
 
 	// Call HasNext multiple times
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if !scanner.HasNext() {
 			t.Errorf("Expected HasNext() to return true on call %d", i+1)
 		}
