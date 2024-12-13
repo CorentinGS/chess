@@ -909,3 +909,69 @@ func TestEligibleDrawsWithFiftyMoveRule(t *testing.T) {
 		t.Fatalf("expected DrawOffer and FiftyMoveRule but got %v", draws)
 	}
 }
+
+func TestRemoveTagPairWhenKeyExists(t *testing.T) {
+	g := NewGame()
+	g.AddTagPair("Event", "Test Event")
+	removed := g.RemoveTagPair("Event")
+	if !removed {
+		t.Fatalf("expected tag pair to be removed")
+	}
+	if g.GetTagPair("Event") != "" {
+		t.Fatalf("expected tag pair to be empty but got %s", g.GetTagPair("Event"))
+	}
+}
+
+func  TestRemoveTagPairWhenKeyDoesNotExist(t *testing.T) {
+	g := NewGame()
+	removed := g.RemoveTagPair("NonExistentKey")
+	if removed {
+		t.Fatalf("expected tag pair not to be removed")
+	}
+}
+
+func  TestRemoveTagPairFromEmptyTagPairs(t *testing.T) {
+	g := NewGame()
+	g.tagPairs = make(map[string]string)
+	removed := g.RemoveTagPair("Event")
+	if removed {
+		t.Fatalf("expected tag pair not to be removed")
+	}
+}
+func TestAddTagPairWhenKeyExists(t *testing.T) {
+	g := NewGame()
+	g.AddTagPair("Event", "Test Event")
+	overwritten := g.AddTagPair("Event", "Updated Event")
+	if !overwritten {
+		t.Fatalf("expected tag pair to be overwritten")
+	}
+	if g.GetTagPair("Event") != "Updated Event" {
+		t.Fatalf("expected tag pair to be 'Updated Event' but got %s", g.GetTagPair("Event"))
+	}
+}
+
+func TestAddTagPairWhenKeyDoesNotExist(t *testing.T) {
+	g := NewGame()
+	overwritten := g.AddTagPair("Event", "Test Event")
+	if overwritten {
+		t.Fatalf("expected tag pair not to be overwritten")
+	}
+	if g.GetTagPair("Event") != "Test Event" {
+		t.Fatalf("expected tag pair to be 'Test Event' but got %s", g.GetTagPair("Event"))
+	}
+}
+
+func TestAddTagPairWithNilTagPairs(t *testing.T) {
+	g := NewGame()
+	g.tagPairs = nil
+	overwritten := g.AddTagPair("Event", "Test Event")
+	if overwritten {
+		t.Fatalf("expected tag pair not to be overwritten")
+	}
+	if g.GetTagPair("Event") != "Test Event" {
+		t.Fatalf("expected tag pair to be 'Test Event' but got %s", g.GetTagPair("Event"))
+	}
+	if g.tagPairs == nil {
+		t.Fatalf("expected tagPairs to be initialized")
+	}
+}
