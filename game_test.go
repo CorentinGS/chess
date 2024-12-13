@@ -278,3 +278,283 @@ func BenchmarkPositionHash(b *testing.B) {
 		g.Position().Hash()
 	}
 }
+
+func TestAddVariationToEmptyParent(t *testing.T) {
+	g := NewGame()
+	parent := &Move{}
+	newMove := &Move{}
+	g.AddVariation(parent, newMove)
+	if len(parent.children) != 1 || parent.children[0] != newMove {
+		t.Fatalf("expected newMove to be added to parent's children")
+	}
+	if newMove.parent != parent {
+		t.Fatalf("expected newMove's parent to be set to parent")
+	}
+}
+
+func TestAddVariationToNonEmptyParent(t *testing.T) {
+	g := NewGame()
+	parent := &Move{children: []*Move{{}}}
+	newMove := &Move{}
+	g.AddVariation(parent, newMove)
+	if len(parent.children) != 2 || parent.children[1] != newMove {
+		t.Fatalf("expected newMove to be added to parent's children")
+	}
+	if newMove.parent != parent {
+		t.Fatalf("expected newMove's parent to be set to parent")
+	}
+}
+
+func TestAddVariationWithNilParent(t *testing.T) {
+	g := NewGame()
+	newMove := &Move{}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("expected panic when parent is nil")
+		}
+	}()
+	g.AddVariation(nil, newMove)
+}
+
+func TestNavigateToMainLineFromLeaf(t *testing.T) {
+	g := NewGame()
+	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
+	for _, m := range moves {
+		if err := g.MoveStr(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g.NavigateToMainLine()
+	if g.currentMove != g.rootMove.children[0] {
+		t.Fatalf("expected to navigate to main line root move")
+	}
+}
+
+func TestNavigateToMainLineFromBranch(t *testing.T) {
+	g := NewGame()
+	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
+	for _, m := range moves {
+		if err := g.MoveStr(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	variationMove := &Move{}
+	g.AddVariation(g.currentMove, variationMove)
+	g.currentMove = variationMove
+	g.NavigateToMainLine()
+	if g.currentMove != g.rootMove.children[0] {
+		t.Fatalf("expected to navigate to main line root move")
+	}
+}
+
+func TestNavigateToMainLineFromRoot(t *testing.T) {
+	g := NewGame()
+	g.NavigateToMainLine()
+	if g.currentMove != g.rootMove {
+		t.Fatalf("expected to stay at root move")
+	}
+}
+
+func TestGoBackFromLeaf(t *testing.T) {
+	g := NewGame()
+	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
+	for _, m := range moves {
+		if err := g.MoveStr(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !g.GoBack() {
+		t.Fatalf("expected to go back from leaf move")
+	}
+	if g.currentMove != g.rootMove.children[0].children[0].children[0].children[0] {
+		t.Fatalf("expected current move to be Bb5's parent")
+	}
+}
+
+func TestGoBackFromRoot(t *testing.T) {
+	g := NewGame()
+	if g.GoBack() {
+		t.Fatalf("expected not to go back from root move")
+	}
+	if g.currentMove != g.rootMove {
+		t.Fatalf("expected to stay at root move")
+	}
+}
+
+func TestGoBackFromMainLine(t *testing.T) {
+	g := NewGame()
+	moves := []string{"e4", "e5", "Nf3"}
+	for _, m := range moves {
+		if err := g.MoveStr(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !g.GoBack() {
+		t.Fatalf("expected to go back from main line move")
+	}
+	if g.currentMove != g.rootMove.children[0].children[0] {
+		t.Fatalf("expected current move to be e5's parent")
+	}
+}
+
+func TestGoForwardFromRoot(t *testing.T) {
+	g := NewGame()
+	g.MoveStr("e4")
+	g.MoveStr("e5")
+	g.currentMove = g.rootMove // Reset to root
+	if !g.GoForward() {
+		t.Fatalf("expected to go forward from root move")
+	}
+	if g.currentMove != g.rootMove.children[0] {
+		t.Fatalf("expected current move to be the first child of root move")
+	}
+}
+
+func TestGoForwardFromLeaf(t *testing.T) {
+	g := NewGame()
+	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
+	for _, m := range moves {
+		if err := g.MoveStr(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if g.GoForward() {
+		t.Fatalf("expected not to go forward from leaf move")
+	}
+	if g.currentMove != g.rootMove.children[0].children[0].children[0].children[0].children[0] {
+		t.Fatalf("expected current move to stay at leaf move")
+	}
+}
+
+func TestGoForwardFromBranch(t *testing.T) {
+	g := NewGame()
+	moves := []string{"e4", "e5", "Nf3", "Nc6"}
+	for _, m := range moves {
+		if err := g.MoveStr(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	variationMove := &Move{}
+	g.AddVariation(g.currentMove, variationMove)
+	childMove := &Move{}                     // Add this line
+	g.AddVariation(variationMove, childMove) // Add this line
+	g.currentMove = variationMove
+	if !g.GoForward() {
+		t.Fatalf("expected to go forward from branch move")
+	}
+	if g.currentMove != childMove { // Change this line
+		t.Fatalf("expected current move to be the child of the variation move")
+	}
+}
+
+func TestIsAtStartWhenAtRoot(t *testing.T) {
+	g := NewGame()
+	if !g.IsAtStart() {
+		t.Fatalf("expected to be at start when at root move")
+	}
+}
+
+func TestIsAtStartWhenNotAtRoot(t *testing.T) {
+	g := NewGame()
+	if err := g.MoveStr("e4"); err != nil {
+		t.Fatal(err)
+	}
+	if g.IsAtStart() {
+		t.Fatalf("expected not to be at start when not at root move")
+	}
+}
+
+func TestIsAtEndWhenAtLeaf(t *testing.T) {
+	g := NewGame()
+	if err := g.MoveStr("e4"); err != nil {
+		t.Fatal(err)
+	}
+	if !g.IsAtEnd() {
+		t.Fatalf("expected to be at end when at leaf move")
+	}
+}
+
+func TestIsAtEndWhenNotAtLeaf(t *testing.T) {
+	g := NewGame()
+	if err := g.MoveStr("e4"); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.MoveStr("e5"); err != nil {
+		t.Fatal(err)
+	}
+	// Add this line to move back to a non-leaf position
+	g.GoBack()
+	if g.IsAtEnd() {
+		t.Fatalf("expected not to be at end when not at leaf move")
+	}
+}
+
+func TestVariationsWithNoChildren(t *testing.T) {
+	g := NewGame()
+	move := &Move{}
+	variations := g.Variations(move)
+	if variations != nil {
+		t.Fatalf("expected no variations for move with no children")
+	}
+}
+
+func TestVariationsWithOneChild(t *testing.T) {
+	g := NewGame()
+	move := &Move{children: []*Move{{}}}
+	variations := g.Variations(move)
+	if variations != nil {
+		t.Fatalf("expected no variations for move with one child")
+	}
+}
+
+func TestVariationsWithMultipleChildren(t *testing.T) {
+	g := NewGame()
+	move := &Move{children: []*Move{{}, {}}}
+	variations := g.Variations(move)
+	if len(variations) != 1 {
+		t.Fatalf("expected one variation for move with multiple children")
+	}
+}
+
+func TestVariationsWithNilMove(t *testing.T) {
+	g := NewGame()
+	variations := g.Variations(nil)
+	if variations != nil {
+		t.Fatalf("expected no variations for nil move")
+	}
+}
+
+func TestCommentsWithNoComments(t *testing.T) {
+	g := NewGame()
+	comments := g.Comments()
+	if len(comments) != 0 {
+		t.Fatalf("expected no comments but got %d", len(comments))
+	}
+}
+
+func TestCommentsWithSingleComment(t *testing.T) {
+	g := NewGame()
+	g.comments = [][]string{{"First comment"}}
+	comments := g.Comments()
+	if len(comments) != 1 || comments[0][0] != "First comment" {
+		t.Fatalf("expected one comment 'First comment' but got %v", comments)
+	}
+}
+
+func TestCommentsWithMultipleComments(t *testing.T) {
+	g := NewGame()
+	g.comments = [][]string{{"First comment"}, {"Second comment"}}
+	comments := g.Comments()
+	if len(comments) != 2 || comments[0][0] != "First comment" || comments[1][0] != "Second comment" {
+		t.Fatalf("expected comments 'First comment' and 'Second comment' but got %v", comments)
+	}
+}
+
+func TestCommentsWithNilComments(t *testing.T) {
+	g := NewGame()
+	g.comments = nil
+	comments := g.Comments()
+	if comments == nil || len(comments) != 0 {
+		t.Fatalf("expected no comments but got %v", comments)
+	}
+}

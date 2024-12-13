@@ -1,6 +1,9 @@
 package chess
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 type bitboardTestPair struct {
 	initial  uint64
@@ -109,5 +112,44 @@ func TestBitboardNew(t *testing.T) {
 		if uint64(bb) != c.bits {
 			t.Fatalf("new bitboard from %v expected %s but got %s", c.smap, intStr(c.bits), bb)
 		}
+	}
+}
+
+func TestMappingEmptyBitboard(t *testing.T) {
+	bb := bitboard(0)
+	expected := map[Square]bool{}
+	result := bb.Mapping()
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %v but got %v", expected, result)
+	}
+}
+
+func TestMappingSingleSquare(t *testing.T) {
+	bb := bitboard(0b_10000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000)
+	expected := map[Square]bool{A1: true}
+	result := bb.Mapping()
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %v but got %v", expected, result)
+	}
+}
+
+func TestMappingMultipleSquares(t *testing.T) {
+	bb := bitboard(0b_10000000_00000000_01000000_00000000_00000000_00000000_00000000_00000001)
+	expected := map[Square]bool{A1: true, B3: true, H8: true}
+	result := bb.Mapping()
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %v but got %v", expected, result)
+	}
+}
+
+func TestMappingFullBitboard(t *testing.T) {
+	bb := bitboard(0b_11111111_11111111_11111111_11111111_11111111_11111111_11111111_11111111)
+	expected := map[Square]bool{}
+	for sq := range numOfSquaresInBoard {
+		expected[Square(sq)] = true
+	}
+	result := bb.Mapping()
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %v but got %v", expected, result)
 	}
 }

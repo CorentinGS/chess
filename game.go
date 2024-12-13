@@ -155,13 +155,27 @@ func (g *Game) AddVariation(parent *Move, newMove *Move) {
 
 func (g *Game) NavigateToMainLine() {
 	current := g.currentMove
-	for current.parent != nil {
-		if len(current.parent.children) > 0 {
-			current = current.parent.children[0]
-		}
+
+	// First, navigate up to find a move that's part of the main line
+	for current.parent != nil && !isMainLine(current) {
 		current = current.parent
 	}
-	g.currentMove = current
+
+	// If there are no moves in the game, stay at root
+	if len(g.rootMove.children) == 0 {
+		g.currentMove = g.rootMove
+		return
+	}
+
+	// Otherwise, navigate to the first move of the main line
+	g.currentMove = g.rootMove.children[0]
+}
+
+func isMainLine(move *Move) bool {
+	if move.parent == nil {
+		return true
+	}
+	return move == move.parent.children[0] && isMainLine(move.parent)
 }
 
 // Move updates the game with the given move.  An error is returned
@@ -207,6 +221,7 @@ func (g *Game) GoBack() bool {
 }
 
 func (g *Game) GoForward() bool {
+	// Check if current move exists and has children
 	if g.currentMove != nil && len(g.currentMove.children) > 0 {
 		g.currentMove = g.currentMove.children[0] // Follow main line
 		return true
@@ -260,7 +275,11 @@ func (g *Game) Variations(move *Move) []*Move {
 }
 
 // Comments returns the comments for the game indexed by moves.
+// Comments returns the comments for the game indexed by moves.
 func (g *Game) Comments() [][]string {
+	if g.comments == nil {
+		return [][]string{}
+	}
 	return append([][]string(nil), g.comments...)
 }
 
