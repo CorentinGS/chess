@@ -462,14 +462,15 @@ func (l *Lexer) NextToken() Token {
 		for l.ch != 0 && isDigit(l.ch) {
 			l.readChar()
 		}
-		if l.ch == '.' {
+		switch l.ch {
+		case '.':
 			return Token{Type: MoveNumber, Value: l.input[position:l.position]}
-		} else if l.ch == '-' {
+		case '-':
 			l.position = position
 			l.readPosition = position + 1
 			l.ch = l.input[position]
 			return l.readResult()
-		} else {
+		default:
 			// Reset position and try again as a regular number
 			l.position = position
 			l.readPosition = position + 1

@@ -337,6 +337,7 @@ func (pos *Position) updateCastleRights(m *Move) CastleRights {
 }
 
 func (pos *Position) updateEnPassantSquare(m *Move) Square {
+	const squaresPerRank = 8
 	p := pos.board.Piece(m.s1)
 	if p.Type() != Pawn {
 		return NoSquare
@@ -344,11 +345,11 @@ func (pos *Position) updateEnPassantSquare(m *Move) Square {
 	if pos.turn == White &&
 		(bbForSquare(m.s1)&bbRank2) != 0 &&
 		(bbForSquare(m.s2)&bbRank4) != 0 {
-		return m.s2 - 8
+		return m.s2 - squaresPerRank
 	} else if pos.turn == Black &&
 		(bbForSquare(m.s1)&bbRank7) != 0 &&
 		(bbForSquare(m.s2)&bbRank5) != 0 {
-		return m.s2 + 8
+		return m.s2 + squaresPerRank
 	}
 	return NoSquare
 }

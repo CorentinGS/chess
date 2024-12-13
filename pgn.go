@@ -8,10 +8,10 @@ import (
 
 // Parser holds the state needed during parsing.
 type Parser struct {
-	tokens      []Token
-	position    int
 	game        *Game
 	currentMove *Move
+	tokens      []Token
+	position    int
 }
 
 // NewParser creates a new Parser instance.

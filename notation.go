@@ -145,11 +145,11 @@ func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
 	m := &Move{s1: s1, s2: s2}
 
 	if l == promoLen {
-		if promo := pieceTypeFromChar(s[4:5]); promo == NoPieceType {
+		promo := pieceTypeFromChar(s[4:5])
+		if promo == NoPieceType {
 			return nil, fmt.Errorf("chess: invalid promotion piece in UCI notation %q", s)
-		} else {
-			m.promo = promo
 		}
+		m.promo = promo
 	}
 
 	if pos == nil {

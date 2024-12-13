@@ -303,15 +303,17 @@ func (b *Board) update(m *Move) {
 		}
 	}
 	// move rook for castle
-	if p1.Color() == White && m.HasTag(KingSideCastle) {
+	switch {
+	case p1.Color() == White && m.HasTag(KingSideCastle):
 		b.bbWhiteRook = b.bbWhiteRook & ^bbForSquare(H1) | bbForSquare(F1)
-	} else if p1.Color() == White && m.HasTag(QueenSideCastle) {
+	case p1.Color() == White && m.HasTag(QueenSideCastle):
 		b.bbWhiteRook = (b.bbWhiteRook & ^bbForSquare(A1)) | bbForSquare(D1)
-	} else if p1.Color() == Black && m.HasTag(KingSideCastle) {
+	case p1.Color() == Black && m.HasTag(KingSideCastle):
 		b.bbBlackRook = b.bbBlackRook & ^bbForSquare(H8) | bbForSquare(F8)
-	} else if p1.Color() == Black && m.HasTag(QueenSideCastle) {
+	case p1.Color() == Black && m.HasTag(QueenSideCastle):
 		b.bbBlackRook = (b.bbBlackRook & ^bbForSquare(A8)) | bbForSquare(D8)
 	}
+
 	b.calcConvienceBBs(m)
 }
 
@@ -322,7 +324,8 @@ func (b *Board) calcConvienceBBs(m *Move) {
 	b.whiteSqs = whiteSqs
 	b.blackSqs = blackSqs
 	b.emptySqs = emptySqs
-	if m == nil {
+	switch {
+	case m == nil:
 		b.whiteKingSq = NoSquare
 		b.blackKingSq = NoSquare
 
@@ -334,9 +337,9 @@ func (b *Board) calcConvienceBBs(m *Move) {
 				b.blackKingSq = sqr
 			}
 		}
-	} else if m.s1 == b.whiteKingSq {
+	case m.s1 == b.whiteKingSq:
 		b.whiteKingSq = m.s2
-	} else if m.s1 == b.blackKingSq {
+	case m.s1 == b.blackKingSq:
 		b.blackKingSq = m.s2
 	}
 }

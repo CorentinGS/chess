@@ -16,6 +16,7 @@ import (
 type BookECO struct {
 	root             *node
 	startingPosition *chess.Position
+	labelCount       int
 }
 
 // NewBookECO returns a new BookECO.  This operation has to parse 2k rows of CSV data and insert it into a graph
@@ -29,10 +30,10 @@ func NewBookECO() *BookECO {
 		root: &node{
 			children: map[string]*node{},
 			pos:      chess.NewGame().Position(),
-			label:    label(),
 		},
 		startingPosition: startingPosition,
 	}
+	b.root.label = b.label()
 	r := csv.NewReader(bytes.NewBuffer(ecoData))
 	r.Comma = '\t'
 	records, err := r.ReadAll()
@@ -115,7 +116,7 @@ func (b *BookECO) ins(n *node, o *Opening, posList []*chess.Position, moves []*c
 			parent:   n,
 			children: map[string]*node{},
 			pos:      pos,
-			label:    label(),
+			label:    b.label(),
 		}
 		n.children[moveStr] = child
 	}
@@ -159,9 +160,9 @@ var (
 	labelCount = 0 //nolint:gochecknoglobals // this is a counter for generating unique labels. (will be removed in the future)
 )
 
-func label() string {
-	s := "a" + strconv.Itoa(labelCount)
-	labelCount++
+func (b *BookECO) label() string {
+	s := "a" + strconv.Itoa(b.labelCount)
+	b.labelCount++
 	return s
 }
 
