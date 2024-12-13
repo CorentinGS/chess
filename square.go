@@ -10,12 +10,12 @@ type Square int8
 
 // File returns the square's file.
 func (sq Square) File() File {
-	return File(int(sq) % numOfSquaresInRow)
+	return File(sq % numOfSquaresInRow)
 }
 
 // Rank returns the square's rank.
 func (sq Square) Rank() Rank {
-	return Rank(int(sq) / numOfSquaresInRow)
+	return Rank(sq / numOfSquaresInRow)
 }
 
 func (sq Square) String() string {

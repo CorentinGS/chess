@@ -78,31 +78,30 @@ type Game struct {
 func PGN(r io.Reader) (func(*Game), error) {
 	scanner := NewScanner(r)
 
-	for scanner.HasNext() {
-		gameScanned, err := scanner.ScanGame()
-		if err != nil {
-			return nil, err
-		}
-
-		tokens, err := TokenizeGame(gameScanned)
-		if err != nil {
-			return nil, err
-		}
-
-		parser := NewParser(tokens)
-		game, err := parser.Parse()
-		if err != nil {
-			return nil, err
-		}
-
-		// Return a function that updates the game with the parsed game state
-		return func(g *Game) {
-			g.copy(game)
-		}, nil
+	if !scanner.HasNext() {
+		return nil, ErrNoGameFound
 	}
 
-	// Return a sentinel error if no games are found
-	return nil, ErrNoGameFound
+	gameScanned, err := scanner.ScanGame()
+	if err != nil {
+		return nil, err
+	}
+
+	tokens, err := TokenizeGame(gameScanned)
+	if err != nil {
+		return nil, err
+	}
+
+	parser := NewParser(tokens)
+	game, err := parser.Parse()
+	if err != nil {
+		return nil, err
+	}
+
+	// Return a function that updates the game with the parsed game state
+	return func(g *Game) {
+		g.copy(game)
+	}, nil
 }
 
 // FEN takes a string and returns a function that updates
