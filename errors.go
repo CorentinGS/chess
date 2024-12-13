@@ -34,4 +34,6 @@ var (
 	ErrInvalidPiece        = func(pos int) error { return &PGNError{"invalid piece", pos} }
 	ErrInvalidSquare       = func(pos int) error { return &PGNError{"invalid square", pos} }
 	ErrInvalidRank         = func(pos int) error { return &PGNError{"invalid rank", pos} }
+
+	ErrNoGameFound = errors.New("no game found in PGN data")
 )
