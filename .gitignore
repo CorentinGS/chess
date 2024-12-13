@@ -28,3 +28,4 @@ _testmain.go
 
 # Benchmarking
 cpu.out
+.idea
