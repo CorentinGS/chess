@@ -44,8 +44,8 @@ var (
 	//nolint:gochecknoglobals // false positive
 	pieceOptionsPool = sync.Pool{
 		New: func() interface{} {
-			// Starting capacity of 4 covers most common cases
-			return make([]string, 0, piecesPoolCapacity)
+			s := make([]string, 0, piecesPoolCapacity)
+			return &s // Return pointer to slice
 		},
 	}
 )
@@ -271,9 +271,9 @@ func (mc moveComponents) clean() string {
 // generateMoveOptions creates possible alternative notations for a move.
 func (mc moveComponents) generateOptions() []string {
 	// Get pre-allocated slice from pool
-	options, _ := pieceOptionsPool.Get().([]string)
-	options = options[:0]               // Clear but keep capacity
-	defer pieceOptionsPool.Put(options) //nolint:staticcheck // false positive
+	options := pieceOptionsPool.Get().(*[]string)
+	*options = (*options)[:0]               // Clear but keep capacity
+	defer pieceOptionsPool.Put(options)     // Now passing pointer
 
 	// Build move options using string builder for efficiency
 	sb, _ := stringPool.Get().(*strings.Builder)
@@ -288,7 +288,7 @@ func (mc moveComponents) generateOptions() []string {
 		sb.WriteString(mc.rank)
 		sb.WriteString(mc.promotes)
 		sb.WriteString(mc.castles)
-		options = append(options, sb.String())
+		*options = append(*options, sb.String())
 
 		// Option 2: with rank, no file
 		sb.Reset()
@@ -299,7 +299,7 @@ func (mc moveComponents) generateOptions() []string {
 		sb.WriteString(mc.rank)
 		sb.WriteString(mc.promotes)
 		sb.WriteString(mc.castles)
-		options = append(options, sb.String())
+		*options = append(*options, sb.String())
 
 		// Option 3: with file, no rank
 		sb.Reset()
@@ -310,7 +310,7 @@ func (mc moveComponents) generateOptions() []string {
 		sb.WriteString(mc.rank)
 		sb.WriteString(mc.promotes)
 		sb.WriteString(mc.castles)
-		options = append(options, sb.String())
+		*options = append(*options, sb.String())
 	} else {
 		if mc.capture != "" {
 			// Pawn capture without rank
@@ -320,7 +320,7 @@ func (mc moveComponents) generateOptions() []string {
 			sb.WriteString(mc.file)
 			sb.WriteString(mc.rank)
 			sb.WriteString(mc.promotes)
-			options = append(options, sb.String())
+			*options = append(*options, sb.String())
 		}
 		if mc.originFile != "" && mc.originRank != "" {
 			// Full coordinates version
@@ -329,11 +329,11 @@ func (mc moveComponents) generateOptions() []string {
 			sb.WriteString(mc.file)
 			sb.WriteString(mc.rank)
 			sb.WriteString(mc.promotes)
-			options = append(options, sb.String())
+			*options = append(*options, sb.String())
 		}
 	}
 
-	return options
+	return *options
 }
 
 // Decode implements the Decoder interface.
