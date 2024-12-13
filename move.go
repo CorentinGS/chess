@@ -22,7 +22,7 @@ const (
 // A Move is the movement of a piece from one square to another.
 type Move struct {
 	parent   *Move
-	position *Position
+	position *Position // Position after the move
 	nag      string
 	comments string
 	command  string

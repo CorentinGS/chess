@@ -60,7 +60,7 @@ type TagPairs map[string]string
 
 // A Game represents a single chess game.
 type Game struct {
-	pos                  *Position
+	pos                  *Position // The current position // Will be removed in favor of currentMove.position
 	outcome              Outcome
 	tagPairs             TagPairs
 	rootMove             *Move // Root of the move tree
@@ -120,7 +120,8 @@ func FEN(fen string) (func(*Game), error) {
 	return func(g *Game) {
 		pos.inCheck = isInCheck(pos)
 		g.pos = pos
-		g.updatePosition()
+		g.rootMove.position = pos
+		g.evaluatePositionStatus()
 	}, nil
 }
 
@@ -135,6 +136,7 @@ func NewGame(options ...func(*Game)) *Game {
 
 	game := &Game{
 		rootMove:    rootMove,
+		tagPairs:    make(map[string]string),
 		currentMove: rootMove,
 		pos:         pos,
 		outcome:     NoOutcome,
@@ -186,7 +188,7 @@ func (g *Game) Move(m *Move) error {
 		return fmt.Errorf("chess: invalid move %s", m)
 	}
 	g.MakeMove(m)
-	g.updatePosition()
+	g.evaluatePositionStatus()
 	return nil
 }
 
@@ -215,6 +217,7 @@ func (g *Game) MakeMove(move *Move) {
 func (g *Game) GoBack() bool {
 	if g.currentMove != nil && g.currentMove.parent != nil {
 		g.currentMove = g.currentMove.parent
+		g.pos = g.currentMove.position.copy()
 		return true
 	}
 	return false
@@ -224,6 +227,7 @@ func (g *Game) GoForward() bool {
 	// Check if current move exists and has children
 	if g.currentMove != nil && len(g.currentMove.children) > 0 {
 		g.currentMove = g.currentMove.children[0] // Follow main line
+		g.pos = g.currentMove.position
 		return true
 	}
 	return false
@@ -284,8 +288,21 @@ func (g *Game) Comments() [][]string {
 }
 
 // Position returns the game's current position.
+// Deprecated: Use CurrentPosition() instead.
+// This method will be removed in a future release.
 func (g *Game) Position() *Position {
 	return g.pos
+}
+
+// CurrentPosition returns the game's current move position.
+// This is the position at the current pointer in the move tree.
+// This should be used to get the current position of the game instead of Position().
+func (g *Game) CurrentPosition() *Position {
+	if g.currentMove == nil {
+		return g.pos
+	}
+
+	return g.currentMove.position
 }
 
 // Outcome returns the game outcome.
@@ -378,6 +395,9 @@ func (g *Game) EligibleDraws() []Method {
 // AddTagPair adds or updates a tag pair with the given key and
 // value and returns true if the value is overwritten.
 func (g *Game) AddTagPair(k, v string) bool {
+	if g.tagPairs == nil {
+		g.tagPairs = make(map[string]string)
+	}
 	if _, existing := g.tagPairs[k]; existing {
 		g.tagPairs[k] = v
 		return true
@@ -403,7 +423,8 @@ func (g *Game) RemoveTagPair(k string) bool {
 	return false
 }
 
-func (g *Game) updatePosition() {
+// evaluatePositionStatus updates the game's outcome and method based on the current position.
+func (g *Game) evaluatePositionStatus() {
 	method := g.pos.Status()
 	if method == Stalemate {
 		g.method = Stalemate
@@ -439,23 +460,29 @@ func (g *Game) updatePosition() {
 }
 
 func (g *Game) copy(game *Game) {
-	g.tagPairs = game.tagPairs
+	g.tagPairs = make(map[string]string)
+	for k, v := range game.tagPairs {
+		g.tagPairs[k] = v
+	}
 	g.rootMove = game.rootMove
 	g.currentMove = game.currentMove
 	g.pos = game.pos
 	g.outcome = game.outcome
 	g.method = game.method
 	g.comments = game.Comments()
+	g.ignoreAutomaticDraws = game.ignoreAutomaticDraws
 }
 
 func (g *Game) Clone() *Game {
 	return &Game{
-		tagPairs:    g.tagPairs,
-		rootMove:    g.rootMove,
-		currentMove: g.currentMove,
-		pos:         g.pos,
-		outcome:     g.outcome,
-		method:      g.method,
+		tagPairs:             g.tagPairs,
+		rootMove:             g.rootMove,
+		currentMove:          g.currentMove,
+		pos:                  g.pos,
+		outcome:              g.outcome,
+		method:               g.method,
+		comments:             g.Comments(),
+		ignoreAutomaticDraws: g.ignoreAutomaticDraws,
 	}
 }
 
@@ -489,10 +516,124 @@ func (g *Game) numOfRepetitions() int {
 	return count
 }
 
-func (g *Game) MoveStr(move string) error {
-	m, err := AlgebraicNotation{}.Decode(g.pos, move)
+// MoveStr updates the game with the given move in algebraic notation.
+// Deprecated: Use PushMove instead.
+// TODO: Replace with PushMove in all tests
+func (g *Game) MoveStr(algebraicMove string) error {
+	// Parse the move
+	tokens, err := TokenizeGame(&GameScanned{Raw: algebraicMove})
+	if err != nil {
+		return errors.New("failed to tokenize move")
+	}
+
+	parser := NewParser(tokens)
+	parser.game = g
+	parser.currentMove = g.currentMove
+
+	// Parse the move
+	move, err := parser.parseMove()
 	if err != nil {
 		return err
 	}
-	return g.Move(m)
+
+	return g.Move(move)
+}
+
+// PushMoveOptions contains options for pushing a move to the game
+type PushMoveOptions struct {
+	// ForceMainline makes this move the main line if variations exist
+	ForceMainline bool
+}
+
+// PushMove updates the game with the given move in algebraic notation.
+func (g *Game) PushMove(algebraicMove string, options *PushMoveOptions) error {
+	if options == nil {
+		options = &PushMoveOptions{}
+	}
+
+	move, err := g.parseAndValidateMove(algebraicMove)
+	if err != nil {
+		return err
+	}
+
+	existingMove := g.findExistingMove(move)
+	g.addOrReorderMove(move, existingMove, options.ForceMainline)
+
+	g.updatePosition(move)
+	g.currentMove = move
+
+	return nil
+}
+
+func (g *Game) parseAndValidateMove(algebraicMove string) (*Move, error) {
+	tokens, err := TokenizeGame(&GameScanned{Raw: algebraicMove})
+	if err != nil {
+		return nil, errors.New("failed to tokenize move")
+	}
+
+	parser := NewParser(tokens)
+	parser.game = g
+	parser.currentMove = g.currentMove
+
+	move, err := parser.parseMove()
+	if err != nil {
+		return nil, err
+	}
+
+	if g.pos == nil {
+		return nil, errors.New("no current position")
+	}
+
+	return move, nil
+}
+
+func (g *Game) findExistingMove(move *Move) *Move {
+	if g.currentMove == nil {
+		return nil
+	}
+	for _, child := range g.currentMove.children {
+		if child.s1 == move.s1 && child.s2 == move.s2 && child.promo == move.promo {
+			return child
+		}
+	}
+	return nil
+}
+
+func (g *Game) addOrReorderMove(move, existingMove *Move, forceMainline bool) {
+	move.parent = g.currentMove
+
+	if existingMove != nil {
+		if forceMainline && existingMove != g.currentMove.children[0] {
+			g.reorderMoveToFront(existingMove)
+		}
+		move = existingMove
+	} else {
+		g.addNewMove(move, forceMainline)
+	}
+}
+
+func (g *Game) reorderMoveToFront(move *Move) {
+	children := g.currentMove.children
+	for i, child := range children {
+		if child == move {
+			copy(children[1:i+1], children[:i])
+			children[0] = move
+			break
+		}
+	}
+}
+
+func (g *Game) addNewMove(move *Move, forceMainline bool) {
+	if forceMainline {
+		g.currentMove.children = append([]*Move{move}, g.currentMove.children...)
+	} else {
+		g.currentMove.children = append(g.currentMove.children, move)
+	}
+}
+
+func (g *Game) updatePosition(move *Move) {
+	if newPos := g.pos.Update(move); newPos != nil {
+		g.pos = newPos
+		move.position = newPos
+	}
 }

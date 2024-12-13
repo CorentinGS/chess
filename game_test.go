@@ -32,6 +32,7 @@ func TestCheckmate(t *testing.T) {
 	if err := g.MoveStr("O-O-O"); err != nil {
 		t.Fatal(err)
 	}
+	t.Log(g.Position().String())
 	if g.Method() != Checkmate {
 		t.Fatalf("expected method %s but got %s", Checkmate, g.Method())
 	}
@@ -320,7 +321,7 @@ func TestNavigateToMainLineFromLeaf(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
 	for _, m := range moves {
-		if err := g.MoveStr(m); err != nil {
+		if err := g.PushMove(m, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -334,7 +335,7 @@ func TestNavigateToMainLineFromBranch(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
 	for _, m := range moves {
-		if err := g.MoveStr(m); err != nil {
+		if err := g.PushMove(m, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -359,7 +360,7 @@ func TestGoBackFromLeaf(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
 	for _, m := range moves {
-		if err := g.MoveStr(m); err != nil {
+		if err := g.PushMove(m, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -385,7 +386,7 @@ func TestGoBackFromMainLine(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3"}
 	for _, m := range moves {
-		if err := g.MoveStr(m); err != nil {
+		if err := g.PushMove(m, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -399,8 +400,8 @@ func TestGoBackFromMainLine(t *testing.T) {
 
 func TestGoForwardFromRoot(t *testing.T) {
 	g := NewGame()
-	g.MoveStr("e4")
-	g.MoveStr("e5")
+	_ = g.PushMove("e4", nil)
+	_ = g.PushMove("e5", nil)
 	g.currentMove = g.rootMove // Reset to root
 	if !g.GoForward() {
 		t.Fatalf("expected to go forward from root move")
@@ -414,7 +415,7 @@ func TestGoForwardFromLeaf(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
 	for _, m := range moves {
-		if err := g.MoveStr(m); err != nil {
+		if err := g.PushMove(m, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -430,7 +431,7 @@ func TestGoForwardFromBranch(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6"}
 	for _, m := range moves {
-		if err := g.MoveStr(m); err != nil {
+		if err := g.PushMove(m, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -456,7 +457,7 @@ func TestIsAtStartWhenAtRoot(t *testing.T) {
 
 func TestIsAtStartWhenNotAtRoot(t *testing.T) {
 	g := NewGame()
-	if err := g.MoveStr("e4"); err != nil {
+	if err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.IsAtStart() {
@@ -466,7 +467,7 @@ func TestIsAtStartWhenNotAtRoot(t *testing.T) {
 
 func TestIsAtEndWhenAtLeaf(t *testing.T) {
 	g := NewGame()
-	if err := g.MoveStr("e4"); err != nil {
+	if err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
 	if !g.IsAtEnd() {
@@ -476,10 +477,10 @@ func TestIsAtEndWhenAtLeaf(t *testing.T) {
 
 func TestIsAtEndWhenNotAtLeaf(t *testing.T) {
 	g := NewGame()
-	if err := g.MoveStr("e4"); err != nil {
+	if err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.MoveStr("e5"); err != nil {
+	if err := g.PushMove("e5", nil); err != nil {
 		t.Fatal(err)
 	}
 	// Add this line to move back to a non-leaf position
@@ -556,5 +557,355 @@ func TestCommentsWithNilComments(t *testing.T) {
 	comments := g.Comments()
 	if comments == nil || len(comments) != 0 {
 		t.Fatalf("expected no comments but got %v", comments)
+	}
+}
+
+func TestPushMove(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupMoves    []string         // Moves to set up the position
+		move          string           // Move to push
+		goBack        bool             // Whether to go back one move before pushing
+		options       *PushMoveOptions // Options for the push
+		wantErr       bool             // Whether we expect an error
+		wantPosition  string           // Expected FEN after the move
+		checkMainline []string         // Expected mainline moves in UCI notation
+	}{
+		{
+			name:          "basic pawn move",
+			move:          "e4",
+			wantErr:       false,
+			wantPosition:  "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+			checkMainline: []string{"e2e4"},
+		},
+		{
+			name:    "invalid move should fail",
+			move:    "e9",
+			wantErr: true,
+		},
+		{
+			name:          "piece move",
+			setupMoves:    []string{"e4", "e5"},
+			move:          "Nf3",
+			wantPosition:  "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+			checkMainline: []string{"e2e4", "e7e5", "g1f3"},
+		},
+		{
+			name:          "create variation without force mainline",
+			setupMoves:    []string{"e4", "e5", "Nf3"},
+			move:          "Nc3",
+			goBack:        true,
+			options:       &PushMoveOptions{},
+			wantPosition:  "rnbqkbnr/pppp1ppp/8/4p3/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2",
+			checkMainline: []string{"e2e4", "e7e5", "g1f3"}, // Original mainline remains
+		},
+		{
+			name:          "create variation with force mainline",
+			setupMoves:    []string{"e4", "e5", "Nf3"},
+			move:          "Nc3",
+			goBack:        true,
+			options:       &PushMoveOptions{ForceMainline: true},
+			wantPosition:  "rnbqkbnr/pppp1ppp/8/4p3/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2",
+			checkMainline: []string{"e2e4", "e7e5", "b1c3"}, // New mainline
+		},
+		{
+			name:          "push existing move without override",
+			setupMoves:    []string{"e4", "e5", "Nf3"},
+			move:          "Nf3",
+			goBack:        true,
+			options:       &PushMoveOptions{},
+			wantPosition:  "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+			checkMainline: []string{"e2e4", "e7e5", "g1f3"},
+		},
+		{
+			name:          "castling move",
+			setupMoves:    []string{"e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "d3", "Nf6"},
+			move:          "O-O",
+			wantPosition:  "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQ1RK1 b kq - 2 5",
+			checkMainline: []string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "d2d3", "g8f6", "O-O"},
+		},
+		{
+			name:          "en passant capture",
+			setupMoves:    []string{"e4", "Nf6", "e5", "d5"},
+			move:          "exd6",
+			wantPosition:  "rnbqkb1r/ppp1pppp/3P1n2/8/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3",
+			checkMainline: []string{"e2e4", "g8f6", "e4e5", "d7d5", "e5d6"},
+		},
+		{
+			name:          "pawn promotion",
+			setupMoves:    []string{"e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"},
+			move:          "bxa8=Q",
+			wantPosition:  "Q1bqkb1r/p2npppp/5n2/8/8/8/PPPP1PPP/RNBQKBNR b KQk - 0 5",
+			checkMainline: []string{"e2e4", "d7d5", "e4d5", "c7c6", "d5c6", "g8f6", "c6b7", "b8d7", "b7a8=q"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new game for each test
+			game := NewGame()
+
+			// Setup moves
+			for _, move := range tt.setupMoves {
+				err := game.PushMove(move, nil)
+				if err != nil {
+					t.Fatalf("setup failed: %v", err)
+				}
+			}
+
+			// Go back one move if needed for the test
+			if tt.goBack && game.currentMove != nil && game.currentMove.parent != nil {
+				game.GoBack()
+
+			}
+
+			// Test the move
+			err := game.PushMove(tt.move, tt.options)
+
+			// Check error expectation
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PushMove() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			// Check position
+			if tt.wantPosition != "" {
+				gotFEN := game.pos.String()
+				if gotFEN != tt.wantPosition {
+					t.Errorf("Position after move = %v, want %v", gotFEN, tt.wantPosition)
+				}
+			}
+
+			// Check mainline
+			if tt.checkMainline != nil {
+				mainline := getMainline(game)
+				if !moveSlicesEqual(mainline, tt.checkMainline) {
+					t.Errorf("Mainline = %v, want %v", mainline, tt.checkMainline)
+				}
+			}
+		})
+	}
+}
+
+// Helper function to get the mainline moves from a game
+func getMainline(game *Game) []string {
+	var moves []string
+	current := game.rootMove
+
+	for len(current.children) > 0 {
+		current = current.children[0] // Follow main line (first variation)
+		moves = append(moves, algebraicMove(current))
+	}
+
+	return moves
+}
+
+// Helper function to convert a move to algebraic notation
+func algebraicMove(move *Move) string {
+	// This is a simplified version - you might want to implement proper algebraic notation
+	if move.HasTag(KingSideCastle) {
+		return "O-O"
+	}
+	if move.HasTag(QueenSideCastle) {
+		return "O-O-O"
+	}
+
+	s1 := move.s1.String()
+	s2 := move.s2.String()
+
+	if move.promo != NoPieceType {
+		return s1 + s2 + "=" + move.promo.String()
+	}
+
+	return s1 + s2
+}
+
+// Helper function to compare move slices
+func moveSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestCopyGameState(t *testing.T) {
+	original := NewGame()
+	_ = original.PushMove("e4", nil)
+	_ = original.PushMove("e5", nil)
+	_ = original.PushMove("Nf3", nil)
+
+	newGame := NewGame()
+	newGame.copy(original)
+
+	if newGame.pos.String() != original.pos.String() {
+		t.Fatalf("expected position %s but got %s", original.pos.String(), newGame.pos.String())
+	}
+	if newGame.currentMove != original.currentMove {
+		t.Fatalf("expected current move to be %v but got %v", original.currentMove, newGame.currentMove)
+	}
+	if newGame.outcome != original.outcome {
+		t.Fatalf("expected outcome %s but got %s", original.outcome, newGame.outcome)
+	}
+	if newGame.method != original.method {
+		t.Fatalf("expected method %d but got %d", original.method, newGame.method)
+	}
+	if len(newGame.Comments()) != len(original.Comments()) {
+		t.Fatalf("expected comments %v but got %v", original.Comments(), newGame.Comments())
+	}
+}
+
+func TestCopyGameStateWithNilComments(t *testing.T) {
+	original := NewGame()
+	original.comments = nil
+
+	newGame := NewGame()
+	newGame.copy(original)
+
+	if newGame.comments == nil {
+		t.Fatalf("expected comments to be initialized")
+	}
+}
+
+func TestCopyGameStateWithTagPairs(t *testing.T) {
+	original := NewGame()
+	original.AddTagPair("Event", "Test Event")
+
+	newGame := NewGame()
+	newGame.copy(original)
+
+	if newGame.GetTagPair("Event") != "Test Event" {
+		t.Fatalf("expected tag pair 'Test Event' but got %s", newGame.GetTagPair("Event"))
+	}
+}
+
+func TestCloneGameState(t *testing.T) {
+	original := NewGame()
+	_ = original.PushMove("e4", nil)
+	_ = original.PushMove("e5", nil)
+	_ = original.PushMove("Nf3", nil)
+
+	clone := original.Clone()
+
+	if clone.pos.String() != original.pos.String() {
+		t.Fatalf("expected position %s but got %s", original.pos.String(), clone.pos.String())
+	}
+	if clone.currentMove != original.currentMove {
+		t.Fatalf("expected current move to be %v but got %v", original.currentMove, clone.currentMove)
+	}
+	if clone.outcome != original.outcome {
+		t.Fatalf("expected outcome %s but got %s", original.outcome, clone.outcome)
+	}
+	if clone.method != original.method {
+		t.Fatalf("expected method %d but got %d", original.method, clone.method)
+	}
+	if len(clone.Comments()) != len(original.Comments()) {
+		t.Fatalf("expected comments %v but got %v", original.Comments(), clone.Comments())
+	}
+}
+
+func TestCloneGameStateWithNilComments(t *testing.T) {
+	original := NewGame()
+	original.comments = nil
+
+	clone := original.Clone()
+
+	if clone.comments == nil {
+		t.Fatalf("expected comments to be initialized")
+	}
+}
+
+func TestCloneGameStateWithTagPairs(t *testing.T) {
+	original := NewGame()
+	original.AddTagPair("Event", "Test Event")
+
+	clone := original.Clone()
+
+	if clone.GetTagPair("Event") != "Test Event" {
+		t.Fatalf("expected tag pair 'Test Event' but got %s", clone.GetTagPair("Event"))
+	}
+}
+
+func TestResignWhenGameInProgress(t *testing.T) {
+	g := NewGame()
+	g.Resign(White)
+	if g.Outcome() != BlackWon {
+		t.Fatalf("expected outcome %s but got %s", BlackWon, g.Outcome())
+	}
+	if g.Method() != Resignation {
+		t.Fatalf("expected method %s but got %s", Resignation, g.Method())
+	}
+}
+
+func TestResignWhenGameAlreadyCompleted(t *testing.T) {
+	g := NewGame()
+	g.Resign(White)
+	g.Resign(Black)
+	if g.Outcome() != BlackWon {
+		t.Fatalf("expected outcome %s but got %s", BlackWon, g.Outcome())
+	}
+	if g.Method() != Resignation {
+		t.Fatalf("expected method %s but got %s", Resignation, g.Method())
+	}
+}
+
+func TestResignWithInvalidColor(t *testing.T) {
+	g := NewGame()
+	g.Resign(NoColor)
+	if g.Outcome() != NoOutcome {
+		t.Fatalf("expected outcome %s but got %s", NoOutcome, g.Outcome())
+	}
+	if g.Method() != NoMethod {
+		t.Fatalf("expected method %s but got %s", NoMethod, g.Method())
+	}
+}
+
+func TestResignWhenBlackResigns(t *testing.T) {
+	g := NewGame()
+	g.Resign(Black)
+	if g.Outcome() != WhiteWon {
+		t.Fatalf("expected outcome %s but got %s", WhiteWon, g.Outcome())
+	}
+	if g.Method() != Resignation {
+		t.Fatalf("expected method %s but got %s", Resignation, g.Method())
+	}
+}
+
+func TestEligibleDrawsWithNoRepetitionsAndLowHalfMoveClock(t *testing.T) {
+	g := NewGame()
+	draws := g.EligibleDraws()
+	if len(draws) != 1 || draws[0] != DrawOffer {
+		t.Fatalf("expected only DrawOffer but got %v", draws)
+	}
+}
+
+func TestEligibleDrawsWithThreeRepetitions(t *testing.T) {
+	g := NewGame()
+	moves := []string{"Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6"}
+	for _, m := range moves {
+		if err := g.PushMove(m, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	draws := g.EligibleDraws()
+	if len(draws) != 2 || draws[1] != ThreefoldRepetition {
+		t.Fatalf("expected DrawOffer and ThreefoldRepetition but got %v", draws)
+	}
+}
+
+func TestEligibleDrawsWithFiftyMoveRule(t *testing.T) {
+	fen, _ := FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 100 60")
+	g := NewGame(fen)
+	draws := g.EligibleDraws()
+	if len(draws) != 2 || draws[1] != FiftyMoveRule {
+		t.Fatalf("expected DrawOffer and FiftyMoveRule but got %v", draws)
 	}
 }

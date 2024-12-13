@@ -22,9 +22,10 @@ func NewParser(tokens []Token) *Parser {
 	return &Parser{
 		tokens: tokens,
 		game: &Game{
-			tagPairs: make(TagPairs),
-			pos:      StartingPosition(),
-			rootMove: rootMove, // Empty root move
+			tagPairs:    make(TagPairs),
+			pos:         StartingPosition(),
+			rootMove:    rootMove, // Empty root move
+			currentMove: rootMove,
 		},
 		currentMove: rootMove,
 	}
@@ -62,7 +63,7 @@ func (p *Parser) Parse() (*Game, error) {
 
 	// Parse moves section
 	if err := p.parseMoveText(); err != nil {
-		return nil, errors.New("parsing moves")
+		return nil, err
 	}
 
 	return p.game, nil
@@ -171,6 +172,9 @@ func (p *Parser) parseMove() (*Move, error) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
 				move.position = p.game.pos.copy()
+				if m.HasTag(Check) {
+					move.addTag(Check)
+				}
 				p.advance()
 				return move, nil
 			}
@@ -185,6 +189,9 @@ func (p *Parser) parseMove() (*Move, error) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
 				move.position = p.game.pos
+				if m.HasTag(Check) {
+					move.addTag(Check)
+				}
 				p.advance()
 				return move, nil
 			}
@@ -254,7 +261,7 @@ func (p *Parser) parseMove() (*Move, error) {
 	// Find matching legal move
 	var matchingMove *Move
 	var err error
-	for _, m := range p.game.pos.ValidMoves() {
+	for _, m := range p.game.ValidMoves() {
 		//nolint:nestif // readability
 		if m.S2() == targetSquare {
 			pos := p.game.pos
