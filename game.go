@@ -562,6 +562,9 @@ func (g *Game) PushMove(algebraicMove string, options *PushMoveOptions) error {
 	g.updatePosition(move)
 	g.currentMove = move
 
+	// Add this line to evaluate the position after the move
+	g.evaluatePositionStatus()
+
 	return nil
 }
 

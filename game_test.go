@@ -12,7 +12,7 @@ func TestCheckmate(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := NewGame(fen)
-	if err := g.MoveStr("Qxf7#"); err != nil {
+	if err := g.PushMove("Qxf7#", nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.Method() != Checkmate {
@@ -29,7 +29,7 @@ func TestCheckmate(t *testing.T) {
 		t.Fatal(err)
 	}
 	g = NewGame(fen)
-	if err := g.MoveStr("O-O-O"); err != nil {
+	if err := g.PushMove("O-O-O", nil); err != nil {
 		t.Fatal(err)
 	}
 	t.Log(g.Position().String())
@@ -64,7 +64,7 @@ func TestStalemate(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := NewGame(fen)
-	if err := g.MoveStr("Qb6"); err != nil {
+	if err := g.PushMove("Qb6", nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.Method() != Stalemate {
@@ -83,7 +83,7 @@ func TestInvalidStalemate(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := NewGame(fen)
-	if err := g.MoveStr("d8=Q"); err != nil {
+	if err := g.PushMove("d8=Q", nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.Outcome() != NoOutcome {
@@ -98,7 +98,7 @@ func TestThreeFoldRepetition(t *testing.T) {
 		"Nf3", "Nf6", "Ng1", "Ng8",
 	}
 	for _, m := range moves {
-		if err := g.MoveStr(m); err != nil {
+		if err := g.PushMove(m, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -117,7 +117,7 @@ func TestInvalidThreeFoldRepetition(t *testing.T) {
 		"Nf3", "Nf6", "Ng1", "Ng8",
 	}
 	for _, m := range moves {
-		if err := g.MoveStr(m); err != nil {
+		if err := g.PushMove(m, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -135,7 +135,7 @@ func TestFiveFoldRepetition(t *testing.T) {
 		"Nf3", "Nf6", "Ng1", "Ng8",
 	}
 	for _, m := range moves {
-		if err := g.MoveStr(m); err != nil {
+		if err := g.PushMove(m, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -163,7 +163,7 @@ func TestInvalidFiftyMoveRule(t *testing.T) {
 func TestSeventyFiveMoveRule(t *testing.T) {
 	fen, _ := FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 149 80")
 	g := NewGame(fen)
-	if err := g.MoveStr("Kf8"); err != nil {
+	if err := g.PushMove("Kf8", nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.Outcome() != Draw || g.Method() != SeventyFiveMoveRule {
@@ -224,11 +224,11 @@ func TestInitialNumOfValidMoves(t *testing.T) {
 func TestPositionHash(t *testing.T) {
 	g1 := NewGame()
 	for _, s := range []string{"Nc3", "e5", "Nf3"} {
-		g1.MoveStr(s)
+		g1.PushMove(s, nil)
 	}
 	g2 := NewGame()
 	for _, s := range []string{"Nf3", "e5", "Nc3"} {
-		g2.MoveStr(s)
+		g2.PushMove(s, nil)
 	}
 	if g1.Position().Hash() != g2.Position().Hash() {
 		t.Fatalf("expected position hashes to be equal but got %s and %s", g1.Position().Hash(), g2.Position().Hash())
@@ -242,7 +242,7 @@ func BenchmarkStalemateStatus(b *testing.B) {
 		b.Fatal(err)
 	}
 	g := NewGame(fen)
-	if err := g.MoveStr("Qb6"); err != nil {
+	if err := g.PushMove("Qb6", nil); err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
@@ -258,7 +258,7 @@ func BenchmarkInvalidStalemateStatus(b *testing.B) {
 		b.Fatal(err)
 	}
 	g := NewGame(fen)
-	if err := g.MoveStr("d8=Q"); err != nil {
+	if err := g.PushMove("d8=Q", nil); err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
