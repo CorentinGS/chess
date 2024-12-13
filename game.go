@@ -609,7 +609,6 @@ func (g *Game) addOrReorderMove(move, existingMove *Move, forceMainline bool) {
 		if forceMainline && existingMove != g.currentMove.children[0] {
 			g.reorderMoveToFront(existingMove)
 		}
-		move = existingMove
 	} else {
 		g.addNewMove(move, forceMainline)
 	}
