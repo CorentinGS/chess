@@ -217,3 +217,38 @@ func TestBigPgn(t *testing.T) {
 		})
 	}
 }
+
+func TestBigBigPgn(t *testing.T) {
+	pgn := mustParsePGN("fixtures/pgns/big_big.pgn")
+	reader := strings.NewReader(pgn)
+
+	scanner := NewScanner(reader)
+	count := 0
+
+	for scanner.HasNext() {
+		count++
+		t.Run(fmt.Sprintf("bigbig pgn : %d", count), func(t *testing.T) {
+			scannedGame, err := scanner.ScanGame()
+			if err != nil {
+				t.Fatalf("fail to scan game from valid pgn: %s", err.Error())
+			}
+
+			tokens, err := TokenizeGame(scannedGame)
+			if err != nil {
+				t.Fatalf("fail to tokenize game from valid pgn: %s", err.Error())
+			}
+
+			raw := scannedGame.Raw
+
+			parser := NewParser(tokens)
+			game, err := parser.Parse()
+			if err != nil {
+				t.Fatalf("fail to read games from valid pgn: %s | %s", err.Error(), raw[:min(200, len(raw))])
+			}
+
+			if game == nil {
+				t.Fatalf("game is nil")
+			}
+		})
+	}
+}
