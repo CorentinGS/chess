@@ -2,6 +2,7 @@ package chess
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -308,7 +309,8 @@ func (p *Parser) parseMove() (*Move, error) {
 	// Find matching legal move
 	var matchingMove *Move
 	var err error
-	for _, m := range p.game.ValidMoves() {
+	validMoves := p.game.pos.ValidMoves()
+	for _, m := range validMoves {
 		//nolint:nestif // readability
 		if m.S2() == targetSquare {
 			pos := p.game.pos
@@ -335,9 +337,9 @@ func (p *Parser) parseMove() (*Move, error) {
 				}
 				continue
 			}
-			if moveData.originRank != "" && strconv.Itoa(int('1'+m.S1()/8)) != moveData.originRank {
+			if moveData.originRank != "" && strconv.Itoa(int((m.S1()/8)+1)) != moveData.originRank {
 				err = &ParserError{
-					Message:    "origin rank mismatch",
+					Message:    fmt.Sprintf("origin rank mismatch: %d", m.S1()/8+1),
 					TokenType:  p.currentToken().Type,
 					TokenValue: p.currentToken().Value,
 					Position:   p.position,
@@ -375,10 +377,8 @@ func (p *Parser) parseMove() (*Move, error) {
 	if matchingMove == nil {
 		if err != nil {
 			return nil, &ParserError{
-				Message:    "no legal move found for position",
-				TokenType:  p.currentToken().Type,
-				TokenValue: p.currentToken().Value,
-				Position:   p.position,
+				Message:  fmt.Sprintf("no legal move found for position: %s", err.Error()),
+				Position: p.position,
 			}
 		}
 		return nil, &ParserError{
