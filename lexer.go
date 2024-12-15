@@ -40,6 +40,47 @@ const (
 	CommandEnd                // ]
 )
 
+func (t TokenType) String() string {
+	types := []string{
+		"EOF",
+		"TagStart",
+		"TagEnd",
+		"TagKey",
+		"TagValue",
+		"MoveNumber",
+		"DOT",
+		"ELLIPSIS",
+		"PIECE",
+		"SQUARE",
+		"CommentStart",
+		"CommentEnd",
+		"COMMENT",
+		"RESULT",
+		"CAPTURE",
+		"FILE",
+		"RANK",
+		"KingsideCastle",
+		"QueensideCastle",
+		"PROMOTION",
+		"PromotionPiece",
+		"CHECK",
+		"CHECKMATE",
+		"NAG",
+		"VariationStart",
+		"VariationEnd",
+		"CommandStart",
+		"CommandName",
+		"CommandParam",
+		"CommandEnd",
+	}
+
+	if t < 0 || int(t) >= len(types) {
+		return "Unknown"
+	}
+
+	return types[t]
+}
+
 type Token struct {
 	Error error
 	Value string

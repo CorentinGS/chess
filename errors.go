@@ -1,6 +1,9 @@
 package chess
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // PGNError custom error types for different PGN errors.
 type PGNError struct {
@@ -35,3 +38,15 @@ var (
 
 	ErrNoGameFound = errors.New("no game found in PGN data")
 )
+
+type ParserError struct {
+	Message    string
+	TokenType  TokenType
+	TokenValue string
+	Position   int
+}
+
+func (e *ParserError) Error() string {
+	return fmt.Sprintf("Parser error at position %d: %s (Token: %v, Value: %s)",
+		e.Position, e.Message, e.TokenType, e.TokenValue)
+}
