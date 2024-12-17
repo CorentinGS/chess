@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 )
 
 // Parser holds the state needed during parsing.
@@ -159,12 +158,13 @@ func (p *Parser) parseMoveText() error {
 			p.addMove(move)
 
 		case CommentStart:
-			comment, err := p.parseComment()
+			comment, commandMap, err := p.parseComment()
 			if err != nil {
 				return err
 			}
 			if p.currentMove != nil {
 				p.currentMove.comments = comment
+				p.currentMove.command = commandMap
 			}
 
 		case VariationStart:
@@ -416,50 +416,91 @@ func (p *Parser) parseMove() (*Move, error) {
 	return move, nil
 }
 
-func (p *Parser) parseComment() (string, error) {
-	p.advance() // consume {
+func (p *Parser) parseComment() (string, map[string]string, error) {
+	p.advance() // Consume "{"
 
 	var comment string
+	var commandMap map[string]string
+
 	for p.currentToken().Type != CommentEnd && p.position < len(p.tokens) {
-		if p.currentToken().Type == CommandStart {
-			command, err := p.parseCommand()
+		switch p.currentToken().Type {
+		case CommandStart:
+			commands, err := p.parseCommand()
 			if err != nil {
-				return "", err
+				return "", nil, err
 			}
-			comment += command
-		} else if p.currentToken().Type == COMMENT {
-			comment += p.currentToken().Value
+
+			// merge commands into commandMap
+			if commandMap == nil {
+				commandMap = make(map[string]string)
+			}
+			for k, v := range commands {
+				commandMap[k] = v
+			}
+
+		case COMMENT:
+			comment += p.currentToken().Value // Append plain comment text
+		default:
+			return "", nil, &ParserError{
+				Message:    "unexpected token in comment",
+				Position:   p.position,
+				TokenType:  p.currentToken().Type,
+				TokenValue: p.currentToken().Value,
+			}
 		}
 		p.advance()
 	}
 
 	if p.position >= len(p.tokens) {
-		return "", &ParserError{
+		return "", nil, &ParserError{
 			Message:  "unterminated comment",
 			Position: p.position,
 		}
 	}
 
-	p.advance() // consume }
-	return comment, nil
+	p.advance() // Consume "}"
+	return comment, commandMap, nil
 }
 
-func (p *Parser) parseCommand() (string, error) {
-	var parts []string
+func (p *Parser) parseCommand() (map[string]string, error) {
+	command := make(map[string]string)
+	var key string
+
+	// Consume the opening "["
+	p.advance()
 
 	for p.currentToken().Type != CommandEnd && p.position < len(p.tokens) {
 		switch p.currentToken().Type {
-		case CommandName, CommandParam:
-			parts = append(parts, p.currentToken().Value)
+
+		case CommandName:
+			// The first token in a command is treated as the key
+			key = p.currentToken().Value
+		case CommandParam:
+			// The second token is treated as the value for the current key
+			if key != "" {
+				command[key] = p.currentToken().Value
+				key = "" // Reset key after assigning value
+			}
+		default:
+			return nil, &ParserError{
+				Message:    "unexpected token in command",
+				Position:   p.position,
+				TokenType:  p.currentToken().Type,
+				TokenValue: p.currentToken().Value,
+			}
 		}
 		p.advance()
 	}
 
 	if p.position >= len(p.tokens) {
-		return "", errors.New("unterminated command")
+		return nil, &ParserError{
+			Message:  "unterminated command",
+			Position: p.position,
+		}
 	}
 
-	return strings.Join(parts, " "), nil
+	// p.advance() // Consume the closing "]"
+	return command, nil
 }
 
 func (p *Parser) parseVariation() error {

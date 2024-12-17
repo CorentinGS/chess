@@ -295,14 +295,10 @@ func TestCompleteGame(t *testing.T) {
 		t.Fatalf("fail to scan game from valid pgn: %s", err.Error())
 	}
 
-	t.Log(scannedGame.Raw)
-
 	tokens, err := TokenizeGame(scannedGame)
 	if err != nil {
 		t.Fatalf("fail to tokenize game from valid pgn: %s", err.Error())
 	}
-
-	t.Log(tokens[80])
 
 	parser := NewParser(tokens)
 	game, err := parser.Parse()
@@ -354,7 +350,15 @@ func TestCompleteGame(t *testing.T) {
 	// print all moves
 	moves := game.Moves()
 
-	if moves[4].comments == "" {
-		t.Fatalf("game move 6 is not correct, expected comment, got %s", moves[5].comments)
+	if game.Moves()[0].command["eval"] != "0.17" {
+		t.Fatalf("game move 1 is not correct, expected eval, got %s", game.Moves()[0].command["eval"])
+	}
+
+	if moves[6].comments != "A57 Benko Gambit Declined: Main Line" {
+		t.Fatalf("game move 4 is not correct, expected comment, got %s", moves[6].comments)
+	}
+
+	if moves[44].nag != "?!" {
+		t.Fatalf("game move 44 is not correct, expected nag '!?', got %s", moves[44].nag)
 	}
 }

@@ -25,8 +25,8 @@ type Move struct {
 	position *Position // Position after the move
 	nag      string
 	comments string
-	command  string
-	children []*Move // Main line and variations
+	command  map[string]string // Store commands as key-value pairs
+	children []*Move           // Main line and variations
 	number   uint
 	tags     MoveTag
 	s1       Square

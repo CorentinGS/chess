@@ -175,9 +175,19 @@ func (l *Lexer) readCommandParam() Token {
 }
 
 func (l *Lexer) readNAG() Token {
+	// Handle cases where NAG starts with '!' or '?'
+	// This shouldn't happen from my understanding of the PGN spec but lichess pgn files have it.
+	// TODO: Better NAG handling of different formats
 	if l.ch == '!' || l.ch == '?' {
 		value := string(l.ch)
-		l.readChar()
+		l.readChar() // Read the next character
+
+		// Check if the next character is also '!' or '?'
+		if l.ch == '!' || l.ch == '?' {
+			value += string(l.ch) // Append the second character
+			l.readChar()          // Move to the next character
+		}
+
 		return Token{Type: NAG, Value: value}
 	}
 	l.readChar() // skip the $ symbol
