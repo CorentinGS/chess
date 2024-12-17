@@ -8,36 +8,37 @@ import (
 type TokenType int
 
 const (
-	EOF             TokenType = iota
-	TagStart                  // [
-	TagEnd                    // ]
-	TagKey                    // The key part of a tag (e.g., "Site")
-	TagValue                  // The value part of a tag (e.g., "Internet")
-	MoveNumber                // 1, 2, 3, etc.
-	DOT                       // .
-	ELLIPSIS                  // ...
-	PIECE                     // N, B, R, Q, K
-	SQUARE                    // e4, e5, etc.
-	CommentStart              // {
-	CommentEnd                // }
-	COMMENT                   // The comment text
-	RESULT                    // 1-0, 0-1, 1/2-1/2
-	CAPTURE                   // 'x' in moves
-	FILE                      // a-h in moves when used as disambiguation
-	RANK                      // 1-8 in moves when used as disambiguation
-	KingsideCastle            // 0-0
-	QueensideCastle           // 0-0-0
-	PROMOTION                 // = in moves
-	PromotionPiece            // The piece being promoted to (Q, R, B, N)
-	CHECK                     // + in moves
-	CHECKMATE                 // # in moves
-	NAG                       // Numeric Annotation Glyph (e.g., $1, $2, etc.)
-	VariationStart            // ( for starting a variation
-	VariationEnd              // ) for ending a variation
-	CommandStart              // [%
-	CommandName               // The command name (e.g., clk, eval)
-	CommandParam              // Command parameter
-	CommandEnd                // ]
+	EOF TokenType = iota
+	Undefined
+	TagStart        // [
+	TagEnd          // ]
+	TagKey          // The key part of a tag (e.g., "Site")
+	TagValue        // The value part of a tag (e.g., "Internet")
+	MoveNumber      // 1, 2, 3, etc.
+	DOT             // .
+	ELLIPSIS        // ...
+	PIECE           // N, B, R, Q, K
+	SQUARE          // e4, e5, etc.
+	CommentStart    // {
+	CommentEnd      // }
+	COMMENT         // The comment text
+	RESULT          // 1-0, 0-1, 1/2-1/2
+	CAPTURE         // 'x' in moves
+	FILE            // a-h in moves when used as disambiguation
+	RANK            // 1-8 in moves when used as disambiguation
+	KingsideCastle  // 0-0
+	QueensideCastle // 0-0-0
+	PROMOTION       // = in moves
+	PromotionPiece  // The piece being promoted to (Q, R, B, N)
+	CHECK           // + in moves
+	CHECKMATE       // # in moves
+	NAG             // Numeric Annotation Glyph (e.g., $1, $2, etc.)
+	VariationStart  // ( for starting a variation
+	VariationEnd    // ) for ending a variation
+	CommandStart    // [%
+	CommandName     // The command name (e.g., clk, eval)
+	CommandParam    // Command parameter
+	CommandEnd      // ]
 )
 
 func (t TokenType) String() string {
@@ -174,6 +175,11 @@ func (l *Lexer) readCommandParam() Token {
 }
 
 func (l *Lexer) readNAG() Token {
+	if l.ch == '!' || l.ch == '?' {
+		value := string(l.ch)
+		l.readChar()
+		return Token{Type: NAG, Value: value}
+	}
 	l.readChar() // skip the $ symbol
 	position := l.position
 
@@ -469,7 +475,7 @@ func (l *Lexer) NextToken() Token {
 		return Token{Type: CAPTURE, Value: "x"}
 	case '-':
 		return l.readResult()
-	case '$':
+	case '$', '!', '?':
 		return l.readNAG()
 	case 'O':
 		// Check for castling
@@ -533,7 +539,7 @@ func (l *Lexer) NextToken() Token {
 		}
 	}
 
-	tok := Token{Type: EOF, Value: string(l.ch)}
+	tok := Token{Type: Undefined, Value: string(l.ch)}
 	l.readChar()
 	return tok
 }

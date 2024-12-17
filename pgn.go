@@ -415,6 +415,7 @@ func (p *Parser) parseMove() (*Move, error) {
 
 	return move, nil
 }
+
 func (p *Parser) parseComment() (string, error) {
 	p.advance() // consume {
 
@@ -477,12 +478,18 @@ func (p *Parser) parseVariation() error {
 		// the last move before the variation start
 		variationParent = parentMove.parent
 		// Reset position to where the variation starts
-		p.game.pos = variationParent.parent.position.copy()
-		if newPos := p.game.pos.Update(variationParent); newPos != nil {
-			p.game.pos = newPos
+		if variationParent.parent != nil {
+			p.game.pos = variationParent.parent.position.copy()
+			if newPos := p.game.pos.Update(variationParent); newPos != nil {
+				p.game.pos = newPos
+			}
+		} else {
+			p.game.pos = StartingPosition()
 		}
+
 	} else {
-		// Reset to starting position for variations from root
+		// If we're at the start of the game, the variation branches from
+		// the root move
 		p.game.pos = StartingPosition()
 	}
 
@@ -503,6 +510,11 @@ func (p *Parser) parseVariation() error {
 		case ELLIPSIS:
 			p.advance()
 			isBlackMove = true
+
+		case VariationStart:
+			if err := p.parseVariation(); err != nil {
+				return err
+			}
 
 		case PIECE, SQUARE, FILE, KingsideCastle, QueensideCastle:
 			if isBlackMove != (p.game.pos.Turn() == Black) {
@@ -529,6 +541,8 @@ func (p *Parser) parseVariation() error {
 				p.game.pos = newPos
 			}
 
+			move.position = p.game.pos.copy()
+
 			// Update current move pointer
 			p.currentMove = move
 			isBlackMove = !isBlackMove
@@ -550,6 +564,7 @@ func (p *Parser) parseVariation() error {
 	// Restore original state
 	p.game.pos = oldPos
 	p.currentMove = parentMove
+	p.game.currentMove = p.currentMove
 
 	return nil
 }

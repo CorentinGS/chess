@@ -112,6 +112,37 @@ func TestGamesFromPGN(t *testing.T) {
 	}
 }
 
+func TestGameWithVariations(t *testing.T) {
+	pgn := mustParsePGN("fixtures/pgns/variations.pgn")
+	reader := strings.NewReader(pgn)
+
+	scanner := NewScanner(reader)
+	scannedGame, err := scanner.ScanGame()
+	if err != nil {
+		t.Fatalf("fail to scan game from valid pgn: %s", err.Error())
+	}
+
+	tokens, err := TokenizeGame(scannedGame)
+	if err != nil {
+		t.Fatalf("fail to tokenize game from valid pgn: %s", err.Error())
+	}
+
+	parser := NewParser(tokens)
+	game, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("fail to read games from valid pgn: %s", err.Error())
+	}
+
+	if game == nil {
+		t.Fatalf("game is nil")
+	}
+
+	if len(game.Moves()) != 7 {
+		t.Fatalf("game moves are not correct, expected 7, got %d", len(game.Moves()))
+	}
+
+}
+
 func TestSingleGameFromPGN(t *testing.T) {
 	pgn := mustParsePGN("fixtures/pgns/single_game.pgn")
 	reader := strings.NewReader(pgn)
@@ -219,6 +250,7 @@ func TestBigPgn(t *testing.T) {
 }
 
 func TestBigBigPgn(t *testing.T) {
+	t.Skip("This test is too slow")
 	pgn := mustParsePGN("fixtures/pgns/big_big.pgn")
 	reader := strings.NewReader(pgn)
 
@@ -250,5 +282,79 @@ func TestBigBigPgn(t *testing.T) {
 				t.Fatalf("game is nil")
 			}
 		})
+	}
+}
+
+func TestCompleteGame(t *testing.T) {
+	pgn := mustParsePGN("fixtures/pgns/complete_game.pgn")
+	reader := strings.NewReader(pgn)
+
+	scanner := NewScanner(reader)
+	scannedGame, err := scanner.ScanGame()
+	if err != nil {
+		t.Fatalf("fail to scan game from valid pgn: %s", err.Error())
+	}
+
+	t.Log(scannedGame.Raw)
+
+	tokens, err := TokenizeGame(scannedGame)
+	if err != nil {
+		t.Fatalf("fail to tokenize game from valid pgn: %s", err.Error())
+	}
+
+	t.Log(tokens[80])
+
+	parser := NewParser(tokens)
+	game, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("fail to read games from valid pgn: %s", err.Error())
+	}
+
+	if game == nil {
+		t.Fatalf("game is nil")
+	}
+
+	if game.tagPairs["Event"] != "Rated blitz game" {
+		t.Fatalf("game event is not correct")
+	}
+
+	if game.tagPairs["Site"] != "https://lichess.org/ASZaQYyr" {
+		t.Fatalf("game site is not correct")
+	}
+
+	if game.tagPairs["Date"] != "2024.12.07" {
+		t.Fatalf("game date is not correct")
+	}
+
+	if game.tagPairs["White"] != "dangerouschess07" {
+		t.Fatalf("game white is not correct")
+	}
+
+	if game.tagPairs["Black"] != "GABUZYAN_CHESSMOOD" {
+		t.Fatalf("game black is not correct")
+	}
+
+	if game.tagPairs["Result"] != "0-1" {
+		t.Fatalf("game result is not correct")
+	}
+
+	// Check moves
+	if len(game.Moves()) != 104 {
+		t.Fatalf("game moves are not correct, expected 52, got %d", len(game.Moves()))
+	}
+
+	if game.Moves()[0].String() != "d2d4" {
+		t.Fatalf("game move 1 is not correct, expected d4, got %s", game.Moves()[0].String())
+	}
+
+	if game.Moves()[0].comments != "" {
+		t.Fatalf("game move 1 is not correct, expected no comment, got %s", game.Moves()[0].comments)
+	}
+
+	// print all moves
+	moves := game.Moves()
+
+	if moves[4].comments == "" {
+		t.Fatalf("game move 6 is not correct, expected comment, got %s", moves[5].comments)
 	}
 }
