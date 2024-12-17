@@ -922,7 +922,7 @@ func TestRemoveTagPairWhenKeyExists(t *testing.T) {
 	}
 }
 
-func  TestRemoveTagPairWhenKeyDoesNotExist(t *testing.T) {
+func TestRemoveTagPairWhenKeyDoesNotExist(t *testing.T) {
 	g := NewGame()
 	removed := g.RemoveTagPair("NonExistentKey")
 	if removed {
@@ -930,7 +930,7 @@ func  TestRemoveTagPairWhenKeyDoesNotExist(t *testing.T) {
 	}
 }
 
-func  TestRemoveTagPairFromEmptyTagPairs(t *testing.T) {
+func TestRemoveTagPairFromEmptyTagPairs(t *testing.T) {
 	g := NewGame()
 	g.tagPairs = make(map[string]string)
 	removed := g.RemoveTagPair("Event")

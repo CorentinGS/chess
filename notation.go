@@ -272,8 +272,8 @@ func (mc moveComponents) clean() string {
 func (mc moveComponents) generateOptions() []string {
 	// Get pre-allocated slice from pool
 	options := pieceOptionsPool.Get().(*[]string)
-	*options = (*options)[:0]               // Clear but keep capacity
-	defer pieceOptionsPool.Put(options)     // Now passing pointer
+	*options = (*options)[:0]           // Clear but keep capacity
+	defer pieceOptionsPool.Put(options) // Now passing pointer
 
 	// Build move options using string builder for efficiency
 	sb, _ := stringPool.Get().(*strings.Builder)

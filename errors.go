@@ -41,8 +41,8 @@ var (
 
 type ParserError struct {
 	Message    string
-	TokenType  TokenType
 	TokenValue string
+	TokenType  TokenType
 	Position   int
 }
 

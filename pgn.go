@@ -11,8 +11,8 @@ type Parser struct {
 	game        *Game
 	currentMove *Move
 	tokens      []Token
-	position    int
 	errors      []ParserError
+	position    int
 }
 
 // NewParser creates a new Parser instance.
