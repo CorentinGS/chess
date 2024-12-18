@@ -2,8 +2,10 @@ package chess
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -377,7 +379,14 @@ func (book *PolyglotBook) GetRandomMove(positionHash uint64) *PolyglotEntry {
 	return &moves[0]
 }
 
-// Fast random number generator (placeholder)
+// fastRand returns a cryptographically secure random uint32.
+// This implementation uses crypto/rand instead of math/rand to ensure
+// that move selection cannot be predicted or manipulated.
 func fastRand() uint32 {
-	return 0
+	b := make([]byte, 4)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate random number: %v", err))
+	}
+	return binary.BigEndian.Uint32(b)
 }
