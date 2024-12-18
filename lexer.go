@@ -44,6 +44,7 @@ const (
 func (t TokenType) String() string {
 	types := []string{
 		"EOF",
+		"Undefined",
 		"TagStart",
 		"TagEnd",
 		"TagKey",
