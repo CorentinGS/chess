@@ -288,7 +288,7 @@ func (g *Game) FEN() string {
 // String implements the fmt.Stringer interface and returns
 // the game's PGN.
 func (g *Game) String() string {
-	return "TODO"
+	return g.FEN()
 }
 
 // MarshalText implements the encoding.TextMarshaler interface and
