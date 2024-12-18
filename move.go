@@ -63,17 +63,3 @@ func (m *Move) HasTag(tag MoveTag) bool {
 func (m *Move) addTag(tag MoveTag) {
 	m.tags |= tag
 }
-
-type moveSlice []Move
-
-func (a moveSlice) find(m *Move) *Move {
-	if m == nil {
-		return nil
-	}
-	for _, move := range a {
-		if move.String() == m.String() {
-			return &move
-		}
-	}
-	return nil
-}
