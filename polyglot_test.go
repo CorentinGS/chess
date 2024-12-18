@@ -3,6 +3,7 @@ package chess
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -60,7 +61,7 @@ func TestBytesBookSource(t *testing.T) {
 	// Test EOF
 	source.index = 32
 	n, err = source.Read(buf)
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Errorf("Read() error = %v, want EOF", err)
 	}
 }
