@@ -194,12 +194,12 @@ func LoadFromSource(source BookSource) (*PolyglotBook, error) {
 
 	buf := make([]byte, 16)
 	for {
-		_, err := source.Read(buf)
-		if err == io.EOF {
+		_, readErr := source.Read(buf)
+		if readErr == io.EOF {
 			break
 		}
-		if err != nil {
-			return nil, err
+		if readErr != nil {
+			return nil, readErr
 		}
 
 		entry := PolyglotEntry{
