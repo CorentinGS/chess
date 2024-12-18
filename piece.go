@@ -14,6 +14,16 @@ const (
 	Black
 )
 
+func ColorFromString(s string) Color {
+	switch strings.ToLower(s) {
+	case "w":
+		return White
+	case "b":
+		return Black
+	}
+	return NoColor
+}
+
 // Other returns the opposite color of the receiver.
 func (c Color) Other() Color {
 	switch c {
