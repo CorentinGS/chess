@@ -519,7 +519,7 @@ func (p *Parser) parseVariation() error {
 		// the last move before the variation start
 		variationParent = parentMove.parent
 		// Reset position to where the variation starts
-		if variationParent.parent != nil {
+		if variationParent.parent != nil && variationParent.parent.position != nil {
 			p.game.pos = variationParent.parent.position.copy()
 			if newPos := p.game.pos.Update(variationParent); newPos != nil {
 				p.game.pos = newPos
