@@ -2,7 +2,6 @@ package chess
 
 import (
 	"errors"
-	"fmt"
 	"io"
 )
 
@@ -178,40 +177,6 @@ func isMainLine(move *Move) bool {
 		return true
 	}
 	return move == move.parent.children[0] && isMainLine(move.parent)
-}
-
-// Move updates the game with the given move.  An error is returned
-// if the move is invalid or the game has already been completed.
-func (g *Game) Move(m *Move) error {
-	valid := moveSlice(g.ValidMoves()).find(m)
-	if valid == nil {
-		return fmt.Errorf("chess: invalid move %s", m)
-	}
-	g.MakeMove(m)
-	g.evaluatePositionStatus()
-	return nil
-}
-
-// MakeMove adds the given move to the game.  The move is not validated and is assumed to be valid.
-func (g *Game) MakeMove(move *Move) {
-	// For the first move in the game
-	if g.currentMove == g.rootMove {
-		move.parent = g.rootMove
-		g.rootMove.children = append(g.rootMove.children, move)
-	} else {
-		// Normal move in the main line
-		move.parent = g.currentMove
-		g.currentMove.children = append(g.currentMove.children, move)
-	}
-
-	// Update position
-	if newPos := g.pos.Update(move); newPos != nil {
-		g.pos = newPos
-	}
-
-	move.position = g.pos.copy()
-
-	g.currentMove = move
 }
 
 func (g *Game) GoBack() bool {
@@ -514,29 +479,6 @@ func (g *Game) numOfRepetitions() int {
 		}
 	}
 	return count
-}
-
-// MoveStr updates the game with the given move in algebraic notation.
-// Deprecated: Use PushMove instead.
-// TODO: Replace with PushMove in all tests
-func (g *Game) MoveStr(algebraicMove string) error {
-	// Parse the move
-	tokens, err := TokenizeGame(&GameScanned{Raw: algebraicMove})
-	if err != nil {
-		return errors.New("failed to tokenize move")
-	}
-
-	parser := NewParser(tokens)
-	parser.game = g
-	parser.currentMove = g.currentMove
-
-	// Parse the move
-	move, err := parser.parseMove()
-	if err != nil {
-		return err
-	}
-
-	return g.Move(move)
 }
 
 // PushMoveOptions contains options for pushing a move to the game

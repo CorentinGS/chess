@@ -10,8 +10,8 @@ import (
 
 func ExampleFind() {
 	g := chess.NewGame()
-	g.MoveStr("e4")
-	g.MoveStr("e6")
+	_ = g.PushMove("e4", nil)
+	_ = g.PushMove("e6", nil)
 
 	// print French Defense
 	book := opening.NewBookECO()
@@ -23,8 +23,8 @@ func ExampleFind() {
 
 func ExamplePossible() {
 	g := chess.NewGame()
-	g.MoveStr("e4")
-	g.MoveStr("d5")
+	_ = g.PushMove("e4", nil)
+	_ = g.PushMove("d5", nil)
 
 	// print all variantions of the Scandinavian Defense
 	book := opening.NewBookECO()
@@ -41,10 +41,10 @@ func ExamplePossible() {
 
 func TestFind(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.MoveStr("e4"); err != nil {
+	if err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.MoveStr("d5"); err != nil {
+	if err := g.PushMove("d5", nil); err != nil {
 		t.Fatal(err)
 	}
 	book := opening.NewBookECO()
@@ -57,7 +57,7 @@ func TestFind(t *testing.T) {
 
 func TestPossible(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.MoveStr("g3"); err != nil {
+	if err := g.PushMove("g3", nil); err != nil {
 		t.Fatal(err)
 	}
 	book := opening.NewBookECO()
