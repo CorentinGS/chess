@@ -1,3 +1,16 @@
+/*
+Package chess provides PGN (Portable Game Notation) parsing functionality,
+supporting standard chess notation including moves, variations, comments,
+annotations, and game metadata.
+Example usage:
+
+	// Create parser from tokens
+	tokens := TokenizeGame(game)
+	parser := NewParser(tokens)
+
+	// Parse complete game
+	game, err := parser.Parse()
+*/
 package chess
 
 import (
@@ -15,7 +28,13 @@ type Parser struct {
 	position    int
 }
 
-// NewParser creates a new Parser instance.
+// NewParser creates a new parser instance initialized with the given tokens.
+// The parser starts with a root move containing the starting position.
+//
+// Example:
+//
+//	tokens := TokenizeGame(game)
+//	parser := NewParser(tokens)
 func NewParser(tokens []Token) *Parser {
 	rootMove := &Move{
 		position: StartingPosition(),
@@ -45,7 +64,19 @@ func (p *Parser) advance() {
 	p.position++
 }
 
-// Parse processes all tokens and returns the completed game.
+// Parse processes all tokens and returns the complete game.
+// This includes parsing header information (tags), moves,
+// variations, comments, and the game result.
+//
+// Returns an error if the PGN is malformed or contains illegal moves.
+//
+// Example:
+//
+//	game, err := parser.Parse()
+//	if err != nil {
+//	    log.Fatal("Error parsing game:", err)
+//	}
+//	fmt.Printf("Event: %s\n", game.GetTagPair("Event"))
 func (p *Parser) Parse() (*Game, error) {
 	// Parse header section (tag pairs)
 	if err := p.parseHeader(); err != nil {

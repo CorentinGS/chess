@@ -1,3 +1,27 @@
+/*
+Package chess provides functionality for reading and parsing chess games in PGN
+(Portable Game Notation) format. It includes a scanner for reading multiple games
+from a single source and a tokenizer for converting PGN text into processable tokens.
+The scanner handles PGN-specific syntax including game metadata, moves, comments,
+and variations. It supports streaming processing of large PGN files and provides
+proper handling of game boundaries and special notation.
+Example usage:
+	// Create scanner for PGN input
+	scanner := NewScanner(reader)
+
+	// Read all games
+	for scanner.HasNext() {
+		game, err := scanner.ScanGame()
+		if err != nil {
+			log.Fatal(err)
+		}
+		// Process game
+	}
+
+	// Tokenize a specific game
+	tokens, err := TokenizeGame(game)
+*/
+
 package chess
 
 import (
@@ -6,11 +30,24 @@ import (
 	"io"
 )
 
+// GameScanned represents a complete chess game in PGN format.
 type GameScanned struct {
+	// Raw contains the complete PGN text of the game
 	Raw string
 }
 
-// TokenizeGame function to tokenize a PGN game.
+// TokenizeGame converts a PGN game into a sequence of tokens.
+// Returns nil if the game is nil. Returns an error if tokenization fails.
+//
+// The function handles all PGN elements including moves, comments,
+// annotations, and metadata tags.
+//
+// Example:
+//
+//	tokens, err := TokenizeGame(game)
+//	if err != nil {
+//	    // Handle error
+//	}
 func TokenizeGame(game *GameScanned) ([]Token, error) {
 	if game == nil {
 		return nil, nil
@@ -30,21 +67,38 @@ func TokenizeGame(game *GameScanned) ([]Token, error) {
 	return tokens, nil
 }
 
-// Scanner struct to scan PGN games.
+// Scanner provides functionality to read chess games from a PGN source.
+// It supports streaming processing of multiple games and proper handling
+// of PGN syntax.
 type Scanner struct {
 	scanner   *bufio.Scanner
 	nextGame  *GameScanned // Buffer for peeked game
 	lastError error        // Store last error
 }
 
-// NewScanner function to create a new PGN scanner.
+// NewScanner creates a new PGN scanner that reads from the provided reader.
+// The scanner is configured to properly split PGN games and handle
+// PGN-specific syntax.
+//
+// Example:
+//
+//	scanner := NewScanner(strings.NewReader(pgnText))
 func NewScanner(r io.Reader) *Scanner {
 	s := bufio.NewScanner(r)
 	s.Split(splitPGNGames)
 	return &Scanner{scanner: s}
 }
 
-// ScanGame function to scan the next PGN game.
+// ScanGame reads and returns the next game from the source.
+// Returns nil and io.EOF when no more games are available.
+// Returns nil and an error if reading fails.
+//
+// Example:
+//
+//	game, err := scanner.ScanGame()
+//	if err == io.EOF {
+//	    // No more games
+//	}
 func (s *Scanner) ScanGame() (*GameScanned, error) {
 	// If we have a buffered game from HasNext(), return it
 	if s.nextGame != nil {
@@ -65,7 +119,15 @@ func (s *Scanner) ScanGame() (*GameScanned, error) {
 	return nil, io.EOF
 }
 
-// HasNext function to check if there is another game to read.
+// HasNext returns true if there are more games available to read.
+// This method can be used to iterate over all games in the source.
+//
+// Example:
+//
+//	for scanner.HasNext() {
+//	    game, err := scanner.ScanGame()
+//	    // Process game
+//	}
 func (s *Scanner) HasNext() bool {
 	// If we already have a buffered game, return true
 	if s.nextGame != nil {

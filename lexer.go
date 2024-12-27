@@ -1,3 +1,23 @@
+/*
+Package chess provides PGN lexical analysis through a lexer that converts
+PGN text into a stream of tokens. The lexer handles all standard PGN notation
+including moves, annotations, comments, and game metadata.
+The lexer provides token-by-token processing of PGN content with proper handling
+of chess-specific notation and PGN syntax rules.
+Example usage:
+
+	// Create new lexer
+	lexer := NewLexer("[Event \"World Championship\"] 1. e4 e5 {Opening}")
+
+	// Process tokens
+	for {
+		token := lexer.NextToken()
+		if token.Type == EOF {
+			break
+		}
+		// Process token
+	}
+*/
 package chess
 
 import (
@@ -5,6 +25,7 @@ import (
 	"unicode"
 )
 
+// TokenType represents the type of token in PGN text.
 type TokenType int
 
 const (
@@ -83,12 +104,14 @@ func (t TokenType) String() string {
 	return types[t]
 }
 
+// Token represents a lexical token from PGN text.
 type Token struct {
 	Error error
 	Value string
 	Type  TokenType
 }
 
+// Lexer provides lexical analysis of PGN text.
 type Lexer struct {
 	input          string
 	position       int
@@ -100,6 +123,13 @@ type Lexer struct {
 	inCommandParam bool
 }
 
+// NewLexer creates a new Lexer for the provided input text.
+// The lexer is initialized and ready to produce tokens through
+// calls to NextToken().
+//
+// Example:
+//
+//	lexer := NewLexer("1. e4 e5")
 func NewLexer(input string) *Lexer {
 	l := &Lexer{input: input}
 	l.readChar()
@@ -413,6 +443,25 @@ func (l *Lexer) readCastling() (Token, bool) {
 	return Token{Type: KingsideCastle, Value: "O-O"}, true
 }
 
+// NextToken reads the next token from the input stream.
+// Returns an EOF token when the input is exhausted.
+// Returns an ILLEGAL token for invalid input.
+//
+// The method handles all standard PGN notation including:
+// - Move notation (e4, Nf3, O-O)
+// - Comments ({comment} or ; comment)
+// - Tags ([Event "World Championship"])
+// - Move numbers and variations
+// - Annotations ($1, !!, ?!)
+//
+// Example:
+//
+//	lexer := NewLexer("1. e4 {Strong move}")
+//	token := lexer.NextToken() // NUMBER: "1"
+//	token = lexer.NextToken()  // DOT: "."
+//	token = lexer.NextToken()  // NOTATION: "e4"
+//	token = lexer.NextToken()  // COMMENT: "Strong move"
+//	token = lexer.NextToken()  // EOF
 func (l *Lexer) NextToken() Token {
 	l.skipWhitespace()
 
