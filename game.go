@@ -1,3 +1,24 @@
+/*
+Package chess provides a complete chess game implementation with support for move
+validation, game tree management, and standard chess formats (PGN, FEN).
+The package manages complete chess games including move history, variations,
+and game outcomes. It supports standard chess rules including all special moves
+(castling, en passant, promotion) and automatic draw detection.
+Example usage:
+
+	// Create new game
+	game := NewGame()
+
+	// Make moves
+	game.PushMove("e4", nil)
+	game.PushMove("e5", nil)
+
+	// Check game status
+
+	if game.Outcome() != NoOutcome {
+		fmt.Printf("Game ended: %s by %s\n", game.Outcome(), game.Method())
+	}
+*/
 package chess
 
 import (
@@ -55,18 +76,19 @@ const (
 	InsufficientMaterial
 )
 
+// TagPairs represents a collection of PGN tag pairs.
 type TagPairs map[string]string
 
 // A Game represents a single chess game.
 type Game struct {
-	pos                  *Position // The current position // Will be removed in favor of currentMove.position
-	outcome              Outcome
-	tagPairs             TagPairs
-	rootMove             *Move // Root of the move tree
-	currentMove          *Move // Current position in the tree
-	comments             [][]string
-	method               Method
-	ignoreAutomaticDraws bool
+	pos                  *Position  // Current position
+	outcome              Outcome    // Game result
+	tagPairs             TagPairs   // PGN tag pairs
+	rootMove             *Move      // Root of move tree
+	currentMove          *Move      // Current position in tree
+	comments             [][]string // Game comments
+	method               Method     // How the game ended
+	ignoreAutomaticDraws bool       // Flag for automatic draw handling
 }
 
 // PGN takes a reader and returns a function that updates
@@ -124,9 +146,16 @@ func FEN(fen string) (func(*Game), error) {
 	}, nil
 }
 
-// NewGame defaults to returning a game in the standard
-// opening position.  Options can be given to configure
-// the game's initial state.
+// NewGame returns a new game in the standard starting position.
+// Optional functions can be provided to configure the initial game state.
+//
+// Example:
+//
+//	// Standard game
+//	game := NewGame()
+//
+//	// Game from FEN
+//	game := NewGame(FEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"))
 func NewGame(options ...func(*Game)) *Game {
 	pos := StartingPosition()
 	rootMove := &Move{
@@ -149,11 +178,15 @@ func NewGame(options ...func(*Game)) *Game {
 	return game
 }
 
+// AddVariation adds a new variation to the game.
+// The parent move must be a move in the game or nil to add a variation to the root.
 func (g *Game) AddVariation(parent *Move, newMove *Move) {
 	parent.children = append(parent.children, newMove)
 	newMove.parent = parent
 }
 
+// NavigateToMainLine navigates to the main line of the game.
+// The main line is the first child of each move.
 func (g *Game) NavigateToMainLine() {
 	current := g.currentMove
 
@@ -179,6 +212,9 @@ func isMainLine(move *Move) bool {
 	return move == move.parent.children[0] && isMainLine(move.parent)
 }
 
+// GoBack navigates to the previous move in the game.
+// Returns true if the move was successful. Returns false if there are no moves to go back to.
+// If the game is at the start, it will return false.
 func (g *Game) GoBack() bool {
 	if g.currentMove != nil && g.currentMove.parent != nil {
 		g.currentMove = g.currentMove.parent
@@ -188,6 +224,9 @@ func (g *Game) GoBack() bool {
 	return false
 }
 
+// GoForward navigates to the next move in the game.
+// Returns true if the move was successful. Returns false if there are no moves to go forward to.
+// If the game is at the end, it will return false.
 func (g *Game) GoForward() bool {
 	// Check if current move exists and has children
 	if g.currentMove != nil && len(g.currentMove.children) > 0 {
@@ -198,16 +237,17 @@ func (g *Game) GoForward() bool {
 	return false
 }
 
+// IsAtStart returns true if the game is at the start.
 func (g *Game) IsAtStart() bool {
 	return g.currentMove == nil || g.currentMove == g.rootMove
 }
 
+// IsAtEnd returns true if the game is at the end.
 func (g *Game) IsAtEnd() bool {
 	return g.currentMove != nil && len(g.currentMove.children) == 0
 }
 
-// ValidMoves returns a list of valid moves in the
-// current position.
+// ValidMoves returns all legal moves in the current position.
 func (g *Game) ValidMoves() []Move {
 	return g.pos.ValidMoves()
 }
@@ -422,6 +462,7 @@ func (g *Game) evaluatePositionStatus() {
 	}
 }
 
+// copy copies the game state from the given game.
 func (g *Game) copy(game *Game) {
 	g.tagPairs = make(map[string]string)
 	for k, v := range game.tagPairs {
@@ -436,6 +477,7 @@ func (g *Game) copy(game *Game) {
 	g.ignoreAutomaticDraws = game.ignoreAutomaticDraws
 }
 
+// Clone returns a deep copy of the game.
 func (g *Game) Clone() *Game {
 	return &Game{
 		tagPairs:             g.tagPairs,
@@ -449,6 +491,8 @@ func (g *Game) Clone() *Game {
 	}
 }
 
+// Positions returns all positions in the game.
+// This includes the starting position and all positions after each move.
 func (g *Game) Positions() []*Position {
 	positions := make([]*Position, 0)
 	current := g.rootMove
@@ -485,7 +529,12 @@ type PushMoveOptions struct {
 	ForceMainline bool
 }
 
-// PushMove updates the game with the given move in algebraic notation.
+// PushMove adds a move in algebraic notation to the game.
+// Returns an error if the move is invalid.
+//
+// Example:
+//
+//	err := game.PushMove("e4", &PushMoveOptions{ForceMainline: true})
 func (g *Game) PushMove(algebraicMove string, options *PushMoveOptions) error {
 	if options == nil {
 		options = &PushMoveOptions{}
