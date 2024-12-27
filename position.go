@@ -1,3 +1,22 @@
+/*
+Package chess provides position representation and manipulation for chess games.
+The package implements complete position tracking including piece placement,
+castling rights, en passant squares, and move counts. It supports standard chess
+formats (FEN) and provides methods for position analysis and move validation.
+Example usage:
+
+	// Create starting position
+	pos := StartingPosition()
+
+	// Check valid moves
+	moves := pos.ValidMoves()
+
+	// Update position with move
+	newPos := pos.Update(move)
+
+	// Get FEN string
+	fen := pos.String()
+*/
 package chess
 
 import (
@@ -22,8 +41,13 @@ const (
 // CastleRights holds the state of both sides castling abilities.
 type CastleRights string
 
-// CanCastle returns true if the given color and side combination
-// can castle, otherwise returns false.
+// CanCastle returns true if the given color and side combination can castle.
+//
+// Example:
+//
+//	if rights.CanCastle(White, KingSide) {
+//	    // White can castle kingside
+//	}
 func (cr CastleRights) CanCastle(c Color, side Side) bool {
 	char := "k"
 	if side == QueenSide {
@@ -41,21 +65,22 @@ func (cr CastleRights) String() string {
 	return string(cr)
 }
 
-// Position represents the state of the game without reguard
-// to its outcome.  Position is translatable to FEN notation.
+// Position represents a complete chess position state.
+// It includes piece placement, castling rights, en passant squares,
+// move counts, and side to move.
 type Position struct {
-	board           *Board
-	castleRights    CastleRights
-	validMoves      []Move
-	halfMoveClock   int
-	moveCount       int
-	turn            Color
-	enPassantSquare Square
-	inCheck         bool
+	board           *Board       // Current board state
+	castleRights    CastleRights // Available castling options
+	validMoves      []Move       // Cache of legal moves
+	halfMoveClock   int          // Half-move counter
+	moveCount       int          // Full move counter
+	turn            Color        // Side to move
+	enPassantSquare Square       // En passant target square
+	inCheck         bool         // Whether current side is in check
 }
 
 const (
-	startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+	startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" // Starting position FEN
 )
 
 // StartingPosition returns the starting position
@@ -66,9 +91,13 @@ func StartingPosition() *Position {
 }
 
 // Update returns a new position resulting from the given move.
-// The move itself isn't validated, if validation is needed use
-// Game's Move method.  This method is more performant for bots that
-// rely on the ValidMoves because it skips redundant validation.
+// The move isn't validated - use Game.Move() for validation.
+// This method is optimized for move generation where validation
+// is handled separately.
+//
+// Example:
+//
+//	newPos := pos.Update(move)
 func (pos *Position) Update(m *Move) *Position {
 	moveCount := pos.moveCount
 	if pos.turn == Black {
@@ -108,7 +137,8 @@ func (pos *Position) Update(m *Move) *Position {
 	}
 }
 
-// ValidMoves returns a list of valid moves for the position.
+// ValidMoves returns all legal moves in the current position.
+// The moves are cached for performance.
 // TODO: Can we make this more efficient? Maybe using an iterator?
 func (pos *Position) ValidMoves() []Move {
 	if pos.validMoves != nil {
@@ -354,6 +384,7 @@ func (pos *Position) updateEnPassantSquare(m *Move) Square {
 	return NoSquare
 }
 
+// samePosition returns true if the two positions are the same.
 func (pos *Position) samePosition(pos2 *Position) bool {
 	return pos.board.String() == pos2.board.String() &&
 		pos.turn == pos2.turn &&
