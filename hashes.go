@@ -1,5 +1,6 @@
 package chess
 
+// GetPolyglotHashes returns a list of Polyglot hashes
 func GetPolyglotHashes() []string {
 	return []string{
 		"9D39247E33776D41",
