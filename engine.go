@@ -1,9 +1,40 @@
+/*
+Package chess implements a chess game engine that manages move generation,
+position analysis, and game state validation.
+The engine uses bitboard operations and lookup tables for efficient move
+generation and position analysis. Move generation includes standard piece
+moves, captures, castling, en passant, and pawn promotions.
+Example usage:
+
+	// Create a position
+	pos := NewPosition()
+
+	// Calculate legal moves for current position
+	eng := engine{}
+	moves := eng.CalcMoves(pos, false)
+
+	// Check game status
+	status := eng.Status(pos)
+	if status == Checkmate {
+		fmt.Println("Game Over - Checkmate")
+	}
+*/
 package chess
 
 import "sync"
 
+// engine implements chess move generation and position analysis.
 type engine struct{}
 
+// CalcMoves returns all legal moves for the given position. If first is true,
+// returns after finding the first legal move. This is useful for quick position
+// validation.
+//
+// The moves are generated in the following order:
+//  1. Standard piece moves and captures
+//  2. Castling moves (if available)
+//
+// Each move is validated to ensure it doesn't leave the king in check
 func (engine) CalcMoves(pos *Position, first bool) []Move {
 	// generate possible moves
 	moves := standardMoves(pos, first)
@@ -11,6 +42,15 @@ func (engine) CalcMoves(pos *Position, first bool) []Move {
 	return append(moves, castleMoves(pos)...)
 }
 
+// Status returns the current game status (Checkmate, Stalemate, or NoMethod)
+// based on the position.
+//
+// The status is determined by:
+//   - Whether the side to move is in check
+//   - Whether any legal moves exist
+//
+// If the position has cached valid moves in pos.validMoves, those will be
+// used. Otherwise, moves will be calculated to determine the status.
 func (engine) Status(pos *Position) Method {
 	var hasMove bool
 	if pos.validMoves != nil {
@@ -43,6 +83,12 @@ var movePool = sync.Pool{
 	},
 }
 
+// standardMoves generates all standard (non-castling) legal moves for the
+// current position. If first is true, returns after finding the first
+// legal move.
+//
+// The function uses a sync.Pool of move arrays to reduce allocations. Each
+// move is validated to ensure it doesn't leave the king in check.
 func standardMoves(pos *Position, first bool) []Move {
 	moves, _ := movePool.Get().(*[maxPossibleMoves]Move)
 	defer movePool.Put(moves)
@@ -121,6 +167,12 @@ func standardMoves(pos *Position, first bool) []Move {
 	return result
 }
 
+// addTags updates a move's tags based on the resulting position.
+// Tags include:
+//   - Capture: The move captures an opponent's piece
+//   - EnPassant: The move is an en passant capture
+//   - Check: The move puts the opponent in check
+//   - inCheck: The move leaves the moving side's king in check (illegal)
 func addTags(m *Move, pos *Position) {
 	p := pos.board.Piece(m.s1)
 	if pos.board.isOccupied(m.s2) {
@@ -141,6 +193,7 @@ func addTags(m *Move, pos *Position) {
 	}
 }
 
+// isInCheck returns true if the side to move is in check in the given position.
 func isInCheck(pos *Position) bool {
 	kingSq := pos.board.whiteKingSq
 	if pos.Turn() == Black {
@@ -153,6 +206,15 @@ func isInCheck(pos *Position) bool {
 	return squaresAreAttacked(pos, kingSq)
 }
 
+// squaresAreAttacked returns true if any of the given squares are attacked
+// by the opponent in the given position.
+//
+// The function checks attacks from:
+//   - Sliding pieces (queen, rook, bishop)
+//   - Knights
+//   - Pawns
+//   - King
+//
 //nolint:mnd // this is a formula to determine if a square is attacked
 func squaresAreAttacked(pos *Position, sqs ...Square) bool {
 	otherColor := pos.Turn().Other()
@@ -216,6 +278,17 @@ func squaresAreAttacked(pos *Position, sqs ...Square) bool {
 	return false
 }
 
+// bbForPossibleMoves returns a bitboard with 1s in positions where the piece
+// of the given type at the given square can potentially move, without considering
+// whether the moves would be legal (e.g., leave the king in check).
+//
+// The function handles movement patterns for:
+//   - King: One square in any direction
+//   - Queen: Sliding moves in all directions
+//   - Rook: Sliding moves horizontally and vertically
+//   - Bishop: Sliding moves diagonally
+//   - Knight: L-shaped jumps
+//   - Pawn: Forward moves and captures, including en passant
 func bbForPossibleMoves(pos *Position, pt PieceType, sq Square) bitboard {
 	switch pt {
 	case King:
@@ -234,6 +307,13 @@ func bbForPossibleMoves(pos *Position, pt PieceType, sq Square) bitboard {
 	return bitboard(0)
 }
 
+// castleMoves returns all legal castling moves for the current position.
+//
+// A castling move is legal if:
+//   - The king has castling rights in that direction
+//   - The squares between king and rook are empty
+//   - The king is not in check
+//   - The king does not pass through check
 func castleMoves(pos *Position) []Move {
 	var moves [2]Move // Maximum of 2 possible castle moves (king side and queen side)
 	count := 0
@@ -292,6 +372,14 @@ func castleMoves(pos *Position) []Move {
 	return moves[:count]
 }
 
+// pawnMoves returns a bitboard with 1s in positions where the pawn at the
+// given square can potentially move.
+//
+// The function considers:
+//   - Single and double forward moves
+//   - Diagonal captures
+//   - En passant captures
+//
 //nolint:mnd // this is a formula to determine the color of a square
 func pawnMoves(pos *Position, sq Square) bitboard {
 	bb := bbForSquare(sq)
@@ -313,6 +401,8 @@ func pawnMoves(pos *Position, sq Square) bitboard {
 	return capRight | capLeft | upOne | upTwo
 }
 
+// diaAttack returns a bitboard representing possible diagonal moves for a
+// sliding piece, considering occupied squares as blocking further movement.
 func diaAttack(occupied bitboard, sq Square) bitboard {
 	pos := bbForSquare(sq)
 	dMask := bbDiagonals[sq]
@@ -320,6 +410,7 @@ func diaAttack(occupied bitboard, sq Square) bitboard {
 	return linearAttack(occupied, pos, dMask) | linearAttack(occupied, pos, adMask)
 }
 
+// hvAttack returns a bitboard representing possible horizontal and vertical
 func hvAttack(occupied bitboard, sq Square) bitboard {
 	pos := bbForSquare(sq)
 	rankMask := bbRanks[sq.Rank()]
@@ -327,6 +418,9 @@ func hvAttack(occupied bitboard, sq Square) bitboard {
 	return linearAttack(occupied, pos, rankMask) | linearAttack(occupied, pos, fileMask)
 }
 
+// linearAttack returns a bitboard representing possible moves in a single
+// direction (rank, file, or diagonal) for a sliding piece, considering
+// occupied squares as blocking further movement.
 func linearAttack(occupied, pos, mask bitboard) bitboard {
 	oInMask := occupied & mask
 	return ((oInMask - 2*pos) ^ (oInMask.Reverse() - 2*pos.Reverse()).Reverse()) & mask
@@ -357,10 +451,12 @@ func bbForSquare(sq Square) bitboard {
 	return bbSquares[sq]
 }
 
+// Lookup tables for piece movement patterns and board masks.
+//
 //nolint:gochecknoglobals // this is a lookup table
 var (
-	bbFiles = [8]bitboard{bbFileA, bbFileB, bbFileC, bbFileD, bbFileE, bbFileF, bbFileG, bbFileH}
-	bbRanks = [8]bitboard{bbRank1, bbRank2, bbRank3, bbRank4, bbRank5, bbRank6, bbRank7, bbRank8}
+	bbFiles = [8]bitboard{bbFileA, bbFileB, bbFileC, bbFileD, bbFileE, bbFileF, bbFileG, bbFileH} // bbFiles contains masks for each file (A-H)
+	bbRanks = [8]bitboard{bbRank1, bbRank2, bbRank3, bbRank4, bbRank5, bbRank6, bbRank7, bbRank8} // bbRanks contains masks for each rank (1-8)
 
 	bbDiagonals = [64]bitboard{9241421688590303745, 4620710844295151872, 2310355422147575808, 1155177711073755136, 577588855528488960, 288794425616760832, 144396663052566528, 72057594037927936, 36099303471055874, 9241421688590303745, 4620710844295151872, 2310355422147575808, 1155177711073755136, 577588855528488960, 288794425616760832, 144396663052566528, 141012904183812, 36099303471055874, 9241421688590303745, 4620710844295151872, 2310355422147575808, 1155177711073755136, 577588855528488960, 288794425616760832, 550831656968, 141012904183812, 36099303471055874, 9241421688590303745, 4620710844295151872, 2310355422147575808, 1155177711073755136, 577588855528488960, 2151686160, 550831656968, 141012904183812, 36099303471055874, 9241421688590303745, 4620710844295151872, 2310355422147575808, 1155177711073755136, 8405024, 2151686160, 550831656968, 141012904183812, 36099303471055874, 9241421688590303745, 4620710844295151872, 2310355422147575808, 32832, 8405024, 2151686160, 550831656968, 141012904183812, 36099303471055874, 9241421688590303745, 4620710844295151872, 128, 32832, 8405024, 2151686160, 550831656968, 141012904183812, 36099303471055874, 9241421688590303745}
 
