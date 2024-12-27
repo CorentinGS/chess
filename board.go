@@ -1,3 +1,38 @@
+/*
+Package chess provides a chess engine implementation using bitboard representation for board state.
+
+The package uses a combination of bitboards for piece positions and convenience lookups,
+allowing for efficient move generation and position analysis.
+
+Board Layout:
+
+    8 | r n b q k b n r
+    7 | p p p p p p p p
+    6 | - - - - - - - -
+    5 | - - - - - - - -
+    4 | - - - - - - - -
+    3 | - - - - - - - -
+    2 | P P P P P P P P
+    1 | R N B Q K B N R
+      ---------------
+        A B C D E F G H
+
+Usage:
+
+    // Create a new board with starting position
+    squares := map[Square]Piece{
+        NewSquare(FileE, Rank1): WhiteKing,
+        NewSquare(FileD, Rank8): BlackQueen,
+    }
+    board := NewBoard(squares)
+
+    // Check piece at square
+    piece := board.Piece(NewSquare(FileE, Rank1))
+
+    // Get all piece positions.
+    positions := board.SquareMap()
+*/
+
 package chess
 
 import (
@@ -5,10 +40,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"log"
-	"sync"
 )
 
-// A Board represents a chess board and its relationship between squares and pieces.
+// Board represents a chess board and its relationship between squares and pieces.
+// It maintains separate bitboards for each piece type and color, along with
+// convenience bitboards for quick position analysis.
 type Board struct {
 	bbWhiteKing   bitboard
 	bbWhiteQueen  bitboard
@@ -22,14 +58,23 @@ type Board struct {
 	bbBlackBishop bitboard
 	bbBlackKnight bitboard
 	bbBlackPawn   bitboard
-	whiteSqs      bitboard
-	blackSqs      bitboard
-	emptySqs      bitboard
-	whiteKingSq   Square
-	blackKingSq   Square
+	whiteSqs      bitboard // all white pieces
+	blackSqs      bitboard // all black pieces
+	emptySqs      bitboard // all empty squares
+	whiteKingSq   Square   // cached white king square
+	blackKingSq   Square   // cached black king square
 }
 
 // NewBoard returns a board from a square to piece mapping.
+// The map should contain only occupied squares.
+//
+// Example:
+//
+//	squares := map[Square]Piece{
+//	    NewSquare(FileE, Rank1): WhiteKing,
+//	    NewSquare(FileE, Rank8): BlackKing,
+//	}
+//	board := NewBoard(squares)
 func NewBoard(m map[Square]Piece) *Board {
 	b := &Board{}
 	for _, p1 := range allPieces {
@@ -46,7 +91,8 @@ func NewBoard(m map[Square]Piece) *Board {
 	return b
 }
 
-// SquareMap returns a mapping of squares to pieces.  A square is only added to the map if it is occupied.
+// SquareMap returns a mapping of squares to pieces.
+// A square is only added to the map if it is occupied.
 func (b *Board) SquareMap() map[Square]Piece {
 	m := map[Square]Piece{}
 	for sq := range numOfSquaresInBoard {
@@ -73,8 +119,9 @@ const (
 	LeftRight
 )
 
-// Flip flips the board over the vertical or hoizontal
-// center line.
+// Flip returns a new board flipped over the specified axis.
+// For UpDown, pieces are mirrored across the horizontal center line.
+// For LeftRight, pieces are mirrored across the vertical center line.
 func (b *Board) Flip(fd FlipDirection) *Board {
 	m := map[Square]Piece{}
 	for sq := range numOfSquaresInBoard {
@@ -82,10 +129,10 @@ func (b *Board) Flip(fd FlipDirection) *Board {
 		switch fd {
 		case UpDown:
 			file := Square(sq).File()
-			rank := Rank(7 - Square(sq).Rank())
+			rank := 7 - Square(sq).Rank()
 			mv = NewSquare(file, rank)
 		case LeftRight:
-			file := File(7 - Square(sq).File())
+			file := 7 - Square(sq).File()
 			rank := Square(sq).Rank()
 			mv = NewSquare(file, rank)
 		}
@@ -106,7 +153,21 @@ func (b *Board) Transpose() *Board {
 	return NewBoard(m)
 }
 
-// Draw returns visual representation of the board useful for debugging.
+// Draw returns a visual ASCII representation of the board.
+// Capital letters represent white pieces, lowercase represent black pieces.
+// Empty squares are shown as "-".
+//
+// Example output:
+//
+//	  A B C D E F G H
+//	8 r n b q k b n r
+//	7 p p p p p p p p
+//	6 - - - - - - - -
+//	5 - - - - - - - -
+//	4 - - - - - - - -
+//	3 - - - - - - - -
+//	2 P P P P P P P P
+//	1 R N B Q K B N R
 func (b *Board) Draw() string {
 	s := "\n A B C D E F G H\n"
 	for r := 7; r >= 0; r-- {
@@ -125,38 +186,17 @@ func (b *Board) Draw() string {
 	return s
 }
 
-// Fixed buffer size for FEN string.
-const fenBufferSize = 71
-
-// Pre-allocate a buffer pool for FEN strings
-// This is done to avoid memory allocations during string building
-// when calling the String() method.
-// TODO: consider remving this pool to simplify the code
-//
-//nolint:gochecknoglobals // sync.Pool is safe for concurrent use
-var fenBufferPool = sync.Pool{
-	New: func() interface{} {
-		buf := make([]byte, 0, fenBufferSize)
-		return &buf
-	},
-}
-
 // String implements the fmt.Stringer interface and returns
 // a string in the FEN board format: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR.
 func (b *Board) String() string {
 	const maxRankValue = 7
 	const numOfFiles = 8
-	// Get buffer from pool
-	bufPtr, _ := fenBufferPool.Get().(*[]byte)
-	// Clear buffer but keep capacity
-	*bufPtr = (*bufPtr)[:0] // Ensure buffer is returned to pool
-	defer fenBufferPool.Put(bufPtr)
+
+	// Use a buffer to build the string
+	buf := make([]byte, 0, 71)
 
 	// Buffer to count empty squares
 	emptyCount := 0
-
-	// Use the dereferenced slice for operations
-	buf := *bufPtr
 
 	// Process each rank
 	for r := maxRankValue; r >= 0; r-- {
@@ -192,14 +232,12 @@ func (b *Board) String() string {
 		}
 	}
 
-	// Make sure we update the pointed-to slice with any possible reallocation
-	*bufPtr = buf
-
 	// Convert to string once at the end
 	return string(buf)
 }
 
 // Piece returns the piece for the given square.
+// Returns NoPiece if the square is empty.
 func (b *Board) Piece(sq Square) Piece {
 	for _, p := range allPieces {
 		bb := b.bbForPiece(p)
