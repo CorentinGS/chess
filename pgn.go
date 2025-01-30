@@ -16,6 +16,7 @@ package chess
 import (
 	"errors"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"strconv"
 )
 
@@ -194,8 +195,16 @@ func (p *Parser) parseMoveText() error {
 				return err
 			}
 			if p.currentMove != nil {
-				p.currentMove.comments = comment
-				p.currentMove.command = commandMap
+				if p.currentMove.command != nil {
+					maps.Copy(p.currentMove.command, commandMap)
+				} else {
+					p.currentMove.command = commandMap
+				}
+				if p.currentMove.comments != "" {
+					p.currentMove.comments += " " + comment
+				} else {
+					p.currentMove.comments = comment
+				}
 			}
 
 		case VariationStart:

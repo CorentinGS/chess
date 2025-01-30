@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -361,4 +362,63 @@ func TestCompleteGame(t *testing.T) {
 	if moves[44].nag != "?!" {
 		t.Fatalf("game move 44 is not correct, expected nag '!?', got %s", moves[44].nag)
 	}
+}
+
+func TestLichessMultipleCommand(t *testing.T) {
+	file, err := os.Open(filepath.Join("fixtures/pgns", "lichess_multiple_command.pgn"))
+	if err != nil {
+		t.Fatalf("Failed to open fixture file: %v", err)
+	}
+
+	scanner := NewScanner(file)
+
+	// Test first game
+	scannedGame, err := scanner.ScanGame()
+	if err != nil {
+		t.Fatalf("Failed to read first game: %v", err)
+	}
+
+	tokens, err := TokenizeGame(scannedGame)
+	if err != nil {
+		t.Fatalf("Failed to tokenize first game: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	game, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("fail to read games from valid pgn: %s", err.Error())
+	}
+
+	if game == nil {
+		t.Fatalf("game is nil")
+	}
+
+	if game.tagPairs["Event"] != "Rated blitz game" {
+		t.Fatalf("game event is not correct")
+	}
+
+	// Check if move one has the correct command
+	if game.Moves()[0].command["eval"] != "0.0" {
+		t.Fatalf("game move 1 is not correct, expected eval, got %s", game.Moves()[0].command["eval"])
+	}
+
+	// Check for clock also
+	if game.Moves()[0].command["clk"] != "0:03:00" {
+		t.Fatalf("game move 1 is not correct, expected clock, got %s", game.Moves()[0].command["clk"])
+	}
+
+	// Check move 5 for comment and eval
+	if game.Moves()[4].comments != "E00 Catalan Opening" {
+		t.Fatalf("game move 5 is not correct, expected comment, got %s", game.Moves()[4].comments)
+	}
+
+	if game.Moves()[4].command["eval"] != "0.14" {
+		t.Fatalf("game move 5 is not correct, expected eval, got %s", game.Moves()[4].command["eval"])
+	}
+
+	// check for clock
+	if game.Moves()[4].command["clk"] != "0:02:58" {
+		t.Fatalf("game move 5 is not correct, expected clock, got %s", game.Moves()[4].command["clk"])
+	}
+
 }
