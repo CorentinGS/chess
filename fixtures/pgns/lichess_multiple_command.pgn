@@ -1,0 +1,24 @@
+[Event "Rated blitz game"]
+[Site "https://lichess.org/1CsNl5oG"]
+[Date "2023.03.13"]
+[White "Bongcloudisgood"]
+[Black "ChessMood"]
+[Result "1-0"]
+[GameId "1CsNl5oG"]
+[UTCDate "2023.03.13"]
+[UTCTime "06:44:06"]
+[WhiteElo "2737"]
+[BlackElo "2537"]
+[WhiteRatingDiff "+2"]
+[BlackRatingDiff "-4"]
+[BlackTitle "GM"]
+[Variant "Standard"]
+[TimeControl "180+0"]
+[ECO "E00"]
+[Opening "Catalan Opening"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+
+1. d4 { [%eval 0.0] [%clk 0:03:00] } 1... Nf6 { [%eval 0.28] [%clk 0:03:00] } 2. c4 { [%eval 0.16] [%clk 0:02:59] } 2... e6 { [%eval 0.23] [%clk 0:03:00] } 3. g3 { [%eval 0.14] [%clk 0:02:58] } { E00 Catalan Opening } 3... Bb4+ { [%eval 0.23] [%clk 0:02:59] } 4. Nd2 { [%eval 0.13] [%clk 0:02:58] } 4... O-O { [%eval 0.27] [%clk 0:02:59] } 5. Bg2 { [%eval 0.0] [%clk 0:02:57] } 5... d5 { [%eval 0.12] [%clk 0:02:57] } 6. Nf3 { [%eval 0.21] [%clk 0:02:57] } 6... c5 { [%eval 0.36] [%clk 0:02:56] } 7. a3 { [%eval 0.29] [%clk 0:02:55] } 7... Bxd2+ { [%eval 0.48] [%clk 0:02:55] } 8. Qxd2 { [%eval 0.27] [%clk 0:02:55] } 8... dxc4 { [%eval 0.54] [%clk 0:02:54] } 9. dxc5 { [%eval 0.43] [%clk 0:02:55] } 9... Na6 { [%eval 0.48] [%clk 0:02:53] } 10. c6 { [%eval 0.36] [%clk 0:02:50] } 10... Nd5?! { (0.36 → 1.40) Inaccuracy. Nc5 was best. } { [%eval 1.4] [%clk 0:02:48] } (10... Nc5) 11. Qc2 { [%eval 1.51] [%clk 0:02:28] } 11... h6 { [%eval 1.58] [%clk 0:02:44] } 12. Qxc4 { [%eval 1.3] [%clk 0:02:26] } 12... bxc6 { [%eval 1.47] [%clk 0:02:43] } 13. O-O { [%eval 1.18] [%clk 0:02:17] } 13... Rb8?! { (1.18 → 2.04) Inaccuracy. Bb7 was best. } { [%eval 2.04] [%clk 0:02:41] } (13... Bb7 14. Rd1 Qf6 15. Nd2 Rad8 16. Qc2 Nb6 17. Ne4 Qe7 18. Be3 c5 19. Rxd8 Rxd8 20. Rc1) 14. Rd1 { [%eval 1.79] [%clk 0:02:14] } 14... Bd7?? { (1.79 → 5.55) Blunder. Qe7 was best. } { [%eval 5.55] [%clk 0:02:40] } (14... Qe7 15. Qc2) 15. Ne5?! { (5.55 → 4.23) Inaccuracy. Qxa6 was best. } { [%eval 4.23] [%clk 0:02:11] } (15. Qxa6 Qf6 16. e4 c5 17. Qe2 Bb5 18. Qe1 Nb6 19. Bf4 Qxb2) 15... Qe7?! { (4.23 → 5.49) Inaccuracy. Bc8 was best. } { [%eval 5.49] [%clk 0:02:38] } (15... Bc8 16. e4 Qc7 17. exd5 Qxe5 18. Bf4 Qxb2 19. dxe6 fxe6 20. Bxb8 Nxb8 21. Rab1 Qe5 22. Qe4) 16. b4 { [%eval 4.58] [%clk 0:02:08] } 16... Rfc8 { [%eval 5.33] [%clk 0:02:36] } 17. Qxa6 { [%eval 4.75] [%clk 0:02:07] } 17... c5 { [%eval 5.3] [%clk 0:02:34] } 18. Nxd7 { [%eval 5.57] [%clk 0:02:05] } 18... Qxd7 { [%eval 5.63] [%clk 0:02:33] } 19. e4 { [%eval 5.09] [%clk 0:01:59] } 19... Nxb4 { [%eval 5.32] [%clk 0:02:30] } 20. Rxd7 { [%eval 4.96] [%clk 0:01:48] } 20... Nxa6 { [%eval 4.95] [%clk 0:02:29] } 21. Rxa7 { [%eval 4.91] [%clk 0:01:48] } 21... Nc7 { [%eval 5.55] [%clk 0:02:28] } 22. Be3 { [%eval 4.9] [%clk 0:01:45] } 22... Nb5 { [%eval 4.62] [%clk 0:02:27] } 23. Ra5 { [%eval 4.05] [%clk 0:01:42] } 23... Nd4 { [%eval 4.29] [%clk 0:02:26] } 24. Rd1 { [%eval 4.13] [%clk 0:01:30] } 24... Nb3 { [%eval 4.23] [%clk 0:02:24] } 25. Ra7 { [%eval 4.43] [%clk 0:01:25] } 25... c4 { [%eval 4.83] [%clk 0:02:23] } 26. Rdd7 { [%eval 4.81] [%clk 0:01:17] } 26... c3 { [%eval 5.67] [%clk 0:02:22] } 27. Rxf7 { [%eval 5.58] [%clk 0:01:16] } 27... c2 { [%eval 5.58] [%clk 0:02:20] } 28. Rxg7+ { [%eval 5.73] [%clk 0:01:15] } 28... Kh8 { [%eval 5.72] [%clk 0:02:18] } 29. Rh7+ { [%eval 5.81] [%clk 0:01:10] } 29... Kg8 { [%eval 5.65] [%clk 0:02:17] } 30. Bf1 { [%eval 5.24] [%clk 0:01:02] } 30... c1=Q { [%eval 5.23] [%clk 0:02:16] } 31. Bxc1 { [%eval 5.22] [%clk 0:00:59] } 31... Rxc1 { [%eval 5.17] [%clk 0:02:16] } 32. Kg2 { [%eval 5.32] [%clk 0:00:54] } 32... Nd2 { [%eval 5.46] [%clk 0:02:11] } 33. Bd3 { [%eval 5.24] [%clk 0:00:51] } 33... Rc3 { [%eval 6.0] [%clk 0:02:10] } 34. Rag7+ { [%eval 5.81] [%clk 0:00:48] } 34... Kf8 { [%eval 5.73] [%clk 0:02:08] } 35. Rf7+ { [%eval 5.89] [%clk 0:00:48] } 35... Kg8 { [%eval 5.5] [%clk 0:02:07] } 36. Rd7 { [%eval 5.62] [%clk 0:00:45] } 36... Kf8?? { (5.62 → Mate in 1) Checkmate is now unavoidable. Nb3 was best. } { [%eval #1] [%clk 0:02:07] } (36... Nb3 37. Rhg7+ Kh8 38. Be2 Nc5 39. Rh7+ Kg8 40. Rdg7+ Kf8 41. Rc7 Kg8 42. Bh5 Rxa3 43. Rcg7+) 37. Rh8# { [%clk 0:00:45] } { White wins by checkmate. } 1-0
+
+
