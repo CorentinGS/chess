@@ -146,6 +146,21 @@ func (p PieceType) Bytes() []byte {
 	return []byte{}
 }
 
+func (p PieceType) ToPolyglotPromotionValue() int {
+	switch p {
+	case Knight:
+		return 1
+	case Bishop:
+		return 2
+	case Rook:
+		return 3
+	case Queen:
+		return 4
+	default:
+		return 0
+	}
+}
+
 // Piece is a piece type with a color.
 type Piece int8
 

@@ -16,8 +16,9 @@ package chess
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"strconv"
+
+	"golang.org/x/exp/maps"
 )
 
 // Parser holds the state needed during parsing.

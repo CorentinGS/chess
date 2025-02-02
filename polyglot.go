@@ -40,7 +40,7 @@ type PolyglotMove struct {
 // Example usage:
 //
 //	// Load from file
-//	book, err := LoadBookFromFile("openings.bin")
+//	book, err := LoadBookFromReader(fileReader)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
@@ -53,6 +53,58 @@ type PolyglotMove struct {
 //	randomMove := book.GetRandomMove(hash)
 type PolyglotBook struct {
 	entries []PolyglotEntry
+}
+
+// MoveWithWeight is a helper struct that couples a chess.Move with a weight.
+type MoveWithWeight struct {
+	Move   Move
+	Weight uint16
+}
+
+func MoveToPolyglot(m Move) uint16 {
+	var encoded uint16
+	encoded |= uint16(int(m.S2().File()) & 0x7)                           // bits 0-2
+	encoded |= uint16((int(m.S2().Rank()) & 0x7) << 3)                    // bits 3-5
+	encoded |= uint16((int(m.S1().File()) & 0x7) << 6)                    // bits 6-8
+	encoded |= uint16((int(m.S1().Rank()) & 0x7) << 9)                    // bits 9-11
+	encoded |= uint16((m.Promo().ToPolyglotPromotionValue() & 0x7) << 12) // bits 12-14
+	return encoded
+}
+
+func (pm PolyglotMove) Encode() uint16 {
+	var encoded uint16
+	encoded |= uint16(pm.ToFile & 0x7)        // bits 0-2
+	encoded |= uint16(pm.ToRank&0x7) << 3     // bits 3-5
+	encoded |= uint16(pm.FromFile&0x7) << 6   // bits 6-8
+	encoded |= uint16(pm.FromRank&0x7) << 9   // bits 9-11
+	encoded |= uint16(pm.Promotion&0x7) << 12 // bits 12-14
+	return encoded
+}
+
+func (pm PolyglotMove) ToMove() Move {
+	fromSquare := fmt.Sprintf("%c%d", 'a'+pm.FromFile, pm.FromRank+1)
+	toSquare := fmt.Sprintf("%c%d", 'a'+pm.ToFile, pm.ToRank+1)
+	var promo string
+	switch pm.Promotion {
+	case 1:
+		promo = "n"
+	case 2:
+		promo = "b"
+	case 3:
+		promo = "r"
+	case 4:
+		promo = "q"
+	default:
+		promo = ""
+	}
+	moveStr := fromSquare + toSquare + promo
+	// Assume chess.MoveFromString converts a UCI string to a chess.Move.
+
+	decode, err := UCINotation{}.Decode(nil, moveStr)
+	if err != nil {
+		return Move{}
+	}
+	return *decode
 }
 
 // BookSource defines the interface for reading polyglot book data.
@@ -344,4 +396,95 @@ func fastRand() uint32 {
 		panic(fmt.Sprintf("failed to generate random number: %v", err))
 	}
 	return binary.BigEndian.Uint32(b)
+}
+
+// NewPolyglotBookFromMap creates a PolyglotBook from a map where
+// the key is the zobrist hash (uint64) and the value is a slice of MoveWithWeight.
+func NewPolyglotBookFromMap(m map[uint64][]MoveWithWeight) *PolyglotBook {
+	var entries []PolyglotEntry
+	for key, moves := range m {
+		for _, mw := range moves {
+			entry := PolyglotEntry{
+				Key:    key,
+				Move:   MoveToPolyglot(mw.Move),
+				Weight: mw.Weight,
+				Learn:  0, // default or as needed
+			}
+			entries = append(entries, entry)
+		}
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Key < entries[j].Key
+	})
+	return &PolyglotBook{entries: entries}
+}
+
+// AddMove adds a new move (with its weight) to a given position hash in the book.
+func (book *PolyglotBook) AddMove(positionHash uint64, move Move, weight uint16) {
+	entry := PolyglotEntry{
+		Key:    positionHash,
+		Move:   MoveToPolyglot(move),
+		Weight: weight,
+		Learn:  0,
+	}
+	book.entries = append(book.entries, entry)
+	// Re-sort after adding
+	sort.Slice(book.entries, func(i, j int) bool {
+		return book.entries[i].Key < book.entries[j].Key
+	})
+}
+
+// UpdateMove searches for an existing move at the given position and updates its weight.
+func (book *PolyglotBook) UpdateMove(positionHash uint64, move Move, newWeight uint16) error {
+	target := MoveToPolyglot(move)
+	updated := false
+	for i, entry := range book.entries {
+		if entry.Key == positionHash && entry.Move == target {
+			book.entries[i].Weight = newWeight
+			updated = true
+		}
+	}
+	if !updated {
+		return errors.New("move not found for update")
+	}
+	return nil
+}
+
+// DeleteMoves removes all moves for a given position hash from the book.
+func (book *PolyglotBook) DeleteMoves(positionHash uint64) {
+	var newEntries []PolyglotEntry
+	for _, entry := range book.entries {
+		if entry.Key != positionHash {
+			newEntries = append(newEntries, entry)
+		}
+	}
+	book.entries = newEntries
+}
+
+func (book *PolyglotBook) GetChessMoves(positionHash uint64) ([]Move, error) {
+	entries := book.FindMoves(positionHash)
+	if entries == nil {
+		return nil, errors.New("no moves found for the given position")
+	}
+	var moves []Move
+	for _, entry := range entries {
+		pm := DecodeMove(entry.Move)
+		move := pm.ToMove()
+		moves = append(moves, move)
+	}
+	return moves, nil
+}
+
+func (book *PolyglotBook) ToMoveMap() map[uint64][]MoveWithWeight {
+	result := make(map[uint64][]MoveWithWeight)
+	for _, entry := range book.entries {
+		pm := DecodeMove(entry.Move)
+		move := pm.ToMove()
+		mw := MoveWithWeight{
+			Move:   move,
+			Weight: entry.Weight,
+		}
+		result[entry.Key] = append(result[entry.Key], mw)
+	}
+	return result
 }
