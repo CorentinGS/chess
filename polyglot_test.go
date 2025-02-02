@@ -442,6 +442,7 @@ func TestPolyglotMoveToMoveConversion(t *testing.T) {
 				s1:    E1,
 				s2:    H1,
 				promo: NoPieceType,
+				tags:  KingSideCastle,
 			},
 		},
 	}

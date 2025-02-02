@@ -104,6 +104,15 @@ func (pm PolyglotMove) ToMove() Move {
 	if err != nil {
 		return Move{}
 	}
+
+	if pm.CastlingMove {
+		if pm.FromFile == 4 && pm.ToFile == 0 {
+			decode.addTag(QueenSideCastle)
+		} else {
+			decode.addTag(KingSideCastle)
+		}
+	}
+
 	return *decode
 }
 
