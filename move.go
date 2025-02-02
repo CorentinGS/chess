@@ -67,6 +67,10 @@ func (m *Move) addTag(tag MoveTag) {
 }
 
 func (m *Move) GetCommand(key string) (string, bool) {
+	if m.command == nil {
+		m.command = make(map[string]string)
+		return "", false
+	}
 	value, ok := m.command[key]
 	return value, ok
 }
