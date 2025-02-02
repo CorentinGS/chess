@@ -240,30 +240,31 @@ func TestChessHasher(t *testing.T) {
 }
 
 func TestZobristHashToUint64(t *testing.T) {
-	t.Run("should convert a valid Zobrist hash to uint64", func(t *testing.T) {
+	t.Run("valid 16-digit hexadecimal hash is converted correctly", func(t *testing.T) {
 		hash := "463b96181691fc9c"
 		expected := uint64(0x463b96181691fc9c)
-		result := ZobristHashToUint64(hash)
+		result, err := ZobristHashToUint64(hash)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if result != expected {
-			t.Fatalf("expected %v but got %v", expected, result)
+			t.Fatalf("expected value %v but got %v", expected, result)
 		}
 	})
 
-	t.Run("should convert a invalid Zobrist hash to uint64", func(t *testing.T) {
+	t.Run("invalid hash format returns error", func(t *testing.T) {
 		hash := "invalidhash"
-		expected := uint64(0)
-		result := ZobristHashToUint64(hash)
-		if result != expected {
-			t.Fatalf("expected %v but got %v", expected, result)
+		_, err := ZobristHashToUint64(hash)
+		if err == nil {
+			t.Fatal("expected error for invalid hash format")
 		}
 	})
 
-	t.Run("should convert an empty Zobrist hash to uint64", func(t *testing.T) {
+	t.Run("empty hash returns error", func(t *testing.T) {
 		hash := ""
-		expected := uint64(0)
-		result := ZobristHashToUint64(hash)
-		if result != expected {
-			t.Fatalf("expected %v but got %v", expected, result)
+		_, err := ZobristHashToUint64(hash)
+		if err == nil {
+			t.Fatal("expected error for empty hash")
 		}
 	})
 }
