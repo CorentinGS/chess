@@ -7,7 +7,7 @@ import (
 
 func TestChessHasher(t *testing.T) {
 	t.Run("Basic Position Validation", func(t *testing.T) {
-		hasher := NewChessHasher()
+		hasher := NewZobristHasher()
 
 		t.Run("should correctly hash the starting position", func(t *testing.T) {
 			startPos := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -38,7 +38,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Known Position Hashes", func(t *testing.T) {
-		hasher := NewChessHasher()
+		hasher := NewZobristHasher()
 		knownPositions := []struct {
 			fen  string
 			hash string
@@ -79,7 +79,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Error Handling", func(t *testing.T) {
-		hasher := NewChessHasher()
+		hasher := NewZobristHasher()
 
 		t.Run("should return error for invalid FEN format", func(t *testing.T) {
 			invalidFen := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
@@ -107,7 +107,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Color Handling", func(t *testing.T) {
-		hasher := NewChessHasher()
+		hasher := NewZobristHasher()
 
 		t.Run("should produce different hashes for white and black to move", func(t *testing.T) {
 			positionWhite := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -129,7 +129,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Castling Rights", func(t *testing.T) {
-		hasher := NewChessHasher()
+		hasher := NewZobristHasher()
 
 		t.Run("should produce different hashes for different castling rights", func(t *testing.T) {
 			withAllCastling := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -147,7 +147,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("En Passant", func(t *testing.T) {
-		hasher := NewChessHasher()
+		hasher := NewZobristHasher()
 
 		t.Run("should handle en passant squares correctly", func(t *testing.T) {
 			afterE4E5 := "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"
@@ -180,7 +180,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Position Equality", func(t *testing.T) {
-		hasher := NewChessHasher()
+		hasher := NewZobristHasher()
 
 		t.Run("should produce identical hashes for identical positions", func(t *testing.T) {
 			position := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -206,7 +206,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Piece Placement", func(t *testing.T) {
-		hasher := NewChessHasher()
+		hasher := NewZobristHasher()
 
 		t.Run("should handle individual piece placement correctly", func(t *testing.T) {
 			positions := []string{

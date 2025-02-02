@@ -1,13 +1,14 @@
 package chess
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 )
 
-// ChessHasher provides methods to generate Zobrist hashes for chess positions
-type ChessHasher struct {
+// ZobristHasher provides methods to generate Zobrist hashes for chess positions
+type ZobristHasher struct {
 	enPassantRank int
 	enPassantFile int
 	pawnNearby    bool
@@ -21,8 +22,19 @@ type Hash []byte
 var emptyHash = parseHexString("0000000000000000")
 
 // NewChessHasher creates a new instance of ChessHasher
-func NewChessHasher() *ChessHasher {
-	return &ChessHasher{
+// Deprecated: Use NewZobristHasher instead
+func NewChessHasher() *ZobristHasher {
+	return &ZobristHasher{
+		enPassantRank: -1,
+		enPassantFile: -1,
+		pawnNearby:    false,
+		hasError:      false,
+	}
+}
+
+// NewZobristHasher creates a new instance of ZobristHasher
+func NewZobristHasher() *ZobristHasher {
+	return &ZobristHasher{
 		enPassantRank: -1,
 		enPassantFile: -1,
 		pawnNearby:    false,
@@ -64,12 +76,12 @@ func xorArrays(a, b Hash) Hash {
 }
 
 // xorHash performs XOR operation with a polyglot hash value
-func (ch *ChessHasher) xorHash(arr Hash, num int) Hash {
+func (ch *ZobristHasher) xorHash(arr Hash, num int) Hash {
 	return xorArrays(arr, parseHexString(GetPolyglotHashes()[num]))
 }
 
 // parseEnPassant processes the en passant square
-func (ch *ChessHasher) parseEnPassant(s string) {
+func (ch *ZobristHasher) parseEnPassant(s string) {
 	if s == "-" {
 		return
 	}
@@ -92,7 +104,7 @@ func (ch *ChessHasher) parseEnPassant(s string) {
 }
 
 // hashSide computes the hash for the side to move
-func (ch *ChessHasher) hashSide(arr Hash, color Color) Hash {
+func (ch *ZobristHasher) hashSide(arr Hash, color Color) Hash {
 	if color == White {
 		return ch.xorHash(arr, 780)
 	}
@@ -100,7 +112,7 @@ func (ch *ChessHasher) hashSide(arr Hash, color Color) Hash {
 }
 
 // hashCastling updates hash based on castling rights
-func (ch *ChessHasher) hashCastling(arr Hash, s string) Hash {
+func (ch *ZobristHasher) hashCastling(arr Hash, s string) Hash {
 	if s == "-" {
 		return arr
 	}
@@ -122,7 +134,7 @@ func (ch *ChessHasher) hashCastling(arr Hash, s string) Hash {
 }
 
 // hashPieces computes hash for the piece positions
-func (ch *ChessHasher) hashPieces(arr Hash, s string) Hash {
+func (ch *ZobristHasher) hashPieces(arr Hash, s string) Hash {
 	ranks := strings.Split(s, "/")
 	if len(ranks) != 8 {
 		ch.hasError = true
@@ -198,7 +210,7 @@ func (ch *ChessHasher) hashPieces(arr Hash, s string) Hash {
 }
 
 // HashPosition computes a Zobrist hash for a chess position in FEN notation
-func (ch *ChessHasher) HashPosition(fen string) (string, error) {
+func (ch *ZobristHasher) HashPosition(fen string) (string, error) {
 	ch.hasError = false
 	ch.enPassantRank = -1
 	ch.enPassantFile = -1
@@ -212,7 +224,7 @@ func (ch *ChessHasher) HashPosition(fen string) (string, error) {
 
 	parts := strings.Fields(strings.TrimSpace(fen))
 	if len(parts) < 4 {
-		return "", fmt.Errorf("incomplete FEN string")
+		return "", errors.New("invalid FEN format")
 	}
 
 	pieces, color, castling, enPassant := parts[0], parts[1], parts[2], parts[3]
@@ -230,7 +242,7 @@ func (ch *ChessHasher) HashPosition(fen string) (string, error) {
 	hash = ch.hashCastling(hash, castling)
 
 	if ch.hasError {
-		return "", fmt.Errorf("invalid position")
+		return "", errors.New("invalid piece placement")
 	}
 
 	return createHexString(hash), nil
@@ -238,6 +250,16 @@ func (ch *ChessHasher) HashPosition(fen string) (string, error) {
 
 func ZobristHashToUint64(hash string) uint64 {
 	var result uint64
-	_, _ = fmt.Sscanf(hash, "%016x", &result)
+
+	// Ensure the input is exactly 16 hex digits
+	if len(hash) != 16 {
+		return 0
+	}
+
+	// Try to parse the hash
+	if _, err := fmt.Sscanf(hash, "%016x", &result); err != nil {
+		return 0
+	}
+
 	return result
 }
