@@ -1079,7 +1079,7 @@ func TestGameString(t *testing.T) {
 			expected: "[Event \"Test Event\"]\n[Site \"Test Site\"]\n\n*",
 		},
 		{
-			name: "GameStringWithDifferentResults",
+			name: "GameStringWithWhiteWinResult",
 			setup: func() *Game {
 				g := NewGame()
 				g.outcome = WhiteWon
@@ -1088,7 +1088,7 @@ func TestGameString(t *testing.T) {
 			expected: "1-0",
 		},
 		{
-			name: "GameStringWithDifferentResults",
+			name: "GameStringWithBlackWinResult",
 			setup: func() *Game {
 				g := NewGame()
 				g.outcome = BlackWon
@@ -1097,7 +1097,7 @@ func TestGameString(t *testing.T) {
 			expected: "0-1",
 		},
 		{
-			name: "GameStringWithDifferentResults",
+			name: "GameStringWithDrawResult",
 			setup: func() *Game {
 				g := NewGame()
 				g.outcome = Draw

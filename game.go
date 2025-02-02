@@ -398,7 +398,7 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder, subV
 		sb.WriteString(" {" + currentMove.comments + "}")
 	}
 
-	if currentMove.command != nil && len(currentMove.command) > 0 {
+	if len(currentMove.command) > 0 {
 		sb.WriteString(" {")
 		for key, value := range currentMove.command {
 			sb.WriteString(" [%" + key + " " + value + "]")
