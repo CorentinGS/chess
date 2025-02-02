@@ -1116,6 +1116,53 @@ func TestGameString(t *testing.T) {
 			},
 			expected: "1. e4 {Good move} { [%clk 10:00:00] } *",
 		},
+		{
+			name: "GameStringWithMultipleNestedVariations",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("e4", nil)
+				_ = g.PushMove("e5", nil)
+				_ = g.PushMove("Nf3", nil)
+				g.GoBack()
+				_ = g.PushMove("Nc3", nil)
+				g.GoBack()
+				_ = g.PushMove("d4", nil)
+				_ = g.PushMove("d5", nil)
+				_ = g.PushMove("c4", nil)
+				g.GoBack()
+				_ = g.PushMove("c3", nil)
+				g.GoBack()
+				return g
+			},
+			expected: "1. e4 e5 2. Nf3 (2. Nc3) (2. d4 d5 3. c4 (3. c3) ) *",
+		},
+		{
+			name: "GameStringWithVariationsForBlack",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("e4", nil)
+				_ = g.PushMove("e5", nil)
+				_ = g.PushMove("Nf3", nil)
+				_ = g.PushMove("Nc6", nil)
+				_ = g.PushMove("Bb5", nil)
+				_ = g.PushMove("a6", nil)
+				g.GoBack()
+				_ = g.PushMove("d6", nil)
+				return g
+			},
+			expected: "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 (3... d6) *",
+		},
+		{
+			name: "GameStringWithVariationsOnRoot",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("e4", nil)
+				g.GoBack()
+				_ = g.PushMove("d4", nil)
+				return g
+			},
+			expected: "1. e4 (1. d4) *",
+		},
 	}
 
 	for _, tt := range tests {

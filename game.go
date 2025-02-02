@@ -378,6 +378,8 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder, subV
 	// For white moves, output the move number.
 	if isWhite {
 		sb.WriteString(fmt.Sprintf("%d. ", moveNum))
+	} else if subVariation {
+		sb.WriteString(fmt.Sprintf("%d... ", moveNum))
 	}
 
 	// Encode the move using your AlgebraicNotation.
