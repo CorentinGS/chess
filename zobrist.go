@@ -235,3 +235,9 @@ func (ch *ChessHasher) HashPosition(fen string) (string, error) {
 
 	return createHexString(hash), nil
 }
+
+func ZobristHashToUint64(hash string) uint64 {
+	var result uint64
+	_, _ = fmt.Sscanf(hash, "%016x", &result)
+	return result
+}
