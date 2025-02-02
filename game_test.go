@@ -1011,3 +1011,119 @@ func TestPGNWithEmptyData(t *testing.T) {
 		t.Fatalf("expected error %v but got %v", ErrNoGameFound, err)
 	}
 }
+
+func TestGameString(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func() *Game
+		expected string
+	}{
+		{
+			name: "GameStringWithNoMoves",
+			setup: func() *Game {
+				return NewGame()
+			},
+			expected: "*",
+		},
+		{
+			name: "GameStringWithSingleMove",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("e4", nil)
+				return g
+			},
+			expected: "1. e4 *",
+		},
+		{
+			name: "GameStringWithMultipleMoves",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("e4", nil)
+				_ = g.PushMove("e5", nil)
+				_ = g.PushMove("Nf3", nil)
+				return g
+			},
+			expected: "1. e4 e5 2. Nf3 *",
+		},
+		{
+			name: "GameStringWithComments",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("e4", nil)
+				g.currentMove.comments = "Good move"
+				return g
+			},
+			expected: "1. e4 {Good move} *",
+		},
+		{
+			name: "GameStringWithVariations",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("e4", nil)
+				_ = g.PushMove("e5", nil)
+				_ = g.PushMove("Nf3", nil)
+				g.GoBack()
+				_ = g.PushMove("Nc3", nil)
+				return g
+			},
+			expected: "1. e4 e5 2. Nf3 (2. Nc3) *",
+		},
+		{
+			name: "GameStringWithTags",
+			setup: func() *Game {
+				g := NewGame()
+				g.AddTagPair("Event", "Test Event")
+				g.AddTagPair("Site", "Test Site")
+				return g
+			},
+			expected: "[Event \"Test Event\"]\n[Site \"Test Site\"]\n\n*",
+		},
+		{
+			name: "GameStringWithDifferentResults",
+			setup: func() *Game {
+				g := NewGame()
+				g.outcome = WhiteWon
+				return g
+			},
+			expected: "1-0",
+		},
+		{
+			name: "GameStringWithDifferentResults",
+			setup: func() *Game {
+				g := NewGame()
+				g.outcome = BlackWon
+				return g
+			},
+			expected: "0-1",
+		},
+		{
+			name: "GameStringWithDifferentResults",
+			setup: func() *Game {
+				g := NewGame()
+				g.outcome = Draw
+				return g
+			},
+			expected: "1/2-1/2",
+		},
+		{
+			name: "GameStringWithCommentsAndClock",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("e4", nil)
+				g.currentMove.comments = "Good move"
+				g.currentMove.SetCommand("clk", "10:00:00")
+				return g
+			},
+			expected: "1. e4 {Good move} { [%clk 10:00:00] } *",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := tt.setup()
+			if g.String() != tt.expected {
+				t.Fatalf("expected %v but got %v", tt.expected, g.String())
+			}
+		})
+	}
+}

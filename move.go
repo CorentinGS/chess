@@ -72,6 +72,9 @@ func (m *Move) GetCommand(key string) (string, bool) {
 }
 
 func (m *Move) SetCommand(key, value string) {
+	if m.command == nil {
+		m.command = make(map[string]string)
+	}
 	m.command[key] = value
 }
 
