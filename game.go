@@ -356,7 +356,20 @@ func (g *Game) String() string {
 }
 
 // writeMoves recursively writes the move text.
-// moveNum is the current move number (for white’s moves) and isWhite indicates whose move it is.
+// writeMoves recursively writes the PGN-formatted move sequence starting from the given move node into the provided strings.Builder.
+// It handles move numbering for white and black moves, encodes moves using algebraic notation based on the appropriate position,
+// and appends comments and command annotations if present. The function distinguishes between main line moves and sub-variations;
+// when processing a sub-variation, moves are enclosed in parentheses.
+// 
+// Parameters:
+//   node - pointer to the current move node from which to write moves.
+//   moveNum - the current move number corresponding to white’s moves.
+//   isWhite - true if it is white’s move, false if it is black’s move.
+//   sb - pointer to a strings.Builder where the formatted move notation is appended.
+//   subVariation - true if the current call is within a sub-variation, affecting formatting details.
+// 
+// The function recurses through the move tree, writing the main line first and then processing any additional variations,
+// ensuring that the output adheres to standard PGN conventions. Future enhancements may include support for all NAG values.
 func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder, subVariation bool) {
 	// If no moves remain, stop.
 	if node == nil {
@@ -398,7 +411,7 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder, subV
 		sb.WriteString(" {" + currentMove.comments + "}")
 	}
 
-	if len(currentMove.command) > 0 {
+	if currentMove.command != nil && len(currentMove.command) > 0 {
 		sb.WriteString(" {")
 		for key, value := range currentMove.command {
 			sb.WriteString(" [%" + key + " " + value + "]")
