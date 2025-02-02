@@ -98,7 +98,6 @@ func (pm PolyglotMove) ToMove() Move {
 		promo = ""
 	}
 	moveStr := fromSquare + toSquare + promo
-	// Assume chess.MoveFromString converts a UCI string to a chess.Move.
 
 	decode, err := UCINotation{}.Decode(nil, moveStr)
 	if err != nil {
