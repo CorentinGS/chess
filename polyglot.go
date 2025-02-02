@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 )
 
@@ -120,36 +119,6 @@ type BytesBookSource struct {
 	index int64
 }
 
-// NewFileBookSource creates a new file-based book source
-func NewFileBookSource(path string) *FileBookSource {
-	return &FileBookSource{path: path}
-}
-
-// Read implements BookSource for FileBookSource
-func (f *FileBookSource) Read(p []byte) (n int, err error) {
-	file, err := os.Open(f.path)
-	if err != nil {
-		return 0, err
-	}
-	defer file.Close()
-	return io.ReadFull(file, p)
-}
-
-// Size implements BookSource for FileBookSource
-func (f *FileBookSource) Size() (int64, error) {
-	file, err := os.Open(f.path)
-	if err != nil {
-		return 0, err
-	}
-	defer file.Close()
-
-	stat, err := file.Stat()
-	if err != nil {
-		return 0, err
-	}
-	return stat.Size(), nil
-}
-
 // NewBytesBookSource creates a new memory-based book source
 func NewBytesBookSource(data []byte) *BytesBookSource {
 	return &BytesBookSource{
@@ -238,20 +207,6 @@ func LoadFromReader(reader io.Reader) (*PolyglotBook, error) {
 	if err != nil {
 		return nil, err
 	}
-	return LoadFromSource(source)
-}
-
-// LoadBookFromFile loads a polyglot book from a file path.
-// This is a convenience function for the common case of loading from a file.
-//
-// Example:
-//
-//	book, err := LoadBookFromFile("openings.bin")
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-func LoadBookFromFile(filename string) (*PolyglotBook, error) {
-	source := NewFileBookSource(filename)
 	return LoadFromSource(source)
 }
 

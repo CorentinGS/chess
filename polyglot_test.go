@@ -105,7 +105,9 @@ func TestFileBookSource(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	source := NewFileBookSource(tmpFile)
+	osFile, _ := os.Open(tmpFile)
+
+	source, _ := NewReaderBookSource(osFile)
 
 	size, err := source.Size()
 	if err != nil || size != 32 {
