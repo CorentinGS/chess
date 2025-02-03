@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 )
 
@@ -336,10 +337,25 @@ func (g *Game) FEN() string {
 func (g *Game) String() string {
 	var sb strings.Builder
 
-	// Write tag pairs.
+	var tagPairList = make([]sortableTagPair, len(g.tagPairs))
+
+	var idx uint = 0
 	for tag, value := range g.tagPairs {
-		sb.WriteString(fmt.Sprintf("[%s \"%s\"]\n", tag, value))
+		tagPairList[idx] = sortableTagPair{
+			Key:   tag,
+			Value: value,
+		}
+		idx++
 	}
+
+	slices.SortFunc(tagPairList, cmpTags)
+
+	// Write tag pairs.
+	for _, tagPair := range tagPairList {
+		sb.WriteString(fmt.Sprintf("[%s \"%s\"]\n", tagPair.Key, tagPair.Value))
+	}
+
+	// Append empty line after tag pairs as per definition
 	if len(g.tagPairs) > 0 {
 		sb.WriteString("\n")
 	}
@@ -355,17 +371,58 @@ func (g *Game) String() string {
 	return sb.String()
 }
 
+// sortableTagPair is its own
+type sortableTagPair struct {
+	Key   string
+	Value string
+}
+
+// Compares two tags to determine in which order they should be brought up
+func cmpTags(a, b sortableTagPair) int {
+	// Don't re-order duplicate keys
+	if a.Key == b.Key {
+		return 0
+	}
+
+	// PGN defined tags take priority
+	for _, req := range []string{
+		"Event",
+		"Site",
+		"Date",
+		"Round",
+		"White",
+		"Black",
+		"Result",
+	} {
+		if a.Key == req {
+			return -1
+		}
+		if b.Key == req {
+			return +1
+		}
+	}
+
+	// Finally compare the keys directly and sort by ascending
+	if a.Key < b.Key {
+		return -1
+	} else if b.Key < a.Key {
+		return +1
+	}
+	return 0
+}
+
 // writeMoves recursively writes the PGN-formatted move sequence starting from the given move node into the provided strings.Builder.
 // It handles move numbering for white and black moves, encodes moves using algebraic notation based on the appropriate position,
 // and appends comments and command annotations if present. The function distinguishes between main line moves and sub-variations;
 // when processing a sub-variation, moves are enclosed in parentheses.
 //
 // Parameters:
-//   node - pointer to the current move node from which to write moves.
-//   moveNum - the current move number corresponding to white’s moves.
-//   isWhite - true if it is white’s move, false if it is black’s move.
-//   sb - pointer to a strings.Builder where the formatted move notation is appended.
-//   subVariation - true if the current call is within a sub-variation, affecting formatting details.
+//
+//	node - pointer to the current move node from which to write moves.
+//	moveNum - the current move number corresponding to white’s moves.
+//	isWhite - true if it is white’s move, false if it is black’s move.
+//	sb - pointer to a strings.Builder where the formatted move notation is appended.
+//	subVariation - true if the current call is within a sub-variation, affecting formatting details.
 //
 // The function recurses through the move tree, writing the main line first and then processing any additional variations,
 // ensuring that the output adheres to standard PGN conventions. Future enhancements may include support for all NAG values.
