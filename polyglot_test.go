@@ -743,3 +743,36 @@ func TestToMoveMap(t *testing.T) {
 		t.Errorf("Expected 1 move for position %d, got %d", pos2, len(movesPos2))
 	}
 }
+
+func BenchmarkToMoveMap(b *testing.B) {
+	pos1 := uint64(10)
+	pos2 := uint64(20)
+	move1 := Move{
+		s1:    A2,
+		s2:    A3,
+		promo: NoPieceType,
+	}
+	move2 := Move{
+		s1:    A3,
+		s2:    A4,
+		promo: NoPieceType,
+	}
+	move3 := Move{
+		s1:    B2,
+		s2:    B3,
+		promo: NoPieceType,
+	}
+	book := &PolyglotBook{
+		entries: []PolyglotEntry{
+			{Key: pos1, Move: MoveToPolyglot(move1), Weight: 50, Learn: 0},
+			{Key: pos1, Move: MoveToPolyglot(move2), Weight: 75, Learn: 0},
+			{Key: pos2, Move: MoveToPolyglot(move3), Weight: 100, Learn: 0},
+		},
+	}
+
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		_ = book.ToMoveMap()
+	}
+}

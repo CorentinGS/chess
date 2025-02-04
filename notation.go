@@ -136,16 +136,22 @@ func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
 		return nil, fmt.Errorf("chess: invalid UCI notation length %d in %q", l, s)
 	}
 
-	s1, ok1 := strToSquareMap[s[0:2]]
-	s2, ok2 := strToSquareMap[s[2:4]]
-	if !ok1 || !ok2 {
+	// Convert directly instead of using map lookups
+	s1 := Square((s[0] - 'a') + (s[1]-'1')*8)
+	s2 := Square((s[2] - 'a') + (s[3]-'1')*8)
+
+	if s1 < A1 || s1 > H8 || s2 < A1 || s2 > H8 {
 		return nil, fmt.Errorf("chess: invalid squares in UCI notation %q", s)
 	}
 
-	m := &Move{s1: s1, s2: s2}
+	m := Move{s1: s1, s2: s2}
 
+	// Promotion (Use a precomputed lookup)
 	if l == promoLen {
-		promo := pieceTypeFromChar(s[4:5])
+		promoMap := [256]PieceType{
+			'n': Knight, 'b': Bishop, 'r': Rook, 'q': Queen,
+		}
+		promo := promoMap[s[4]]
 		if promo == NoPieceType {
 			return nil, fmt.Errorf("chess: invalid promotion piece in UCI notation %q", s)
 		}
@@ -153,9 +159,10 @@ func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
 	}
 
 	if pos == nil {
-		return m, nil
+		return &m, nil
 	}
 
+	// Check castling
 	p := pos.Board().Piece(s1)
 	if p.Type() == King {
 		if (s1 == E1 && s2 == G1) || (s1 == E8 && s2 == G8) {
@@ -172,7 +179,7 @@ func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
 		m.addTag(Capture)
 	}
 
-	return m, nil
+	return &m, nil
 }
 
 // AlgebraicNotation (or Standard Algebraic Notation) is the
