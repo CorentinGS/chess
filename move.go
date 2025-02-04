@@ -113,6 +113,6 @@ func (m *Move) Children() []*Move {
 	return m.children
 }
 
-func (m *Move) Number() uint {
-	return m.number
+func (m *Move) Number() int {
+	return int(m.number)
 }

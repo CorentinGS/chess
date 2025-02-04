@@ -203,6 +203,15 @@ func TestSingleGameFromPGN(t *testing.T) {
 		t.Fatalf("game moves are not correct, expected 6, got %d", len(game.Moves()))
 	}
 
+	for i, move := range game.Moves() {
+		// check move number for each move
+		// Get the full move number
+		fullMoveNumber := (i / 2) + 1
+		if move.Number() != fullMoveNumber {
+			t.Fatalf("game move %d is not correct, expected full move number %d, got %d", i, fullMoveNumber, move.Number())
+		}
+	}
+
 	if game.Moves()[0].String() != "e2e4" {
 		t.Fatalf("game move 1 is not correct, expected e4, got %s", game.Moves()[0].String())
 	}
@@ -245,6 +254,26 @@ func TestBigPgn(t *testing.T) {
 
 			if game == nil {
 				t.Fatalf("game is nil")
+			}
+
+			// check moves number
+			if len(game.Moves()) == 0 {
+				t.Fatalf("game moves are not correct, expected 0, got %d", len(game.Moves()))
+			}
+
+			if game.GetTagPair("Variant") == "From Position" {
+				t.Skip("Skipping test for From Position")
+			}
+
+			for i, move := range game.Moves() {
+				// check move number for each move
+				// Get the full move number
+				fullMoveNumber := (i / 2) + 1
+				if move.Number() != fullMoveNumber {
+					t.Log(game.Moves())
+					t.Log(game)
+					t.Fatalf("game move %d is not correct, expected full move number %d, got %d", i, fullMoveNumber, move.Number())
+				}
 			}
 		})
 	}

@@ -166,6 +166,7 @@ func (p *Parser) parseTagPair() error {
 }
 
 func (p *Parser) parseMoveText() error {
+	var moveNumber uint64
 	for p.position < len(p.tokens) {
 		token := p.currentToken()
 
@@ -173,7 +174,7 @@ func (p *Parser) parseMoveText() error {
 		case MoveNumber:
 			number, err := strconv.ParseUint(token.Value, 10, 32)
 			if err == nil && p.currentMove != nil {
-				p.currentMove.number = uint(number)
+				moveNumber = number
 			}
 			p.advance()
 			if p.currentToken().Type == DOT {
@@ -187,6 +188,9 @@ func (p *Parser) parseMoveText() error {
 			move, err := p.parseMove()
 			if err != nil {
 				return err
+			}
+			if moveNumber > 0 {
+				move.number = uint(moveNumber)
 			}
 			p.addMove(move)
 
