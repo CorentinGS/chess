@@ -81,13 +81,6 @@ func (pm PolyglotMove) Encode() uint16 {
 	return encoded
 }
 
-var castleMap = map[string]string{
-	"e1h1": "e1g1",
-	"e1a1": "e1c1",
-	"e8h8": "e8g8",
-	"e8a8": "e8c8",
-}
-
 func convertPolyglotCastleToUCI(fromFile, toFile, rank byte) (byte, byte, byte, byte) {
 	if fromFile == 'e' {
 		switch toFile {
