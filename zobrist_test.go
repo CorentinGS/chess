@@ -261,3 +261,14 @@ func TestZobristHashToUint64(t *testing.T) {
 
 	})
 }
+
+func BenchmarkHashPosition(b *testing.B) {
+	hasher := NewZobristHasher()
+	fen := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = hasher.HashPosition(fen)
+	}
+}

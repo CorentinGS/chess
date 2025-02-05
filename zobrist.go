@@ -1,9 +1,10 @@
 package chess
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -42,14 +43,20 @@ func NewZobristHasher() *ZobristHasher {
 	}
 }
 
-// parseHexString converts a hex string to a byte slice
+// parseHexString converts a hex string to a byte slice efficiently
 func parseHexString(s string) Hash {
-	result := make([]byte, len(s)/2)
-	for i := 0; i < len(s); i += 2 {
-		var value byte
-		_, _ = fmt.Sscanf(s[i:i+2], "%02x", &value)
-		result[i/2] = value
+	// Ensure the input has an even length
+	if len(s)%2 != 0 {
+		return nil // Handle invalid input
 	}
+
+	// Use a preallocated buffer for zero allocations
+	result := make([]byte, len(s)/2)
+	_, err := hex.Decode(result, []byte(s))
+	if err != nil {
+		return nil // Handle invalid hex string
+	}
+
 	return result
 }
 
@@ -216,18 +223,23 @@ func (ch *ZobristHasher) HashPosition(fen string) (string, error) {
 	ch.enPassantFile = -1
 	ch.pawnNearby = false
 
-	// Validate FEN format
-	validFEN := regexp.MustCompile(`^([rnbqkpRNBQKP1-8]+\/){7}[rnbqkpRNBQKP1-8]+ [wb] [KQkq-]{1,4} [a-h1-8-]{1,2} \d+ \d+$`)
-	if !validFEN.MatchString(fen) {
-		return "", fmt.Errorf("invalid FEN format")
-	}
-
-	parts := strings.Fields(strings.TrimSpace(fen))
+	// FEN should have at least 4 parts
+	parts := strings.SplitN(fen, " ", 5)
 	if len(parts) < 4 {
 		return "", errors.New("invalid FEN format")
 	}
 
 	pieces, color, castling, enPassant := parts[0], parts[1], parts[2], parts[3]
+
+	// Quick validation without regex
+	if len(color) != 1 || (color[0] != 'w' && color[0] != 'b') {
+		return "", errors.New("invalid side to move")
+	}
+
+	if len(castling) > 4 {
+		return "", errors.New("invalid castling rights")
+	}
+
 	hash := make(Hash, len(emptyHash))
 	copy(hash, emptyHash)
 
@@ -249,16 +261,16 @@ func (ch *ZobristHasher) HashPosition(fen string) (string, error) {
 }
 
 func ZobristHashToUint64(hash string) uint64 {
-	var result uint64
-
 	// Ensure the input is exactly 16 hex digits
 	if len(hash) != 16 {
 		return 0
 	}
 
-	// Try to parse the hash
-	if _, err := fmt.Sscanf(hash, "%016x", &result); err != nil {
+	// Convert directly using `strconv.ParseUint`
+	result, err := strconv.ParseUint(hash, 16, 64)
+	if err != nil {
 		return 0
+
 	}
 
 	return result
