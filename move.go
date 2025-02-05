@@ -62,7 +62,7 @@ func (m *Move) HasTag(tag MoveTag) bool {
 	return (tag & m.tags) > 0
 }
 
-func (m *Move) addTag(tag MoveTag) {
+func (m *Move) AddTag(tag MoveTag) {
 	m.tags |= tag
 }
 
