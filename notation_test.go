@@ -149,6 +149,97 @@ func TestEncodeUCINotationWithInvalidMove(t *testing.T) {
 	}
 }
 
+func TestUCINotationDecode(t *testing.T) {
+	moveWithCheckCapture := &Move{s1: D1, s2: D8, tags: Check}
+	moveWithCheckCapture.AddTag(Capture)
+
+	tests := []struct {
+		name    string
+		pos     *Position
+		input   string
+		want    *Move
+		wantErr bool
+	}{
+		{
+			name:    "valid move without promotion",
+			pos:     unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+			input:   "e2e4",
+			want:    &Move{s1: E2, s2: E4},
+			wantErr: false,
+		},
+		{
+			name:    "valid move with promotion",
+			pos:     unsafeFEN("8/P7/8/8/8/8/8/8 w - - 0 1"),
+			input:   "a7a8q",
+			want:    &Move{s1: A7, s2: A8, promo: Queen},
+			wantErr: false,
+		},
+		{
+			name:    "valid move with capture",
+			pos:     unsafeFEN("rnbqkb1r/ppp2ppp/3p1n2/4P3/4P3/2N5/PPP2PPP/R1BQKBNR b KQkq - 0 4"),
+			input:   "d6e5",
+			want:    &Move{s1: D6, s2: E5, tags: Capture},
+			wantErr: false,
+		},
+		{
+			name:    "valid move with check only",
+			pos:     unsafeFEN("rnbqkb1r/ppp2ppp/5n2/4p3/4P3/2N5/PPP2PPP/R1BQKBNR w KQkq - 0 5"),
+			input:   "f1b5",
+			want:    &Move{s1: F1, s2: B5, tags: Check},
+			wantErr: false,
+		},
+		{
+			name:    "valid move with check and capture",
+			pos:     unsafeFEN("rnbqkb1r/ppp2ppp/5n2/4p3/4P3/2N5/PPP2PPP/R1BQKBNR w KQkq - 0 5"),
+			input:   "d1d8",
+			want:    moveWithCheckCapture,
+			wantErr: false,
+		},
+		{
+			name:    "invalid UCI notation length",
+			pos:     nil,
+			input:   "e2e",
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "invalid squares in UCI notation",
+			pos:     nil,
+			input:   "e9e4",
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "invalid promotion piece",
+			pos:     nil,
+			input:   "a7a8x",
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "valid en passant move",
+			pos:     unsafeFEN("rnbqkbnr/ppp2ppp/4p3/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3"),
+			input:   "e5d6",
+			want:    &Move{s1: E5, s2: D6, tags: EnPassant},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			notation := UCINotation{}
+			got, err := notation.Decode(tt.pos, tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Decode() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && (got.String() != tt.want.String() || got.promo != tt.want.promo || got.tags != tt.want.tags) {
+				t.Errorf("Decode() = %v (%d), want %v (%d)", got, got.tags, tt.want, tt.want.tags)
+			}
+		})
+	}
+}
+
 // Common test positions for consistent benchmarking
 var (
 	// Initial position

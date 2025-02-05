@@ -62,6 +62,8 @@ func (m *Move) HasTag(tag MoveTag) bool {
 	return (tag & m.tags) > 0
 }
 
+// AddTag adds the given MoveTag to the move's tags using a bitwise OR operation.
+// Multiple tags can be combined by calling AddTag multiple times.
 func (m *Move) AddTag(tag MoveTag) {
 	m.tags |= tag
 }

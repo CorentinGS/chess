@@ -162,22 +162,8 @@ func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
 		return &m, nil
 	}
 
-	// Check castling
-	p := pos.Board().Piece(s1)
-	if p.Type() == King {
-		if (s1 == E1 && s2 == G1) || (s1 == E8 && s2 == G8) {
-			m.AddTag(KingSideCastle)
-		} else if (s1 == E1 && s2 == C1) || (s1 == E8 && s2 == C8) {
-			m.AddTag(QueenSideCastle)
-		}
-	} else if p.Type() == Pawn && s2 == pos.enPassantSquare {
-		m.AddTag(EnPassant | Capture)
-	}
-
-	// Check for capture
-	if c2 := pos.Board().Piece(s2).Color(); c2 != NoColor && c2 != p.Color() {
-		m.AddTag(Capture)
-	}
+	// check for check
+	addTags(&m, pos)
 
 	return &m, nil
 }
