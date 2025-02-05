@@ -19,6 +19,9 @@ var polyglotHashesBytes = func() [len(polyglotHashes)][8]byte {
 
 // GetPolyglotHashBytes returns a precomputed byte slice for a given index
 func GetPolyglotHashBytes(index int) []byte {
+	if index < 0 || index >= len(polyglotHashesBytes) {
+		return nil
+	}
 	return polyglotHashesBytes[index][:]
 }
 
