@@ -241,7 +241,7 @@ func (p *Parser) parseMove() (*Move, error) {
 				move.s2 = m.S2()
 				move.position = p.game.pos.copy()
 				if m.HasTag(Check) {
-					move.addTag(Check)
+					move.AddTag(Check)
 				}
 				p.advance()
 				return move, nil
@@ -263,7 +263,7 @@ func (p *Parser) parseMove() (*Move, error) {
 				move.s2 = m.S2()
 				move.position = p.game.pos
 				if m.HasTag(Check) {
-					move.addTag(Check)
+					move.AddTag(Check)
 				}
 				p.advance()
 				return move, nil

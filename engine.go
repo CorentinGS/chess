@@ -176,20 +176,20 @@ func standardMoves(pos *Position, first bool) []Move {
 func addTags(m *Move, pos *Position) {
 	p := pos.board.Piece(m.s1)
 	if pos.board.isOccupied(m.s2) {
-		m.addTag(Capture)
+		m.AddTag(Capture)
 	} else if m.s2 == pos.enPassantSquare && p.Type() == Pawn {
-		m.addTag(EnPassant)
+		m.AddTag(EnPassant)
 	}
 	// determine if in check after move (makes move invalid)
 	cp := pos.copy()
 	cp.board.update(m)
 	if isInCheck(cp) {
-		m.addTag(inCheck)
+		m.AddTag(inCheck)
 	}
 	// determine if opponent in check after move
 	cp.turn = cp.turn.Other()
 	if isInCheck(cp) {
-		m.addTag(Check)
+		m.AddTag(Check)
 	}
 }
 
@@ -327,7 +327,7 @@ func castleMoves(pos *Position) []Move {
 		!squaresAreAttacked(pos, F1, G1) &&
 		!pos.inCheck {
 		m := Move{s1: E1, s2: G1}
-		m.addTag(KingSideCastle)
+		m.AddTag(KingSideCastle)
 		addTags(&m, pos)
 		moves[count] = m
 		count++
@@ -339,7 +339,7 @@ func castleMoves(pos *Position) []Move {
 		!squaresAreAttacked(pos, C1, D1) &&
 		!pos.inCheck {
 		m := Move{s1: E1, s2: C1}
-		m.addTag(QueenSideCastle)
+		m.AddTag(QueenSideCastle)
 		addTags(&m, pos)
 		moves[count] = m
 		count++
@@ -351,7 +351,7 @@ func castleMoves(pos *Position) []Move {
 		!squaresAreAttacked(pos, F8, G8) &&
 		!pos.inCheck {
 		m := Move{s1: E8, s2: G8}
-		m.addTag(KingSideCastle)
+		m.AddTag(KingSideCastle)
 		addTags(&m, pos)
 		moves[count] = m
 		count++
@@ -363,7 +363,7 @@ func castleMoves(pos *Position) []Move {
 		!squaresAreAttacked(pos, C8, D8) &&
 		!pos.inCheck {
 		m := Move{s1: E8, s2: C8}
-		m.addTag(QueenSideCastle)
+		m.AddTag(QueenSideCastle)
 		addTags(&m, pos)
 		moves[count] = m
 		count++
