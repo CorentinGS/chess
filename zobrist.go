@@ -3,7 +3,6 @@ package chess
 import (
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -60,13 +59,9 @@ func parseHexString(s string) Hash {
 	return result
 }
 
-// createHexString converts a byte slice to a hex string
+// createHexString converts a byte slice to a hex string efficiently
 func createHexString(h Hash) string {
-	var sb strings.Builder
-	for _, b := range h {
-		_, _ = fmt.Fprintf(&sb, "%02x", b)
-	}
-	return sb.String()
+	return hex.EncodeToString(h)
 }
 
 func xorArrays(a, b Hash) {
@@ -95,7 +90,7 @@ func xorArraysInto(a, b, out Hash) {
 // xorHash performs an in-place XOR operation on a hash
 func (ch *ZobristHasher) xorHash(arr Hash, num int) {
 	// Get the precomputed Polyglot hash as a byte slice
-	polyglotHash := parseHexString(GetPolyglotHashes()[num])
+	polyglotHash := GetPolyglotHashBytes(num)
 
 	// Perform in-place XOR
 	xorArrays(arr, polyglotHash)
