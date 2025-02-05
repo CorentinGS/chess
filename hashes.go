@@ -1,11 +1,17 @@
 package chess
 
-import "encoding/hex"
+import (
+	"encoding/hex"
+	"fmt"
+)
 
 var polyglotHashesBytes = func() [len(polyglotHashes)][8]byte {
 	var hashes [len(polyglotHashes)][8]byte
 	for i, hexStr := range polyglotHashes {
-		b, _ := hex.DecodeString(hexStr)
+		b, err := hex.DecodeString(hexStr)
+		if err != nil {
+			panic(fmt.Errorf("invalid polyglot hash at index %d: %w", i, err))
+		}
 		copy(hashes[i][:], b)
 	}
 	return hashes
