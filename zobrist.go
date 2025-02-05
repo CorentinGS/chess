@@ -69,22 +69,36 @@ func createHexString(h Hash) string {
 	return sb.String()
 }
 
-// xorArrays performs bitwise XOR between two byte slices
-func xorArrays(a, b Hash) Hash {
+func xorArrays(a, b Hash) {
 	length := len(a)
 	if len(b) < length {
 		length = len(b)
 	}
-	result := make(Hash, length)
 	for i := 0; i < length; i++ {
-		result[i] = a[i] ^ b[i]
+		a[i] ^= b[i] // XOR in place, avoiding new slice allocation
 	}
-	return result
 }
 
-// xorHash performs XOR operation with a polyglot hash value
-func (ch *ZobristHasher) xorHash(arr Hash, num int) Hash {
-	return xorArrays(arr, parseHexString(GetPolyglotHashes()[num]))
+func xorArraysInto(a, b, out Hash) {
+	length := len(a)
+	if len(b) < length {
+		length = len(b)
+	}
+	if len(out) < length {
+		panic("output buffer too small")
+	}
+	for i := 0; i < length; i++ {
+		out[i] = a[i] ^ b[i]
+	}
+}
+
+// xorHash performs an in-place XOR operation on a hash
+func (ch *ZobristHasher) xorHash(arr Hash, num int) {
+	// Get the precomputed Polyglot hash as a byte slice
+	polyglotHash := parseHexString(GetPolyglotHashes()[num])
+
+	// Perform in-place XOR
+	xorArrays(arr, polyglotHash)
 }
 
 // parseEnPassant processes the en passant square
@@ -113,7 +127,7 @@ func (ch *ZobristHasher) parseEnPassant(s string) {
 // hashSide computes the hash for the side to move
 func (ch *ZobristHasher) hashSide(arr Hash, color Color) Hash {
 	if color == White {
-		return ch.xorHash(arr, 780)
+		ch.xorHash(arr, 780)
 	}
 	return arr
 }
@@ -125,16 +139,16 @@ func (ch *ZobristHasher) hashCastling(arr Hash, s string) Hash {
 	}
 
 	if strings.Contains(s, "K") {
-		arr = ch.xorHash(arr, 768)
+		ch.xorHash(arr, 768)
 	}
 	if strings.Contains(s, "Q") {
-		arr = ch.xorHash(arr, 769)
+		ch.xorHash(arr, 769)
 	}
 	if strings.Contains(s, "k") {
-		arr = ch.xorHash(arr, 770)
+		ch.xorHash(arr, 770)
 	}
 	if strings.Contains(s, "q") {
-		arr = ch.xorHash(arr, 771)
+		ch.xorHash(arr, 771)
 	}
 
 	return arr
@@ -155,7 +169,7 @@ func (ch *ZobristHasher) hashPieces(arr Hash, s string) Hash {
 			piece := ranks[i][j]
 			switch piece {
 			case 'p':
-				arr = ch.xorHash(arr, 8*rank+file)
+				ch.xorHash(arr, 8*rank+file)
 				if ch.enPassantRank == 2 && rank == 3 && ch.enPassantFile > 0 && file == ch.enPassantFile-1 {
 					ch.pawnNearby = true
 				}
@@ -164,7 +178,7 @@ func (ch *ZobristHasher) hashPieces(arr Hash, s string) Hash {
 				}
 				file++
 			case 'P':
-				arr = ch.xorHash(arr, 64*1+8*rank+file)
+				ch.xorHash(arr, 64*1+8*rank+file)
 				if ch.enPassantRank == 5 && rank == 4 && ch.enPassantFile > 0 && file == ch.enPassantFile-1 {
 					ch.pawnNearby = true
 				}
@@ -173,34 +187,34 @@ func (ch *ZobristHasher) hashPieces(arr Hash, s string) Hash {
 				}
 				file++
 			case 'n':
-				arr = ch.xorHash(arr, 64*2+8*rank+file)
+				ch.xorHash(arr, 64*2+8*rank+file)
 				file++
 			case 'N':
-				arr = ch.xorHash(arr, 64*3+8*rank+file)
+				ch.xorHash(arr, 64*3+8*rank+file)
 				file++
 			case 'b':
-				arr = ch.xorHash(arr, 64*4+8*rank+file)
+				ch.xorHash(arr, 64*4+8*rank+file)
 				file++
 			case 'B':
-				arr = ch.xorHash(arr, 64*5+8*rank+file)
+				ch.xorHash(arr, 64*5+8*rank+file)
 				file++
 			case 'r':
-				arr = ch.xorHash(arr, 64*6+8*rank+file)
+				ch.xorHash(arr, 64*6+8*rank+file)
 				file++
 			case 'R':
-				arr = ch.xorHash(arr, 64*7+8*rank+file)
+				ch.xorHash(arr, 64*7+8*rank+file)
 				file++
 			case 'q':
-				arr = ch.xorHash(arr, 64*8+8*rank+file)
+				ch.xorHash(arr, 64*8+8*rank+file)
 				file++
 			case 'Q':
-				arr = ch.xorHash(arr, 64*9+8*rank+file)
+				ch.xorHash(arr, 64*9+8*rank+file)
 				file++
 			case 'k':
-				arr = ch.xorHash(arr, 64*10+8*rank+file)
+				ch.xorHash(arr, 64*10+8*rank+file)
 				file++
 			case 'K':
-				arr = ch.xorHash(arr, 64*11+8*rank+file)
+				ch.xorHash(arr, 64*11+8*rank+file)
 				file++
 			case '1', '2', '3', '4', '5', '6', '7', '8':
 				file += int(piece - '0')
@@ -247,7 +261,7 @@ func (ch *ZobristHasher) HashPosition(fen string) (string, error) {
 	hash = ch.hashPieces(hash, pieces)
 
 	if ch.pawnNearby {
-		hash = ch.xorHash(hash, 772+ch.enPassantFile)
+		ch.xorHash(hash, 772+ch.enPassantFile)
 	}
 
 	hash = ch.hashSide(hash, ColorFromString(color))
