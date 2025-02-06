@@ -236,6 +236,9 @@ func TestUCINotationDecode(t *testing.T) {
 			if !tt.wantErr && (got.String() != tt.want.String() || got.promo != tt.want.promo || got.tags != tt.want.tags) {
 				t.Errorf("Decode() = %v (%d), want %v (%d)", got, got.tags, tt.want, tt.want.tags)
 			}
+			if !tt.wantErr && tt.want.position != nil && got.position != nil && tt.want.position.String() != got.position.String() {
+				t.Errorf("Decode() = %v, want %v", got.position, tt.want.position)
+			}
 		})
 	}
 }
