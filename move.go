@@ -84,6 +84,10 @@ func (m *Move) SetCommand(key, value string) {
 	m.command[key] = value
 }
 
+func (m *Move) SetComment(comment string) {
+	m.comments = comment
+}
+
 func (m *Move) AddComment(comment string) {
 	comments := strings.Builder{}
 	comments.WriteString(m.comments)

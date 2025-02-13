@@ -320,6 +320,103 @@ func countMoves(t *testing.T, originalPosition *Position, positions []*Position,
 	countMoves(t, originalPosition, newPositions, nodesPerDepth[1:], maxDepth)
 }
 
+func Test_SetCommentUpdatesComment(t *testing.T) {
+	move := &Move{}
+	move.SetComment("Initial comment")
+	expected := "Initial comment"
+	if move.Comments() != expected {
+		t.Fatalf("expected %v but got %v", expected, move.Comments())
+	}
+}
+
+func Test_SetCommentOverwritesExistingComment(t *testing.T) {
+	move := &Move{comments: "Old comment"}
+	move.SetComment("New comment")
+	expected := "New comment"
+	if move.Comments() != expected {
+		t.Fatalf("expected %v but got %v", expected, move.Comments())
+	}
+}
+
+func Test_SetCommentWithEmptyString(t *testing.T) {
+	move := &Move{comments: "Existing comment"}
+	move.SetComment("")
+	expected := ""
+	if move.Comments() != expected {
+		t.Fatalf("expected %v but got %v", expected, move.Comments())
+	}
+}
+
+func TestAddComment(t *testing.T) {
+	t.Run("AddCommentAppendsToExistingComment", func(t *testing.T) {
+		move := &Move{comments: "Initial comment. "}
+		move.AddComment("Additional comment.")
+		expected := "Initial comment. Additional comment."
+		if move.Comments() != expected {
+			t.Fatalf("expected %v but got %v", expected, move.Comments())
+		}
+	})
+
+	t.Run("AddCommentToEmptyComment", func(t *testing.T) {
+		move := &Move{}
+		move.AddComment("First comment.")
+		expected := "First comment."
+		if move.Comments() != expected {
+			t.Fatalf("expected %v but got %v", expected, move.Comments())
+		}
+	})
+}
+
+func TestNAGReturnsCorrectValue(t *testing.T) {
+	t.Run("NAGReturnsCorrectValue", func(t *testing.T) {
+		move := &Move{nag: "!!"}
+		expected := "!!"
+		if move.NAG() != expected {
+			t.Fatalf("expected %v but got %v", expected, move.NAG())
+		}
+	})
+}
+
+func TestSetNAGUpdatesNAG(t *testing.T) {
+	t.Run("SetNAGUpdatesNAG", func(t *testing.T) {
+		move := &Move{}
+		move.SetNAG("??")
+		expected := "??"
+		if move.NAG() != expected {
+			t.Fatalf("expected %v but got %v", expected, move.NAG())
+		}
+	})
+}
+
+func TestGetCommand(t *testing.T) {
+	t.Run("GetCommandReturnsValueIfExists", func(t *testing.T) {
+		move := &Move{command: map[string]string{"key": "value"}}
+		value, ok := move.GetCommand("key")
+		if !ok || value != "value" {
+			t.Fatalf("expected value to be 'value' and ok to be true, but got value: %v, ok: %v", value, ok)
+		}
+	})
+
+	t.Run("GetCommandReturnsFalseIfKeyDoesNotExist", func(t *testing.T) {
+		move := &Move{command: map[string]string{"key": "value"}}
+		_, ok := move.GetCommand("nonexistent")
+		if ok {
+			t.Fatalf("expected ok to be false, but got true")
+		}
+	})
+
+	t.Run("GetCommandInitializesCommandMapIfNil", func(t *testing.T) {
+		move := &Move{}
+		_, ok := move.GetCommand("key")
+		if ok {
+			t.Fatalf("expected ok to be false, but got true")
+		}
+		if move.command == nil {
+			t.Fatalf("expected command map to be initialized, but it was nil")
+		}
+	})
+}
+
 func BenchmarkValidMoves(b *testing.B) {
 	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 	b.ResetTimer()
