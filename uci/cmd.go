@@ -295,13 +295,19 @@ func (CmdGo) ProcessResponse(e *Engine) error {
 			if len(parts) <= 1 {
 				return errors.New("best move not found " + text)
 			}
-			bestMove, err := chess.UCINotation{}.Decode(nil, parts[1])
+			var position *chess.Position
+			if e.position != nil {
+				position = e.position.Position
+			} else {
+				position = chess.StartingPosition()
+			}
+			bestMove, err := chess.UCINotation{}.Decode(position, parts[1])
 			if err != nil {
 				return err
 			}
 			results.BestMove = bestMove
 			if len(parts) >= maxParts {
-				ponderMove, decodeErr := chess.UCINotation{}.Decode(nil, parts[3])
+				ponderMove, decodeErr := chess.UCINotation{}.Decode(position, parts[3])
 				if decodeErr != nil {
 					return decodeErr
 				}

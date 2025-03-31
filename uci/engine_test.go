@@ -22,6 +22,39 @@ func init() {
 	StockfishPath = filepath.Join(dir, "..", "stockfish")
 }
 
+func Test_UCIMovesTags(t *testing.T) {
+	eng, err := uci.New(StockfishPath, uci.Debug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer eng.Close()
+	setOpt := uci.CmdSetOption{Name: "UCI_Elo", Value: "1500"}
+	setPos := uci.CmdPosition{Position: chess.StartingPosition()}
+	setGo := uci.CmdGo{MoveTime: time.Second / 10}
+	if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, setOpt, uci.CmdUCINewGame, setPos, setGo); err != nil {
+		t.Fatal("failed to run command", err)
+	}
+
+	game := chess.NewGame()
+	notation := chess.UCINotation{}
+
+	for game.Outcome() == chess.NoOutcome {
+		cmdPos := uci.CmdPosition{Position: game.Position()}
+		cmdGo := uci.CmdGo{MoveTime: time.Second / 100}
+		if err := eng.Run(cmdPos, cmdGo); err != nil {
+			t.Fatal("failed to run command", err)
+		}
+
+		move := eng.SearchResults().BestMove
+		san := notation.Encode(game.Position(), move)
+
+		err = game.PushMove(san, nil)
+		if err != nil {
+			t.Fatal("failed to push move", err)
+		}
+	}
+}
+
 func TestLogger(t *testing.T) {
 	t.SkipNow()
 
