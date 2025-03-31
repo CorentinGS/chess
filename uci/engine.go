@@ -52,7 +52,7 @@ func New(path string, opts ...func(e *Engine)) (*Engine, error) {
 	cmd := exec.Command(path)
 	cmd.Stdin = rIn
 	cmd.Stdout = wOut
-	e := &Engine{cmd: cmd, in: wIn, out: rOut, mu: &sync.RWMutex{}, logger: log.New(os.Stdout, "uci", log.LstdFlags)}
+	e := &Engine{cmd: cmd, in: wIn, out: rOut, mu: &sync.RWMutex{}, logger: log.New(os.Stdout, "uci", log.LstdFlags), position: &CmdPosition{}}
 	for _, opt := range opts {
 		opt(e)
 	}
@@ -172,6 +172,9 @@ func (e *Engine) processCommand(cmd Cmd) error {
 	}
 	if posCmd, ok := cmd.(*CmdPosition); ok {
 		e.position = posCmd
+	}
+	if posCmd, ok := cmd.(CmdPosition); ok {
+		e.position = &posCmd
 	}
 	if err := cmd.ProcessResponse(e); err != nil {
 		return err

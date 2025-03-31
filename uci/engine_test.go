@@ -2,6 +2,7 @@ package uci_test
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -36,7 +37,7 @@ func Test_UCIMovesTags(t *testing.T) {
 	}
 
 	game := chess.NewGame()
-	notation := chess.UCINotation{}
+	notation := chess.AlgebraicNotation{}
 
 	for game.Outcome() == chess.NoOutcome {
 		cmdPos := uci.CmdPosition{Position: game.Position()}
@@ -46,11 +47,12 @@ func Test_UCIMovesTags(t *testing.T) {
 		}
 
 		move := eng.SearchResults().BestMove
-		san := notation.Encode(game.Position(), move)
+		pos := game.Position()
+		san := notation.Encode(pos, move)
 
 		err = game.PushMove(san, nil)
 		if err != nil {
-			t.Fatal("failed to push move", err)
+			t.Fatal(fmt.Sprintf("failed to push move %s - %s - %v. Pos: %s", san, move.String(), move.HasTag(chess.Capture), pos.String()), err)
 		}
 	}
 }

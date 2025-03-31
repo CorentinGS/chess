@@ -299,7 +299,7 @@ func (CmdGo) ProcessResponse(e *Engine) error {
 			if e.position != nil {
 				position = e.position.Position
 			} else {
-				position = chess.StartingPosition()
+				position = nil
 			}
 			bestMove, err := chess.UCINotation{}.Decode(position, parts[1])
 			if err != nil {
