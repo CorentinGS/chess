@@ -42,8 +42,8 @@ func Test_UCIMovesTags(t *testing.T) {
 	for game.Outcome() == chess.NoOutcome {
 		cmdPos := uci.CmdPosition{Position: game.Position()}
 		cmdGo := uci.CmdGo{MoveTime: time.Second / 100}
-		if err := eng.Run(cmdPos, cmdGo); err != nil {
-			t.Fatal("failed to run command", err)
+		if err2 := eng.Run(cmdPos, cmdGo); err2 != nil {
+			t.Fatal("failed to run command", err2)
 		}
 
 		move := eng.SearchResults().BestMove

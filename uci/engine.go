@@ -20,9 +20,9 @@ type Engine struct {
 	id       map[string]string
 	options  map[string]Option
 	mu       *sync.RWMutex
+	position *CmdPosition
 	results  SearchResults
 	debug    bool
-	position *CmdPosition
 }
 
 // Debug is an option for the New function to add logging for debugging.  This will
