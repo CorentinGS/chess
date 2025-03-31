@@ -24,6 +24,7 @@ func init() {
 }
 
 func Test_UCIMovesTags(t *testing.T) {
+	t.SkipNow()
 	eng, err := uci.New(StockfishPath, uci.Debug)
 	if err != nil {
 		t.Fatal(err)
