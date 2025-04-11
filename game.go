@@ -798,6 +798,33 @@ func (g *Game) PushNotationMove(moveStr string, notation Notation, options *Push
 	return nil
 }
 
+// Move method adds a move to the game using a Move struct.
+// It returns an error if the move is invalid.
+//
+// Example:
+//
+//	possibleMove := game.ValidMoves()[0]
+//
+//	err := game.Move(&possibleMove, nil)
+//	if err != nil {
+//	    panic(err)
+//	}
+func (g *Game) Move(move *Move, options *PushMoveOptions) error {
+	if options == nil {
+		options = &PushMoveOptions{}
+	}
+
+	existingMove := g.findExistingMove(move)
+	g.addOrReorderMove(move, existingMove, options.ForceMainline)
+
+	g.updatePosition(move)
+	g.currentMove = move
+
+	g.evaluatePositionStatus()
+
+	return nil
+}
+
 func (g *Game) parseAndValidateMove(algebraicMove string) (*Move, error) {
 	tokens, err := TokenizeGame(&GameScanned{Raw: algebraicMove})
 	if err != nil {
