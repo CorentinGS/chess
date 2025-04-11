@@ -763,6 +763,39 @@ func (g *Game) PushMove(algebraicMove string, options *PushMoveOptions) error {
 	return nil
 }
 
+// PushNotationMove adds a move to the game using any supported notation.
+// It returns an error if the move is invalid.
+//
+// Example:
+//
+//	err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, &PushMoveOptions{ForceMainline: true})
+//	if err != nil {
+//	  panic(err)
+//	}
+//
+//	game.PushNotationMove("c7c5", chess.UCINotation{}, nil)
+//	game.PushNotationMove("Nc1f3", chess.LongAlgebraicNotation{}, nil)
+func (g *Game) PushNotationMove(moveStr string, notation Notation, options *PushMoveOptions) error {
+	if options == nil {
+		options = &PushMoveOptions{}
+	}
+
+	move, err := notation.Decode(g.pos, moveStr)
+	if err != nil {
+		return err
+	}
+
+	existingMove := g.findExistingMove(move)
+	g.addOrReorderMove(move, existingMove, options.ForceMainline)
+
+	g.updatePosition(move)
+	g.currentMove = move
+
+	g.evaluatePositionStatus()
+
+	return nil
+}
+
 func (g *Game) parseAndValidateMove(algebraicMove string) (*Move, error) {
 	tokens, err := TokenizeGame(&GameScanned{Raw: algebraicMove})
 	if err != nil {
