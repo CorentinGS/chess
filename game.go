@@ -735,6 +735,8 @@ type PushMoveOptions struct {
 	ForceMainline bool
 }
 
+// Deprecated: use PushNotationMove instead.
+//
 // PushMove adds a move in algebraic notation to the game.
 // Returns an error if the move is invalid.
 //
