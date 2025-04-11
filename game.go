@@ -778,24 +778,12 @@ func (g *Game) PushMove(algebraicMove string, options *PushMoveOptions) error {
 //	game.PushNotationMove("c7c5", chess.UCINotation{}, nil)
 //	game.PushNotationMove("Nc1f3", chess.LongAlgebraicNotation{}, nil)
 func (g *Game) PushNotationMove(moveStr string, notation Notation, options *PushMoveOptions) error {
-	if options == nil {
-		options = &PushMoveOptions{}
-	}
-
 	move, err := notation.Decode(g.pos, moveStr)
 	if err != nil {
 		return err
 	}
 
-	existingMove := g.findExistingMove(move)
-	g.addOrReorderMove(move, existingMove, options.ForceMainline)
-
-	g.updatePosition(move)
-	g.currentMove = move
-
-	g.evaluatePositionStatus()
-
-	return nil
+	return g.Move(move, options)
 }
 
 // Move method adds a move to the game using a Move struct.
