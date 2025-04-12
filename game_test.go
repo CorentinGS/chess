@@ -1174,3 +1174,25 @@ func TestGameString(t *testing.T) {
 		})
 	}
 }
+
+func FuzzTestPushNotationMove(f *testing.F) {
+	f.Add("e2e4", 0)
+	f.Add("e4", 1)
+	f.Add("Nb1c3", 2)
+
+	f.Fuzz(func(t *testing.T, move string, notationType int) {
+		game := NewGame()
+
+		var notation Notation
+		switch notationType % 3 {
+		case 0:
+			notation = UCINotation{}
+		case 1:
+			notation = AlgebraicNotation{}
+		case 2:
+			notation = LongAlgebraicNotation{}
+		}
+
+		_ = game.PushNotationMove(move, notation, nil)
+	})
+}
