@@ -145,6 +145,22 @@ func TestUCINotationDecode(t *testing.T) {
 			expectedPos: unsafeFEN("rnbQkb1r/ppp2ppp/5n2/4p3/4P3/2N5/PPP2PPP/R1B1KBNR b KQkq - 0 5"),
 		},
 		{
+			name:        "valid move with castle with check",
+			pos:         unsafeFEN("r4b1r/ppp3pp/8/4p3/2Pq4/3P1Q2/PP3PPP/1k2K2R w K - 2 19"),
+			input:       "e1g1",
+			want:        &Move{s1: E1, s2: G1, tags: Check | KingSideCastle},
+			wantErr:     false,
+			expectedPos: unsafeFEN("r4b1r/ppp3pp/8/4p3/2Pq4/3P1Q2/PP3PPP/1k3RK1 b - - 3 19"),
+		},
+		{
+			name:        "valid en passant move with check",
+			pos:         unsafeFEN("r3k1r1/pbppqpb1/1pn3p1/7p/1N2pPn1/1PP4N/PB1P2PP/2QRK1R1 b q f3 0 2"),
+			input:       "e4f3",
+			want:        &Move{s1: E4, s2: F3, tags: Check | EnPassant},
+			wantErr:     false,
+			expectedPos: unsafeFEN("r3k1r1/pbppqpb1/1pn3p1/7p/1N4n1/1PP2p1N/PB1P2PP/2QRK1R1 w q - 0 3"),
+		},
+		{
 			name:    "invalid UCI notation length",
 			pos:     nil,
 			input:   "e2e",
