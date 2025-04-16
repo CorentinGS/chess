@@ -162,7 +162,6 @@ func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
 		return &m, nil
 	}
 
-	// check for check
 	addTags(&m, pos)
 
 	m.position = pos.Update(&m)

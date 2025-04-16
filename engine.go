@@ -173,12 +173,25 @@ func standardMoves(pos *Position, first bool) []Move {
 //   - EnPassant: The move is an en passant capture
 //   - Check: The move puts the opponent in check
 //   - inCheck: The move leaves the moving side's king in check (illegal)
+//   - KingSideCastle: The move is a king-side castle
+//   - QueenSideCastle: The move is a queen-side castle
 func addTags(m *Move, pos *Position) {
 	p := pos.board.Piece(m.s1)
 	if pos.board.isOccupied(m.s2) {
 		m.AddTag(Capture)
 	} else if m.s2 == pos.enPassantSquare && p.Type() == Pawn {
 		m.AddTag(EnPassant)
+	}
+	// determine if move is castle
+	if (p == WhiteKing && m.s1 == E1) || (p == BlackKing && m.s1 == E8) {
+		switch m.s2 {
+		case C1, C8:
+			m.AddTag(QueenSideCastle)
+			break
+		case G1, G8:
+			m.AddTag(KingSideCastle)
+			break
+		}
 	}
 	// determine if in check after move (makes move invalid)
 	cp := pos.copy()
