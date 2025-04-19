@@ -86,7 +86,7 @@ func main() {
 		// select a random move
 		moves := game.ValidMoves()
 		move := moves[rand.Intn(len(moves))]
-		game.Move(move)
+		game.Move(&move, nil)
 	}
 	// print outcome and game PGN
 	fmt.Println(game.Position().Board().Draw())
@@ -144,7 +144,7 @@ func main() {
 			panic(err)
 		}
 		move := eng.SearchResults().BestMove
-		if err := game.Move(move); err != nil {
+		if err := game.Move(move, nil); err != nil {
 			panic(err)
 		}
 	}
