@@ -295,9 +295,9 @@ func (p *Parser) parseMove() (*Move, error) {
 		isCapture  bool      // Capture indicated by 'x'
 		promotion  PieceType // Promotion piece type
 	}
-	var originRankInt = -1 // Use -1 for not present, avoids strconv in loop
+	var originRankInt = -1 // Use -1 for not present
 
-	// Parse Piece or initial file/rank (simplified from original for clarity)
+	// Parse Piece or initial file/rank
 	switch currentTok.Type {
 	case PIECE:
 		moveData.piece = currentTok.Value
@@ -318,7 +318,7 @@ func (p *Parser) parseMove() (*Move, error) {
 			moveData.originRank = currentTok.Value
 			p.advance()
 			currentTok = p.currentToken()
-		} // Add square disambiguation if needed based on your notation support
+		}
 
 	case FILE: // Pawn move starting with file (e.g., "exd5")
 		moveData.originFile = currentTok.Value
@@ -343,10 +343,10 @@ func (p *Parser) parseMove() (*Move, error) {
 		}
 	}
 	moveData.destSquare = currentTok.Value
-	targetSquare := parseSquare(moveData.destSquare) // No allocation expected
+	targetSquare := parseSquare(moveData.destSquare)
 	if targetSquare == NoSquare {
 		return nil, &ParserError{ // Alloc: error object
-			Message:    fmt.Sprintf("invalid destination square format: %s", moveData.destSquare), // Alloc: error string
+			Message:    fmt.Sprintf("invalid destination square format: %s", moveData.destSquare),
 			TokenType:  currentTok.Type,
 			TokenValue: currentTok.Value,
 			Position:   p.position,
@@ -360,17 +360,17 @@ func (p *Parser) parseMove() (*Move, error) {
 		p.advance() // Consume '='
 		currentTok = p.currentToken()
 		if currentTok.Type != PromotionPiece {
-			return nil, &ParserError{ // Alloc: error object
+			return nil, &ParserError{
 				Message:    "expected promotion piece type after '='",
 				TokenType:  currentTok.Type,
 				TokenValue: currentTok.Value,
 				Position:   p.position,
 			}
 		}
-		moveData.promotion = parsePieceType(currentTok.Value) // No allocation expected
+		moveData.promotion = parsePieceType(currentTok.Value)
 		if moveData.promotion == NoPieceType {
-			return nil, &ParserError{ // Alloc: error object
-				Message:    fmt.Sprintf("invalid promotion piece type: %s", currentTok.Value), // Alloc: error string
+			return nil, &ParserError{
+				Message:    fmt.Sprintf("invalid promotion piece type: %s", currentTok.Value),
 				TokenType:  currentTok.Type,
 				TokenValue: currentTok.Value,
 				Position:   p.position,
@@ -382,13 +382,13 @@ func (p *Parser) parseMove() (*Move, error) {
 
 	// --- Find the Matching Legal Move ---
 
-	// Pre-parse integer rank for comparison (avoids strconv in the loop)
+	// Pre-parse integer rank for comparison
 	if moveData.originRank != "" {
-		rankNum, err := strconv.Atoi(moveData.originRank) // Potential minor alloc? Usually optimized.
+		rankNum, err := strconv.Atoi(moveData.originRank)
 		if err != nil || rankNum < 1 || rankNum > 8 {
-			return nil, &ParserError{ // Alloc: error object
-				Message:    fmt.Sprintf("invalid origin rank: %s", moveData.originRank), // Alloc: error string
-				TokenType:  RANK,                                                        // Best guess
+			return nil, &ParserError{
+				Message:    fmt.Sprintf("invalid origin rank: %s", moveData.originRank),
+				TokenType:  RANK,
 				TokenValue: moveData.originRank,
 				Position:   p.position,
 			}
@@ -402,7 +402,7 @@ func (p *Parser) parseMove() (*Move, error) {
 	board := p.game.pos.Board() // Get board once
 	expectedPieceType := NoPieceType
 	if moveData.piece != "" {
-		expectedPieceType = PieceTypeFromString(moveData.piece) // No allocation expected
+		expectedPieceType = PieceTypeFromString(moveData.piece)
 	} else {
 		expectedPieceType = Pawn // Default to pawn if no piece specified
 	}
@@ -425,16 +425,15 @@ func (p *Parser) parseMove() (*Move, error) {
 
 		// Check piece type
 		if piece.Type() != expectedPieceType {
-			// Avoid allocating error strings in the loop unless it's the final error
 			continue
 		}
 
-		// Check disambiguation file (string comparison is cheap)
+		// Check disambiguation file
 		if moveData.originFile != "" && m.S1().File().String() != moveData.originFile {
 			continue
 		}
 
-		// Check disambiguation rank (use pre-parsed int - faster)
+		// Check disambiguation rank
 		if originRankInt != -1 && int(m.S1().Rank()) != originRankInt { // Compare 0-7 ranks
 			continue
 		}
@@ -446,38 +445,22 @@ func (p *Parser) parseMove() (*Move, error) {
 		}
 
 		// Check promotion (must match if specified, must not exist if not specified)
-		movePromo := m.promo // Assume m.promo uses 0 or NoPieceType for no promotion
+		movePromo := m.promo
 		if moveData.promotion != NoPieceType && movePromo != moveData.promotion {
-			continue // Promotion required but doesn't match
+			continue // Promotion mismatch
 		}
-		if moveData.promotion == NoPieceType && movePromo != NoPieceType && movePromo != 0 {
+		if moveData.promotion == NoPieceType && movePromo != 0 {
 			continue // Promotion not specified but occurred
 		}
 
-		// If we get here, this move matches all criteria
-		if foundMatch {
-			// Ambiguous notation! Should not happen with valid SAN.
-			// Construct error string only when ambiguity is confirmed.
-			return nil, &ParserError{ // Alloc: error object
-				Message:    "ambiguous move notation (multiple legal moves match)",
-				TokenType:  p.currentToken().Type, // Or a generic type
-				TokenValue: "(ambiguous)",         // Provide more context if possible
-				Position:   p.position,
-			}
-		}
 		matchingMove = m
 		foundMatch = true
-		// Optimization: break here assumes SAN guarantees non-ambiguity.
-		// If ambiguity is possible, remove break and handle after loop.
 		break
 	} // End of validMoves loop
 
 	// Check result of the loop
 	if !foundMatch {
-		// Construct the detailed error message *after* the loop fails
-		// This avoids allocating error objects on every mismatch inside the loop.
 		// Re-check the conditions to create a specific error message.
-		// (This part adds slight overhead but avoids loop allocations for errors)
 		var specificErrorMsg string = "no legal move matches the notation" // Default
 		for i := range validMoves {
 			m := &validMoves[i]
@@ -507,15 +490,15 @@ func (p *Parser) parseMove() (*Move, error) {
 				specificErrorMsg = fmt.Sprintf("promotion mismatch (expected %v)", moveData.promotion)
 				break
 			}
-			if moveData.promotion == NoPieceType && movePromo != NoPieceType && movePromo != 0 {
+			if moveData.promotion == NoPieceType && movePromo != 0 {
 				specificErrorMsg = "unexpected promotion"
 				break
 			}
 		}
 
-		return nil, &ParserError{ // Alloc: error object
-			Message:    specificErrorMsg,      // Alloc: error string (now allocated only once on failure)
-			TokenType:  p.currentToken().Type, // Token where parsing stopped/failed
+		return nil, &ParserError{
+			Message:    specificErrorMsg,
+			TokenType:  p.currentToken().Type,
 			TokenValue: p.currentToken().Value,
 			Position:   p.position,
 		}
@@ -524,12 +507,21 @@ func (p *Parser) parseMove() (*Move, error) {
 	// Copy the matched move details into the result 'move'
 	move.s1 = matchingMove.S1()
 	move.s2 = matchingMove.S2()
+
+	if matchingMove == nil {
+		return nil, &ParserError{
+			Message:    "no matching move found",
+			TokenType:  p.currentToken().Type,
+			TokenValue: p.currentToken().Value,
+			Position:   p.position,
+		}
+	}
 	move.tags = matchingMove.tags // Copy all tags (capture, check, etc.)
 	move.promo = matchingMove.promo
 
 	// --- CRITICAL ALLOCATION POINT ---
 	// Consider if copying the entire position is truly necessary.
-	move.position = p.game.pos.copy() // Alloc: Potentially large, copies position object
+	move.position = p.game.pos.copy()
 
 	// Parse optional suffixes like check (+) or NAGs ($1)
 	p.parseOptionalSuffixes(move) // Call helper
