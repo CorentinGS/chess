@@ -68,6 +68,7 @@ var _ = []commentTest{
 func BenchmarkPGN(b *testing.B) {
 	pgn := mustParsePGN("fixtures/pgns/0001.pgn")
 	b.ResetTimer()
+	b.ReportAllocs()
 	for n := 0; n < b.N; n++ {
 		opt, _ := PGN(strings.NewReader(pgn))
 		NewGame(opt)

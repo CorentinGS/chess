@@ -232,235 +232,334 @@ func (p *Parser) parseMoveText() error {
 func (p *Parser) parseMove() (*Move, error) {
 	move := &Move{}
 
-	// Handle castling first as it's a special case
-	if p.currentToken().Type == KingsideCastle {
-		move.tags = KingSideCastle
-		for _, m := range p.game.pos.ValidMoves() {
-			if m.HasTag(KingSideCastle) {
+	validMoves := p.game.pos.ValidMoves() // Potential alloc: slice for moves
+	if len(validMoves) == 0 {
+		return nil, &ParserError{
+			Message:    "no legal moves available in the position",
+			TokenType:  p.currentToken().Type,
+			TokenValue: p.currentToken().Value,
+			Position:   p.position,
+		}
+	}
+
+	currentTok := p.currentToken() // Read current token
+
+	// --- Handle Castling ---
+	var expectedCastleTag MoveTag = 0
+	if currentTok.Type == KingsideCastle {
+		expectedCastleTag = KingSideCastle
+	} else if currentTok.Type == QueensideCastle {
+		expectedCastleTag = QueenSideCastle
+	}
+
+	if expectedCastleTag != 0 {
+		foundCastle := false
+		// Iterate the pre-generated validMoves
+		for _, m := range validMoves {
+			if m.HasTag(expectedCastleTag) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
-				move.position = p.game.pos.copy()
-				if m.HasTag(Check) {
+				move.tags = expectedCastleTag // Start with only the castle tag
+				if m.HasTag(Check) {          // Add check tag if the move results in check
 					move.AddTag(Check)
 				}
-				p.advance()
-				return move, nil
+				foundCastle = true
+				break // Found the unique castling move
 			}
 		}
-		return nil, &ParserError{
-			Message:    "illegal kingside castle",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
-		}
-	}
 
-	if p.currentToken().Type == QueensideCastle {
-		move.tags = QueenSideCastle
-		for _, m := range p.game.pos.ValidMoves() {
-			if m.HasTag(QueenSideCastle) {
-				move.s1 = m.S1()
-				move.s2 = m.S2()
-				move.position = p.game.pos
-				if m.HasTag(Check) {
-					move.AddTag(Check)
-				}
-				p.advance()
-				return move, nil
-			}
-		}
-		return nil, &ParserError{
-			Message:    "illegal queenside castle",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
-		}
-	}
-
-	// Parse regular move
-	var moveData struct {
-		piece      string    // The piece type (if any)
-		originFile string    // Disambiguation file
-		originRank string    // Disambiguation rank
-		destSquare string    // Destination square
-		isCapture  bool      // Whether it's a capture
-		promotion  PieceType // Promotion piece type
-	}
-
-	// First token could be piece, file (for pawn moves), or square
-	switch p.currentToken().Type {
-	case PIECE:
-		moveData.piece = p.currentToken().Value
-		p.advance()
-
-		// Check for disambiguation
-		if p.currentToken().Type == FILE {
-			moveData.originFile = p.currentToken().Value
-			p.advance()
-		} else if p.currentToken().Type == RANK {
-			moveData.originRank = p.currentToken().Value
-			p.advance()
-		}
-
-	case FILE:
-		moveData.originFile = p.currentToken().Value
-		p.advance()
-	}
-
-	// Handle capture
-	if p.currentToken().Type == CAPTURE {
-		moveData.isCapture = true
-		p.advance()
-	}
-
-	// Get destination square
-	if p.currentToken().Type != SQUARE {
-		return nil, &ParserError{
-			Message:    "expected destination square",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
-		}
-	}
-	moveData.destSquare = p.currentToken().Value
-	p.advance()
-
-	// Handle promotion
-	if p.currentToken().Type == PROMOTION {
-		p.advance()
-		if p.currentToken().Type != PromotionPiece {
+		if !foundCastle {
 			return nil, &ParserError{
-				Message:    "expected promotion piece",
-				TokenType:  p.currentToken().Type,
-				TokenValue: p.currentToken().Value,
+				Message:    fmt.Sprintf("illegal %s castle", currentTok.Value),
+				TokenType:  currentTok.Type,
+				TokenValue: currentTok.Value,
 				Position:   p.position,
 			}
 		}
-		moveData.promotion = parsePieceType(p.currentToken().Value)
-		p.advance()
+		p.advance() // Consume the O-O or O-O-O token
+
+		move.position = p.game.pos.copy() // Alloc: Potentially large, copies position object
+
+		// Check for optional Check/NAG suffix after castling
+		p.parseOptionalSuffixes(move)
+
+		return move, nil
 	}
 
-	// Get target square
-	targetSquare := parseSquare(moveData.destSquare)
+	// --- Parse Regular Move (non-castling) ---
+	var moveData struct {
+		piece      string    // The piece type char (e.g., "N", "B") - empty for pawns
+		originFile string    // Disambiguation file ("a".."h")
+		originRank string    // Disambiguation rank ("1".."8")
+		destSquare string    // Destination square string ("e4")
+		isCapture  bool      // Capture indicated by 'x'
+		promotion  PieceType // Promotion piece type
+	}
+	var originRankInt = -1 // Use -1 for not present, avoids strconv in loop
+
+	// Parse Piece or initial file/rank (simplified from original for clarity)
+	switch currentTok.Type {
+	case PIECE:
+		moveData.piece = currentTok.Value
+		p.advance()
+		currentTok = p.currentToken()
+		// Disambiguation checks (can be combined)
+		if currentTok.Type == FILE {
+			moveData.originFile = currentTok.Value
+			p.advance()
+			currentTok = p.currentToken()
+			// Allow rank after file e.g. R1a2 - less common
+			if currentTok.Type == RANK {
+				moveData.originRank = currentTok.Value
+				p.advance()
+				currentTok = p.currentToken()
+			}
+		} else if currentTok.Type == RANK {
+			moveData.originRank = currentTok.Value
+			p.advance()
+			currentTok = p.currentToken()
+		} // Add square disambiguation if needed based on your notation support
+
+	case FILE: // Pawn move starting with file (e.g., "exd5")
+		moveData.originFile = currentTok.Value
+		p.advance()
+		currentTok = p.currentToken()
+	} // Case SQUARE or others handled later
+
+	// Handle Optional Capture 'x'
+	if currentTok.Type == CAPTURE {
+		moveData.isCapture = true
+		p.advance()
+		currentTok = p.currentToken()
+	}
+
+	// Get Destination Square (mandatory)
+	if currentTok.Type != SQUARE {
+		return nil, &ParserError{ // Alloc: error object
+			Message:    "expected destination square",
+			TokenType:  currentTok.Type,
+			TokenValue: currentTok.Value,
+			Position:   p.position,
+		}
+	}
+	moveData.destSquare = currentTok.Value
+	targetSquare := parseSquare(moveData.destSquare) // No allocation expected
 	if targetSquare == NoSquare {
-		return nil, &ParserError{
-			Message:    "invalid destination square",
-			TokenType:  p.currentToken().Type,
+		return nil, &ParserError{ // Alloc: error object
+			Message:    fmt.Sprintf("invalid destination square format: %s", moveData.destSquare), // Alloc: error string
+			TokenType:  currentTok.Type,
+			TokenValue: currentTok.Value,
+			Position:   p.position,
+		}
+	}
+	p.advance()
+	currentTok = p.currentToken()
+
+	// Handle Optional Promotion (e.g., "=Q")
+	if currentTok.Type == PROMOTION {
+		p.advance() // Consume '='
+		currentTok = p.currentToken()
+		if currentTok.Type != PromotionPiece {
+			return nil, &ParserError{ // Alloc: error object
+				Message:    "expected promotion piece type after '='",
+				TokenType:  currentTok.Type,
+				TokenValue: currentTok.Value,
+				Position:   p.position,
+			}
+		}
+		moveData.promotion = parsePieceType(currentTok.Value) // No allocation expected
+		if moveData.promotion == NoPieceType {
+			return nil, &ParserError{ // Alloc: error object
+				Message:    fmt.Sprintf("invalid promotion piece type: %s", currentTok.Value), // Alloc: error string
+				TokenType:  currentTok.Type,
+				TokenValue: currentTok.Value,
+				Position:   p.position,
+			}
+		}
+		p.advance()
+		// currentTok updated by parseOptionalSuffixes later
+	}
+
+	// --- Find the Matching Legal Move ---
+
+	// Pre-parse integer rank for comparison (avoids strconv in the loop)
+	if moveData.originRank != "" {
+		rankNum, err := strconv.Atoi(moveData.originRank) // Potential minor alloc? Usually optimized.
+		if err != nil || rankNum < 1 || rankNum > 8 {
+			return nil, &ParserError{ // Alloc: error object
+				Message:    fmt.Sprintf("invalid origin rank: %s", moveData.originRank), // Alloc: error string
+				TokenType:  RANK,                                                        // Best guess
+				TokenValue: moveData.originRank,
+				Position:   p.position,
+			}
+		}
+		originRankInt = rankNum - 1 // Convert to 0-7 index
+	}
+
+	var matchingMove *Move // Pointer to the move *in the validMoves slice*
+	foundMatch := false
+
+	board := p.game.pos.Board() // Get board once
+	expectedPieceType := NoPieceType
+	if moveData.piece != "" {
+		expectedPieceType = PieceTypeFromString(moveData.piece) // No allocation expected
+	} else {
+		expectedPieceType = Pawn // Default to pawn if no piece specified
+	}
+
+	// Iterate the pre-generated validMoves
+	for i := range validMoves {
+		m := &validMoves[i] // Take address to avoid copying struct in loop
+
+		// Skip castling moves now
+		if m.HasTag(KingSideCastle) || m.HasTag(QueenSideCastle) {
+			continue
+		}
+
+		// Must match destination square
+		if m.S2() != targetSquare {
+			continue
+		}
+
+		piece := board.Piece(m.S1()) // Get the piece being moved
+
+		// Check piece type
+		if piece.Type() != expectedPieceType {
+			// Avoid allocating error strings in the loop unless it's the final error
+			continue
+		}
+
+		// Check disambiguation file (string comparison is cheap)
+		if moveData.originFile != "" && m.S1().File().String() != moveData.originFile {
+			continue
+		}
+
+		// Check disambiguation rank (use pre-parsed int - faster)
+		if originRankInt != -1 && int(m.S1().Rank()) != originRankInt { // Compare 0-7 ranks
+			continue
+		}
+
+		// Check capture indication vs actual capture tags
+		isActualCapture := m.HasTag(Capture) || m.HasTag(EnPassant)
+		if moveData.isCapture != isActualCapture {
+			continue
+		}
+
+		// Check promotion (must match if specified, must not exist if not specified)
+		movePromo := m.promo // Assume m.promo uses 0 or NoPieceType for no promotion
+		if moveData.promotion != NoPieceType && movePromo != moveData.promotion {
+			continue // Promotion required but doesn't match
+		}
+		if moveData.promotion == NoPieceType && movePromo != NoPieceType && movePromo != 0 {
+			continue // Promotion not specified but occurred
+		}
+
+		// If we get here, this move matches all criteria
+		if foundMatch {
+			// Ambiguous notation! Should not happen with valid SAN.
+			// Construct error string only when ambiguity is confirmed.
+			return nil, &ParserError{ // Alloc: error object
+				Message:    "ambiguous move notation (multiple legal moves match)",
+				TokenType:  p.currentToken().Type, // Or a generic type
+				TokenValue: "(ambiguous)",         // Provide more context if possible
+				Position:   p.position,
+			}
+		}
+		matchingMove = m
+		foundMatch = true
+		// Optimization: break here assumes SAN guarantees non-ambiguity.
+		// If ambiguity is possible, remove break and handle after loop.
+		break
+	} // End of validMoves loop
+
+	// Check result of the loop
+	if !foundMatch {
+		// Construct the detailed error message *after* the loop fails
+		// This avoids allocating error objects on every mismatch inside the loop.
+		// Re-check the conditions to create a specific error message.
+		// (This part adds slight overhead but avoids loop allocations for errors)
+		var specificErrorMsg string = "no legal move matches the notation" // Default
+		for i := range validMoves {
+			m := &validMoves[i]
+			if m.S2() != targetSquare {
+				continue
+			}
+			piece := board.Piece(m.S1())
+			if piece.Type() != expectedPieceType {
+				specificErrorMsg = fmt.Sprintf("piece type mismatch (expected %v)", expectedPieceType)
+				break
+			}
+			if moveData.originFile != "" && m.S1().File().String() != moveData.originFile {
+				specificErrorMsg = fmt.Sprintf("origin file mismatch (expected %s)", moveData.originFile)
+				break
+			}
+			if originRankInt != -1 && int(m.S1().Rank()) != originRankInt {
+				specificErrorMsg = fmt.Sprintf("origin rank mismatch (expected %d)", originRankInt+1)
+				break
+			}
+			isActualCapture := m.HasTag(Capture) || m.HasTag(EnPassant)
+			if moveData.isCapture != isActualCapture {
+				specificErrorMsg = fmt.Sprintf("capture mismatch (expected %t)", moveData.isCapture)
+				break
+			}
+			movePromo := m.promo
+			if moveData.promotion != NoPieceType && movePromo != moveData.promotion {
+				specificErrorMsg = fmt.Sprintf("promotion mismatch (expected %v)", moveData.promotion)
+				break
+			}
+			if moveData.promotion == NoPieceType && movePromo != NoPieceType && movePromo != 0 {
+				specificErrorMsg = "unexpected promotion"
+				break
+			}
+		}
+
+		return nil, &ParserError{ // Alloc: error object
+			Message:    specificErrorMsg,      // Alloc: error string (now allocated only once on failure)
+			TokenType:  p.currentToken().Type, // Token where parsing stopped/failed
 			TokenValue: p.currentToken().Value,
 			Position:   p.position,
 		}
 	}
 
-	// Find matching legal move
-	var matchingMove *Move
-	var err error
-	validMoves := p.game.pos.ValidMoves()
-	for _, m := range validMoves {
-		//nolint:nestif // readability
-		if m.S2() == targetSquare {
-			pos := p.game.pos
-			piece := pos.Board().Piece(m.S1())
-
-			// Check piece type
-			if moveData.piece != "" && piece.Type() != PieceTypeFromString(moveData.piece) || moveData.piece == "" && piece.Type() != Pawn {
-				err = &ParserError{
-					Message:    "piece type mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				}
-				continue
-			}
-
-			// Check disambiguation
-			if moveData.originFile != "" && m.S1().File().String() != moveData.originFile {
-				err = &ParserError{
-					Message:    "origin file mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				}
-				continue
-			}
-			if moveData.originRank != "" && strconv.Itoa(int((m.S1()/8)+1)) != moveData.originRank {
-				err = &ParserError{
-					Message:    fmt.Sprintf("origin rank mismatch: %d", m.S1()/8+1),
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				}
-				continue
-			}
-
-			// Check capture
-			if moveData.isCapture != (m.HasTag(Capture) || m.HasTag(EnPassant)) {
-				err = &ParserError{
-					Message:    "capture mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				}
-				continue
-			}
-
-			// Check promotion
-			if moveData.promotion != NoPieceType && m.promo != moveData.promotion {
-				err = &ParserError{
-					Message:    "promotion mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				}
-				continue
-			}
-
-			matchingMove = &m
-			break
-		}
-	}
-
-	if matchingMove == nil {
-		if err != nil {
-			return nil, &ParserError{
-				Message:  fmt.Sprintf("no legal move found for position: %s", err.Error()),
-				Position: p.position,
-			}
-		}
-		return nil, &ParserError{
-			Message:  "no legal move found for position",
-			Position: p.position,
-		}
-	}
-
-	// Copy the matched move details
+	// Copy the matched move details into the result 'move'
 	move.s1 = matchingMove.S1()
 	move.s2 = matchingMove.S2()
-	move.tags = matchingMove.tags
+	move.tags = matchingMove.tags // Copy all tags (capture, check, etc.)
 	move.promo = matchingMove.promo
-	move.position = p.game.pos.copy() // Cache current position
 
-	// Handle check/checkmate if present
-	if p.currentToken().Type == CHECK {
-		move.tags |= Check
-		p.advance()
-	}
+	// --- CRITICAL ALLOCATION POINT ---
+	// Consider if copying the entire position is truly necessary.
+	move.position = p.game.pos.copy() // Alloc: Potentially large, copies position object
 
-	// Handle NAG if present
-	if p.currentToken().Type == NAG {
-		move.nag = p.currentToken().Value
-		p.advance()
-	}
+	// Parse optional suffixes like check (+) or NAGs ($1)
+	p.parseOptionalSuffixes(move) // Call helper
 
-	// Set move number for both white and black moves
-	if p.game.pos != nil && p.game.pos.Turn() == Black {
-		if parentMoveNum := p.currentMove.number; parentMoveNum > 0 {
-			move.number = parentMoveNum
-		}
-	}
+	// Move number setting is handled in addMove or parseMoveText
+	// p.setMoveNumber(move) // Removed from here
 
 	return move, nil
 }
 
+// Helper function to parse optional suffixes (Check, NAG)
+func (p *Parser) parseOptionalSuffixes(move *Move) {
+	currentTok := p.currentToken()
+
+	// Handle Check (+) or Checkmate (#)
+	if currentTok.Type == CHECK {
+		// Optional: Verify check tag matches generated move, or just consume token.
+		// move.AddTag(Check) // Usually redundant if generator is correct
+		p.advance()
+		currentTok = p.currentToken()
+	}
+
+	// Handle NAG (Numeric Annotation Glyph, e.g., $1, $2)
+	if currentTok.Type == NAG {
+		move.nag = currentTok.Value
+		p.advance()
+	}
+}
+
+// Note: setMoveNumber helper removed as logic seems better placed in addMove or parseMoveText
 func (p *Parser) parseComment() (string, map[string]string, error) {
 	p.advance() // Consume "{"
 
