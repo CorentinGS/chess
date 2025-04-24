@@ -75,8 +75,8 @@ type Board struct {
 //	    NewSquare(FileE, Rank8): BlackKing,
 //	}
 //	board := NewBoard(squares)
-func NewBoard(m map[Square]Piece) *Board {
-	b := &Board{}
+func NewBoard(m map[Square]Piece) Board {
+	b := Board{}
 	for _, p1 := range allPieces {
 		var bb uint64
 		for sq := range numOfSquaresInBoard {
@@ -105,8 +105,9 @@ func (b *Board) SquareMap() map[Square]Piece {
 }
 
 // Rotate rotates the board 90 degrees clockwise.
-func (b *Board) Rotate() *Board {
-	return b.Flip(UpDown).Transpose()
+func (b *Board) Rotate() Board {
+	flip := b.Flip(UpDown)
+	return flip.Transpose()
 }
 
 // FlipDirection is the direction for the Board.Flip method.
@@ -122,7 +123,7 @@ const (
 // Flip returns a new board flipped over the specified axis.
 // For UpDown, pieces are mirrored across the horizontal center line.
 // For LeftRight, pieces are mirrored across the vertical center line.
-func (b *Board) Flip(fd FlipDirection) *Board {
+func (b *Board) Flip(fd FlipDirection) Board {
 	m := map[Square]Piece{}
 	for sq := range numOfSquaresInBoard {
 		var mv Square
@@ -142,7 +143,7 @@ func (b *Board) Flip(fd FlipDirection) *Board {
 }
 
 // Transpose flips the board over the A8 to H1 diagonal.
-func (b *Board) Transpose() *Board {
+func (b *Board) Transpose() Board {
 	m := map[Square]Piece{}
 	for sq := range numOfSquaresInBoard {
 		file := File(7 - Square(sq).Rank())
@@ -382,8 +383,8 @@ func (b *Board) calcConvienceBBs(m *Move) {
 	}
 }
 
-func (b *Board) copy() *Board {
-	return &Board{
+func (b *Board) copy() Board {
+	return Board{
 		whiteSqs:      b.whiteSqs,
 		blackSqs:      b.blackSqs,
 		emptySqs:      b.emptySqs,

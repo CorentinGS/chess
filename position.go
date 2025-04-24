@@ -69,7 +69,7 @@ func (cr CastleRights) String() string {
 // It includes piece placement, castling rights, en passant squares,
 // move counts, and side to move.
 type Position struct {
-	board           *Board       // Current board state
+	board           Board        // Current board state
 	castleRights    CastleRights // Available castling options
 	validMoves      []Move       // Cache of legal moves
 	halfMoveClock   int          // Half-move counter
@@ -155,7 +155,7 @@ func (pos *Position) Status() Method {
 }
 
 // Board returns the position's board.
-func (pos *Position) Board() *Board {
+func (pos *Position) Board() Board {
 	return pos.board
 }
 
@@ -283,7 +283,7 @@ func (pos *Position) UnmarshalBinary(data []byte) error {
 	if len(data) != size {
 		return errors.New("chess: position binary data should consist of 101 bytes")
 	}
-	board := &Board{}
+	board := Board{}
 	if err := board.UnmarshalBinary(data[:96]); err != nil {
 		return err
 	}

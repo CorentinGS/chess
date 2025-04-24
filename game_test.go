@@ -51,7 +51,8 @@ func TestCheckmateFromFen(t *testing.T) {
 	}
 	g := NewGame(fen)
 	if g.Method() != Checkmate {
-		t.Error(g.Position().Board().Draw())
+		board := g.Position().Board()
+		t.Error(board.Draw())
 		t.Fatalf("expected method %s but got %s", Checkmate, g.Method())
 	}
 	if g.Outcome() != WhiteWon {
@@ -188,7 +189,8 @@ func TestInsufficientMaterial(t *testing.T) {
 		}
 		g := NewGame(fen)
 		if g.Outcome() != Draw || g.Method() != InsufficientMaterial {
-			log.Println(g.Position().Board().Draw())
+			board := g.Position().Board()
+			log.Println(board.Draw())
 			t.Fatalf("%s should automatically draw by insufficient material", f)
 		}
 	}
@@ -210,7 +212,8 @@ func TestSufficientMaterial(t *testing.T) {
 		}
 		g := NewGame(fen)
 		if g.Outcome() != NoOutcome {
-			log.Println(g.Position().Board().Draw())
+			board := g.Position().Board()
+			log.Println(board.Draw())
 			t.Fatalf("%s should not find insufficient material", f)
 		}
 	}

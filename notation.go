@@ -196,7 +196,8 @@ func (AlgebraicNotation) Encode(pos *Position, m *Move) string {
 	sb.Reset()
 	defer stringPool.Put(sb)
 
-	p := pos.Board().Piece(m.S1())
+	board := pos.Board()
+	p := board.Piece(m.S1())
 	if pChar := pieceTypeToChar[p.Type()]; pChar != "" {
 		sb.WriteString(pChar)
 	}
@@ -388,7 +389,8 @@ func (LongAlgebraicNotation) Encode(pos *Position, m *Move) string {
 	} else if m.HasTag(QueenSideCastle) {
 		return "O-O-O" + checkChar
 	}
-	p := pos.Board().Piece(m.S1())
+	board := pos.Board()
+	p := board.Piece(m.S1())
 	pChar := charFromPieceType(p.Type())
 	s1Str := m.s1.String()
 	capChar := ""

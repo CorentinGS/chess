@@ -44,7 +44,7 @@ func decodeFEN(fen string) (*Position, error) {
 		return nil, errors.New("chess: fen invalid move count")
 	}
 	return &Position{
-		board:           b,
+		board:           *b,
 		turn:            turn,
 		castleRights:    rights,
 		enPassantSquare: sq,
@@ -153,9 +153,9 @@ func fenBoard(boardStr string) (*Board, error) {
 		}
 	}
 
-	// Create new board with the pooled map
-	// Note: NewBoard must copy the map since we're returning m to the pool
-	return NewBoard(m), nil
+	newBoard := NewBoard(m)
+
+	return &newBoard, nil
 }
 
 // fenFormRank converts a FEN rank string to a map of pieces, reusing the provided map.
