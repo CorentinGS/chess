@@ -287,7 +287,7 @@ func (CmdGo) ProcessResponse(e *Engine) error {
 	const maxParts = 4
 
 	scanner := bufio.NewScanner(e.out)
-	results := SearchResults{}
+	results := SearchResults{MultiPVInfo: make([]Info, 1)}
 	for scanner.Scan() {
 		text := e.readLine(scanner)
 		if strings.HasPrefix(text, "bestmove") {
@@ -318,10 +318,25 @@ func (CmdGo) ProcessResponse(e *Engine) error {
 
 		info := &Info{}
 		err := info.UnmarshalText([]byte(text))
-		if err == nil {
+		if err != nil {
+			continue
+		}
+
+		if info.Multipv == 0 || info.Multipv == 1 {
 			results.Info = *info
 		}
+
+		if info.Multipv > 1 && info.Multipv < 300 {
+			currentPVCount := len(results.MultiPVInfo)
+			if info.Multipv > currentPVCount {
+				for i := currentPVCount; i < info.Multipv; i++ {
+					results.MultiPVInfo = append(results.MultiPVInfo, Info{})
+				}
+			}
+			results.MultiPVInfo[info.Multipv-1] = *info
+		}
 	}
+	results.MultiPVInfo[0] = results.Info
 	e.results = results
 	return nil
 }

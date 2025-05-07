@@ -23,6 +23,81 @@ func init() {
 	StockfishPath = filepath.Join(dir, "..", "stockfish")
 }
 
+func Test_EngineInfo(t *testing.T) {
+	t.SkipNow()
+	fenStr := "2n1k1r1/8/4B3/3p4/3P4/8/K7/N7 w - - 0 1"
+	pos := &chess.Position{}
+	if err := pos.UnmarshalText([]byte(fenStr)); err != nil {
+		t.Fatal("failed to parse FEN", err)
+	}
+
+	eng, err := uci.New(StockfishPath, uci.Debug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer eng.Close()
+
+	cmdMultiPV := uci.CmdSetOption{Name: "multipv", Value: "3"}
+	cmdPos := uci.CmdPosition{Position: pos}
+	cmdGo := uci.CmdGo{MoveTime: time.Second / 10}
+	if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame, cmdMultiPV, cmdPos, cmdGo); err != nil {
+		t.Fatal("failed to run command", err)
+	}
+
+	move := eng.SearchResults().Info.PV[0]
+	moveStr := chess.AlgebraicNotation{}.Encode(pos, move)
+
+	if moveStr != "Bg8" {
+		t.Errorf("expected Bg8, got %s", moveStr)
+	}
+}
+
+func Test_EngineMultiPVInfo(t *testing.T) {
+	t.SkipNow()
+	fenStr := "2n1k1r1/8/4B3/3p4/3P4/8/K7/N7 w - - 0 1"
+	pos := &chess.Position{}
+	if err := pos.UnmarshalText([]byte(fenStr)); err != nil {
+		t.Fatal("failed to parse FEN", err)
+	}
+
+	eng, err := uci.New(StockfishPath, uci.Debug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer eng.Close()
+
+	cmdMultiPV := uci.CmdSetOption{Name: "multipv", Value: "3"}
+	cmdPos := uci.CmdPosition{Position: pos}
+	cmdGo := uci.CmdGo{MoveTime: time.Second / 10}
+	if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame, cmdMultiPV, cmdPos, cmdGo); err != nil {
+		t.Fatal("failed to run command", err)
+	}
+
+	multiPVInfo := eng.SearchResults().MultiPVInfo
+
+	if len(multiPVInfo) != 3 {
+		t.Errorf("expected 3 MultiPV lines, got %d", len(multiPVInfo))
+	}
+
+	move := multiPVInfo[0].PV[0]
+	moveStr := chess.AlgebraicNotation{}.Encode(pos, move)
+	if moveStr != "Bg8" {
+		t.Errorf("expected Bg8, got %s", moveStr)
+	}
+
+	move = multiPVInfo[1].PV[0]
+	moveStr = chess.AlgebraicNotation{}.Encode(pos, move)
+	if moveStr != "Bc8" {
+		t.Errorf("expected Bc8, got %s", moveStr)
+	}
+
+	move = multiPVInfo[2].PV[0]
+	moveStr = chess.AlgebraicNotation{}.Encode(pos, move)
+	if moveStr != "Bd5" {
+		t.Errorf("expected Bd5, got %s", moveStr)
+	}
+}
+
 func Test_UCIMovesTags(t *testing.T) {
 	t.SkipNow()
 	eng, err := uci.New(StockfishPath, uci.Debug)

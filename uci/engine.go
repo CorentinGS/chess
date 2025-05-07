@@ -52,7 +52,7 @@ func New(path string, opts ...func(e *Engine)) (*Engine, error) {
 	cmd := exec.Command(path)
 	cmd.Stdin = rIn
 	cmd.Stdout = wOut
-	e := &Engine{cmd: cmd, in: wIn, out: rOut, mu: &sync.RWMutex{}, logger: log.New(os.Stdout, "uci", log.LstdFlags), position: &CmdPosition{}}
+	e := &Engine{cmd: cmd, in: wIn, out: rOut, mu: &sync.RWMutex{}, logger: log.New(os.Stdout, "uci", log.LstdFlags), position: &CmdPosition{}, results: SearchResults{MultiPVInfo: []Info{}}}
 	for _, opt := range opts {
 		opt(e)
 	}

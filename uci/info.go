@@ -14,9 +14,10 @@ import (
 // info depth 21 seldepth 31 multipv 1 score cp 39 nodes 862438 nps 860716 hashfull 409 tbhits 0 time 1002 pv e2e4
 // bestmove e2e4 ponder c7c5.
 type SearchResults struct {
-	BestMove *chess.Move
-	Ponder   *chess.Move
-	Info     Info
+	BestMove    *chess.Move
+	Ponder      *chess.Move
+	Info        Info
+	MultiPVInfo []Info
 }
 
 // Info corresponds to the "info" engine output:
