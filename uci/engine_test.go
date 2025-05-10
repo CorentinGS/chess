@@ -109,37 +109,37 @@ func Test_UCIMovesTags(t *testing.T) {
 		t.Run("UCIMovesTags_"+name, func(t *testing.T) {
 			if !isEngineAvailable(name) {
 				t.Skipf("engine %s not available", name)
+			}
 
-				eng, err := uci.New(name, uci.Debug)
+			eng, err := uci.New(name, uci.Debug)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer eng.Close()
+			setOpt := uci.CmdSetOption{Name: "UCI_Elo", Value: "1500"}
+			setPos := uci.CmdPosition{Position: chess.StartingPosition()}
+			setGo := uci.CmdGo{MoveTime: time.Second / 10}
+			if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, setOpt, uci.CmdUCINewGame, setPos, setGo); err != nil {
+				t.Fatal("failed to run command", err)
+			}
+
+			game := chess.NewGame()
+			notation := chess.AlgebraicNotation{}
+
+			for game.Outcome() == chess.NoOutcome {
+				cmdPos := uci.CmdPosition{Position: game.Position()}
+				cmdGo := uci.CmdGo{MoveTime: time.Second / 100}
+				if err2 := eng.Run(cmdPos, cmdGo); err2 != nil {
+					t.Fatal("failed to run command", err2)
+				}
+
+				move := eng.SearchResults().BestMove
+				pos := game.Position()
+				san := notation.Encode(pos, move)
+
+				err = game.PushMove(san, nil)
 				if err != nil {
-					t.Fatal(err)
-				}
-				defer eng.Close()
-				setOpt := uci.CmdSetOption{Name: "UCI_Elo", Value: "1500"}
-				setPos := uci.CmdPosition{Position: chess.StartingPosition()}
-				setGo := uci.CmdGo{MoveTime: time.Second / 10}
-				if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, setOpt, uci.CmdUCINewGame, setPos, setGo); err != nil {
-					t.Fatal("failed to run command", err)
-				}
-
-				game := chess.NewGame()
-				notation := chess.AlgebraicNotation{}
-
-				for game.Outcome() == chess.NoOutcome {
-					cmdPos := uci.CmdPosition{Position: game.Position()}
-					cmdGo := uci.CmdGo{MoveTime: time.Second / 100}
-					if err2 := eng.Run(cmdPos, cmdGo); err2 != nil {
-						t.Fatal("failed to run command", err2)
-					}
-
-					move := eng.SearchResults().BestMove
-					pos := game.Position()
-					san := notation.Encode(pos, move)
-
-					err = game.PushMove(san, nil)
-					if err != nil {
-						t.Fatal(fmt.Sprintf("failed to push move %s - %s - %v. Pos: %s", san, move.String(), move.HasTag(chess.Capture), pos.String()), err)
-					}
+					t.Fatal(fmt.Sprintf("failed to push move %s - %s - %v. Pos: %s", san, move.String(), move.HasTag(chess.Capture), pos.String()), err)
 				}
 			}
 		})
