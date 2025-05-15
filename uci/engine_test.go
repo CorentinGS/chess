@@ -19,6 +19,46 @@ func isEngineAvailable(engine string) bool {
 	return err == nil
 }
 
+func Test_EngineEval(t *testing.T) {
+	for _, name := range engines {
+		fenStr := "4k3/8/8/8/8/8/8/4K2R w - - 0 1"
+
+		t.Run("EngineEval_"+name, func(t *testing.T) {
+			if !isEngineAvailable(name) {
+				t.Skipf("engine %s not available", name)
+			}
+
+			pos := &chess.Position{}
+			if err := pos.UnmarshalText([]byte(fenStr)); err != nil {
+				t.Fatal("failed to parse FEN", err)
+			}
+
+			eng, err := uci.New(name, uci.Debug)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer eng.Close()
+
+			cmdPos := uci.CmdPosition{Position: pos}
+			err = eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame, cmdPos, uci.CmdEval)
+
+			if name == "stockfish" {
+				if err != nil {
+					t.Fatal("failed to run command", err)
+				}
+
+				if eng.Eval() < 500 {
+					t.Errorf("expected an eval greater than or equal to 500, got %d", eng.Eval())
+				}
+			} else if name == "lc0" {
+				if err == nil {
+					t.Fatal("expected an error", err)
+				}
+			}
+		})
+	}
+}
+
 func Test_EngineInfo(t *testing.T) {
 	for _, name := range engines {
 		fenStr := "r1bq1rk1/ppp2ppp/2n2n2/3pp3/3P4/2P1PN2/PP1N1PPP/R1BQ1RK1 w - - 0 8"

@@ -22,6 +22,7 @@ type Engine struct {
 	mu       *sync.RWMutex
 	position *CmdPosition
 	results  SearchResults
+	eval     int
 	debug    bool
 }
 
@@ -122,6 +123,12 @@ func (e *Engine) SearchResults() SearchResults {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.results
+}
+
+func (e *Engine) Eval() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.eval
 }
 
 // Run runs the set of Cmds in the order given and returns an error if

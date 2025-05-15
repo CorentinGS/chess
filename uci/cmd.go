@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -116,6 +117,29 @@ var (
 	// CmdQuit (shouldn't be used directly as its handled by Engine.Close()) corresponds to the "quit" command:
 	// quit the program as soon as possible.
 	CmdQuit = cmdNoOptions{Name: "quit", F: func(_ *Engine) error {
+		return nil
+	}}
+
+	// CmdEval is a non-standard command that requests the engine's static evaluation of the current position.
+	CmdEval = cmdNoOptions{Name: "eval", F: func(e *Engine) error {
+		scanner := bufio.NewScanner(e.out)
+		for scanner.Scan() {
+			text := e.readLine(scanner)
+			if strings.Contains(text, "error") {
+				return errors.New("eval command not supported")
+			}
+			if strings.HasPrefix(text, "Final evaluation") {
+				parts := strings.Fields(text)
+				if len(parts) >= 3 {
+					evalStr := parts[2]
+					eval, err := strconv.ParseFloat(evalStr, 64)
+					if err == nil {
+						e.eval = int(math.Round(eval * 100))
+					}
+					break
+				}
+			}
+		}
 		return nil
 	}}
 )
