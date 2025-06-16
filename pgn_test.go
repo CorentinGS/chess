@@ -451,3 +451,50 @@ func TestLichessMultipleCommand(t *testing.T) {
 	}
 
 }
+
+func TestParseMoveWithNAGAndComment(t *testing.T) {
+	pgn := `[Event "Test"]
+[Site "Internet"]
+[Date "2023.12.06"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 $1 {Good move} e5 {Solid} $2 2. Nf3 $3 {Another comment} Nc6 $4 {Yet another}`
+
+	scanner := NewScanner(strings.NewReader(pgn))
+	scannedGame, err := scanner.ScanGame()
+	if err != nil {
+		t.Fatalf("fail to scan game: %v", err)
+	}
+
+	tokens, err := TokenizeGame(scannedGame)
+	if err != nil {
+		t.Fatalf("fail to tokenize game: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	game, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("fail to parse game: %v", err)
+	}
+
+	moves := game.Moves()
+	if len(moves) < 4 {
+		t.Fatalf("expected at least 4 moves, got %d", len(moves))
+	}
+
+	if moves[0].nag == "" || moves[0].comments == "" {
+		t.Errorf("move 1 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[0].nag, moves[0].comments)
+	}
+	if moves[1].nag == "" || moves[1].comments == "" {
+		t.Errorf("move 2 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[1].nag, moves[1].comments)
+	}
+	if moves[2].nag == "" || moves[2].comments == "" {
+		t.Errorf("move 3 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[2].nag, moves[2].comments)
+	}
+	if moves[3].nag == "" || moves[3].comments == "" {
+		t.Errorf("move 4 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[3].nag, moves[3].comments)
+	}
+}

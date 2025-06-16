@@ -313,6 +313,52 @@ func TestNAG(t *testing.T) {
 				{Type: NAG, Value: "$3"},
 			},
 		},
+		{
+			name:  "NAG and comment after move",
+			input: "e4 $1 {Good move}",
+			expected: []Token{
+				{Type: SQUARE, Value: "e4"},
+				{Type: NAG, Value: "$1"},
+				{Type: CommentStart, Value: "{"},
+				{Type: COMMENT, Value: "Good move"},
+				{Type: CommentEnd, Value: "}"},
+			},
+		},
+		{
+			name:  "Comment and NAG after move",
+			input: "e4 {Good move} $1",
+			expected: []Token{
+				{Type: SQUARE, Value: "e4"},
+				{Type: CommentStart, Value: "{"},
+				{Type: COMMENT, Value: "Good move"},
+				{Type: CommentEnd, Value: "}"},
+				{Type: NAG, Value: "$1"},
+			},
+		},
+		{
+			name:  "Move with multiple NAGs and comment",
+			input: "e4 $1 $2 {Excellent move}",
+			expected: []Token{
+				{Type: SQUARE, Value: "e4"},
+				{Type: NAG, Value: "$1"},
+				{Type: NAG, Value: "$2"},
+				{Type: CommentStart, Value: "{"},
+				{Type: COMMENT, Value: "Excellent move"},
+				{Type: CommentEnd, Value: "}"},
+			},
+		},
+		{
+			name:  "Move with comment and multiple NAGs",
+			input: "e4 {Excellent move} $1 $2",
+			expected: []Token{
+				{Type: SQUARE, Value: "e4"},
+				{Type: CommentStart, Value: "{"},
+				{Type: COMMENT, Value: "Excellent move"},
+				{Type: CommentEnd, Value: "}"},
+				{Type: NAG, Value: "$1"},
+				{Type: NAG, Value: "$2"},
+			},
+		},
 	}
 
 	for _, tt := range tests {

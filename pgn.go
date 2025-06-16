@@ -194,6 +194,34 @@ func (p *Parser) parseMoveText() error {
 			}
 			p.addMove(move)
 
+			// Collect all NAGs and comments that follow the move
+			for {
+				tok := p.currentToken()
+				if tok.Type == NAG {
+					p.currentMove.nag = tok.Value
+					p.advance()
+				} else if tok.Type == CommentStart {
+					comment, commandMap, err := p.parseComment()
+					if err != nil {
+						return err
+					}
+					if p.currentMove != nil {
+						if p.currentMove.command != nil {
+							maps.Copy(p.currentMove.command, commandMap)
+						} else {
+							p.currentMove.command = commandMap
+						}
+						if p.currentMove.comments != "" {
+							p.currentMove.comments += " " + comment
+						} else {
+							p.currentMove.comments = comment
+						}
+					}
+				} else {
+					break
+				}
+			}
+
 		case CommentStart:
 			comment, commandMap, err := p.parseComment()
 			if err != nil {
