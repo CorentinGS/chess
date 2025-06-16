@@ -498,3 +498,72 @@ func TestParseMoveWithNAGAndComment(t *testing.T) {
 		t.Errorf("move 4 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[3].nag, moves[3].comments)
 	}
 }
+
+func TestVariationMoveNumbers(t *testing.T) {
+	pgn := `[Event "VariationTest"]
+[Site "Internet"]
+[Date "2023.12.06"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Nf6 4. d3) a6 4. Ba4 Nf6 5. O-O Be7 1-0`
+
+	scanner := NewScanner(strings.NewReader(pgn))
+	scannedGame, err := scanner.ScanGame()
+	if err != nil {
+		t.Fatalf("fail to scan game: %v", err)
+	}
+
+	tokens, err := TokenizeGame(scannedGame)
+	if err != nil {
+		t.Fatalf("fail to tokenize game: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	game, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("fail to parse game: %v", err)
+	}
+
+	// Helper to recursively check move numbers
+	var checkMoveNumbers func(m *Move, expectedNum int)
+	checkMoveNumbers = func(m *Move, expectedNum int) {
+		fullMove := (expectedNum-1)/2 + 1
+		for _, child := range m.children {
+			if child.number != 0 && int(child.Ply()) != expectedNum {
+				t.Errorf("move %s: expected move number %d, got %d", child.String(), expectedNum, child.Ply())
+			}
+			if child.FullMoveNumber() != fullMove {
+				t.Errorf("move %s: expected full move number %d, got %d", child.String(), fullMove, child.FullMoveNumber())
+			}
+			// If this move starts a variation, the move number should be correct for the branch
+			checkMoveNumbers(child, expectedNum+1)
+		}
+	}
+
+	t.Logf("Root move number: %d", game.rootMove.number)
+	t.Logf("Root move ply: %d", game.rootMove.Ply())
+	t.Logf("Root move full move number: %d", game.rootMove.FullMoveNumber())
+	t.Logf("Second move: %v", game.rootMove.Children()[0])
+
+	// Mainline starts at move 1
+	checkMoveNumbers(game.rootMove, 1)
+
+	// Check specific variation branch
+	mainMoves := game.Moves()
+	if len(mainMoves) < 3 {
+		t.Fatalf("expected at least 3 mainline moves, got %d", len(mainMoves))
+	}
+	variation := mainMoves[3].children // 3. Bb5 (3. Bc4 ...)
+	if len(variation) == 0 {
+		t.Fatalf("expected a variation at move 3, got none")
+	}
+	if variation[0].number != 3 {
+		t.Errorf("variation first move: expected move number 3, got %d", variation[0].FullMoveNumber())
+	}
+	if len(variation[0].children) > 0 && variation[0].children[0].number != 3 {
+		t.Errorf("variation reply: expected move number 3 or 4, got %d", variation[0].children[0].Ply())
+	}
+}

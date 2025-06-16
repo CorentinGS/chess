@@ -120,5 +120,30 @@ func (m *Move) Children() []*Move {
 }
 
 func (m *Move) Number() int {
+	//return m.MoveNumber()
 	return int(m.number)
+
+}
+
+// FullMoveNumber returns the full move number (increments after Black's move).
+func (m *Move) FullMoveNumber() int {
+	return m.Number()
+}
+
+// Ply returns the half-move number (increments every move).
+func (m *Move) Ply() int {
+	if m == nil {
+		return 0
+	}
+	if m.position == nil {
+		return 0
+	}
+	moveNumber := int(m.number)
+	// we reverse the color because the position is after the move has been played
+	if m.position.turn == Black {
+		// After the move, it's White's turn, so the move was by Black
+		return (moveNumber-1)*2 + 1
+	}
+	// After the move, it's Black's turn, so the move was by White
+	return (moveNumber)*2 + 0
 }

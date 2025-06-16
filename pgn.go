@@ -167,6 +167,7 @@ func (p *Parser) parseTagPair() error {
 
 func (p *Parser) parseMoveText() error {
 	var moveNumber uint64
+	var ply int = 1
 	for p.position < len(p.tokens) {
 		token := p.currentToken()
 
@@ -175,6 +176,7 @@ func (p *Parser) parseMoveText() error {
 			number, err := strconv.ParseUint(token.Value, 10, 32)
 			if err == nil && p.currentMove != nil {
 				moveNumber = number
+				ply = int((moveNumber-1)*2 + 1)
 			}
 			p.advance()
 			if p.currentToken().Type == DOT {
@@ -183,6 +185,7 @@ func (p *Parser) parseMoveText() error {
 
 		case ELLIPSIS:
 			p.advance()
+			ply++
 
 		case PIECE, SQUARE, FILE, KingsideCastle, QueensideCastle:
 			move, err := p.parseMove()
@@ -193,6 +196,7 @@ func (p *Parser) parseMoveText() error {
 				move.number = uint(moveNumber)
 			}
 			p.addMove(move)
+			ply++
 
 			// Collect all NAGs and comments that follow the move
 			for {
@@ -241,7 +245,7 @@ func (p *Parser) parseMoveText() error {
 			}
 
 		case VariationStart:
-			if err := p.parseVariation(); err != nil {
+			if err := p.parseVariation(moveNumber, ply); err != nil {
 				return err
 			}
 
@@ -576,7 +580,7 @@ func (p *Parser) parseCommand() (map[string]string, error) {
 	return command, nil
 }
 
-func (p *Parser) parseVariation() error {
+func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	p.advance() // consume (
 
 	// Save current state to restore later
@@ -588,10 +592,7 @@ func (p *Parser) parseVariation() error {
 
 	// Find the move this variation should branch from
 	if parentMove != p.game.rootMove && parentMove.parent != nil {
-		// If we're in the middle of the game, the variation branches from
-		// the last move before the variation start
 		variationParent = parentMove.parent
-		// Reset position to where the variation starts
 		if variationParent.parent != nil && variationParent.parent.position != nil {
 			p.game.pos = variationParent.parent.position.copy()
 			if newPos := p.game.pos.Update(variationParent); newPos != nil {
@@ -600,21 +601,24 @@ func (p *Parser) parseVariation() error {
 		} else {
 			p.game.pos = StartingPosition()
 		}
-
 	} else {
-		// If we're at the start of the game, the variation branches from
-		// the root move
 		p.game.pos = StartingPosition()
 	}
 
-	// Set current move to the parent of the variation
 	p.currentMove = variationParent
 
+	moveNumber := parentMoveNumber
+	ply := parentPly
 	isBlackMove := false
 
 	for p.currentToken().Type != VariationEnd && p.position < len(p.tokens) {
 		switch p.currentToken().Type {
 		case MoveNumber:
+			num, err := strconv.ParseUint(p.currentToken().Value, 10, 32)
+			if err == nil {
+				moveNumber = num
+				ply = int((moveNumber-1)*2 + 1)
+			}
 			p.advance()
 			if p.currentToken().Type == DOT {
 				p.advance()
@@ -624,9 +628,10 @@ func (p *Parser) parseVariation() error {
 		case ELLIPSIS:
 			p.advance()
 			isBlackMove = true
+			ply++
 
 		case VariationStart:
-			if err := p.parseVariation(); err != nil {
+			if err := p.parseVariation(moveNumber, ply); err != nil {
 				return err
 			}
 
@@ -643,22 +648,18 @@ func (p *Parser) parseVariation() error {
 				return err
 			}
 
-			// Add move as child of current move
 			move.parent = p.currentMove
 			p.currentMove.children = append(p.currentMove.children, move)
-
-			// Cache position before the move
 			move.position = p.game.pos.copy()
+			move.number = uint(moveNumber)
 
-			// Update position
 			if newPos := p.game.pos.Update(move); newPos != nil {
 				p.game.pos = newPos
 			}
 
 			move.position = p.game.pos.copy()
-
-			// Update current move pointer
 			p.currentMove = move
+			ply++
 			isBlackMove = !isBlackMove
 
 		default:
@@ -675,7 +676,6 @@ func (p *Parser) parseVariation() error {
 
 	p.advance() // consume )
 
-	// Restore original state
 	p.game.pos = oldPos
 	p.currentMove = parentMove
 	p.game.currentMove = p.currentMove

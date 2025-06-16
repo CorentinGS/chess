@@ -185,6 +185,22 @@ func (pos *Position) CastleRights() CastleRights {
 	return pos.castleRights
 }
 
+// Ply returns the half-move number (increments every move).
+func (pos *Position) Ply() int {
+	if pos == nil {
+		return 0
+	}
+	if pos.moveCount == 0 {
+		return 0
+	}
+
+	if pos.turn == White {
+		return (pos.moveCount-1)*2 + 1
+	} else {
+		return (pos.moveCount) * 2
+	}
+}
+
 // String implements the fmt.Stringer interface and returns a
 // string with the FEN format: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1.
 func (pos *Position) String() string {

@@ -58,3 +58,29 @@ func TestPositionUpdate(t *testing.T) {
 		}
 	}
 }
+func TestPositionPly(t *testing.T) {
+	tests := []struct {
+		moveCount int
+		turn      Color
+		want      int
+	}{
+		{moveCount: 0, turn: White, want: 0},
+		{moveCount: 1, turn: White, want: 1},
+		{moveCount: 1, turn: Black, want: 2},
+		{moveCount: 2, turn: White, want: 3},
+		{moveCount: 2, turn: Black, want: 4},
+		{moveCount: 10, turn: White, want: 19},
+		{moveCount: 10, turn: Black, want: 20},
+	}
+
+	for _, tt := range tests {
+		pos := &Position{
+			moveCount: tt.moveCount,
+			turn:      tt.turn,
+		}
+		got := pos.Ply()
+		if got != tt.want {
+			t.Errorf("Ply() with moveCount=%d, turn=%v: got %d, want %d", tt.moveCount, tt.turn, got, tt.want)
+		}
+	}
+}
