@@ -13,7 +13,7 @@
 ![rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1](example.png)
 
 ## Why I Forked
-I forked the original notnil/chess package for several reasons:
+I forked the original ![notnil/chess](https://github.com/notnil/chess)  package for several reasons:
 
 - Update Rate: The original package was not being updated at the pace I needed for my projects.
 - Pending PRs: There were numerous pull requests that needed to be merged to make the package production-ready for my work.
