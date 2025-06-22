@@ -492,12 +492,7 @@ func writeMoveNumber(moveNum int, isWhite bool, subVariation bool, sb *strings.B
 }
 
 func writeMoveEncoding(node *Move, currentMove *Move, sb *strings.Builder) {
-	if node.Parent() == nil {
-		sb.WriteString(AlgebraicNotation{}.Encode(node.Position(), currentMove))
-	} else {
-		moveStr := AlgebraicNotation{}.Encode(node.Parent().Position(), currentMove)
-		sb.WriteString(moveStr)
-	}
+	sb.WriteString(AlgebraicNotation{}.Encode(node.Position(), currentMove))
 }
 
 func writeComments(move *Move, sb *strings.Builder) {
