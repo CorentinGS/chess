@@ -447,7 +447,7 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder, subV
 	writeMoveNumber(moveNum, isWhite, subVariation, sb)
 
 	// Encode the move using your AlgebraicNotation.
-	writeMoveEncoding(node, currentMove, sb)
+	writeMoveEncoding(node, currentMove, subVariation, sb)
 
 	// Append a comment if present.
 	writeComments(currentMove, sb)
@@ -491,8 +491,13 @@ func writeMoveNumber(moveNum int, isWhite bool, subVariation bool, sb *strings.B
 	}
 }
 
-func writeMoveEncoding(node *Move, currentMove *Move, sb *strings.Builder) {
-	sb.WriteString(AlgebraicNotation{}.Encode(node.Position(), currentMove))
+func writeMoveEncoding(node *Move, currentMove *Move, subVariation bool, sb *strings.Builder) {
+	if subVariation && node.Parent() != nil {
+		moveStr := AlgebraicNotation{}.Encode(node.Parent().Position(), currentMove)
+		sb.WriteString(moveStr)
+	} else {
+		sb.WriteString(AlgebraicNotation{}.Encode(node.Position(), currentMove))
+	}
 }
 
 func writeComments(move *Move, sb *strings.Builder) {
