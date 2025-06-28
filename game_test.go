@@ -1046,6 +1046,23 @@ func TestGameString(t *testing.T) {
 			expected: "1. e4 e5 2. Nf3 *",
 		},
 		{
+			name: "GameStringWithLongerGame",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("Nf3", nil)
+				_ = g.PushMove("Nc6", nil)
+				_ = g.PushMove("Nc3", nil)
+				_ = g.PushMove("e6", nil)
+				_ = g.PushMove("e4", nil)
+				_ = g.PushMove("a6", nil)
+				_ = g.PushMove("Ne2", nil)
+				_ = g.PushMove("Nf6", nil)
+				_ = g.PushMove("Ned4", nil)
+				return g
+			},
+			expected: "1. Nf3 Nc6 2. Nc3 e6 3. e4 a6 4. Ne2 Nf6 5. Ned4 *",
+		},
+		{
 			name: "GameStringWithComments",
 			setup: func() *Game {
 				g := NewGame()
