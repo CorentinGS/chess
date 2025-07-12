@@ -834,6 +834,13 @@ func TestCloneGameStateWithTagPairs(t *testing.T) {
 	if clone.GetTagPair("Event") != "Test Event" {
 		t.Fatalf("expected tag pair 'Test Event' but got %s", clone.GetTagPair("Event"))
 	}
+
+	// modify original to ensure the clone is a true deep copy
+	original.AddTagPair("Event", "Test Event Modified")
+
+	if clone.GetTagPair("Event") != "Test Event" {
+		t.Fatalf("expected tag pair 'Test Event' but got %s", clone.GetTagPair("Event"))
+	}
 }
 
 func TestResignWhenGameInProgress(t *testing.T) {
@@ -1151,7 +1158,7 @@ func TestGameString(t *testing.T) {
 				g.GoBack()
 				return g
 			},
-			expected: "1. e4 e5 2. Nf3 (2. Nc3) (2. d4 d5 3. c4 (3. c3) ) *",
+			expected: "1. e4 e5 2. Nf3 (2. Nc3) (2. d4 d5 3. c4 (3. c3)) *",
 		},
 		{
 			name: "GameStringWithVariationsForBlack",
@@ -1186,7 +1193,7 @@ func TestGameString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := tt.setup()
 			if g.String() != tt.expected {
-				t.Fatalf("expected %v but got %v", tt.expected, g.String())
+				t.Fatalf("\n\tExpected:'%v'\n\tGot:     '%v'\n", tt.expected, g.String())
 			}
 		})
 	}

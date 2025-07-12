@@ -118,6 +118,17 @@ func TestGameWithVariations(t *testing.T) {
 		t.Fatalf("game moves are not correct, expected 7, got %d", len(game.Moves()))
 	}
 
+	lines := strings.Split(game.String(), "\n")
+	if len(lines) == 0 {
+		t.Fatalf("game output blank")
+	}
+
+	const expectedLastLine = "1. e4 (1. e3 e5) 1... e5 (1... d6 2. d4 Nf6 3. Nc3 e5 4. dxe5 (4. Nf3 Nbd7) 4... dxe5 5. Qxd8+ Kxd8) 2. Nf3 (2. Nc3 Nf6 3. f4) 2... Nc6 3. d4 exd4 4. Nxd4 *"
+	lastLine := lines[len(lines)-1]
+	if lastLine != expectedLastLine {
+		t.Fatalf("game output not correct\n\tExpected:'%v'\n\tGot:     '%v'\n",
+			expectedLastLine, lastLine)
+	}
 }
 
 func TestSingleGameFromPGN(t *testing.T) {

@@ -100,6 +100,9 @@ func (p *Parser) Parse() (*Game, error) {
 		return nil, err
 	}
 
+	if p.game.outcome == UnknownOutcome {
+		p.game.outcome = NoOutcome
+	}
 	return p.game, nil
 }
 

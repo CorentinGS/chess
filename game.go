@@ -34,6 +34,7 @@ import (
 type Outcome string
 
 const (
+	UnknownOutcome Outcome = ""
 	// NoOutcome indicates that a game is in progress or ended without a result.
 	NoOutcome Outcome = "*"
 	// WhiteWon indicates that white won the game.
@@ -362,11 +363,15 @@ func (g *Game) String() string {
 
 	// Assume g.rootMove is a dummy root (holding the initial position)
 	// and that its first child is the first actual move.
+	needTrailingSpace := false
 	if g.rootMove != nil && len(g.rootMove.children) > 0 {
-		writeMoves(g.rootMove, 1, true, &sb, false)
+		needTrailingSpace = !writeMoves(g.rootMove, 1, true, &sb, false, false)
 	}
 
 	// Append the game result.
+	if needTrailingSpace {
+		sb.WriteString(" ")
+	}
 	sb.WriteString(g.Outcome().String()) // outcomeString() returns the result as a string (e.g. "1-0")
 	return sb.String()
 }
@@ -423,13 +428,17 @@ func cmpTags(a, b sortableTagPair) int {
 //	isWhite - true if it is white’s move, false if it is black’s move.
 //	sb - pointer to a strings.Builder where the formatted move notation is appended.
 //	subVariation - true if the current call is within a sub-variation, affecting formatting details.
+//	closedVariation - true if the prior call closed a sub-variation, affecting formatting details.
 //
 // The function recurses through the move tree, writing the main line first and then processing any additional variations,
 // ensuring that the output adheres to standard PGN conventions. Future enhancements may include support for all NAG values.
-func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder, subVariation bool) {
+// the function returns whether or not a trailing space was added to the output
+func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder, subVariation, closedVariation bool) bool {
+	trailingSpace := false
+
 	// If no moves remain, stop.
 	if node == nil {
-		return
+		return trailingSpace
 	}
 
 	var currentMove *Move
@@ -439,12 +448,12 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder, subV
 		currentMove = node
 	} else {
 		if len(node.children) == 0 {
-			return // nothing to print if no child exists (should not happen for a proper game)
+			return trailingSpace // nothing to print if no child exists (should not happen for a proper game)
 		}
 		currentMove = node.children[0]
 	}
 
-	writeMoveNumber(moveNum, isWhite, subVariation, sb)
+	writeMoveNumber(moveNum, isWhite, subVariation, closedVariation, sb)
 
 	// Encode the move using your AlgebraicNotation.
 	writeMoveEncoding(node, currentMove, subVariation, sb)
@@ -456,16 +465,12 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder, subV
 
 	//TODO: Add support for all nags values in the future
 
-	// if subvariation is over don't add space
-	if !subVariation {
-		sb.WriteString(" ")
-	} else if len(currentMove.children) > 0 {
+	if len(node.children) > 1 || len(currentMove.children) > 0 {
 		sb.WriteString(" ")
 	}
-
 	// Process any variations (children beyond the first).
 	// In PGN, variations are enclosed in parentheses.
-	writeVariations(node, moveNum, isWhite, sb)
+	closedVar := writeVariations(node, moveNum, isWhite, sb)
 
 	if len(currentMove.children) > 0 {
 		var nextMoveNum int
@@ -479,14 +484,19 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder, subV
 			nextMoveNum = moveNum + 1
 			nextIsWhite = true
 		}
-		writeMoves(currentMove, nextMoveNum, nextIsWhite, sb, false)
+		writeMoves(currentMove, nextMoveNum, nextIsWhite, sb, false, closedVar)
 	}
+
+	return trailingSpace
 }
 
-func writeMoveNumber(moveNum int, isWhite bool, subVariation bool, sb *strings.Builder) {
+func writeMoveNumber(moveNum int, isWhite bool, subVariation, closedVariation bool, sb *strings.Builder) {
+	if closedVariation {
+		sb.WriteString(" ")
+	}
 	if isWhite {
 		sb.WriteString(fmt.Sprintf("%d. ", moveNum))
-	} else if subVariation {
+	} else if subVariation || closedVariation {
 		sb.WriteString(fmt.Sprintf("%d... ", moveNum))
 	}
 }
@@ -516,15 +526,24 @@ func writeCommands(move *Move, sb *strings.Builder) {
 	}
 }
 
-func writeVariations(node *Move, moveNum int, isWhite bool, sb *strings.Builder) {
+func writeVariations(node *Move, moveNum int, isWhite bool, sb *strings.Builder) bool {
+	wroteAtLeastOneVar := false
+
 	if len(node.children) > 1 {
 		for i := 1; i < len(node.children); i++ {
+			if wroteAtLeastOneVar {
+				sb.WriteString(" ")
+			}
+			wroteAtLeastOneVar = true
+
 			variation := node.children[i]
 			sb.WriteString("(")
-			writeMoves(variation, moveNum, isWhite, sb, true)
-			sb.WriteString(") ")
+			writeMoves(variation, moveNum, isWhite, sb, true, false)
+			sb.WriteString(")")
 		}
 	}
+
+	return wroteAtLeastOneVar
 }
 
 // MarshalText implements the encoding.TextMarshaler interface and
@@ -685,19 +704,13 @@ func (g *Game) copy(game *Game) {
 
 // Clone returns a deep copy of the game.
 func (g *Game) Clone() *Game {
-	return &Game{
-		tagPairs:             g.tagPairs,
-		rootMove:             g.rootMove,
-		currentMove:          g.currentMove,
-		pos:                  g.pos,
-		outcome:              g.outcome,
-		method:               g.method,
-		comments:             g.Comments(),
-		ignoreAutomaticDraws: g.ignoreAutomaticDraws,
-	}
+	ret := &Game{}
+	ret.copy(g)
+
+	return ret
 }
 
-// Positions returns all positions in the game.
+// Positions returns all positions in the game in the main line.
 // This includes the starting position and all positions after each move.
 func (g *Game) Positions() []*Position {
 	positions := make([]*Position, 0)
