@@ -13,7 +13,7 @@ Example usage:
 	for scanner.HasNext() {
 		game, err := scanner.ParseNext()
 		if err != nil {
-			log.Fatal("Failed to parse game: %v", err)
+			log.Fatalf("Failed to parse game: %v", err)
 		}
 		// Process game
 	}
