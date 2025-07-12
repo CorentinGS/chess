@@ -1002,12 +1002,19 @@ func TestPGNWithValidData(t *testing.T) {
 	}
 }
 
-func TestPGNWithInvalidData(t *testing.T) {
+func TestTaglessPGN(t *testing.T) {
 	pgnData := "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7 11. c4 c6 12. cxb5 axb5 13. Nc3 Bb7 14. Bg5 h6 15. Bh4 Re8 16. a3 Bf8 17. Rc1 Qb6 18. dxe5 dxe5 19. Qe2 Nh5 20. Qd2 Nc5 21. Bc2 Nf4 22. Bg3 Rad8 23. Qe3 Qc7 24. Rcd1 Rxd1 25. Rxd1 Nce6 26. Bb3 Bc5 27. Qe1 Nd4 28. Nxd4 Bxd4 29. Bxf4 exf4 30. Rxd4 c5 31. Rd1 c4 32. Bc2 Qe5 33. f3 Qc5+ 34. Qf2 Qe5 35. Qd4 Qg5 36. Qd7 Re7 37. Qd8+ Kh7 38. e5+ g6 39. Qd6 Bxf3 40. Rd2 Rxe5 41. Qd4 Re1+ 42. Kf2 Qg3# 0-1"
-	r := strings.NewReader(pgnData)
+
+	r := strings.NewReader("#!)(*#@$" + pgnData)
 	_, err := PGN(r)
 	if err == nil {
 		t.Fatal("expected error for invalid PGN data")
+	}
+
+	r = strings.NewReader(pgnData)
+	_, err = PGN(r)
+	if err != nil {
+		t.Fatal("expected non-nil error for tagless PGN data")
 	}
 }
 

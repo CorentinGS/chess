@@ -246,12 +246,26 @@ func handleEOF(data []byte, atEOF bool) (int, []byte, error) {
 	return 0, nil, nil
 }
 
-// Helper to find the start of a game (first '[' character).
+// Helper to find the start of a game (normally first '[' character).
 func findGameStart(data []byte, start int, atEOF bool) int {
 	// If the first character is not '[', find the next '[' character
 	if start < len(data) && data[start] != '[' {
 		idx := bytes.IndexByte(data[start:], '[')
 		if idx == -1 {
+			return findTaglessGameStart(data, start, atEOF)
+		}
+		start += idx
+	}
+	return start
+}
+
+// Helper to find the start of a game without tags
+func findTaglessGameStart(data []byte, start int, atEOF bool) int {
+	// If the first character is not '[', find the next '[' character
+	if start < len(data) && data[start] != '1' {
+		idx := bytes.IndexByte(data[start:], '1')
+		if idx == -1 || data[start+idx+1] != '.' ||
+			(idx != 0 && data[start+idx-1] != '\n') {
 			if atEOF {
 				return -1 // this could be removed as we return -1 in the next line anyway (just to be explicit and debuggable)
 			}
@@ -259,6 +273,7 @@ func findGameStart(data []byte, start int, atEOF bool) int {
 		}
 		start += idx
 	}
+
 	return start
 }
 
