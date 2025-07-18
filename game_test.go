@@ -800,8 +800,14 @@ func TestCloneGameState(t *testing.T) {
 	if clone.pos.String() != original.pos.String() {
 		t.Fatalf("expected position %s but got %s", original.pos.String(), clone.pos.String())
 	}
-	if clone.currentMove != original.currentMove {
+	if clone.currentMove.String() != original.currentMove.String() {
 		t.Fatalf("expected current move to be %v but got %v", original.currentMove, clone.currentMove)
+	}
+	if clone.currentMove == original.currentMove {
+		t.Errorf("clone failed to deep copy currentMove")
+	}
+	if clone.rootMove == original.rootMove {
+		t.Errorf("clone failed to deep copy rootMove")
 	}
 	if clone.outcome != original.outcome {
 		t.Fatalf("expected outcome %s but got %s", original.outcome, clone.outcome)
@@ -812,6 +818,22 @@ func TestCloneGameState(t *testing.T) {
 	if len(clone.Comments()) != len(original.Comments()) {
 		t.Fatalf("expected comments %v but got %v", original.Comments(), clone.Comments())
 	}
+
+	// make sure we can modify the clone without impact on the original
+	err := clone.PushMove("Nf6", nil)
+	if err != nil {
+		t.Fatalf("failed to push Nf6")
+	}
+	if clone.pos.String() == original.pos.String() {
+		t.Error("modifying the clone incorrectly mutates the original position")
+	}
+	if len(clone.Moves()) == len(original.Moves()) {
+		t.Errorf("modifying the clone incorrectly mutates the original moves")
+	}
+	if len(clone.Positions()) == len(original.Positions()) {
+		t.Errorf("modifying the clone incorrectly mutates the original positions")
+	}
+
 }
 
 func TestCloneGameStateWithNilComments(t *testing.T) {
