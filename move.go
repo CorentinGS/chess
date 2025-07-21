@@ -178,3 +178,16 @@ func (m *Move) Clone() *Move {
 
 	return ret
 }
+
+func (m *Move) cloneChildren(srcChildren []*Move) {
+	if srcChildren == nil || len(srcChildren) == 0 {
+		return
+	}
+
+	for _, srcMv := range srcChildren {
+		dstMv := srcMv.Clone()
+		dstMv.parent = m
+		dstMv.cloneChildren(srcMv.children)
+		m.children = append(m.children, dstMv)
+	}
+}

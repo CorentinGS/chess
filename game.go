@@ -714,6 +714,17 @@ func (g *Game) Clone() *Game {
 	ret := &Game{}
 	ret.copy(g)
 
+	// we have to also deep copy the moves so that modifications to the
+	// clone do not impact the parent
+	ret.rootMove = g.rootMove.Clone()
+	ret.rootMove.cloneChildren(g.rootMove.children)
+	mlen := len(ret.Moves())
+	if mlen == 0 {
+		ret.currentMove = ret.rootMove
+	} else {
+		ret.currentMove = ret.Moves()[mlen-1]
+	}
+
 	return ret
 }
 
@@ -962,7 +973,8 @@ func (g *Game) buildOneGameFromPath(path []*Move) *Game {
 		cur = child
 	}
 
-	newG := g.Clone()
+	newG := &Game{}
+	newG.copy(g)
 	newG.rootMove = rootMove
 	newG.currentMove = cur
 	newG.pos = cur.position
