@@ -103,6 +103,8 @@ func (p *Parser) Parse() (*Game, error) {
 	if p.game.outcome == UnknownOutcome {
 		p.game.outcome = NoOutcome
 	}
+	p.game.currentMove = p.currentMove
+
 	return p.game, nil
 }
 

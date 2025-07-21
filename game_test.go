@@ -1022,6 +1022,15 @@ func TestPGNWithValidData(t *testing.T) {
 	if g.Method() != NoMethod {
 		t.Fatalf("expected method %s but got %s", NoMethod, g.Method())
 	}
+	if len(g.Moves()) != 6 {
+		t.Fatalf("expected 6 moves got %v", len(g.Moves()))
+	}
+	if len(g.Positions()) != 7 {
+		t.Fatalf("expected 7 positions got %v", len(g.Positions()))
+	}
+	if g.currentMove.String() != "a7a6" {
+		t.Fatalf("expected current move a7a6 but got %v", g.currentMove.String())
+	}
 }
 
 func TestTaglessPGN(t *testing.T) {
@@ -1266,6 +1275,33 @@ func TestInvalidPushNotationMove(t *testing.T) {
 	err = game.PushNotationMove(bogusMv, AlgebraicNotation{}, nil)
 	if err == nil {
 		t.Errorf("PushNotationMove() (alg) succeeded in pushing bogus mv when it should have failed")
+	}
+}
+
+func TestValidPushNotationMove(t *testing.T) {
+	pgn := strings.NewReader("1. e4 (1. g4) 1... c5 2. Nc3 Nc6 3. f4 g6 4. Nf3 Bg7 5. a4 Nf6 6. e5 *")
+	mv := "Ng4"
+	opt, err := PGN(pgn)
+	if err != nil {
+		t.Fatalf("PGN(pgn) failed")
+	}
+	game := NewGame(opt)
+
+	startMlen := len(game.Moves())
+	startPlen := len(game.Positions())
+
+	err = game.PushNotationMove(mv, AlgebraicNotation{}, &PushMoveOptions{
+		ForceMainline: true,
+	})
+	if err != nil {
+		t.Errorf("PushNotationMove() failed but should have succeeded")
+	}
+
+	if len(game.Moves()) != startMlen+1 {
+		t.Errorf("PushNotationMove() failed to update game.Moves()")
+	}
+	if len(game.Positions()) != startPlen+1 {
+		t.Errorf("PushNotationMove() failed to update game.Positions()")
 	}
 }
 
