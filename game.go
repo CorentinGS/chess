@@ -445,6 +445,11 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 		return trailingSpace
 	}
 
+	// Handle root move comments before processing children
+	if isRoot && node.comments != "" {
+		writeComments(node, sb)
+	}
+
 	var currentMove *Move
 
 	// The main line is the first child.
@@ -480,11 +485,11 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 		var nextMoveNum int
 		var nextIsWhite bool
 		if isWhite {
-			// After white’s move, black plays using the same move number.
+			// After white's move, black plays using the same move number.
 			nextMoveNum = moveNum
 			nextIsWhite = false
 		} else {
-			// After black’s move, increment move number.
+			// After black's move, increment move number.
 			nextMoveNum = moveNum + 1
 			nextIsWhite = true
 		}

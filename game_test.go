@@ -1358,3 +1358,45 @@ func TestGameSplitNoVar(t *testing.T) {
 	pgn := "[Event \"SomeEvent\"]\n1. e4 e5 2. Nf3 Nc6\n\n"
 	validateSplit(t, pgn, expectedLastLines)
 }
+
+func TestRootMoveComments(t *testing.T) {
+	game := NewGame()
+
+	// Add a comment to the root move
+	root := game.GetRootMove()
+	root.AddComment("This is a comment before the first move")
+
+	// Add some moves
+	game.PushMove("e4", nil)
+	game.PushMove("e5", nil)
+
+	// Generate PGN
+	pgn := game.String()
+
+	// Check that the comment appears in the PGN
+	if !strings.Contains(pgn, "{This is a comment before the first move}") {
+		t.Errorf("Root move comment not found in PGN output: %s", pgn)
+	}
+
+	// Verify the comment appears before the first move
+	lines := strings.Split(pgn, "\n")
+	foundComment := false
+	foundFirstMove := false
+
+	for _, line := range lines {
+		if strings.Contains(line, "{This is a comment before the first move}") {
+			foundComment = true
+		}
+		if strings.Contains(line, "1. e4") {
+			foundFirstMove = true
+		}
+		// Comment should appear before the first move
+		if foundFirstMove && !foundComment {
+			t.Errorf("Comment should appear before the first move in PGN")
+		}
+	}
+
+	if !foundComment {
+		t.Errorf("Comment not found in PGN output")
+	}
+}
