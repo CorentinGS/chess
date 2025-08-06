@@ -364,10 +364,15 @@ func (g *Game) String() string {
 	// Assume g.rootMove is a dummy root (holding the initial position)
 	// and that its first child is the first actual move.
 	needTrailingSpace := false
-	if g.rootMove != nil && len(g.rootMove.children) > 0 {
-		needTrailingSpace = !writeMoves(g.rootMove,
-			g.rootMove.Position().moveCount,
-			g.rootMove.Position().Turn() == White, &sb, false, false, true)
+	if g.rootMove != nil {
+		if len(g.rootMove.children) > 0 {
+			needTrailingSpace = !writeMoves(g.rootMove,
+				g.rootMove.Position().moveCount,
+				g.rootMove.Position().Turn() == White, &sb, false, false, true)
+		} else if g.rootMove.comments != "" {
+			// Handle root move comments when there are no children
+			writeComments(g.rootMove, &sb)
+		}
 	}
 
 	// Append the game result.
@@ -445,6 +450,11 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 		return trailingSpace
 	}
 
+	// Handle root move comments before processing children
+	if isRoot && node.comments != "" {
+		writeComments(node, sb)
+	}
+
 	var currentMove *Move
 
 	// The main line is the first child.
@@ -480,11 +490,11 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 		var nextMoveNum int
 		var nextIsWhite bool
 		if isWhite {
-			// After white’s move, black plays using the same move number.
+			// After white's move, black plays using the same move number.
 			nextMoveNum = moveNum
 			nextIsWhite = false
 		} else {
-			// After black’s move, increment move number.
+			// After black's move, increment move number.
 			nextMoveNum = moveNum + 1
 			nextIsWhite = true
 		}

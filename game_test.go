@@ -1358,3 +1358,173 @@ func TestGameSplitNoVar(t *testing.T) {
 	pgn := "[Event \"SomeEvent\"]\n1. e4 e5 2. Nf3 Nc6\n\n"
 	validateSplit(t, pgn, expectedLastLines)
 }
+
+func TestRootMoveComments(t *testing.T) {
+	t.Run("BasicRootMoveComment", func(t *testing.T) {
+		game := NewGame()
+
+		// Add a comment to the root move
+		root := game.GetRootMove()
+		root.AddComment("This is a comment before the first move")
+
+		// Add some moves
+		game.PushMove("e4", nil)
+		game.PushMove("e5", nil)
+
+		// Generate PGN
+		pgn := game.String()
+
+		// Check that the comment appears in the PGN
+		if !strings.Contains(pgn, "{This is a comment before the first move}") {
+			t.Errorf("Root move comment not found in PGN output: %s", pgn)
+		}
+
+		// Verify the comment appears before the first move
+		lines := strings.Split(pgn, "\n")
+		foundComment := false
+		foundFirstMove := false
+
+		for _, line := range lines {
+			if strings.Contains(line, "{This is a comment before the first move}") {
+				foundComment = true
+			}
+			if strings.Contains(line, "1. e4") {
+				foundFirstMove = true
+			}
+			// Comment should appear before the first move
+			if foundFirstMove && !foundComment {
+				t.Errorf("Comment should appear before the first move in PGN")
+			}
+		}
+
+		if !foundComment {
+			t.Errorf("Comment not found in PGN output")
+		}
+	})
+
+	t.Run("RootMoveCommentWithNoMoves", func(t *testing.T) {
+		game := NewGame()
+
+		// Add a comment to the root move
+		root := game.GetRootMove()
+		root.AddComment("Comment on empty game")
+
+		// Generate PGN
+		pgn := game.String()
+
+		// Check that the comment appears in the PGN
+		if !strings.Contains(pgn, "{Comment on empty game}") {
+			t.Errorf("Root move comment not found in PGN output for empty game: %s", pgn)
+		}
+	})
+
+	t.Run("RootMoveCommentWithMultipleComments", func(t *testing.T) {
+		game := NewGame()
+
+		// Add multiple comments to the root move
+		root := game.GetRootMove()
+		root.AddComment("First comment. ")
+		root.AddComment("Second comment.")
+
+		// Add some moves
+		game.PushMove("e4", nil)
+
+		// Generate PGN
+		pgn := game.String()
+
+		// Check that both comments appear in the PGN
+		if !strings.Contains(pgn, "{First comment. Second comment.}") {
+			t.Errorf("Combined root move comments not found in PGN output: %s", pgn)
+		}
+	})
+
+	t.Run("RootMoveCommentWithTags", func(t *testing.T) {
+		game := NewGame()
+
+		// Add tag pairs
+		game.AddTagPair("Event", "Test Event")
+		game.AddTagPair("Site", "Test Site")
+
+		// Add a comment to the root move
+		root := game.GetRootMove()
+		root.AddComment("Comment with tags")
+
+		// Add some moves
+		game.PushMove("e4", nil)
+
+		// Generate PGN
+		pgn := game.String()
+
+		// Check that the comment appears in the PGN
+		if !strings.Contains(pgn, "{Comment with tags}") {
+			t.Errorf("Root move comment not found in PGN output with tags: %s", pgn)
+		}
+
+		// Verify the structure: tags, empty line, comment, moves
+		lines := strings.Split(pgn, "\n")
+		foundTags := false
+		foundEmptyLine := false
+		foundComment := false
+		foundMove := false
+
+		for _, line := range lines {
+			if strings.Contains(line, "[Event") || strings.Contains(line, "[Site") {
+				foundTags = true
+			}
+			if line == "" && foundTags {
+				foundEmptyLine = true
+			}
+			if strings.Contains(line, "{Comment with tags}") {
+				foundComment = true
+			}
+			if strings.Contains(line, "1. e4") {
+				foundMove = true
+			}
+		}
+
+		if !foundTags || !foundEmptyLine || !foundComment || !foundMove {
+			t.Errorf("PGN structure incorrect. Tags: %v, EmptyLine: %v, Comment: %v, Move: %v",
+				foundTags, foundEmptyLine, foundComment, foundMove)
+		}
+	})
+
+	t.Run("RootMoveCommentWithVariations", func(t *testing.T) {
+		game := NewGame()
+
+		// Add a comment to the root move
+		root := game.GetRootMove()
+		root.AddComment("Comment before variations")
+
+		// Add moves and create variations
+		game.PushMove("e4", nil)
+		game.PushMove("e5", nil)
+		game.GoBack()
+		game.PushMove("d5", nil)
+
+		// Generate PGN
+		pgn := game.String()
+
+		// Check that the comment appears in the PGN
+		if !strings.Contains(pgn, "{Comment before variations}") {
+			t.Errorf("Root move comment not found in PGN output with variations: %s", pgn)
+		}
+
+		// Verify the comment appears before any moves or variations
+		lines := strings.Split(pgn, "\n")
+		foundComment := false
+		foundMoves := false
+
+		for _, line := range lines {
+			if strings.Contains(line, "{Comment before variations}") {
+				foundComment = true
+			}
+			if strings.Contains(line, "1. e4") || strings.Contains(line, "(1... d5)") {
+				foundMoves = true
+			}
+			// Comment should appear before moves
+			if foundMoves && !foundComment {
+				t.Errorf("Comment should appear before moves in PGN with variations")
+			}
+		}
+	})
+}
