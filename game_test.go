@@ -1779,3 +1779,143 @@ func TestValidateSAN(t *testing.T) {
 		})
 	}
 }
+
+func TestGameMoveValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupMoves  []string // Moves to set up the position
+		move        *Move    // Move to test
+		wantErr     bool     // Whether we expect an error
+		errorString string   // Expected error string (if wantErr is true)
+	}{
+		{
+			name: "valid move should succeed",
+			move: &Move{
+				s1: E2,
+				s2: E4,
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid move should fail",
+			move: &Move{
+				s1: E2,
+				s2: E5, // Invalid move - pawn can't move three squares from e2 to e5
+			},
+			wantErr:     true,
+			errorString: "move e2e5 is not valid for the current position",
+		},
+		{
+			name:        "nil move should fail",
+			move:        nil,
+			wantErr:     true,
+			errorString: "move cannot be nil",
+		},
+		{
+			name:       "invalid move from valid position should fail",
+			setupMoves: []string{"e4", "e5"},
+			move: &Move{
+				s1: E4,
+				s2: E6, // Invalid move - pawn can't move two squares from e4 to e6
+			},
+			wantErr:     true,
+			errorString: "move e4e6 is not valid for the current position",
+		},
+		{
+			name:       "valid move from valid position should succeed",
+			setupMoves: []string{"e4", "e5"},
+			move: &Move{
+				s1: G1,
+				s2: F3,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "valid promotion move should succeed",
+			setupMoves: []string{"e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"},
+			move: &Move{
+				s1:    B7,
+				s2:    A8,
+				promo: Queen,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "invalid promotion move should fail",
+			setupMoves: []string{"e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"},
+			move: &Move{
+				s1:    B7,
+				s2:    A8,
+				promo: King, // Invalid promotion piece
+			},
+			wantErr:     true,
+			errorString: "move b7a8k is not valid for the current position",
+		},
+		{
+			name:       "valid castling move should succeed",
+			setupMoves: []string{"e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "d3", "Nf6"},
+			move: &Move{
+				s1:   E1,
+				s2:   G1,
+				tags: KingSideCastle,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "invalid castling move should fail",
+			setupMoves: []string{"e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "d3", "Nf6"},
+			move: &Move{
+				s1:   E1,
+				s2:   H1, // Invalid castling destination
+				tags: KingSideCastle,
+			},
+			wantErr:     true,
+			errorString: "move e1h1 is not valid for the current position",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new game for each test
+			game := NewGame()
+
+			// Setup moves
+			for _, move := range tt.setupMoves {
+				err := game.PushMove(move, nil)
+				if err != nil {
+					t.Fatalf("setup failed: %v", err)
+				}
+			}
+
+			// Test the move
+			err := game.Move(tt.move, nil)
+
+			// Check error expectation
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Move() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				if tt.errorString != "" && err.Error() != tt.errorString {
+					t.Errorf("Move() error = %v, want error string %v", err.Error(), tt.errorString)
+				}
+				return
+			}
+
+			// If the move was successful, verify it was added to the game
+			if tt.move != nil {
+				// Check that the current move matches our move
+				if game.currentMove == nil {
+					t.Errorf("Move() succeeded but currentMove is nil")
+					return
+				}
+
+				if game.currentMove.s1 != tt.move.s1 || game.currentMove.s2 != tt.move.s2 || game.currentMove.promo != tt.move.promo {
+					t.Errorf("Move() succeeded but currentMove doesn't match: got %v, want %v",
+						game.currentMove, tt.move)
+				}
+			}
+		})
+	}
+}
