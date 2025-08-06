@@ -843,6 +843,11 @@ func (g *Game) Move(move *Move, options *PushMoveOptions) error {
 		options = &PushMoveOptions{}
 	}
 
+	// Validate the move before adding it
+	if err := g.validateMove(move); err != nil {
+		return err
+	}
+
 	existingMove := g.findExistingMove(move)
 	g.addOrReorderMove(move, existingMove, options.ForceMainline)
 
@@ -852,6 +857,28 @@ func (g *Game) Move(move *Move, options *PushMoveOptions) error {
 	g.evaluatePositionStatus()
 
 	return nil
+}
+
+// validateMove checks if the given move is valid for the current position.
+// It returns an error if the move is invalid.
+func (g *Game) validateMove(move *Move) error {
+	if move == nil {
+		return errors.New("move cannot be nil")
+	}
+
+	if g.pos == nil {
+		return errors.New("no current position")
+	}
+
+	// Check if the move exists in the list of valid moves for the current position
+	validMoves := g.pos.ValidMoves()
+	for _, validMove := range validMoves {
+		if validMove.s1 == move.s1 && validMove.s2 == move.s2 && validMove.promo == move.promo {
+			return nil // Move is valid
+		}
+	}
+
+	return fmt.Errorf("move %s is not valid for the current position", move.String())
 }
 
 func (g *Game) parseAndValidateMove(algebraicMove string) (*Move, error) {
