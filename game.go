@@ -991,3 +991,11 @@ func (g *Game) buildOneGameFromPath(path []*Move) *Game {
 
 	return newG
 }
+
+// ValidateSAN checks if a string is valid Standard Algebraic Notation (SAN) syntax.
+// This function only validates the syntax, not whether the move is legal in any position.
+// Examples of valid SAN: "e4", "Nf3", "O-O", "Qxd2+", "e8=Q#"
+func ValidateSAN(s string) error {
+	_, err := algebraicNotationParts(s)
+	return err
+}

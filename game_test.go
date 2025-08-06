@@ -1528,3 +1528,254 @@ func TestRootMoveComments(t *testing.T) {
 		}
 	})
 }
+
+func TestValidateSAN(t *testing.T) {
+	tests := []struct {
+		name    string
+		san     string
+		wantErr bool
+	}{
+		// Valid SAN notation tests
+		{
+			name:    "valid pawn move",
+			san:     "e4",
+			wantErr: false,
+		},
+		{
+			name:    "valid piece move",
+			san:     "Nf3",
+			wantErr: false,
+		},
+		{
+			name:    "valid piece move with check",
+			san:     "Qd2+",
+			wantErr: false,
+		},
+		{
+			name:    "valid piece move with checkmate",
+			san:     "Qd2#",
+			wantErr: false,
+		},
+		{
+			name:    "valid capture",
+			san:     "Qxd2",
+			wantErr: false,
+		},
+		{
+			name:    "valid capture with check",
+			san:     "Qxd2+",
+			wantErr: false,
+		},
+		{
+			name:    "valid pawn capture",
+			san:     "exd5",
+			wantErr: false,
+		},
+		{
+			name:    "valid promotion",
+			san:     "e8=Q",
+			wantErr: false,
+		},
+		{
+			name:    "valid promotion with check",
+			san:     "e8=Q+",
+			wantErr: false,
+		},
+		{
+			name:    "valid promotion with checkmate",
+			san:     "e8=Q#",
+			wantErr: false,
+		},
+		{
+			name:    "valid castling kingside",
+			san:     "O-O",
+			wantErr: false,
+		},
+		{
+			name:    "valid castling queenside",
+			san:     "O-O-O",
+			wantErr: false,
+		},
+		{
+			name:    "valid castling with check",
+			san:     "O-O+",
+			wantErr: false,
+		},
+		{
+			name:    "valid castling with checkmate",
+			san:     "O-O#",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with disambiguation file",
+			san:     "Nbd7",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with disambiguation rank",
+			san:     "N1d2",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with disambiguation both",
+			san:     "N1d2",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with question mark",
+			san:     "e4?",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with exclamation mark",
+			san:     "e4!",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with double question mark",
+			san:     "e4??",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with double exclamation mark",
+			san:     "e4!!",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with question exclamation",
+			san:     "e4?!",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with exclamation question",
+			san:     "e4!?",
+			wantErr: false,
+		},
+		{
+			name:    "valid en passant",
+			san:     "exd6e.p.",
+			wantErr: false,
+		},
+		{
+			name:    "valid en passant with check",
+			san:     "exd6e.p.+",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with multiple files (disambiguation)",
+			san:     "Nef3",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with capture and disambiguation",
+			san:     "Nxd7",
+			wantErr: false,
+		},
+		{
+			name:    "valid move with rank 9 (edge case - regex accepts it)",
+			san:     "e9",
+			wantErr: false,
+		},
+
+		// Invalid SAN notation tests
+		{
+			name:    "invalid piece",
+			san:     "Xf3",
+			wantErr: true,
+		},
+		{
+			name:    "invalid file",
+			san:     "ei4",
+			wantErr: true,
+		},
+		{
+			name:    "invalid capture without destination",
+			san:     "Qx",
+			wantErr: true,
+		},
+		{
+			name:    "invalid promotion without piece",
+			san:     "e8=",
+			wantErr: true,
+		},
+		{
+			name:    "invalid promotion piece",
+			san:     "e8=P",
+			wantErr: true,
+		},
+		{
+			name:    "invalid castling",
+			san:     "O-O-O-O",
+			wantErr: true,
+		},
+		{
+			name:    "invalid castling format",
+			san:     "0-0",
+			wantErr: true,
+		},
+		{
+			name:    "empty string",
+			san:     "",
+			wantErr: true,
+		},
+		{
+			name:    "just piece",
+			san:     "Q",
+			wantErr: true,
+		},
+		{
+			name:    "just file",
+			san:     "e",
+			wantErr: true,
+		},
+		{
+			name:    "just rank",
+			san:     "4",
+			wantErr: true,
+		},
+		{
+			name:    "invalid move with multiple pieces",
+			san:     "NNf3",
+			wantErr: true,
+		},
+		{
+			name:    "invalid move with multiple ranks",
+			san:     "N13f3",
+			wantErr: true,
+		},
+		{
+			name:    "invalid move with invalid characters",
+			san:     "N@f3",
+			wantErr: true,
+		},
+		{
+			name:    "invalid move with spaces",
+			san:     "N f3",
+			wantErr: true,
+		},
+		{
+			name:    "invalid move with tabs",
+			san:     "N\tf3",
+			wantErr: true,
+		},
+		{
+			name:    "invalid move with invalid promotion",
+			san:     "e8=X",
+			wantErr: true,
+		},
+		{
+			name:    "invalid move with invalid check symbol",
+			san:     "e4*",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateSAN(tt.san)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateSAN(%q) error = %v, wantErr %v", tt.san, err, tt.wantErr)
+			}
+		})
+	}
+}
