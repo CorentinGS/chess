@@ -364,10 +364,15 @@ func (g *Game) String() string {
 	// Assume g.rootMove is a dummy root (holding the initial position)
 	// and that its first child is the first actual move.
 	needTrailingSpace := false
-	if g.rootMove != nil && len(g.rootMove.children) > 0 {
-		needTrailingSpace = !writeMoves(g.rootMove,
-			g.rootMove.Position().moveCount,
-			g.rootMove.Position().Turn() == White, &sb, false, false, true)
+	if g.rootMove != nil {
+		if len(g.rootMove.children) > 0 {
+			needTrailingSpace = !writeMoves(g.rootMove,
+				g.rootMove.Position().moveCount,
+				g.rootMove.Position().Turn() == White, &sb, false, false, true)
+		} else if g.rootMove.comments != "" {
+			// Handle root move comments when there are no children
+			writeComments(g.rootMove, &sb)
+		}
 	}
 
 	// Append the game result.
