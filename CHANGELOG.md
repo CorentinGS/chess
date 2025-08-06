@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v2.2.0 - 2025-08-06
+#### Features
+- add ValidateSAN function and comprehensive tests - (30701c7) - CorentinGS
+- Add support for root move comments in PGN output (#68) - (3f55e9c) - Corentin Giaufer Saubert
+
+- - -
+
 ## v2.1.0 - 2025-07-13
 #### Bug Fixes
 - fatal formatting - (32ce606) - Corentin Giaufer Saubert
