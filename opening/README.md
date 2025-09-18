@@ -22,8 +22,8 @@ import (
 
 func main(){
     g := chess.NewGame()
-	g.MoveStr("e4")
-	g.MoveStr("e6")
+	g.PushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+	g.PushNotationMove("e6", chess.AlgebraicNotation{}, nil)
 
 	// print French Defense
 	book := opening.NewBookECO()
