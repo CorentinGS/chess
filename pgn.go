@@ -204,12 +204,14 @@ func (p *Parser) parseMoveText() error {
 			ply++
 
 			// Collect all NAGs and comments that follow the move
+			collectLoop:
 			for {
 				tok := p.currentToken()
-				if tok.Type == NAG {
+				switch tok.Type {
+				case NAG:
 					p.currentMove.nag = tok.Value
 					p.advance()
-				} else if tok.Type == CommentStart {
+				case CommentStart:
 					comment, commandMap, err := p.parseComment()
 					if err != nil {
 						return err
@@ -226,8 +228,8 @@ func (p *Parser) parseMoveText() error {
 							p.currentMove.comments = comment
 						}
 					}
-				} else {
-					break
+				default:
+					break collectLoop
 				}
 			}
 
