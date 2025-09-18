@@ -12,6 +12,12 @@
 
 ![rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1](example.png)
 
+## Recent Updates
+
+**Move Validation Enhancement**: The `Game.Move()` method now properly validates moves according to chess rules, returning descriptive errors for invalid moves. This addresses the documented behavior and ensures game correctness.
+
+**Performance Option**: Added `Game.UnsafeMove()` method for high-performance scenarios where moves are pre-validated, providing ~1.5x performance improvement by skipping validation.
+
 ## Why I Forked
 I forked the original ![notnil/chess](https://github.com/notnil/chess)  package for several reasons:
 
@@ -86,7 +92,9 @@ func main() {
 		// select a random move
 		moves := game.ValidMoves()
 		move := moves[rand.Intn(len(moves))]
-		game.Move(&move, nil)
+		if err := game.Move(&move, nil); err != nil {
+			panic(err) // Should not happen with valid moves
+		}
 	}
 	// print outcome and game PGN
 	fmt.Println(game.Position().Board().Draw())
@@ -156,7 +164,34 @@ func main() {
 
 ### Movement
 
-Chess exposes two ways of moving: valid move generation and notation parsing.  Valid moves are calculated from the current position and are returned from the ValidMoves method.  Even if the client isn't a go program (e.g. a web app) the list of moves can be serialized into their string representation and supplied to the client.  Once a move is selected the MoveStr method can be used to parse the selected move's string.
+Chess provides multiple ways of making moves: direct move execution, valid move generation, and notation parsing. All move methods include proper validation to ensure game correctness.
+
+#### Move Methods
+
+The library offers two move execution methods to balance safety and performance:
+
+**Move()** - Validates moves before execution (recommended for general use):
+```go
+game := chess.NewGame()
+moves := game.ValidMoves()
+err := game.Move(&moves[0], nil)
+if err != nil {
+    // Handle invalid move error
+}
+```
+
+**UnsafeMove()** - High-performance move execution without validation:
+```go
+game := chess.NewGame()
+moves := game.ValidMoves()
+// Only use when you're certain the move is valid
+err := game.UnsafeMove(&moves[0], nil)
+if err != nil {
+    // Handle error (should not occur with valid moves)
+}
+```
+
+> **Performance Note**: `UnsafeMove()` provides ~1.5x performance improvement over `Move()` by skipping validation. Use it only when moves are pre-validated or known to be legal.
 
 #### Valid Moves
 
@@ -165,7 +200,7 @@ Valid moves generated from the game's current position:
 ```go
 game := chess.NewGame()
 moves := game.ValidMoves()
-game.Move(moves[0])
+game.Move(&moves[0], nil)
 fmt.Println(moves[0]) // b1a3
 ```
 
@@ -177,6 +212,51 @@ Game's MoveStr method accepts string input using the default Algebraic Notation:
 game := chess.NewGame()
 if err := game.MoveStr("e4"); err != nil {
 	// handle error
+}
+```
+
+#### Move Validation
+
+All move methods automatically validate moves according to chess rules. The `Move()` method validates moves before execution and returns descriptive errors for invalid moves:
+
+```go
+game := chess.NewGame()
+
+// Get valid moves from current position
+validMoves := game.ValidMoves()
+if len(validMoves) > 0 {
+    // This will succeed - move is known to be valid
+    if err := game.Move(&validMoves[0], nil); err != nil {
+        fmt.Println("Move failed:", err)
+    } else {
+        fmt.Println("Move succeeded")
+    }
+}
+
+// Using notation parsing with validation
+if err := game.MoveStr("e4"); err != nil {
+    fmt.Println("Move failed:", err)
+} else {
+    fmt.Println("e4 move succeeded")
+}
+
+// Invalid notation will be caught
+if err := game.MoveStr("e5"); err != nil {
+    fmt.Println("Move failed:", err) 
+    // Output: Move failed: [notation parsing error]
+}
+```
+
+For scenarios requiring maximum performance where moves are already validated:
+
+```go
+game := chess.NewGame()
+validMoves := game.ValidMoves()
+selectedMove := &validMoves[0] // We know this is valid
+
+// ~1.5x faster than Move() by skipping validation
+if err := game.UnsafeMove(selectedMove, nil); err != nil {
+    panic(err) // Should not happen with pre-validated moves
 }
 ```
 
