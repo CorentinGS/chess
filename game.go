@@ -780,34 +780,18 @@ type PushMoveOptions struct {
 //
 // PushMove adds a move in algebraic notation to the game.
 // Returns an error if the move is invalid.
+// This method now validates moves for consistency with other move methods.
 //
 // Example:
 //
 //	err := game.PushMove("e4", &PushMoveOptions{ForceMainline: true})
 func (g *Game) PushMove(algebraicMove string, options *PushMoveOptions) error {
-	if options == nil {
-		options = &PushMoveOptions{}
-	}
-
-	move, err := g.parseAndValidateMove(algebraicMove)
-	if err != nil {
-		return err
-	}
-
-	existingMove := g.findExistingMove(move)
-	g.addOrReorderMove(move, existingMove, options.ForceMainline)
-
-	g.updatePosition(move)
-	g.currentMove = move
-
-	// Add this line to evaluate the position after the move
-	g.evaluatePositionStatus()
-
-	return nil
+	return g.PushNotationMove(algebraicMove, AlgebraicNotation{}, options)
 }
 
 // PushNotationMove adds a move to the game using any supported notation.
-// It returns an error if the move is invalid.
+// It validates the move before adding it to ensure game correctness.
+// For high-performance scenarios where moves are pre-validated, use UnsafePushNotationMove.
 //
 // Example:
 //
@@ -825,6 +809,27 @@ func (g *Game) PushNotationMove(moveStr string, notation Notation, options *Push
 	}
 
 	return g.Move(move, options)
+}
+
+// UnsafePushNotationMove adds a move to the game using any supported notation without validation.
+// This method is intended for high-performance scenarios where moves are known to be valid.
+// Use this method only when you have already validated the move or are certain it's legal.
+// For general use, prefer PushNotationMove which includes validation.
+//
+// Example:
+//
+//	// Only use when you're certain the move is valid
+//	err := game.UnsafePushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+//	if err != nil {
+//	    panic(err) // Should not happen with valid notation/moves
+//	}
+func (g *Game) UnsafePushNotationMove(moveStr string, notation Notation, options *PushMoveOptions) error {
+	move, err := notation.Decode(g.pos, moveStr)
+	if err != nil {
+		return err
+	}
+
+	return g.UnsafeMove(move, options)
 }
 
 // Move method adds a move to the game using a Move struct.
@@ -913,28 +918,6 @@ func (g *Game) validateMove(move *Move) error {
 	}
 
 	return fmt.Errorf("move %s is not valid for the current position", move.String())
-}
-
-func (g *Game) parseAndValidateMove(algebraicMove string) (*Move, error) {
-	tokens, err := TokenizeGame(&GameScanned{Raw: algebraicMove})
-	if err != nil {
-		return nil, errors.New("failed to tokenize move")
-	}
-
-	parser := NewParser(tokens)
-	parser.game = g
-	parser.currentMove = g.currentMove
-
-	move, err := parser.parseMove()
-	if err != nil {
-		return nil, err
-	}
-
-	if g.pos == nil {
-		return nil, errors.New("no current position")
-	}
-
-	return move, nil
 }
 
 func (g *Game) findExistingMove(move *Move) *Move {

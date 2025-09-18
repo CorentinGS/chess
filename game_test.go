@@ -2058,3 +2058,136 @@ func TestMoveVsUnsafeMovePerformance(t *testing.T) {
 		t.Logf("Warning: UnsafeMove wasn't faster than Move - this might be expected for simple positions")
 	}
 }
+
+func TestUnsafePushNotationMove(t *testing.T) {
+	tests := []struct {
+		name       string
+		setupMoves []string // Moves to set up the position
+		moveStr    string   // Move to test
+		notation   Notation // Notation to use
+		wantErr    bool     // Whether we expect an error
+	}{
+		{
+			name:     "valid algebraic move should succeed without validation",
+			moveStr:  "e4",
+			notation: AlgebraicNotation{},
+			wantErr:  false,
+		},
+		{
+			name:     "valid UCI move should succeed without validation",
+			moveStr:  "e2e4",
+			notation: UCINotation{},
+			wantErr:  false,
+		},
+		{
+			name:     "valid long algebraic move should succeed without validation",
+			moveStr:  "e2e4",
+			notation: LongAlgebraicNotation{},
+			wantErr:  false,
+		},
+		{
+			name:     "invalid notation should fail during parsing",
+			moveStr:  "xyz",
+			notation: AlgebraicNotation{},
+			wantErr:  true, // This should fail at notation parsing, not validation
+		},
+		{
+			name:       "complex valid move should succeed",
+			setupMoves: []string{"e4", "e5"},
+			moveStr:    "Nf3",
+			notation:   AlgebraicNotation{},
+			wantErr:    false,
+		},
+		{
+			name:       "invalid move should still succeed (no validation)",
+			setupMoves: []string{"e4", "e5"},
+			moveStr:    "e2e3", // This move is illegal but UnsafePushNotationMove doesn't validate
+			notation:   UCINotation{},
+			wantErr:    false, // No validation, so no error expected
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new game for each test
+			game := NewGame()
+
+			// Setup moves
+			for _, move := range tt.setupMoves {
+				err := game.PushNotationMove(move, AlgebraicNotation{}, nil)
+				if err != nil {
+					t.Fatalf("setup failed: %v", err)
+				}
+			}
+
+			// Test the move
+			err := game.UnsafePushNotationMove(tt.moveStr, tt.notation, nil)
+
+			// Check error expectation
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UnsafePushNotationMove() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			// If the move was successful, verify it was added to the game
+			if game.currentMove == nil {
+				t.Errorf("UnsafePushNotationMove() succeeded but currentMove is nil")
+				return
+			}
+
+			// For successful cases, just verify that some move was made
+			moves := game.Moves()
+			if len(moves) == 0 {
+				t.Errorf("UnsafePushNotationMove() succeeded but no moves in game")
+			}
+		})
+	}
+}
+
+// TestPushNotationMoveVsUnsafePushNotationMovePerformance demonstrates the performance difference
+func TestPushNotationMoveVsUnsafePushNotationMovePerformance(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping performance test in short mode")
+	}
+
+	game := NewGame()
+
+	// Test with a common opening move
+	moveStr := "e4"
+	notation := AlgebraicNotation{}
+
+	// Test PushNotationMove (with validation)
+	start := time.Now()
+	for i := 0; i < 1000; i++ {
+		gameClone := game.Clone()
+		err := gameClone.PushNotationMove(moveStr, notation, nil)
+		if err != nil {
+			t.Fatalf("PushNotationMove failed: %v", err)
+		}
+	}
+	pushNotationMoveTime := time.Since(start)
+
+	// Test UnsafePushNotationMove (without validation)
+	start = time.Now()
+	for i := 0; i < 1000; i++ {
+		gameClone := game.Clone()
+		err := gameClone.UnsafePushNotationMove(moveStr, notation, nil)
+		if err != nil {
+			t.Fatalf("UnsafePushNotationMove failed: %v", err)
+		}
+	}
+	unsafePushNotationMoveTime := time.Since(start)
+
+	t.Logf("PushNotationMove() (with validation): %v", pushNotationMoveTime)
+	t.Logf("UnsafePushNotationMove() (no validation): %v", unsafePushNotationMoveTime)
+	t.Logf("Performance improvement: %.2fx", float64(pushNotationMoveTime)/float64(unsafePushNotationMoveTime))
+
+	// UnsafePushNotationMove should be faster
+	if unsafePushNotationMoveTime >= pushNotationMoveTime {
+		t.Logf("Warning: UnsafePushNotationMove wasn't faster than PushNotationMove - this might be expected for simple positions")
+	}
+}
