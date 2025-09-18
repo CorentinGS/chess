@@ -671,10 +671,11 @@ func (g *Game) RemoveTagPair(k string) bool {
 // evaluatePositionStatus updates the game's outcome and method based on the current position.
 func (g *Game) evaluatePositionStatus() {
 	method := g.pos.Status()
-	if method == Stalemate {
+	switch method {
+	case Stalemate:
 		g.method = Stalemate
 		g.outcome = Draw
-	} else if method == Checkmate {
+	case Checkmate:
 		g.method = Checkmate
 		g.outcome = WhiteWon
 		if g.pos.Turn() == White {
@@ -977,9 +978,7 @@ func (g *Game) Split() []*Game {
 	// Collect all move paths starting from the root's children
 	var paths [][]*Move
 	for _, m := range g.rootMove.children {
-		for _, p := range collectPaths(m) {
-			paths = append(paths, p)
-		}
+		paths = append(paths, collectPaths(m)...)
 	}
 
 	// Build a Game for each path
