@@ -12,7 +12,6 @@ func TestChessHasher(t *testing.T) {
 		t.Run("should correctly hash the starting position", func(t *testing.T) {
 			startPos := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 			hash, err := hasher.HashPosition(startPos)
-
 			if err != nil {
 				t.Errorf("Expected no error, got %v", err)
 			}
@@ -27,7 +26,6 @@ func TestChessHasher(t *testing.T) {
 		t.Run("should handle empty board position", func(t *testing.T) {
 			emptyPos := "8/8/8/8/8/8/8/8 w - - 0 1"
 			hash, err := hasher.HashPosition(emptyPos)
-
 			if err != nil {
 				t.Errorf("Expected no error, got %v", err)
 			}
@@ -258,7 +256,6 @@ func TestZobristHashToUint64(t *testing.T) {
 	t.Run("empty hash returns error", func(t *testing.T) {
 		hash := ""
 		_ = ZobristHashToUint64(hash)
-
 	})
 }
 

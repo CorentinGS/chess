@@ -149,7 +149,6 @@ func (p *Parser) parseTagPair() error {
 			TokenValue: p.currentToken().Value,
 			Position:   p.position,
 		}
-
 	}
 	value := p.currentToken().Value
 	p.advance()
@@ -172,7 +171,7 @@ func (p *Parser) parseTagPair() error {
 
 func (p *Parser) parseMoveText() error {
 	var moveNumber uint64
-	var ply = 1
+	ply := 1
 	for p.position < len(p.tokens) {
 		token := p.currentToken()
 

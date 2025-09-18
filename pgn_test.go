@@ -403,7 +403,6 @@ func TestLichessMultipleCommand(t *testing.T) {
 	if game.Moves()[4].command["clk"] != "0:02:58" {
 		t.Fatalf("game move 5 is not correct, expected clock, got %s", game.Moves()[4].command["clk"])
 	}
-
 }
 
 func TestParseMoveWithNAGAndComment(t *testing.T) {
