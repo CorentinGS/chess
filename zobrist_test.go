@@ -71,7 +71,7 @@ func TestChessHasher(t *testing.T) {
 				if err != nil {
 					t.Errorf("Expected no error, got %v", err)
 				}
-				if strings.ToLower(hash) != strings.ToLower(tc.hash) {
+				if !strings.EqualFold(hash, tc.hash) {
 					t.Errorf("Expected hash %s, got %s", tc.hash, hash)
 				}
 			})

@@ -60,7 +60,7 @@ func TestBytesBookSource(t *testing.T) {
 
 	// Test EOF
 	source.index = 32
-	n, err = source.Read(buf)
+	_, err = source.Read(buf)
 	if !errors.Is(err, io.EOF) {
 		t.Errorf("Read() error = %v, want EOF", err)
 	}
@@ -362,7 +362,7 @@ func TestPolyglotMoveEncode(t *testing.T) {
 				Promotion:    0,
 				CastlingMove: false,
 			},
-			expected: uint16((0 << 9) | (0 << 6) | (1 << 3) | 0),
+			expected: uint16((0 << 9) | (0 << 6) | (1 << 3)),
 		},
 		{
 			name: "Move with promotion",
