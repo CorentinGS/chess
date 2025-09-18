@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v2.3.0 - 2025-09-18
+#### Bug Fixes
+- experiment for issue #61 - (5231e8f) - CorentinGS
+#### Documentation
+- update README examples to use PushNotationMove for consistency - (cd1dbc6) - CorentinGS
+- update README with move validation enhancements and UnsafeMove method details - (63bdd33) - CorentinGS
+#### Features
+- enhance move validation and add UnsafePushNotationMove for performance - (dd84264) - CorentinGS
+- add UnsafeMove method for high-performance move handling and related tests - (550a75b) - CorentinGS
+
+- - -
+
 ## v2.2.0 - 2025-08-06
 #### Features
 - add ValidateSAN function and comprehensive tests - (30701c7) - CorentinGS
