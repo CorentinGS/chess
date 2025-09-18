@@ -232,11 +232,11 @@ fmt.Println(moves[0]) // b1a3
 
 #### Parse Notation
 
-Game's MoveStr method accepts string input using the default Algebraic Notation:
+PushNotationMove method accepts string input using any supported notation:
 
 ```go
 game := chess.NewGame()
-if err := game.MoveStr("e4"); err != nil {
+if err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil); err != nil {
 	// handle error
 }
 ```
@@ -260,16 +260,16 @@ if len(validMoves) > 0 {
 }
 
 // Using notation parsing with validation
-if err := game.MoveStr("e4"); err != nil {
+if err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil); err != nil {
     fmt.Println("Move failed:", err)
 } else {
     fmt.Println("e4 move succeeded")
 }
 
 // Invalid notation will be caught
-if err := game.MoveStr("e5"); err != nil {
+if err := game.PushNotationMove("e5", chess.AlgebraicNotation{}, nil); err != nil {
     fmt.Println("Move failed:", err) 
-    // Output: Move failed: [notation parsing error]
+    // Output: Move failed: [invalid move error]
 }
 ```
 
@@ -301,10 +301,10 @@ Black wins by checkmate (Fool's Mate):
 
 ```go
 game := chess.NewGame()
-game.MoveStr("f3")
-game.MoveStr("e6")
-game.MoveStr("g4")
-game.MoveStr("Qh4")
+game.PushNotationMove("f3", chess.AlgebraicNotation{}, nil)
+game.PushNotationMove("e6", chess.AlgebraicNotation{}, nil)
+game.PushNotationMove("g4", chess.AlgebraicNotation{}, nil)
+game.PushNotationMove("Qh4", chess.AlgebraicNotation{}, nil)
 fmt.Println(game.Outcome()) // 0-1
 fmt.Println(game.Method()) // Checkmate
 /*
@@ -328,7 +328,7 @@ Black king has no safe move:
 fenStr := "k1K5/8/8/8/8/8/8/1Q6 w - - 0 1"
 fen, _ := chess.FEN(fenStr)
 game := chess.NewGame(fen)
-game.MoveStr("Qb6")
+game.PushNotationMove("Qb6", chess.AlgebraicNotation{}, nil)
 fmt.Println(game.Outcome()) // 1/2-1/2
 fmt.Println(game.Method())  // Stalemate
 /*
@@ -350,7 +350,7 @@ Black resigns and white wins:
 
 ```go
 game := chess.NewGame()
-game.MoveStr("f3")
+game.PushNotationMove("f3", chess.AlgebraicNotation{}, nil)
 game.Resign(chess.Black)
 fmt.Println(game.Outcome()) // 1-0
 fmt.Println(game.Method()) // Resignation
@@ -375,7 +375,7 @@ fmt.Println(game.Method())  // DrawOffer
 game := chess.NewGame()
 moves := []string{"Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8"}
 for _, m := range moves {
-	game.MoveStr(m)
+	game.PushNotationMove(m, chess.AlgebraicNotation{}, nil)
 }
 fmt.Println(game.EligibleDraws()) //  [DrawOffer ThreefoldRepetition]
 ```
@@ -393,7 +393,7 @@ moves := []string{
 	"Nf3", "Nf6", "Ng1", "Ng8",
 }
 for _, m := range moves {
-	game.MoveStr(m)
+	game.PushNotationMove(m, chess.AlgebraicNotation{}, nil)
 }
 fmt.Println(game.Outcome()) // 1/2-1/2
 fmt.Println(game.Method()) // FivefoldRepetition
@@ -418,7 +418,7 @@ According to [FIDE Laws of Chess Rule 9.6b](http://www.fide.com/component/handbo
 ```go
 fen, _ := chess.FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 149 23")
 game := chess.NewGame(fen)
-game.MoveStr("Kf8")
+game.PushNotationMove("Kf8", chess.AlgebraicNotation{}, nil)
 fmt.Println(game.Outcome()) // 1/2-1/2
 fmt.Println(game.Method()) // SeventyFiveMoveRule
 ```  
@@ -478,8 +478,8 @@ Moves and tag pairs added to the PGN output:
 ```go
 game := chess.NewGame()
 game.AddTagPair("Event", "F/S Return Match")
-game.MoveStr("e4")
-game.MoveStr("e5")
+game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+game.PushNotationMove("e5", chess.AlgebraicNotation{}, nil)
 fmt.Println(game)
 /*
 [Event "F/S Return Match"]
@@ -568,9 +568,9 @@ fmt.Println(pos.String()) // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq 
 [Algebraic Notation](https://en.wikipedia.org/wiki/Algebraic_notation_(chess)) (or Standard Algebraic Notation) is the official chess notation used by FIDE. Examples: e2, e5, O-O (short castling), e8=Q (promotion)
 
 ```go
-game := chess.NewGame(chess.UseNotation(chess.AlgebraicNotation{}))
-game.MoveStr("e4")
-game.MoveStr("e5")
+game := chess.NewGame()
+game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+game.PushNotationMove("e5", chess.AlgebraicNotation{}, nil)
 fmt.Println(game) // 1.e4 e5  *
 ```
 
@@ -579,11 +579,11 @@ fmt.Println(game) // 1.e4 e5  *
 [Long Algebraic Notation](https://en.wikipedia.org/wiki/Algebraic_notation_(chess)#Long_algebraic_notation) LongAlgebraicNotation is a more beginner friendly alternative to algebraic notation, where the origin of the piece is visible as well as the destination. Examples: Rd1xd8+, Ng8f6.
 
 ```go
-game := chess.NewGame(chess.UseNotation(chess.LongAlgebraicNotation{}))
-game.MoveStr("f2f3")
-game.MoveStr("e7e5")
-game.MoveStr("g2g4")
-game.MoveStr("Qd8h4")
+game := chess.NewGame()
+game.PushNotationMove("f2f3", chess.LongAlgebraicNotation{}, nil)
+game.PushNotationMove("e7e5", chess.LongAlgebraicNotation{}, nil)
+game.PushNotationMove("g2g4", chess.LongAlgebraicNotation{}, nil)
+game.PushNotationMove("Qd8h4", chess.LongAlgebraicNotation{}, nil)
 fmt.Println(game) // 1.f2f3 e7e5 2.g2g4 Qd8h4#  0-1
 ```
 
@@ -592,9 +592,9 @@ fmt.Println(game) // 1.f2f3 e7e5 2.g2g4 Qd8h4#  0-1
 UCI notation is a more computer friendly alternative to algebraic notation. This notation is the Universal Chess Interface notation. Examples: e2e4, e7e5, e1g1 (white short castling), e7e8q (for promotion)
 
 ```go
-game := chess.NewGame(chess.UseNotation(chess.UCINotation{}))
-game.MoveStr("e2e4")
-game.MoveStr("e7e5")
+game := chess.NewGame()
+game.PushNotationMove("e2e4", chess.UCINotation{}, nil)
+game.PushNotationMove("e7e5", chess.UCINotation{}, nil)
 fmt.Println(game) // 1.e2e4 e7e5  *
 ```
 
