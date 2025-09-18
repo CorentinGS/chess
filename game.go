@@ -829,6 +829,8 @@ func (g *Game) PushNotationMove(moveStr string, notation Notation, options *Push
 
 // Move method adds a move to the game using a Move struct.
 // It returns an error if the move is invalid.
+// This method validates the move before adding it to ensure game correctness.
+// For high-performance scenarios where moves are pre-validated, use UnsafeMove.
 //
 // Example:
 //
@@ -846,6 +848,38 @@ func (g *Game) Move(move *Move, options *PushMoveOptions) error {
 	// Validate the move before adding it
 	if err := g.validateMove(move); err != nil {
 		return err
+	}
+
+	return g.moveUnchecked(move, options)
+}
+
+// UnsafeMove adds a move to the game without validation.
+// This method is intended for high-performance scenarios where moves are known to be valid.
+// Use this method only when you have already validated the move or are certain it's legal.
+// For general use, prefer the Move method which includes validation.
+//
+// Example:
+//
+//	// Only use when you're certain the move is valid
+//	validMoves := game.ValidMoves()
+//	move := &validMoves[0] // We know this is valid
+//	err := game.UnsafeMove(move, nil)
+//	if err != nil {
+//	    panic(err) // Should not happen with valid moves
+//	}
+func (g *Game) UnsafeMove(move *Move, options *PushMoveOptions) error {
+	if options == nil {
+		options = &PushMoveOptions{}
+	}
+
+	return g.moveUnchecked(move, options)
+}
+
+// moveUnchecked is the internal implementation that performs the move without validation.
+// This is shared by both Move (after validation) and MoveUnchecked.
+func (g *Game) moveUnchecked(move *Move, options *PushMoveOptions) error {
+	if move == nil {
+		return errors.New("move cannot be nil")
 	}
 
 	existingMove := g.findExistingMove(move)
