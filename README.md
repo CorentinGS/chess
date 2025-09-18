@@ -1,4 +1,5 @@
 # Chess Library
+
 [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/corentings/chess)
 [![Go Report Card](https://goreportcard.com/badge/corentings/chess)](https://goreportcard.com/report/corentings/chess)
 [![License](http://img.shields.io/badge/license-mit-blue.svg?style=flat-square)](https://raw.githubusercontent.com/corentings/chess/master/LICENSE)
@@ -8,40 +9,52 @@
 
 ## Introduction
 
-**chess** is a set of go packages which provide common chess utilities such as move generation, turn management, checkmate detection, PGN encoding, UCI interoperability, image generation, opening book exploration, and others.  It is well tested and optimized for performance.
+**chess** is a set of go packages which provide common chess utilities such as move generation, turn management,
+checkmate detection, PGN encoding, UCI interoperability, image generation, opening book exploration, and others. It is
+well tested and optimized for performance.
 
 ![rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1](example.png)
 
 ## Recent Updates
 
-**Comprehensive Move Validation**: All move methods now properly validate moves according to chess rules, returning descriptive errors for invalid moves. This ensures consistent game correctness across all move APIs.
+**Comprehensive Move Validation**: All move methods now properly validate moves according to chess rules, returning
+descriptive errors for invalid moves. This ensures consistent game correctness across all move APIs.
 
 **Performance Options**: Added unsafe variants for high-performance scenarios:
-- `UnsafeMove()` - ~1.5x faster than `Move()` 
+
+- `UnsafeMove()` - ~1.5x faster than `Move()`
 - `UnsafePushNotationMove()` - ~1.1x faster than `PushNotationMove()`
 
-**API Consistency**: Refactored move methods for clear validation behavior and consistent performance options across all move APIs.
+**API Consistency**: Refactored move methods for clear validation behavior and consistent performance options across all
+move APIs.
 
 ## Why I Forked
+
 I forked the original ![notnil/chess](https://github.com/notnil/chess)  package for several reasons:
 
 - Update Rate: The original package was not being updated at the pace I needed for my projects.
-- Pending PRs: There were numerous pull requests that needed to be merged to make the package production-ready for my work.
--  Performance and Allocations: I wanted to improve overall performance and reduce memory allocations.
+- Pending PRs: There were numerous pull requests that needed to be merged to make the package production-ready for my
+  work.
+- Performance and Allocations: I wanted to improve overall performance and reduce memory allocations.
 - Customization: I had specific changes in mind that would not be easily integrated into the original package.
 
 ## Credits
-I want to extend my gratitude to the original author of notnil/chess for their amazing work.
-This fork is not intended to steal or replace their work but to build upon it, providing an alternative for the open-source community and allowing for faster development.
 
+I want to extend my gratitude to the original author of notnil/chess for their amazing work.
+This fork is not intended to steal or replace their work but to build upon it, providing an alternative for the
+open-source community and allowing for faster development.
 
 ## Disclaimer
-**Breaking Changes**: This package is under the `/v2` namespace to signify that it might not be backward compatible with the original package.
+
+**Breaking Changes**: This package is under the `/v2` namespace to signify that it might not be backward compatible with
+the original package.
 While some parts might work as plug-and-play, others might require changes.
-Unfortunately, I do not plan to maintain a breaking change list at this time, but I expect in-code comments and the compiler/linter to assist with migration.
+Unfortunately, I do not plan to maintain a breaking change list at this time, but I expect in-code comments and the
+compiler/linter to assist with migration.
 
 **Maintenance**: This package is primarily maintained for my current work and projects.
 It is shared as a respect for the original work and to contribute to the community. My main focus is:
+
 - Rewriting code to reduce allocations
 - Replacing strings with more efficient data structures where possible
 - Improving performance
@@ -50,22 +63,22 @@ It is shared as a respect for the original work and to contribute to the communi
     - Potential major changes to the game representation to support variations
 
 ## Contributions
+
 I am open to suggestions, pull requests, and contributions from anyone interested in improving this library.
 If you have ideas or want to help make this package more robust and widely usable, please feel free to:
+
 - Open issues for bugs or feature requests
 - Submit pull requests with improvements or fixes
 - Contact me directly for discussions or ideas
 
-
-
 ## Repo Structure
 
-| Package | Docs Link | Description |
-| ------------- | ------------- | ------------- |
-| **chess**  | [corentings/chess](README.md)  | Move generation, serialization / deserialization, turn management, checkmate detection  |
-| **image**  | [corentings/chess/image](image/README.md)  | SVG chess board image generation  |
-| **opening**  | [corentings/chess/opening](opening/README.md)  | Opening book interactivity  |
-| **uci**  | [corentings/chess/uci](uci/README.md)  | Universal Chess Interface client  |
+| Package     | Docs Link                                     | Description                                                                            |
+|-------------|-----------------------------------------------|----------------------------------------------------------------------------------------|
+| **chess**   | [corentings/chess](README.md)                 | Move generation, serialization / deserialization, turn management, checkmate detection |
+| **image**   | [corentings/chess/image](image/README.md)     | SVG chess board image generation                                                       |
+| **opening** | [corentings/chess/opening](opening/README.md) | Opening book interactivity                                                             |
+| **uci**     | [corentings/chess/uci](uci/README.md)         | Universal Chess Interface client                                                       |
 
 ## Installation
 
@@ -125,6 +138,7 @@ func main() {
 ```
 
 ### Example Stockfish v. Stockfish
+
 ```go
 package main
 
@@ -168,55 +182,61 @@ func main() {
 
 ### Movement
 
-Chess provides multiple ways of making moves: direct move execution, valid move generation, and notation parsing. All move methods include proper validation to ensure game correctness.
+Chess provides multiple ways of making moves: direct move execution, valid move generation, and notation parsing. All
+move methods include proper validation to ensure game correctness.
 
 #### Move Methods
 
 The library offers two move execution methods to balance safety and performance:
 
 **Move()** - Validates moves before execution (recommended for general use):
+
 ```go
 game := chess.NewGame()
 moves := game.ValidMoves()
 err := game.Move(&moves[0], nil)
 if err != nil {
-    // Handle invalid move error
+// Handle invalid move error
 }
 ```
 
 **UnsafeMove()** - High-performance move execution without validation:
+
 ```go
 game := chess.NewGame()
 moves := game.ValidMoves()
 // Only use when you're certain the move is valid
 err := game.UnsafeMove(&moves[0], nil)
 if err != nil {
-    // Handle error (should not occur with valid moves)
+// Handle error (should not occur with valid moves)
 }
 ```
 
 **PushNotationMove()** - Validates moves using any notation (recommended for general use):
+
 ```go
 game := chess.NewGame()
 err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil)
 if err != nil {
-    // Handle invalid move or notation error
+// Handle invalid move or notation error
 }
 ```
 
 **UnsafePushNotationMove()** - High-performance notation parsing without move validation:
+
 ```go
 game := chess.NewGame()
 // Only use when you're certain the move is valid
 err := game.UnsafePushNotationMove("e4", chess.AlgebraicNotation{}, nil)
 if err != nil {
-    // Handle notation parsing error (should not occur with valid notation)
+// Handle notation parsing error (should not occur with valid notation)
 }
 ```
 
-> **Performance Note**: 
+> **Performance Note**:
 > - `UnsafeMove()` provides ~1.5x performance improvement over `Move()` by skipping validation
-> - `UnsafePushNotationMove()` provides ~1.1x performance improvement over `PushNotationMove()` by skipping move validation
+> - `UnsafePushNotationMove()` provides ~1.1x performance improvement over `PushNotationMove()` by skipping move
+    validation
 > - Use unsafe variants only when moves are pre-validated or known to be legal
 
 #### Valid Moves
@@ -237,13 +257,14 @@ PushNotationMove method accepts string input using any supported notation:
 ```go
 game := chess.NewGame()
 if err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil); err != nil {
-	// handle error
+// handle error
 }
 ```
 
 #### Move Validation
 
-All move methods automatically validate moves according to chess rules. The `Move()` method validates moves before execution and returns descriptive errors for invalid moves:
+All move methods automatically validate moves according to chess rules. The `Move()` method validates moves before
+execution and returns descriptive errors for invalid moves:
 
 ```go
 game := chess.NewGame()
@@ -251,25 +272,25 @@ game := chess.NewGame()
 // Get valid moves from current position
 validMoves := game.ValidMoves()
 if len(validMoves) > 0 {
-    // This will succeed - move is known to be valid
-    if err := game.Move(&validMoves[0], nil); err != nil {
-        fmt.Println("Move failed:", err)
-    } else {
-        fmt.Println("Move succeeded")
-    }
+// This will succeed - move is known to be valid
+if err := game.Move(&validMoves[0], nil); err != nil {
+fmt.Println("Move failed:", err)
+} else {
+fmt.Println("Move succeeded")
+}
 }
 
 // Using notation parsing with validation
 if err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil); err != nil {
-    fmt.Println("Move failed:", err)
+fmt.Println("Move failed:", err)
 } else {
-    fmt.Println("e4 move succeeded")
+fmt.Println("e4 move succeeded")
 }
 
 // Invalid notation will be caught
 if err := game.PushNotationMove("e5", chess.AlgebraicNotation{}, nil); err != nil {
-    fmt.Println("Move failed:", err) 
-    // Output: Move failed: [invalid move error]
+fmt.Println("Move failed:", err)
+// Output: Move failed: [invalid move error]
 }
 ```
 
@@ -282,18 +303,19 @@ game := chess.NewGame()
 validMoves := game.ValidMoves()
 selectedMove := &validMoves[0] // We know this is valid
 if err := game.UnsafeMove(selectedMove, nil); err != nil {
-    panic(err) // Should not happen with pre-validated moves
+panic(err) // Should not happen with pre-validated moves
 }
 
 // Option 2: Using notation (~1.1x faster)  
 if err := game.UnsafePushNotationMove("e4", chess.AlgebraicNotation{}, nil); err != nil {
-    panic(err) // Should not happen with valid notation/moves
+panic(err) // Should not happen with valid notation/moves
 }
 ```
 
 ### Outcome
 
-The outcome of the match is calculated automatically from the inputted moves if possible.  Draw agreements, resignations, and other human initiated outcomes can be inputted as well.
+The outcome of the match is calculated automatically from the inputted moves if possible. Draw agreements, resignations,
+and other human initiated outcomes can be inputted as well.
 
 #### Checkmate
 
@@ -330,7 +352,7 @@ fen, _ := chess.FEN(fenStr)
 game := chess.NewGame(fen)
 game.PushNotationMove("Qb6", chess.AlgebraicNotation{}, nil)
 fmt.Println(game.Outcome()) // 1/2-1/2
-fmt.Println(game.Method())  // Stalemate
+fmt.Println(game.Method()) // Stalemate
 /*
  A B C D E F G H
 8♚ - ♔ - - - - -
@@ -364,36 +386,39 @@ Draw by mutual agreement:
 game := chess.NewGame()
 game.Draw(chess.DrawOffer)
 fmt.Println(game.Outcome()) // 1/2-1/2
-fmt.Println(game.Method())  // DrawOffer
+fmt.Println(game.Method()) // DrawOffer
 ```
 
 #### Threefold Repetition
 
-[Threefold repetition](https://en.wikipedia.org/wiki/Threefold_repetition) occurs when the position repeats three times (not necessarily in a row).  If this occurs both players have the option of taking a draw, but aren't required until Fivefold Repetition.
+[Threefold repetition](https://en.wikipedia.org/wiki/Threefold_repetition) occurs when the position repeats three
+times (not necessarily in a row). If this occurs both players have the option of taking a draw, but aren't required
+until Fivefold Repetition.
 
 ```go
 game := chess.NewGame()
 moves := []string{"Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8"}
 for _, m := range moves {
-	game.PushNotationMove(m, chess.AlgebraicNotation{}, nil)
+game.PushNotationMove(m, chess.AlgebraicNotation{}, nil)
 }
 fmt.Println(game.EligibleDraws()) //  [DrawOffer ThreefoldRepetition]
 ```
 
 #### Fivefold Repetition
 
-According to the [FIDE Laws of Chess](http://www.fide.com/component/handbook/?id=171&view=article) if a position repeats five times then the game is drawn automatically.
+According to the [FIDE Laws of Chess](http://www.fide.com/component/handbook/?id=171&view=article) if a position repeats
+five times then the game is drawn automatically.
 
 ```go
 game := chess.NewGame()
 moves := []string{
-	"Nf3", "Nf6", "Ng1", "Ng8",
-	"Nf3", "Nf6", "Ng1", "Ng8",
-	"Nf3", "Nf6", "Ng1", "Ng8",
-	"Nf3", "Nf6", "Ng1", "Ng8",
+"Nf3", "Nf6", "Ng1", "Ng8",
+"Nf3", "Nf6", "Ng1", "Ng8",
+"Nf3", "Nf6", "Ng1", "Ng8",
+"Nf3", "Nf6", "Ng1", "Ng8",
 }
 for _, m := range moves {
-	game.PushNotationMove(m, chess.AlgebraicNotation{}, nil)
+game.PushNotationMove(m, chess.AlgebraicNotation{}, nil)
 }
 fmt.Println(game.Outcome()) // 1/2-1/2
 fmt.Println(game.Method()) // FivefoldRepetition
@@ -401,7 +426,8 @@ fmt.Println(game.Method()) // FivefoldRepetition
 
 #### Fifty Move Rule
 
-[Fifty-move rule](https://en.wikipedia.org/wiki/Fifty-move_rule) allows either player to claim a draw if no capture has been made and no pawn has been moved in the last fifty moves.
+[Fifty-move rule](https://en.wikipedia.org/wiki/Fifty-move_rule) allows either player to claim a draw if no capture has
+been made and no pawn has been moved in the last fifty moves.
 
 ```go
 fen, _ := chess.FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 100 23")
@@ -413,7 +439,9 @@ fmt.Println(game.Method()) // FiftyMoveRule
 
 #### Seventy Five Move Rule
 
-According to [FIDE Laws of Chess Rule 9.6b](http://www.fide.com/component/handbook/?id=171&view=article) if 75 consecutive moves have been made without movement of any pawn or any capture, the game is drawn unless the last move was checkmate.
+According to [FIDE Laws of Chess Rule 9.6b](http://www.fide.com/component/handbook/?id=171&view=article) if 75
+consecutive moves have been made without movement of any pawn or any capture, the game is drawn unless the last move was
+checkmate.
 
 ```go
 fen, _ := chess.FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 149 23")
@@ -425,7 +453,8 @@ fmt.Println(game.Method()) // SeventyFiveMoveRule
 
 #### Insufficient Material
 
-[Impossibility of checkmate](https://en.wikipedia.org/wiki/Draw_%28chess%29#Draws_in_all_games), or insufficient material, results when neither white or black has the pieces remaining to checkmate the opponent.
+[Impossibility of checkmate](https://en.wikipedia.org/wiki/Draw_%28chess%29#Draws_in_all_games), or insufficient
+material, results when neither white or black has the pieces remaining to checkmate the opponent.
 
 ```go
 fen, _ := chess.FEN("8/2k5/8/8/8/3K4/8/8 w - - 1 1")
@@ -436,7 +465,9 @@ fmt.Println(game.Method()) // InsufficientMaterial
 
 ### PGN
 
-[PGN](https://en.wikipedia.org/wiki/Portable_Game_Notation), or Portable Game Notation, is the most common serialization format for chess matches.  PGNs include move history and metadata about the match.  Chess includes the ability to read and write the PGN format.
+[PGN](https://en.wikipedia.org/wiki/Portable_Game_Notation), or Portable Game Notation, is the most common serialization
+format for chess matches. PGNs include move history and metadata about the match. Chess includes the ability to read and
+write the PGN format.
 
 #### Example PGN
 
@@ -466,7 +497,7 @@ PGN supplied as an optional parameter to the NewGame constructor:
 ```go
 pgn, err := chess.PGN(pgnReader)
 if err != nil {
-	// handle error
+// handle error
 }
 game := chess.NewGame(pgn)
 ```
@@ -495,19 +526,19 @@ For parsing large PGN database files use Scanner:
 ```go
 f, err := os.Open("lichess_db_standard_rated_2013-01.pgn")
 if err != nil {
-	panic(err)
+panic(err)
 }
 defer f.Close()
 
 scanner := chess.NewScanner(f)
 // Read all games
 for scanner.HasNext() {
-	game, err := scanner.ParseNext()
-	if err != nil {
-		log.Fatal("Failed to parse game: %v", err)
-	}
-	fmt.Println(game.GetTagPair("Site"))
-	// Output &{Site https://lichess.org/8jb5kiqw}
+game, err := scanner.ParseNext()
+if err != nil {
+log.Fatal("Failed to parse game: %v", err)
+}
+fmt.Println(game.GetTagPair("Site"))
+// Output &{Site https://lichess.org/8jb5kiqw}
 }
 ```
 
@@ -518,25 +549,27 @@ To expand every variation into a distinct Game:
 ```go
 f, err := os.Open("lichess_db_standard_rated_2013-01.pgn")
 if err != nil {
-	panic(err)
+panic(err)
 }
 defer f.Close()
 
 scanner := chess.NewScanner(f, chess.WithExpandVariations())
 // Read all games
 for scanner.HasNext() {
-	game, err := scanner.ParseNext()
-	if err != nil {
-		log.Fatal("Failed to parse game: %v", err)
-	}
-	fmt.Println(game.GetTagPair("Site"))
-	// Output &{Site https://lichess.org/8jb5kiqw}
+game, err := scanner.ParseNext()
+if err != nil {
+log.Fatal("Failed to parse game: %v", err)
+}
+fmt.Println(game.GetTagPair("Site"))
+// Output &{Site https://lichess.org/8jb5kiqw}
 }
 ```
 
 ### FEN
 
-[FEN](https://en.wikipedia.org/wiki/Forsyth–Edwards_Notation), or Forsyth–Edwards Notation, is the standard notation for describing a board position.  FENs include piece positions, turn, castle rights, en passant square, half move counter (for [50 move rule](https://en.wikipedia.org/wiki/Fifty-move_rule)), and full move counter.
+[FEN](https://en.wikipedia.org/wiki/Forsyth–Edwards_Notation), or Forsyth–Edwards Notation, is the standard notation for
+describing a board position. FENs include piece positions, turn, castle rights, en passant square, half move counter (
+for [50 move rule](https://en.wikipedia.org/wiki/Fifty-move_rule)), and full move counter.
 
 #### Read FEN
 
@@ -545,7 +578,7 @@ FEN supplied as an optional parameter to the NewGame constructor:
 ```go
 fen, err := chess.FEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 if err != nil {
-	// handle error
+// handle error
 }
 game := chess.NewGame(fen)
 ```
@@ -562,10 +595,13 @@ fmt.Println(pos.String()) // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq 
 
 ### Notations
 
-[Chess Notation](https://en.wikipedia.org/wiki/Chess_notation) define how moves are encoded in a serialized format.  Chess uses a notation when converting to and from PGN and for accepting move text.
+[Chess Notation](https://en.wikipedia.org/wiki/Chess_notation) define how moves are encoded in a serialized format.
+Chess uses a notation when converting to and from PGN and for accepting move text.
+
 #### Algebraic Notation
 
-[Algebraic Notation](https://en.wikipedia.org/wiki/Algebraic_notation_(chess)) (or Standard Algebraic Notation) is the official chess notation used by FIDE. Examples: e2, e5, O-O (short castling), e8=Q (promotion)
+[Algebraic Notation](https://en.wikipedia.org/wiki/Algebraic_notation_(chess)) (or Standard Algebraic Notation) is the
+official chess notation used by FIDE. Examples: e2, e5, O-O (short castling), e8=Q (promotion)
 
 ```go
 game := chess.NewGame()
@@ -576,7 +612,9 @@ fmt.Println(game) // 1.e4 e5  *
 
 #### Long Algebraic Notation
 
-[Long Algebraic Notation](https://en.wikipedia.org/wiki/Algebraic_notation_(chess)#Long_algebraic_notation) LongAlgebraicNotation is a more beginner friendly alternative to algebraic notation, where the origin of the piece is visible as well as the destination. Examples: Rd1xd8+, Ng8f6.
+[Long Algebraic Notation](https://en.wikipedia.org/wiki/Algebraic_notation_(chess)#Long_algebraic_notation)
+LongAlgebraicNotation is a more beginner friendly alternative to algebraic notation, where the origin of the piece is
+visible as well as the destination. Examples: Rd1xd8+, Ng8f6.
 
 ```go
 game := chess.NewGame()
@@ -589,7 +627,8 @@ fmt.Println(game) // 1.f2f3 e7e5 2.g2g4 Qd8h4#  0-1
 
 #### UCI Notation
 
-UCI notation is a more computer friendly alternative to algebraic notation. This notation is the Universal Chess Interface notation. Examples: e2e4, e7e5, e1g1 (white short castling), e7e8q (for promotion)
+UCI notation is a more computer friendly alternative to algebraic notation. This notation is the Universal Chess
+Interface notation. Examples: e2e4, e7e5, e1g1 (white short castling), e7e8q (for promotion)
 
 ```go
 game := chess.NewGame()
@@ -620,8 +659,8 @@ fmt.Println(game.Position().Board().Draw())
 
 ### Move History
 
-Move History is a convenient API for accessing aligned positions, moves, and comments.  Move
-History is useful when trying to understand detailed information about a game.  Below is an
+Move History is a convenient API for accessing aligned positions, moves, and comments. Move
+History is useful when trying to understand detailed information about a game. Below is an
 example showing how to see which side castled first.
 
 ```go
@@ -665,16 +704,20 @@ func main() {
 
 ## Performance
 
-Chess has been performance tuned, using [pprof](https://golang.org/pkg/runtime/pprof/), with the goal of being fast enough for use by chess bots.  The original map based board representation was replaced by [bitboards](https://chessprogramming.wikispaces.com/Bitboards) resulting in a large performance increase.
+Chess has been performance tuned, using [pprof](https://golang.org/pkg/runtime/pprof/), with the goal of being fast
+enough for use by chess bots. The original map based board representation was replaced
+by [bitboards](https://chessprogramming.wikispaces.com/Bitboards) resulting in a large performance increase.
 
 ### Benchmarks
 
 The benchmarks can be run with the following command:
+
 ```
 go test -bench=.
 ```
 
 Results from the baseline 2015 MBP:
+
 ```
 BenchmarkBitboardReverse-4              2000000000               1.01 ns/op
 BenchmarkStalemateStatus-4                500000              3116 ns/op
