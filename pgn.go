@@ -172,7 +172,7 @@ func (p *Parser) parseTagPair() error {
 
 func (p *Parser) parseMoveText() error {
 	var moveNumber uint64
-	var ply int = 1
+	var ply = 1
 	for p.position < len(p.tokens) {
 		token := p.currentToken()
 
@@ -204,7 +204,7 @@ func (p *Parser) parseMoveText() error {
 			ply++
 
 			// Collect all NAGs and comments that follow the move
-			collectLoop:
+		collectLoop:
 			for {
 				tok := p.currentToken()
 				switch tok.Type {
