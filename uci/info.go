@@ -18,8 +18,8 @@ var missingWdlErr = errors.New("uci: wdl unavailable; this is mostly likely beca
 type SearchResults struct {
 	BestMove    *chess.Move
 	Ponder      *chess.Move
-	Info        Info
 	MultiPVInfo []Info
+	Info        Info
 }
 
 // Info corresponds to the "info" engine output:

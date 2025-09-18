@@ -68,11 +68,11 @@ func TokenizeGame(game *GameScanned) ([]Token, error) {
 // It supports streaming processing of multiple games and proper handling
 // of PGN syntax.
 type Scanner struct {
+	lastError       error // Store last error
 	scanner         *bufio.Scanner
 	nextGame        *GameScanned // Buffer for peeked game
-	lastError       error        // Store last error
+	nextParsedGames []*Game      // only valid when ExpandVariations==true
 	opts            ScannerOpts
-	nextParsedGames []*Game // only valid when ExpandVariations==true
 }
 
 type ScannerOption func(*Scanner)
