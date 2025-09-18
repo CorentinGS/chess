@@ -180,7 +180,7 @@ func (m *Move) Clone() *Move {
 }
 
 func (m *Move) cloneChildren(srcChildren []*Move) {
-	if srcChildren == nil || len(srcChildren) == 0 {
+	if len(srcChildren) == 0 {
 		return
 	}
 
