@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCheckmate(t *testing.T) {
@@ -1917,5 +1918,143 @@ func TestGameMoveValidation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGameUnsafeMove(t *testing.T) {
+	tests := []struct {
+		name       string
+		setupMoves []string // Moves to set up the position
+		move       *Move    // Move to test
+		wantErr    bool     // Whether we expect an error
+	}{
+		{
+			name: "valid move should succeed without validation",
+			move: &Move{
+				s1: E2,
+				s2: E4,
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid move should still succeed (no validation)",
+			move: &Move{
+				s1: E2,
+				s2: E5, // Invalid move but UnsafeMove doesn't validate
+			},
+			wantErr: false, // UnsafeMove doesn't validate, so no error expected
+		},
+		{
+			name:    "nil move should fail",
+			move:    nil,
+			wantErr: true,
+		},
+		{
+			name:       "complex valid move should succeed",
+			setupMoves: []string{"e4", "e5"},
+			move: &Move{
+				s1: G1,
+				s2: F3,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "promotion move should succeed without validation",
+			setupMoves: []string{"e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"},
+			move: &Move{
+				s1:    B7,
+				s2:    A8,
+				promo: Queen,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new game for each test
+			game := NewGame()
+
+			// Setup moves
+			for _, move := range tt.setupMoves {
+				err := game.PushMove(move, nil)
+				if err != nil {
+					t.Fatalf("setup failed: %v", err)
+				}
+			}
+
+			// Test the move
+			err := game.UnsafeMove(tt.move, nil)
+
+			// Check error expectation
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UnsafeMove() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			// If the move was successful, verify it was added to the game
+			if tt.move != nil {
+				// Check that the current move matches our move
+				if game.currentMove == nil {
+					t.Errorf("UnsafeMove() succeeded but currentMove is nil")
+					return
+				}
+
+				if game.currentMove.s1 != tt.move.s1 || game.currentMove.s2 != tt.move.s2 || game.currentMove.promo != tt.move.promo {
+					t.Errorf("UnsafeMove() succeeded but currentMove doesn't match: got %v, want %v",
+						game.currentMove, tt.move)
+				}
+			}
+		})
+	}
+}
+
+// TestMoveVsUnsafeMovePerformance demonstrates the performance difference
+func TestMoveVsUnsafeMovePerformance(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping performance test in short mode")
+	}
+
+	game := NewGame()
+	validMoves := game.ValidMoves()
+	if len(validMoves) == 0 {
+		t.Fatal("no valid moves available")
+	}
+
+	move := &validMoves[0]
+
+	// Test Move (with validation)
+	start := time.Now()
+	for i := 0; i < 1000; i++ {
+		gameClone := game.Clone()
+		err := gameClone.Move(move, nil)
+		if err != nil {
+			t.Fatalf("Move failed: %v", err)
+		}
+	}
+	moveTime := time.Since(start)
+
+	// Test UnsafeMove (without validation)
+	start = time.Now()
+	for i := 0; i < 1000; i++ {
+		gameClone := game.Clone()
+		err := gameClone.UnsafeMove(move, nil)
+		if err != nil {
+			t.Fatalf("UnsafeMove failed: %v", err)
+		}
+	}
+	unsafeMoveTime := time.Since(start)
+
+	t.Logf("Move() (with validation): %v", moveTime)
+	t.Logf("UnsafeMove() (no validation): %v", unsafeMoveTime)
+	t.Logf("Performance improvement: %.2fx", float64(moveTime)/float64(unsafeMoveTime))
+
+	// UnsafeMove should be faster (though the difference might be small for simple positions)
+	if unsafeMoveTime >= moveTime {
+		t.Logf("Warning: UnsafeMove wasn't faster than Move - this might be expected for simple positions")
 	}
 }
