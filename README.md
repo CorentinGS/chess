@@ -14,9 +14,13 @@
 
 ## Recent Updates
 
-**Move Validation Enhancement**: The `Game.Move()` method now properly validates moves according to chess rules, returning descriptive errors for invalid moves. This addresses the documented behavior and ensures game correctness.
+**Comprehensive Move Validation**: All move methods now properly validate moves according to chess rules, returning descriptive errors for invalid moves. This ensures consistent game correctness across all move APIs.
 
-**Performance Option**: Added `Game.UnsafeMove()` method for high-performance scenarios where moves are pre-validated, providing ~1.5x performance improvement by skipping validation.
+**Performance Options**: Added unsafe variants for high-performance scenarios:
+- `UnsafeMove()` - ~1.5x faster than `Move()` 
+- `UnsafePushNotationMove()` - ~1.1x faster than `PushNotationMove()`
+
+**API Consistency**: Refactored move methods for clear validation behavior and consistent performance options across all move APIs.
 
 ## Why I Forked
 I forked the original ![notnil/chess](https://github.com/notnil/chess)  package for several reasons:
@@ -191,7 +195,29 @@ if err != nil {
 }
 ```
 
-> **Performance Note**: `UnsafeMove()` provides ~1.5x performance improvement over `Move()` by skipping validation. Use it only when moves are pre-validated or known to be legal.
+**PushNotationMove()** - Validates moves using any notation (recommended for general use):
+```go
+game := chess.NewGame()
+err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+if err != nil {
+    // Handle invalid move or notation error
+}
+```
+
+**UnsafePushNotationMove()** - High-performance notation parsing without move validation:
+```go
+game := chess.NewGame()
+// Only use when you're certain the move is valid
+err := game.UnsafePushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+if err != nil {
+    // Handle notation parsing error (should not occur with valid notation)
+}
+```
+
+> **Performance Note**: 
+> - `UnsafeMove()` provides ~1.5x performance improvement over `Move()` by skipping validation
+> - `UnsafePushNotationMove()` provides ~1.1x performance improvement over `PushNotationMove()` by skipping move validation
+> - Use unsafe variants only when moves are pre-validated or known to be legal
 
 #### Valid Moves
 
@@ -251,12 +277,17 @@ For scenarios requiring maximum performance where moves are already validated:
 
 ```go
 game := chess.NewGame()
+
+// Option 1: Using Move structs directly (~1.5x faster)
 validMoves := game.ValidMoves()
 selectedMove := &validMoves[0] // We know this is valid
-
-// ~1.5x faster than Move() by skipping validation
 if err := game.UnsafeMove(selectedMove, nil); err != nil {
     panic(err) // Should not happen with pre-validated moves
+}
+
+// Option 2: Using notation (~1.1x faster)  
+if err := game.UnsafePushNotationMove("e4", chess.AlgebraicNotation{}, nil); err != nil {
+    panic(err) // Should not happen with valid notation/moves
 }
 ```
 
