@@ -233,8 +233,8 @@ func TestHasNextDoesntConsume(t *testing.T) {
 }
 
 func validateExpand(t *testing.T, scanner *Scanner, expectedLastLines []string,
-	expectedFinalPos []string) {
-
+	expectedFinalPos []string,
+) {
 	count := 0
 	for scanner.HasNext() {
 		game, err := scanner.ParseNext()

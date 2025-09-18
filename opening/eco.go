@@ -155,11 +155,6 @@ func (b *BookECO) nodeList(root *node) []*node {
 	return nodes
 }
 
-var (
-	//TODO: This is a legacy counter for generating unique labels. (will be removed in the future)
-	labelCount = 0 //nolint:gochecknoglobals // this is a counter for generating unique labels. (will be removed in the future)
-)
-
 func (b *BookECO) label() string {
 	s := "a" + strconv.Itoa(b.labelCount)
 	b.labelCount++

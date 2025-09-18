@@ -58,6 +58,7 @@ func TestPositionUpdate(t *testing.T) {
 		}
 	}
 }
+
 func TestPositionPly(t *testing.T) {
 	tests := []struct {
 		moveCount int

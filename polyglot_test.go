@@ -101,7 +101,7 @@ func TestFileBookSource(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "test.bin")
-	if err := os.WriteFile(tmpFile, bookData, 0666); err != nil {
+	if err := os.WriteFile(tmpFile, bookData, 0o666); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 

@@ -659,7 +659,6 @@ func TestPushMove(t *testing.T) {
 			// Go back one move if needed for the test
 			if tt.goBack && game.currentMove != nil && game.currentMove.parent != nil {
 				game.GoBack()
-
 			}
 
 			// Test the move
@@ -834,7 +833,6 @@ func TestCloneGameState(t *testing.T) {
 	if len(clone.Positions()) == len(original.Positions()) {
 		t.Errorf("modifying the clone incorrectly mutates the original positions")
 	}
-
 }
 
 func TestCloneGameStateWithNilComments(t *testing.T) {
@@ -970,6 +968,7 @@ func TestRemoveTagPairFromEmptyTagPairs(t *testing.T) {
 		t.Fatalf("expected tag pair not to be removed")
 	}
 }
+
 func TestAddTagPairWhenKeyExists(t *testing.T) {
 	g := NewGame()
 	g.AddTagPair("Event", "Test Event")

@@ -338,7 +338,7 @@ func (g *Game) FEN() string {
 func (g *Game) String() string {
 	var sb strings.Builder
 
-	var tagPairList = make([]sortableTagPair, len(g.tagPairs))
+	tagPairList := make([]sortableTagPair, len(g.tagPairs))
 
 	var idx uint = 0
 	for tag, value := range g.tagPairs {
@@ -442,7 +442,8 @@ func cmpTags(a, b sortableTagPair) int {
 // ensuring that the output adheres to standard PGN conventions. Future enhancements may include support for all NAG values.
 // the function returns whether or not a trailing space was added to the output
 func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
-	subVariation, closedVariation, isRoot bool) bool {
+	subVariation, closedVariation, isRoot bool,
+) bool {
 	trailingSpace := false
 
 	// If no moves remain, stop.
@@ -477,7 +478,7 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 
 	writeCommands(currentMove, sb)
 
-	//TODO: Add support for all nags values in the future
+	// TODO: Add support for all nags values in the future
 
 	if len(node.children) > 1 || len(currentMove.children) > 0 {
 		sb.WriteString(" ")
@@ -506,8 +507,8 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 }
 
 func writeMoveNumber(moveNum int, isWhite bool, subVariation, closedVariation,
-	isRoot bool, sb *strings.Builder) {
-
+	isRoot bool, sb *strings.Builder,
+) {
 	if closedVariation {
 		sb.WriteString(" ")
 	}

@@ -279,7 +279,6 @@ func ZobristHashToUint64(hash string) uint64 {
 	result, err := strconv.ParseUint(hash, 16, 64)
 	if err != nil {
 		return 0
-
 	}
 
 	return result

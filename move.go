@@ -126,7 +126,6 @@ func (m *Move) Number() int {
 	}
 
 	return ret
-
 }
 
 // FullMoveNumber returns the full move number (increments after Black's move).
