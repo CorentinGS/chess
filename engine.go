@@ -187,10 +187,8 @@ func addTags(m *Move, pos *Position) {
 		switch m.s2 {
 		case C1, C8:
 			m.AddTag(QueenSideCastle)
-			break
 		case G1, G8:
 			m.AddTag(KingSideCastle)
-			break
 		}
 	}
 	// determine if in check after move (makes move invalid)
