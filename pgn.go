@@ -61,14 +61,6 @@ func (p *Parser) currentToken() Token {
 	return p.tokens[p.position]
 }
 
-// nextToken returns the next token without advancing the position.
-func (p *Parser) nextToken() Token {
-	if p.position+1 >= len(p.tokens) {
-		return Token{Type: EOF}
-	}
-	return p.tokens[p.position+1]
-}
-
 // advance moves to the next token.
 func (p *Parser) advance() {
 	p.position++
