@@ -31,35 +31,36 @@ type TokenType int
 const (
 	EOF TokenType = iota
 	Undefined
-	TagStart        // [
-	TagEnd          // ]
-	TagKey          // The key part of a tag (e.g., "Site")
-	TagValue        // The value part of a tag (e.g., "Internet")
-	MoveNumber      // 1, 2, 3, etc.
-	DOT             // .
-	ELLIPSIS        // ...
-	PIECE           // N, B, R, Q, K
-	SQUARE          // e4, e5, etc.
-	CommentStart    // {
-	CommentEnd      // }
-	COMMENT         // The comment text
-	RESULT          // 1-0, 0-1, 1/2-1/2, *
-	CAPTURE         // 'x' in moves
-	FILE            // a-h in moves when used as disambiguation
-	RANK            // 1-8 in moves when used as disambiguation
-	KingsideCastle  // 0-0
-	QueensideCastle // 0-0-0
-	PROMOTION       // = in moves
-	PromotionPiece  // The piece being promoted to (Q, R, B, N)
-	CHECK           // + in moves
-	CHECKMATE       // # in moves
-	NAG             // Numeric Annotation Glyph (e.g., $1, $2, etc.)
-	VariationStart  // ( for starting a variation
-	VariationEnd    // ) for ending a variation
-	CommandStart    // [%
-	CommandName     // The command name (e.g., clk, eval)
-	CommandParam    // Command parameter
-	CommandEnd      // ]
+	TagStart            // [
+	TagEnd              // ]
+	TagKey              // The key part of a tag (e.g., "Site")
+	TagValue            // The value part of a tag (e.g., "Internet")
+	MoveNumber          // 1, 2, 3, etc.
+	DOT                 // .
+	ELLIPSIS            // ...
+	PIECE               // N, B, R, Q, K
+	SQUARE              // e4, e5, etc.
+	CommentStart        // {
+	CommentEnd          // }
+	COMMENT             // The comment text
+	RESULT              // 1-0, 0-1, 1/2-1/2, *
+	CAPTURE             // 'x' in moves
+	FILE                // a-h in moves when used as disambiguation
+	RANK                // 1-8 in moves when used as disambiguation
+	KingsideCastle      // 0-0
+	QueensideCastle     // 0-0-0
+	PROMOTION           // = in moves
+	PromotionPiece      // The piece being promoted to (Q, R, B, N)
+	CHECK               // + in moves
+	CHECKMATE           // # in moves
+	NAG                 // Numeric Annotation Glyph (e.g., $1, $2, etc.)
+	VariationStart      // ( for starting a variation
+	VariationEnd        // ) for ending a variation
+	CommandStart        // [%
+	CommandName         // The command name (e.g., clk, eval)
+	CommandParam        // Command parameter
+	CommandEnd          // ]
+	DeambiguationSquare // Full square disambiguation (e.g., e8 in Qe8f7)
 )
 
 func (t TokenType) String() string {
@@ -317,6 +318,7 @@ func (l *Lexer) readPieceMove() Token {
 
 func (l *Lexer) readMove() Token {
 	const disambiguationLength = 3
+	const disambiguationSquareLength = 4
 
 	position := l.position
 
@@ -347,6 +349,17 @@ func (l *Lexer) readMove() Token {
 
 	// Get the total length of what we read
 	length := l.position - position
+
+	// Handle full square disambiguation (e.g., "e8f7" -> "e8" then "f7")
+	if length == disambiguationSquareLength &&
+		isFile(l.input[position]) && isDigit(l.input[position+1]) &&
+		isFile(l.input[position+2]) && isDigit(l.input[position+3]) {
+		// Reset to return just the first square
+		l.position = position + 2
+		l.readPosition = position + 3
+		l.ch = l.input[l.position] // set current char to the first character of the second square
+		return Token{Type: DeambiguationSquare, Value: l.input[position : position+2]}
+	}
 
 	// If we read 3 characters, first one is disambiguation
 	if length == disambiguationLength {
