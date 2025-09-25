@@ -346,14 +346,6 @@ func (p *Parser) parseMove() (*Move, error) {
 		} else if p.currentToken().Type == RANK {
 			moveData.originRank = p.currentToken().Value
 			p.advance()
-		} else if p.currentToken().Type == SQUARE && p.nextToken().Type == SQUARE {
-			// Full square disambiguation (e.g., "Qe8f7" -> piece: Q, origin: e8, dest: f7)
-			originSquare := p.currentToken().Value
-			if len(originSquare) == 2 {
-				moveData.originFile = string(originSquare[0])
-				moveData.originRank = string(originSquare[1])
-			}
-			p.advance()
 		}
 
 	case FILE:
