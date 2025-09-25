@@ -348,6 +348,17 @@ func (l *Lexer) readMove() Token {
 	// Get the total length of what we read
 	length := l.position - position
 
+	// Handle full square disambiguation (e.g., "e8f7" -> "e8" then "f7")
+	if length == 4 &&
+		isFile(l.input[position]) && isDigit(l.input[position+1]) &&
+		isFile(l.input[position+2]) && isDigit(l.input[position+3]) {
+		// Reset to return just the first square
+		l.position = position + 2
+		l.readPosition = position + 3
+		l.ch = l.input[position+2] // set current char to the first character of the second square
+		return Token{Type: SQUARE, Value: l.input[position : position+2]}
+	}
+
 	// If we read 3 characters, first one is disambiguation
 	if length == disambiguationLength {
 		l.readPosition = position + 1

@@ -61,6 +61,14 @@ func (p *Parser) currentToken() Token {
 	return p.tokens[p.position]
 }
 
+// nextToken returns the next token without advancing the position.
+func (p *Parser) nextToken() Token {
+	if p.position+1 >= len(p.tokens) {
+		return Token{Type: EOF}
+	}
+	return p.tokens[p.position+1]
+}
+
 // advance moves to the next token.
 func (p *Parser) advance() {
 	p.position++
@@ -338,11 +346,20 @@ func (p *Parser) parseMove() (*Move, error) {
 		} else if p.currentToken().Type == RANK {
 			moveData.originRank = p.currentToken().Value
 			p.advance()
+		} else if p.currentToken().Type == SQUARE && p.nextToken().Type == SQUARE {
+			// Full square disambiguation (e.g., "Qe8f7" -> piece: Q, origin: e8, dest: f7)
+			originSquare := p.currentToken().Value
+			if len(originSquare) == 2 {
+				moveData.originFile = string(originSquare[0])
+				moveData.originRank = string(originSquare[1])
+			}
+			p.advance()
 		}
 
 	case FILE:
 		moveData.originFile = p.currentToken().Value
 		p.advance()
+
 	}
 
 	// Handle capture
