@@ -65,17 +65,17 @@ func TestTokenizerDisambiguationSquares(t *testing.T) {
 		{
 			name:     "queen_with_full_square_disambiguation",
 			input:    "Qe8f7",
-			expected: []TokenType{PIECE, SQUARE, SQUARE}, // This is likely wrong - should be PIECE, SQUARE (source), SQUARE (dest)
+			expected: []TokenType{PIECE, DeambiguationSquare, SQUARE}, // This is likely wrong - should be PIECE, SQUARE (source), SQUARE (dest)
 		},
 		{
 			name:     "rook_with_full_square_disambiguation",
 			input:    "Ra1d1",
-			expected: []TokenType{PIECE, SQUARE, SQUARE},
+			expected: []TokenType{PIECE, DeambiguationSquare, SQUARE},
 		},
 		{
 			name:     "knight_with_full_square_disambiguation",
 			input:    "Nb1c3",
-			expected: []TokenType{PIECE, SQUARE, SQUARE},
+			expected: []TokenType{PIECE, DeambiguationSquare, SQUARE},
 		},
 		{
 			name:     "standard_piece_move",
