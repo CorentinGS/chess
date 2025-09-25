@@ -2,6 +2,24 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v2.3.1 - 2025-09-25
+#### Bug Fixes
+- pgn disambiguation squares (#75) - (362a897) - Corentin Giaufer Saubert
+- Potential fix for code scanning alert no. 1: Workflow does not contain permissions (#74) - (34f57bc) - Corentin Giaufer Saubert
+#### Documentation
+- improve formatting and readability in README.md - (f9102d2) - CorentinGS
+#### Refactoring
+- clean up code by removing unnecessary blank lines and optimizing variable initialization - (eefa43f) - CorentinGS
+- reorganize fields in Scanner and SearchResults structs for clarity - (6a3f038) - CorentinGS
+- streamline variable initialization in parseMoveText function - (a508986) - CorentinGS
+- improve error handling in TestBytesBookSource and enhance string comparison in TestChessHasher - (503a6d7) - CorentinGS
+- optimize token handling in parseMoveText - (71f7da8) - CorentinGS
+- simplify cloneChildren method by removing unnecessary nil check - (5f4e014) - CorentinGS
+- simplify evaluatePositionStatus method and optimize path collection in Split - (9879d58) - CorentinGS
+- remove unnecessary break statements in addTags function - (712f228) - CorentinGS
+
+- - -
+
 ## v2.3.0 - 2025-09-18
 #### Bug Fixes
 - experiment for issue #61 - (5231e8f) - CorentinGS
