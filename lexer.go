@@ -60,7 +60,7 @@ const (
 	CommandName         // The command name (e.g., clk, eval)
 	CommandParam        // Command parameter
 	CommandEnd          // ]
-	DeambiguationSquare // e.g., e8 (used for disambiguation in moves like Qe8f7) - this is not a standard PGN token but added for clarity
+	DeambiguationSquare // Full square disambiguation (e.g., e8 in Qe8f7)
 )
 
 func (t TokenType) String() string {
