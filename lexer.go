@@ -357,7 +357,7 @@ func (l *Lexer) readMove() Token {
 		// Reset to return just the first square
 		l.position = position + 2
 		l.readPosition = position + 3
-		l.ch = l.input[position+2] // set current char to the first character of the second square
+		l.ch = l.input[l.position] // set current char to the first character of the second square
 		return Token{Type: DeambiguationSquare, Value: l.input[position : position+2]}
 	}
 
