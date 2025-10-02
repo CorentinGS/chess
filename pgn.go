@@ -727,6 +727,7 @@ func (p *Parser) addMove(move *Move) {
 	// Update position
 	if newPos := p.game.pos.Update(move); newPos != nil {
 		p.game.pos = newPos
+		p.game.evaluatePositionStatus()
 	}
 
 	// Cache position before the move
