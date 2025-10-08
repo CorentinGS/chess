@@ -2,6 +2,10 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v2.3.2 - 2025-10-08
+
+- - -
+
 ## v2.3.1 - 2025-09-25
 #### Bug Fixes
 - pgn disambiguation squares (#75) - (362a897) - Corentin Giaufer Saubert
