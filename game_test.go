@@ -147,6 +147,24 @@ func TestFiveFoldRepetition(t *testing.T) {
 	}
 }
 
+func TestFiveFoldRepetitionIgnored(t *testing.T) {
+	g := NewGame(IgnoreFivefoldRepetitionDraw())
+	moves := []string{
+		"Nf3", "Nf6", "Ng1", "Ng8",
+		"Nf3", "Nf6", "Ng1", "Ng8",
+		"Nf3", "Nf6", "Ng1", "Ng8",
+		"Nf3", "Nf6", "Ng1", "Ng8",
+	}
+	for _, m := range moves {
+		if err := g.PushMove(m, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if g.Outcome() == Draw && g.Method() == FivefoldRepetition {
+		t.Fatal("automatically draw after five repetitions should be ignored")
+	}
+}
+
 func TestFiftyMoveRule(t *testing.T) {
 	fen, _ := FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 100 60")
 	g := NewGame(fen)
@@ -174,6 +192,17 @@ func TestSeventyFiveMoveRule(t *testing.T) {
 	}
 }
 
+func TestSeventyFiveMoveRuleIgnored(t *testing.T) {
+	fen, _ := FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 149 80")
+	g := NewGame(fen, IgnoreSeventyFiveMoveRuleDraw())
+	if err := g.PushMove("Kf8", nil); err != nil {
+		t.Fatal(err)
+	}
+	if g.Outcome() == Draw && g.Method() == SeventyFiveMoveRule {
+		t.Fatal("automatically draw after seventy five moves w/ no pawn move or capture should be ignored")
+	}
+}
+
 func TestInsufficientMaterial(t *testing.T) {
 	fens := []string{
 		"8/2k5/8/8/8/3K4/8/8 w - - 1 1",
@@ -191,6 +220,27 @@ func TestInsufficientMaterial(t *testing.T) {
 		if g.Outcome() != Draw || g.Method() != InsufficientMaterial {
 			log.Println(g.Position().Board().Draw())
 			t.Fatalf("%s should automatically draw by insufficient material", f)
+		}
+	}
+}
+
+func TestInsufficientMaterialIgnored(t *testing.T) {
+	fens := []string{
+		"8/2k5/8/8/8/3K4/8/8 w - - 1 1",
+		"8/2k5/8/8/8/3K1N2/8/8 w - - 1 1",
+		"8/2k5/8/8/8/3K1B2/8/8 w - - 1 1",
+		"8/2k5/2b5/8/8/3K1B2/8/8 w - - 1 1",
+		"4b3/2k5/2b5/8/8/3K1B2/8/8 w - - 1 1",
+	}
+	for _, f := range fens {
+		fen, err := FEN(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g := NewGame(IgnoreInsufficientMaterialDraw(), fen)
+		if g.Outcome() == Draw && g.Method() == InsufficientMaterial {
+			log.Println(g.Position().Board().Draw())
+			t.Fatalf("%s automatically draw by insufficient material should be ignored", f)
 		}
 	}
 }
@@ -2188,5 +2238,26 @@ func TestPushNotationMoveVsUnsafePushNotationMovePerformance(t *testing.T) {
 	// UnsafePushNotationMove should be faster
 	if unsafePushNotationMoveTime >= pushNotationMoveTime {
 		t.Logf("Warning: UnsafePushNotationMove wasn't faster than PushNotationMove - this might be expected for simple positions")
+	}
+}
+
+func TestIgnoreFivefoldRepetitionDraw(t *testing.T) {
+	g := NewGame(IgnoreFivefoldRepetitionDraw())
+	if !g.ignoreFivefoldRepetitionDraw {
+		t.Fatal("ignoreFivefoldRepetitionDraw should be true after being ignored")
+	}
+}
+
+func TestIgnoreSeventyFiveMoveRuleDraw(t *testing.T) {
+	g := NewGame(IgnoreSeventyFiveMoveRuleDraw())
+	if !g.ignoreSeventyFiveMoveRuleDraw {
+		t.Fatal("ignoreSeventyFiveMoveRuleDraw should be true after being ignored")
+	}
+}
+
+func TestIgnoreInsufficientMaterialDraw(t *testing.T) {
+	g := NewGame(IgnoreInsufficientMaterialDraw())
+	if !g.ignoreInsufficientMaterialDraw {
+		t.Fatal("ignoreInsufficientMaterialDraw should be true after being ignored")
 	}
 }
