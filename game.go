@@ -86,14 +86,16 @@ type TagPairs map[string]string
 
 // A Game represents a single chess game.
 type Game struct {
-	pos                  *Position  // Current position
-	outcome              Outcome    // Game result
-	tagPairs             TagPairs   // PGN tag pairs
-	rootMove             *Move      // Root of move tree
-	currentMove          *Move      // Current position in tree
-	comments             [][]string // Game comments
-	method               Method     // How the game ended
-	ignoreAutomaticDraws bool       // Flag for automatic draw handling
+	pos                            *Position  // Current position
+	outcome                        Outcome    // Game result
+	tagPairs                       TagPairs   // PGN tag pairs
+	rootMove                       *Move      // Root of move tree
+	currentMove                    *Move      // Current position in tree
+	comments                       [][]string // Game comments
+	method                         Method     // How the game ended
+	ignoreFivefoldRepetitionDraw   bool       // Flag for automatic FivefoldRepetition draw handling
+	ignoreSeventyFiveMoveRuleDraw  bool       // Flag for automatic SeventyFiveMoveRule draw handling
+	ignoreInsufficientMaterialDraw bool       // Flag for automatic InsufficientMaterial draw handling
 }
 
 // PGN takes a reader and returns a function that updates
@@ -688,19 +690,19 @@ func (g *Game) evaluatePositionStatus() {
 	}
 
 	// five fold rep creates automatic draw
-	if !g.ignoreAutomaticDraws && g.numOfRepetitions() >= 5 {
+	if !g.ignoreFivefoldRepetitionDraw && g.numOfRepetitions() >= 5 {
 		g.outcome = Draw
 		g.method = FivefoldRepetition
 	}
 
 	// 75 move rule creates automatic draw
-	if !g.ignoreAutomaticDraws && g.pos.halfMoveClock >= 150 && g.method != Checkmate {
+	if !g.ignoreSeventyFiveMoveRuleDraw && g.pos.halfMoveClock >= 150 && g.method != Checkmate {
 		g.outcome = Draw
 		g.method = SeventyFiveMoveRule
 	}
 
 	// insufficient material creates automatic draw
-	if !g.ignoreAutomaticDraws && !g.pos.board.hasSufficientMaterial() {
+	if !g.ignoreInsufficientMaterialDraw && !g.pos.board.hasSufficientMaterial() {
 		g.outcome = Draw
 		g.method = InsufficientMaterial
 	}
@@ -718,7 +720,9 @@ func (g *Game) copy(game *Game) {
 	g.outcome = game.outcome
 	g.method = game.method
 	g.comments = game.Comments()
-	g.ignoreAutomaticDraws = game.ignoreAutomaticDraws
+	g.ignoreFivefoldRepetitionDraw = game.ignoreFivefoldRepetitionDraw
+	g.ignoreSeventyFiveMoveRuleDraw = game.ignoreSeventyFiveMoveRuleDraw
+	g.ignoreInsufficientMaterialDraw = game.ignoreInsufficientMaterialDraw
 }
 
 // Clone returns a deep copy of the game.
@@ -1042,4 +1046,31 @@ func (g *Game) buildOneGameFromPath(path []*Move) *Game {
 func ValidateSAN(s string) error {
 	_, err := algebraicNotationParts(s)
 	return err
+}
+
+// IgnoreFivefoldRepetitionDraw returns a Game option that disables automatic draws
+// caused by the fivefold repetition rule. When applied, the game will not
+// automatically end in a draw if the same position occurs five times.
+func IgnoreFivefoldRepetitionDraw() func(*Game) {
+	return func(g *Game) {
+		g.ignoreFivefoldRepetitionDraw = true
+	}
+}
+
+// IgnoreSeventyFiveMoveRuleDraw returns a Game option that disables automatic draws
+// triggered by the seventy-five move rule. When applied, the game will not
+// automatically end in a draw if one hundred fifty half-moves pass without a pawn move or capture.
+func IgnoreSeventyFiveMoveRuleDraw() func(*Game) {
+	return func(g *Game) {
+		g.ignoreSeventyFiveMoveRuleDraw = true
+	}
+}
+
+// IgnoreInsufficientMaterialDraw returns a Game option that disables automatic draws
+// caused by insufficient material. When applied, the game will not automatically
+// end in a draw even if checkmate is impossible with the remaining pieces.
+func IgnoreInsufficientMaterialDraw() func(*Game) {
+	return func(g *Game) {
+		g.ignoreInsufficientMaterialDraw = true
+	}
 }
