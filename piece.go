@@ -244,6 +244,9 @@ func (p Piece) Color() Color {
 
 // String implements the fmt.Stringer interface.
 func (p Piece) String() string {
+	if p == NoPiece {
+		return "-"
+	}
 	return pieceUnicodes[int(p)]
 }
 
