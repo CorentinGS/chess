@@ -53,11 +53,6 @@ func decodeFEN(fen string) (*Position, error) {
 	}, nil
 }
 
-// preallocated array to avoid strings.Split allocation
-//
-//nolint:gochecknoglobals // this is a preallocated array.
-var rankBuffer [8]string
-
 const (
 	fileMapSize  = 8
 	pieceMapSize = 32
@@ -94,6 +89,10 @@ func clearMap[K comparable, V any](m map[K]V) {
 // fenBoard generates board from FEN format while minimizing allocations.
 func fenBoard(boardStr string) (*Board, error) {
 	const maxRankLen = 8
+
+	// Local preallocated array to avoid strings.Split allocations.
+	// Kept local (instead of global) so fenBoard is concurrency-safe.
+	var rankBuffer [maxRankLen]string
 
 	// Get maps from pools
 	m, _ := pieceMapPool.Get().(map[Square]Piece)
