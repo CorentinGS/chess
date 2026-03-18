@@ -441,6 +441,183 @@ func TestParseMoveWithNAGAndComment(t *testing.T) {
 	}
 }
 
+func TestVariationComments(t *testing.T) {
+	pgn := `[Event "Test"]
+[Site "Internet"]
+[Date "2023.12.06"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "*"]
+
+1. e4 {main line comment} e5 (1... d5 {variation comment on d5} 2. exd5 {variation comment on exd5} Qxd5) 2. Nf3 Nc6 *`
+
+	scanner := NewScanner(strings.NewReader(pgn))
+	game, err := scanner.ParseNext()
+	if err != nil {
+		t.Fatalf("fail to parse game: %v", err)
+	}
+
+	// Check main line comment on 1. e4
+	mainMoves := game.Moves()
+	if mainMoves[0].comments != "main line comment" {
+		t.Errorf("expected main line comment on e4, got %q", mainMoves[0].comments)
+	}
+
+	// 1... e5 is mainMoves[1], and its parent (rootMove child for e4) should have
+	// a second child which is the variation 1... d5
+	e4Move := game.rootMove.children[0] // 1. e4
+	if len(e4Move.children) < 2 {
+		t.Fatalf("expected at least 2 children on e4 (main line e5 + variation d5), got %d", len(e4Move.children))
+	}
+
+	// First child is the main line 1... e5
+	// Second child is the variation 1... d5
+	d5Move := e4Move.children[1]
+	if d5Move.comments != "variation comment on d5" {
+		t.Errorf("expected 'variation comment on d5' on 1...d5, got %q", d5Move.comments)
+	}
+
+	// d5's first child should be 2. exd5
+	if len(d5Move.children) == 0 {
+		t.Fatalf("expected children on d5 variation move")
+	}
+	exd5Move := d5Move.children[0]
+	if exd5Move.comments != "variation comment on exd5" {
+		t.Errorf("expected 'variation comment on exd5' on 2.exd5, got %q", exd5Move.comments)
+	}
+}
+
+func TestVariationNAGs(t *testing.T) {
+	pgn := `[Event "Test"]
+[Site "Internet"]
+[Date "2023.12.06"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "*"]
+
+1. e4 e5 (1... d5 $1 {great move} 2. exd5 $6 Qxd5 $2) 2. Nf3 *`
+
+	scanner := NewScanner(strings.NewReader(pgn))
+	game, err := scanner.ParseNext()
+	if err != nil {
+		t.Fatalf("fail to parse game: %v", err)
+	}
+
+	// Find the variation: 1... d5
+	e4Move := game.rootMove.children[0]
+	if len(e4Move.children) < 2 {
+		t.Fatalf("expected variation on e4, got %d children", len(e4Move.children))
+	}
+
+	d5Move := e4Move.children[1]
+	if d5Move.nag != "$1" {
+		t.Errorf("expected NAG '$1' on 1...d5, got %q", d5Move.nag)
+	}
+	if d5Move.comments != "great move" {
+		t.Errorf("expected comment 'great move' on 1...d5, got %q", d5Move.comments)
+	}
+
+	if len(d5Move.children) == 0 {
+		t.Fatalf("expected children on d5")
+	}
+	exd5Move := d5Move.children[0]
+	if exd5Move.nag != "$6" {
+		t.Errorf("expected NAG '$6' on 2.exd5, got %q", exd5Move.nag)
+	}
+
+	if len(exd5Move.children) == 0 {
+		t.Fatalf("expected children on exd5")
+	}
+	qxd5Move := exd5Move.children[0]
+	if qxd5Move.nag != "$2" {
+		t.Errorf("expected NAG '$2' on 2...Qxd5, got %q", qxd5Move.nag)
+	}
+}
+
+func TestVariationCommands(t *testing.T) {
+	pgn := `[Event "Test"]
+[Site "Internet"]
+[Date "2023.12.06"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "*"]
+
+1. e4 e5 (1... d5 {good move [%eval -0.5] [%clk 0:05:00]} 2. exd5) 2. Nf3 *`
+
+	scanner := NewScanner(strings.NewReader(pgn))
+	game, err := scanner.ParseNext()
+	if err != nil {
+		t.Fatalf("fail to parse game: %v", err)
+	}
+
+	e4Move := game.rootMove.children[0]
+	if len(e4Move.children) < 2 {
+		t.Fatalf("expected variation on e4, got %d children", len(e4Move.children))
+	}
+
+	d5Move := e4Move.children[1]
+	if d5Move.comments != "good move" {
+		t.Errorf("expected comment 'good move' on 1...d5, got %q", d5Move.comments)
+	}
+	if d5Move.command["eval"] != "-0.5" {
+		t.Errorf("expected eval command '-0.5' on 1...d5, got %q", d5Move.command["eval"])
+	}
+	if d5Move.command["clk"] != "0:05:00" {
+		t.Errorf("expected clk command '0:05:00' on 1...d5, got %q", d5Move.command["clk"])
+	}
+}
+
+func TestNestedVariationComments(t *testing.T) {
+	pgn := `[Event "Test"]
+[Site "Internet"]
+[Date "2023.12.06"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 {Ruy Lopez} (3. Bc4 {Italian Game} Nf6 (3... Bc5 {Giuoco Piano}) 4. d3) 3... a6 *`
+
+	scanner := NewScanner(strings.NewReader(pgn))
+	game, err := scanner.ParseNext()
+	if err != nil {
+		t.Fatalf("fail to parse game: %v", err)
+	}
+
+	// Main line: 3. Bb5 should have comment "Ruy Lopez"
+	mainMoves := game.Moves()
+	// Moves: e4, e5, Nf3, Nc6, Bb5, a6 => index 4 is Bb5
+	if len(mainMoves) < 5 {
+		t.Fatalf("expected at least 5 main line moves, got %d", len(mainMoves))
+	}
+	bb5Move := mainMoves[4]
+	if bb5Move.comments != "Ruy Lopez" {
+		t.Errorf("expected 'Ruy Lopez' comment on 3.Bb5, got %q", bb5Move.comments)
+	}
+
+	// Variation: 3. Bc4 should have comment "Italian Game"
+	nc6Move := mainMoves[3] // parent of Bb5 and Bc4
+	if len(nc6Move.children) < 2 {
+		t.Fatalf("expected variation at move 3, got %d children", len(nc6Move.children))
+	}
+	bc4Move := nc6Move.children[1]
+	if bc4Move.comments != "Italian Game" {
+		t.Errorf("expected 'Italian Game' comment on 3.Bc4, got %q", bc4Move.comments)
+	}
+
+	// Nested variation: 3... Bc5 should have comment "Giuoco Piano"
+	if len(bc4Move.children) < 2 {
+		t.Fatalf("expected nested variation on Bc4, got %d children", len(bc4Move.children))
+	}
+	bc5Move := bc4Move.children[1]
+	if bc5Move.comments != "Giuoco Piano" {
+		t.Errorf("expected 'Giuoco Piano' comment on 3...Bc5, got %q", bc5Move.comments)
+	}
+}
+
 func TestVariationMoveNumbers(t *testing.T) {
 	pgn := `[Event "VariationTest"]
 [Site "Internet"]

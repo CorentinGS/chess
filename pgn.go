@@ -650,6 +650,28 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 				return err
 			}
 
+		case CommentStart:
+			comment, commandMap, err := p.parseComment()
+			if err != nil {
+				return err
+			}
+			if p.currentMove != nil {
+				if p.currentMove.command != nil {
+					maps.Copy(p.currentMove.command, commandMap)
+				} else {
+					p.currentMove.command = commandMap
+				}
+				if p.currentMove.comments != "" {
+					p.currentMove.comments += " " + comment
+				} else {
+					p.currentMove.comments = comment
+				}
+			}
+
+		case NAG:
+			p.currentMove.nag = p.currentToken().Value
+			p.advance()
+
 		case PIECE, SQUARE, FILE, KingsideCastle, QueensideCastle:
 			if isBlackMove != (p.game.pos.Turn() == Black) {
 				return &ParserError{
@@ -676,6 +698,36 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 			p.currentMove = move
 			ply++
 			isBlackMove = !isBlackMove
+
+			// Collect all NAGs and comments that follow the move
+		collectVariationAnnotations:
+			for {
+				tok := p.currentToken()
+				switch tok.Type {
+				case NAG:
+					p.currentMove.nag = tok.Value
+					p.advance()
+				case CommentStart:
+					comment, commandMap, err := p.parseComment()
+					if err != nil {
+						return err
+					}
+					if p.currentMove != nil {
+						if p.currentMove.command != nil {
+							maps.Copy(p.currentMove.command, commandMap)
+						} else {
+							p.currentMove.command = commandMap
+						}
+						if p.currentMove.comments != "" {
+							p.currentMove.comments += " " + comment
+						} else {
+							p.currentMove.comments = comment
+						}
+					}
+				default:
+					break collectVariationAnnotations
+				}
+			}
 
 		default:
 			p.advance()
