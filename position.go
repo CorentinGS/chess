@@ -441,10 +441,59 @@ func (pos *Position) updateEnPassantSquare(m *Move) Square {
 	return NoSquare
 }
 
-// samePosition returns true if the two positions are the same.
+// samePosition returns true if the two positions are the same
+// according to FIDE Article 9.2.3. The en passant square is only
+// considered if an en passant capture is actually possible (i.e.,
+// there is an opponent pawn on an adjacent file that could capture)
+// per FIDE Article 9.2.3.1.
 func (pos *Position) samePosition(pos2 *Position) bool {
 	return pos.board.String() == pos2.board.String() &&
 		pos.turn == pos2.turn &&
 		pos.castleRights.String() == pos2.castleRights.String() &&
-		pos.enPassantSquare == pos2.enPassantSquare
+		pos.relevantEnPassantSquare() == pos2.relevantEnPassantSquare()
+}
+
+// relevantEnPassantSquare returns the en passant square only if
+// an en passant capture is actually possible. Per FIDE rules,
+// the en passant square is only relevant if there is an opponent
+// pawn that can make the capture.
+func (pos *Position) relevantEnPassantSquare() Square {
+	if pos.enPassantSquare == NoSquare {
+		return NoSquare
+	}
+	// The en passant square is the square the capturing pawn moves TO.
+	// The capturing pawn must be on an adjacent file, on the same rank
+	// as the pawn that just advanced two squares.
+	//
+	// If the en passant square is on rank 3, the capturing pawn (black)
+	// must be on rank 4. If on rank 6, the capturing pawn (white)
+	// must be on rank 5.
+	epFile := pos.enPassantSquare.File()
+	epRank := pos.enPassantSquare.Rank()
+
+	var captureRank Rank
+	var capturingPawn Piece
+	if epRank == Rank3 {
+		captureRank = Rank4
+		capturingPawn = BlackPawn
+	} else {
+		captureRank = Rank5
+		capturingPawn = WhitePawn
+	}
+
+	// Check adjacent files for a pawn that could capture
+	if epFile > FileA {
+		sq := NewSquare(epFile-1, captureRank)
+		if pos.board.Piece(sq) == capturingPawn {
+			return pos.enPassantSquare
+		}
+	}
+	if epFile < FileH {
+		sq := NewSquare(epFile+1, captureRank)
+		if pos.board.Piece(sq) == capturingPawn {
+			return pos.enPassantSquare
+		}
+	}
+
+	return NoSquare
 }
