@@ -87,9 +87,10 @@ func TestPositionPly(t *testing.T) {
 }
 
 func TestSamePositionEnPassantFIDECompliance(t *testing.T) {
-	// FIDE Article 9.2.2: positions are the same only if "the possible
-	// moves of all the pieces are the same". An en passant square should
-	// only matter when an en passant capture is actually possible.
+	// FIDE Article 9.2.3: positions are the same only if "the possible
+	// moves of all the pieces are the same". Per Article 9.2.3.1, an en
+	// passant square should only matter when a pawn could have been
+	// captured en passant (i.e., the capture is actually possible).
 
 	// Position with en passant square set but no pawn can capture:
 	// White pawn on e4 (just pushed e2-e4), en passant square e3,
