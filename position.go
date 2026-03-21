@@ -442,9 +442,10 @@ func (pos *Position) updateEnPassantSquare(m *Move) Square {
 }
 
 // samePosition returns true if the two positions are the same
-// according to FIDE Article 9.2.2. The en passant square is only
+// according to FIDE Article 9.2.3. The en passant square is only
 // considered if an en passant capture is actually possible (i.e.,
-// there is an opponent pawn on an adjacent file that could capture).
+// there is an opponent pawn on an adjacent file that could capture)
+// per FIDE Article 9.2.3.1.
 func (pos *Position) samePosition(pos2 *Position) bool {
 	return pos.board.String() == pos2.board.String() &&
 		pos.turn == pos2.turn &&
