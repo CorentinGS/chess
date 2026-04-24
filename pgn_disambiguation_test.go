@@ -78,6 +78,21 @@ func TestTokenizerDisambiguationSquares(t *testing.T) {
 			expected: []TokenType{PIECE, DeambiguationSquare, SQUARE},
 		},
 		{
+			name:     "queen_with_full_square_disambiguation_capture",
+			input:    "Qg8xg7",
+			expected: []TokenType{PIECE, DeambiguationSquare, CAPTURE, SQUARE},
+		},
+		{
+			name:     "rook_with_full_square_disambiguation_capture",
+			input:    "Ra1xa8",
+			expected: []TokenType{PIECE, DeambiguationSquare, CAPTURE, SQUARE},
+		},
+		{
+			name:     "knight_with_full_square_disambiguation_capture",
+			input:    "Nb1xc3",
+			expected: []TokenType{PIECE, DeambiguationSquare, CAPTURE, SQUARE},
+		},
+		{
 			name:     "standard_piece_move",
 			input:    "Nf3",
 			expected: []TokenType{PIECE, SQUARE},
@@ -121,5 +136,37 @@ func TestTokenizerDisambiguationSquares(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPGNFullSquareDisambiguationCapture(t *testing.T) {
+	pgn := `[Event "rated blitz game"]
+[Site "https://lichess.org/FaQvH6Iq"]
+[Result "1-0"]
+
+1. c4 Nf6 2. Nc3 Ng8 3. e4 Nf6 4. e5 Ng8 5. d4 e6 6. f4 Ne7 7. Nf3 Ng8 8. d5 Ne7 9. Be3 Nf5 10. Bf2 Ne7 11. Bd3 Ng8 12. O-O Nh6 13. h3 Ng8 14. g4 h5 15. g5 d6 16. Qc2 Qf6 17. exf6 Nc6 18. fxg7 Bd7 19. gxh8=Q O-O-O 20. g6 Bg7 21. gxf7 Kb8 22. fxg8=Q Ka8 23. f5 Rf8 24. f6 Be8 25. f7 Nd8 26. fxe8=Q Kb8 27. Qhxh5 Ka8 28. Qg4 Kb8 29. h4 Ka8 30. h5 Kb8 31. h6 Ka8 32. h7 Kb8 33. h8=Q Ka8 34. dxe6 Kb8 35. e7 Ka8 36. exf8=Q Kb8 37. Qg8xg7 Ka8 38. Qgg8 Kb8 39. Q4g7 Ka8 40. c5 Kb8 41. cxd6 Ka8 42. dxc7 b6 43. cxd8=Q# 1-0`
+
+	scanner := NewScanner(strings.NewReader(pgn))
+	game, err := scanner.ParseNext()
+	if err != nil {
+		t.Fatalf("expected PGN with full-square disambiguation capture to parse: %v", err)
+	}
+	if game == nil {
+		t.Fatal("expected game to be parsed")
+	}
+
+	// Verify the specific problematic move (Qg8xg7) was parsed correctly.
+	// Move 37 is at index 72 (0-based) in the moves slice.
+	moves := game.Moves()
+	if len(moves) < 73 {
+		t.Fatalf("expected at least 73 moves, got %d", len(moves))
+	}
+
+	move37 := moves[72]
+	if move37.String() != "g8g7" {
+		t.Errorf("expected move 37 to be g8g7, got %s", move37.String())
+	}
+	if !move37.HasTag(Capture) {
+		t.Errorf("expected move 37 to have Capture tag")
 	}
 }
