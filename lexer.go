@@ -361,6 +361,15 @@ func (l *Lexer) readMove() Token {
 		return Token{Type: DeambiguationSquare, Value: l.input[position : position+2]}
 	}
 
+	// Handle full square disambiguation before a capture
+	// (e.g., "g8xg7" in "Qg8xg7" -> "g8" then "xg7").
+	if length == 2 && position > 0 && isPiece(l.input[position-1]) &&
+		isFile(l.input[position]) && isDigit(l.input[position+1]) &&
+		l.ch == 'x' && l.readPosition+1 < len(l.input) &&
+		isFile(l.input[l.readPosition]) && isDigit(l.input[l.readPosition+1]) {
+		return Token{Type: DeambiguationSquare, Value: l.input[position:l.position]}
+	}
+
 	// If we read 3 characters, first one is disambiguation
 	if length == disambiguationLength {
 		l.readPosition = position + 1
