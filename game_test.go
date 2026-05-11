@@ -1226,7 +1226,30 @@ func TestGameString(t *testing.T) {
 				g.currentMove.SetCommand("clk", "10:00:00")
 				return g
 			},
-			expected: "1. e4 {Good move} { [%clk 10:00:00] } *",
+			expected: "1. e4 {Good move [%clk 10:00:00]} *",
+		},
+		{
+			name: "GameStringWithCommandsOnly",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("e4", nil)
+				g.currentMove.SetCommand("eval", "0.24")
+				g.currentMove.SetCommand("clk", "10:00:00")
+				return g
+			},
+			expected: "1. e4 { [%clk 10:00:00] [%eval 0.24]} *",
+		},
+		{
+			name: "GameStringWithCommentsAndMultipleCommands",
+			setup: func() *Game {
+				g := NewGame()
+				_ = g.PushMove("e4", nil)
+				g.currentMove.comments = "Good move"
+				g.currentMove.SetCommand("eval", "0.24")
+				g.currentMove.SetCommand("clk", "10:00:00")
+				return g
+			},
+			expected: "1. e4 {Good move [%clk 10:00:00] [%eval 0.24]} *",
 		},
 		{
 			name: "GameStringWithMultipleNestedVariations",

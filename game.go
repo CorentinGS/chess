@@ -371,9 +371,8 @@ func (g *Game) String() string {
 			needTrailingSpace = !writeMoves(g.rootMove,
 				g.rootMove.Position().moveCount,
 				g.rootMove.Position().Turn() == White, &sb, false, false, true)
-		} else if g.rootMove.comments != "" {
-			// Handle root move comments when there are no children
-			writeComments(g.rootMove, &sb)
+		} else if g.rootMove.comments != "" || len(g.rootMove.command) > 0 {
+			writeAnnotations(g.rootMove, &sb)
 		}
 	}
 
@@ -454,8 +453,8 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 	}
 
 	// Handle root move comments before processing children
-	if isRoot && node.comments != "" {
-		writeComments(node, sb)
+	if isRoot && (node.comments != "" || len(node.command) > 0) {
+		writeAnnotations(node, sb)
 	}
 
 	var currentMove *Move
@@ -475,10 +474,7 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 	// Encode the move using your AlgebraicNotation.
 	writeMoveEncoding(node, currentMove, subVariation, sb)
 
-	// Append a comment if present.
-	writeComments(currentMove, sb)
-
-	writeCommands(currentMove, sb)
+	writeAnnotations(currentMove, sb)
 
 	// TODO: Add support for all nags values in the future
 
@@ -539,11 +535,53 @@ func writeComments(move *Move, sb *strings.Builder) {
 func writeCommands(move *Move, sb *strings.Builder) {
 	if len(move.command) > 0 {
 		sb.WriteString(" {")
-		for key, value := range move.command {
-			sb.WriteString(" [%" + key + " " + value + "]")
-		}
-		sb.WriteString(" }")
+		writeSortedCommands(move, sb)
+		sb.WriteString("}")
 	}
+}
+
+func writeSortedCommands(move *Move, sb *strings.Builder) {
+	keys := make([]string, 0, len(move.command))
+	for key := range move.command {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		sb.WriteString(" [%")
+		sb.WriteString(key)
+		sb.WriteString(" ")
+		sb.WriteString(move.command[key])
+		sb.WriteString("]")
+	}
+}
+
+func writeAnnotations(move *Move, sb *strings.Builder) {
+	if move == nil {
+		return
+	}
+
+	hasComment := move.comments != ""
+	hasCommands := len(move.command) > 0
+
+	if !hasComment && !hasCommands {
+		return
+	}
+
+	if hasComment && !hasCommands {
+		writeComments(move, sb)
+		return
+	}
+
+	if !hasComment {
+		writeCommands(move, sb)
+		return
+	}
+
+	sb.WriteString(" {")
+	sb.WriteString(move.comments)
+	writeSortedCommands(move, sb)
+
+	sb.WriteString("}")
 }
 
 func writeVariations(node *Move, moveNum int, isWhite bool, sb *strings.Builder) bool {

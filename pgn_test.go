@@ -618,6 +618,57 @@ func TestNestedVariationComments(t *testing.T) {
 	}
 }
 
+func TestRoundTripWithVariationsAndCommandAnnotations(t *testing.T) {
+	pgn := `[Event "Test"]
+[Site "Internet"]
+[Date "2023.12.06"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 {Ruy Lopez} (3. Bc4 {Italian Game} Nf6 (3... Bc5 {Giuoco Piano}) 4. d3) 3... a6 *`
+
+	base := NewScanner(strings.NewReader(pgn))
+	if !base.HasNext() {
+		t.Fatal("expected one game in input pgn")
+	}
+	game, err := base.ParseNext()
+	if err != nil {
+		t.Fatalf("failed to parse input pgn: %v", err)
+	}
+
+	var walk func(*Move)
+	walk = func(m *Move) {
+		if m == nil {
+			return
+		}
+		if m.Comments() != "" {
+			m.SetCommand("eval", "0.25")
+		}
+		for _, child := range m.Children() {
+			walk(child)
+		}
+	}
+	walk(game.GetRootMove())
+
+	roundTrip := game.String()
+
+	if strings.Contains(roundTrip, "{Ruy Lopez} { [%eval 0.25] }") {
+		t.Fatalf("expected comment and command to be merged in one comment block, got: %s", roundTrip)
+	}
+
+	if !strings.Contains(roundTrip, "{Ruy Lopez [%eval 0.25]}") {
+		t.Fatalf("expected merged comment+command block, got: %s", roundTrip)
+	}
+	if !strings.Contains(roundTrip, "{Italian Game [%eval 0.25]}") {
+		t.Fatalf("expected merged comment+command block in variation, got: %s", roundTrip)
+	}
+	if !strings.Contains(roundTrip, "{Giuoco Piano [%eval 0.25]}") {
+		t.Fatalf("expected merged comment+command block in nested variation, got: %s", roundTrip)
+	}
+}
+
 func TestVariationMoveNumbers(t *testing.T) {
 	pgn := `[Event "VariationTest"]
 [Site "Internet"]
