@@ -281,6 +281,48 @@ func (g *Game) Moves() []*Move {
 	return moves[1:] // Skip the root move
 }
 
+// MoveHistory is a move's result from Game's MoveHistory method.
+// It contains the move itself, any comments, and the pre and post positions.
+type MoveHistory struct {
+	PrePosition  *Position
+	PostPosition *Position
+	Move         *Move
+	Comments     []string
+}
+
+// MoveHistory returns the main-line moves in order along with the pre and post
+// positions and any comments. Variations are not included.
+// Returns an empty slice for games with no moves.
+func (g *Game) MoveHistory() []*MoveHistory {
+	if g.rootMove == nil || len(g.rootMove.children) == 0 {
+		return []*MoveHistory{}
+	}
+
+	history := make([]*MoveHistory, 0)
+	current := g.rootMove
+
+	for current != nil && len(current.children) > 0 {
+		move := current.children[0]
+		if move == nil {
+			break
+		}
+		comments := []string(nil)
+		if move.Comments() != "" {
+			comments = []string{move.Comments()}
+		}
+
+		history = append(history, &MoveHistory{
+			PrePosition:  current.position,
+			PostPosition: move.position,
+			Move:         move,
+			Comments:     comments,
+		})
+		current = move
+	}
+
+	return history
+}
+
 // GetRootMove returns the root move of the game.
 func (g *Game) GetRootMove() *Move {
 	return g.rootMove
