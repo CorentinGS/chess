@@ -80,7 +80,7 @@ jobs:
     needs: test  # Ensure changelog runs only if tests pass
     if: github.event_name == 'pull_request'  # Run only for pull requests
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     steps:
       - name: Checkout code
