@@ -70,6 +70,8 @@ jobs:
           go-version: '${{ needs.setup.outputs.go-version }}'
 
       - name: Run vulnerability check (govulncheck)
+        env:
+          GOTOOLCHAIN: auto
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
 
