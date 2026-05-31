@@ -131,6 +131,8 @@ func standardMoves(pos *Position, first bool) []Move {
 				if (p == WhitePawn && Square(s2).Rank() == Rank8) || (p == BlackPawn && Square(s2).Rank() == Rank1) {
 					for _, pt := range promoPieceTypes {
 						m.promo = pt
+						m.tags = 0 // Reset tags every promo piece type
+
 						addTags(&m, pos)
 						if !m.HasTag(inCheck) {
 							// Copy the valid move to the array

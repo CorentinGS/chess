@@ -8,6 +8,26 @@ import (
 	"time"
 )
 
+func TestPromo_Knight_Check(t *testing.T) {
+	fenStr := "k7/4P3/8/8/8/8/8/K7 w - - 0 1"
+	fen, err := FEN(fenStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := NewGame(fen)
+
+	knightPromoMove := g.ValidMoves()[6]
+
+	if knightPromoMove.Promo() != Knight {
+		t.Fatal("this promo move should be Knight")
+	}
+
+	if knightPromoMove.HasTag(Check) {
+		t.Fatal("knight promo move should not have check")
+	}
+	println(validMoves)
+}
+
 func TestCheckmate(t *testing.T) {
 	fenStr := "rn1qkbnr/pbpp1ppp/1p6/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 0 1"
 	fen, err := FEN(fenStr)
