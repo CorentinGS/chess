@@ -2515,3 +2515,36 @@ func TestMoveHistoryFromPGN(t *testing.T) {
 		}
 	}
 }
+
+func TestGameUnsafeMoves(t *testing.T) {
+	game := NewGame()
+	if len(game.UnsafeMoves()) != 0 {
+		t.Errorf("expected 0 unsafe moves at start, got %d", len(game.UnsafeMoves()))
+	}
+
+	// Verify delegation to Position
+	pos := game.Position()
+	if len(game.UnsafeMoves()) != len(pos.UnsafeMoves()) {
+		t.Errorf("Game.UnsafeMoves() length mismatch with Position.UnsafeMoves()")
+	}
+}
+
+func TestEscapeTagValue(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"plain", "hello", "hello"},
+		{"quote", `say "hi"`, `say \"hi\"`},
+		{"backslash", `path\to`, `path\\to`},
+		{"mixed", `a\"b`, `a\\\"b`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := escapeTagValue(tc.input); got != tc.want {
+				t.Errorf("escapeTagValue(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}

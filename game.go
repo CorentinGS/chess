@@ -259,6 +259,12 @@ func (g *Game) ValidMoves() []Move {
 	return g.pos.ValidMoves()
 }
 
+// UnsafeMoves returns all pseudo-legal moves that leave the moving side's king in check.
+// These moves are valid piece movements but illegal because they expose the king.
+func (g *Game) UnsafeMoves() []Move {
+	return g.pos.UnsafeMoves()
+}
+
 // Moves returns the move history of the game following the main line.
 func (g *Game) Moves() []*Move {
 	if g.rootMove == nil {
