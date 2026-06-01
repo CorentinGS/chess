@@ -132,12 +132,11 @@ func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 				// Reuse move struct by setting fields directly
 				m.s1 = Square(s1)
 				m.s2 = Square(s2)
-				m.tags = 0 // Reset tags
 
 				if (p == WhitePawn && Square(s2).Rank() == Rank8) || (p == BlackPawn && Square(s2).Rank() == Rank1) {
 					for _, pt := range promoPieceTypes {
 						m.promo = pt
-						addTags(&m, pos)
+						m.tags = moveTags(m, pos)
 						if m.HasTag(inCheck) == unsafeOnly {
 							// Copy the valid move to the array
 							moves[count] = m
@@ -152,8 +151,8 @@ func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 					}
 				} else {
 					m.promo = 0
-					addTags(&m, pos)
-					if m.HasTag(inCheck) == unsafeOnly {
+						m.tags = moveTags(m, pos)
+						if m.HasTag(inCheck) == unsafeOnly {
 						moves[count] = m
 						count++
 						if first {
@@ -173,7 +172,7 @@ func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 	return result
 }
 
-// addTags updates a move's tags based on the resulting position.
+// moveTags computes all tags for a move from scratch based on the resulting position.
 // Tags include:
 //   - Capture: The move captures an opponent's piece
 //   - EnPassant: The move is an en passant capture
@@ -181,33 +180,38 @@ func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 //   - inCheck: The move leaves the moving side's king in check (illegal)
 //   - KingSideCastle: The move is a king-side castle
 //   - QueenSideCastle: The move is a queen-side castle
-func addTags(m *Move, pos *Position) {
+func moveTags(m Move, pos *Position) MoveTag {
+	var tags MoveTag
 	p := pos.board.Piece(m.s1)
 	if pos.board.isOccupied(m.s2) {
-		m.AddTag(Capture)
+		tags |= Capture
 	} else if m.s2 == pos.enPassantSquare && p.Type() == Pawn {
-		m.AddTag(EnPassant)
+		tags |= EnPassant
 	}
 	// determine if move is castle
 	if (p == WhiteKing && m.s1 == E1) || (p == BlackKing && m.s1 == E8) {
 		switch m.s2 {
 		case C1, C8:
-			m.AddTag(QueenSideCastle)
+			tags |= QueenSideCastle
 		case G1, G8:
-			m.AddTag(KingSideCastle)
+			tags |= KingSideCastle
 		}
 	}
+	// apply preliminary tags to a local copy so board.update reads them correctly
+	local := m
+	local.tags = tags
 	// determine if in check after move (makes move invalid)
 	cp := pos.copy()
-	cp.board.update(m)
+	cp.board.update(&local)
 	if isInCheck(cp) {
-		m.AddTag(inCheck)
+		tags |= inCheck
 	}
 	// determine if opponent in check after move
 	cp.turn = cp.turn.Other()
 	if isInCheck(cp) {
-		m.AddTag(Check)
+		tags |= Check
 	}
+	return tags
 }
 
 // isInCheck returns true if the side to move is in check in the given position.
@@ -344,8 +348,7 @@ func castleMoves(pos *Position) []Move {
 		!squaresAreAttacked(pos, F1, G1) &&
 		!pos.inCheck {
 		m := Move{s1: E1, s2: G1}
-		m.AddTag(KingSideCastle)
-		addTags(&m, pos)
+		m.tags = moveTags(m, pos)
 		moves[count] = m
 		count++
 	}
@@ -356,8 +359,7 @@ func castleMoves(pos *Position) []Move {
 		!squaresAreAttacked(pos, C1, D1) &&
 		!pos.inCheck {
 		m := Move{s1: E1, s2: C1}
-		m.AddTag(QueenSideCastle)
-		addTags(&m, pos)
+		m.tags = moveTags(m, pos)
 		moves[count] = m
 		count++
 	}
@@ -368,8 +370,7 @@ func castleMoves(pos *Position) []Move {
 		!squaresAreAttacked(pos, F8, G8) &&
 		!pos.inCheck {
 		m := Move{s1: E8, s2: G8}
-		m.AddTag(KingSideCastle)
-		addTags(&m, pos)
+		m.tags = moveTags(m, pos)
 		moves[count] = m
 		count++
 	}
@@ -380,8 +381,7 @@ func castleMoves(pos *Position) []Move {
 		!squaresAreAttacked(pos, C8, D8) &&
 		!pos.inCheck {
 		m := Move{s1: E8, s2: C8}
-		m.AddTag(QueenSideCastle)
-		addTags(&m, pos)
+		m.tags = moveTags(m, pos)
 		moves[count] = m
 		count++
 	}

@@ -94,7 +94,7 @@ func BenchmarkStandardMoves_BoardDensity(b *testing.B) {
 	}
 }
 
-func TestAddTags(t *testing.T) {
+func TestMoveTags(t *testing.T) {
 	tests := []struct {
 		name string
 		move Move
@@ -165,7 +165,7 @@ func TestAddTags(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			addTags(&test.move, mustPosition(test.fen))
+			test.move.tags = moveTags(test.move, mustPosition(test.fen))
 
 			if test.move.tags != test.want {
 				t.Errorf("fen: %s | move: %s\ntags(%d) == expected_tags(%d)", test.fen, test.move.String(), test.move.tags, test.want)
@@ -179,6 +179,68 @@ func TestUnsafeMoves_StartingPosition(t *testing.T) {
 	moves := engine{}.UnsafeMoves(pos)
 	if len(moves) != 0 {
 		t.Errorf("expected 0 unsafe moves in starting position, got %d", len(moves))
+	}
+}
+
+func TestPromotionCheckTagIsolation(t *testing.T) {
+	// FEN from issue #112: k7/4P3/8/8/8/8/8/K7 w - - 0 1
+	// White pawn on E7 can promote to E8. Only Queen and Rook give check
+	// to the black king on A8. Bishop and Knight should NOT have Check.
+	pos := mustPosition("k7/4P3/8/8/8/8/8/K7 w - - 0 1")
+	moves := pos.ValidMoves()
+
+	// Verify total move count (3 king moves + 4 promotions = 7)
+	if len(moves) != 7 {
+		t.Fatalf("expected 7 moves, got %d", len(moves))
+	}
+
+	// Helper: find move by s1, s2, promo fields (order-independent)
+	findMove := func(s1, s2 Square, promo PieceType) (Move, bool) {
+		for _, m := range moves {
+			if m.s1 == s1 && m.s2 == s2 && m.promo == promo {
+				return m, true
+			}
+		}
+		return Move{}, false
+	}
+
+	tests := []struct {
+		name      string
+		promo     PieceType
+		wantCheck bool
+	}{
+		{"queen promotion with check", Queen, true},
+		{"rook promotion with check", Rook, true},
+		{"bishop promotion without check", Bishop, false},
+		{"knight promotion without check", Knight, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			m, ok := findMove(E7, E8, test.promo)
+			if !ok {
+				t.Fatalf("expected to find E7-E8=%s promotion move", test.promo.String())
+			}
+			gotCheck := m.HasTag(Check)
+			if gotCheck != test.wantCheck {
+				t.Errorf("E7-E8=%s: Check=%v, want %v", test.promo.String(), gotCheck, test.wantCheck)
+			}
+		})
+	}
+}
+
+func TestPromotionNoCheck(t *testing.T) {
+	// Position where no promotion gives check against an existing black king.
+	// Black king on A6 is not attacked by any promoted piece on E8.
+	pos := mustPosition("8/4P3/k7/8/8/8/8/7K w - - 0 1")
+	moves := pos.ValidMoves()
+
+	for _, m := range moves {
+		if m.s1 == E7 && m.s2 == E8 {
+			if m.HasTag(Check) {
+				t.Errorf("E7-E8=%s should NOT have Check tag", m.promo.String())
+			}
+		}
 	}
 }
 
