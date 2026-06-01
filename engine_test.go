@@ -44,7 +44,7 @@ func BenchmarkStandardMoves(b *testing.B) {
 			b.ReportAllocs()
 
 			for i := 0; i < b.N; i++ {
-				moves := standardMoves(bm.pos, bm.wantFirst)
+				moves := standardMoves(bm.pos, bm.wantFirst, false)
 				// Prevent compiler optimization
 				if len(moves) == 0 {
 					b.Fatal("unexpected zero moves")
@@ -61,7 +61,7 @@ func BenchmarkStandardMoves_PawnPromotions(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		moves := standardMoves(pos, false)
+		moves := standardMoves(pos, false, false)
 		if len(moves) == 0 {
 			b.Fatal("unexpected zero moves")
 		}
@@ -85,7 +85,7 @@ func BenchmarkStandardMoves_BoardDensity(b *testing.B) {
 		b.Run(p.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				moves := standardMoves(pos, false)
+				moves := standardMoves(pos, false, false)
 				if len(moves) == 0 && p.name != "Empty" {
 					b.Fatal("unexpected zero moves")
 				}
@@ -174,6 +174,46 @@ func TestAddTags(t *testing.T) {
 	}
 }
 
+func TestUnsafeMoves_StartingPosition(t *testing.T) {
+	pos := mustPosition("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+	moves := engine{}.UnsafeMoves(pos)
+	if len(moves) != 0 {
+		t.Errorf("expected 0 unsafe moves in starting position, got %d", len(moves))
+	}
+}
+
+func TestUnsafeMoves_PinnedKnight(t *testing.T) {
+	pos := mustPosition("4k3/8/8/8/1b6/2N5/8/4K3 w - - 0 1")
+	moves := engine{}.UnsafeMoves(pos)
+	if len(moves) != 8 {
+		t.Fatalf("expected 8 unsafe moves for pinned knight, got %d", len(moves))
+	}
+	for _, m := range moves {
+		if m.s1 != C3 {
+			t.Errorf("expected unsafe move from C3, got %s", m.s1.String())
+		}
+		if !m.HasTag(inCheck) {
+			t.Errorf("expected unsafe move to have inCheck tag: %s", m.String())
+		}
+	}
+}
+
+func TestUnsafeMoves_KingIntoCheck(t *testing.T) {
+	pos := mustPosition("8/8/8/8/8/3r4/8/4K3 w - - 0 1")
+	moves := engine{}.UnsafeMoves(pos)
+	if len(moves) != 2 {
+		t.Fatalf("expected 2 unsafe moves, got %d", len(moves))
+	}
+	expected := map[string]bool{"d1": true, "d2": true}
+	for _, m := range moves {
+		if m.s1 != E1 {
+			t.Errorf("expected move from E1, got %s", m.s1.String())
+		}
+		if !expected[m.s2.String()] {
+			t.Errorf("unexpected unsafe move to %s", m.s2.String())
+		}
+	}
+}
 // Helper function to convert FEN to Position
 func mustPosition(fen string) *Position {
 	fenObject, err := FEN(fen)

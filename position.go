@@ -148,6 +148,12 @@ func (pos *Position) ValidMoves() []Move {
 	return append([]Move(nil), pos.validMoves...)
 }
 
+// UnsafeMoves returns all pseudo-legal moves that are illegal because they leave
+// the moving side's king in check. These moves should not be played via Move().
+func (pos *Position) UnsafeMoves() []Move {
+	return engine{}.UnsafeMoves(pos)
+}
+
 // Status returns the position's status as one of the outcome methods.
 // Possible returns values include Checkmate, Stalemate, and NoMethod.
 func (pos *Position) Status() Method {

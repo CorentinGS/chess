@@ -37,9 +37,15 @@ type engine struct{}
 // Each move is validated to ensure it doesn't leave the king in check
 func (engine) CalcMoves(pos *Position, first bool) []Move {
 	// generate possible moves
-	moves := standardMoves(pos, first)
+	moves := standardMoves(pos, first, false)
 	// return moves including castles
 	return append(moves, castleMoves(pos)...)
+}
+
+// UnsafeMoves returns all pseudo-legal moves that are illegal because they
+// leave the moving side's king in check.
+func (engine) UnsafeMoves(pos *Position) []Move {
+	return standardMoves(pos, false, true)
 }
 
 // Status returns the current game status (Checkmate, Stalemate, or NoMethod)
@@ -89,7 +95,7 @@ var movePool = sync.Pool{
 //
 // The function uses a sync.Pool of move arrays to reduce allocations. Each
 // move is validated to ensure it doesn't leave the king in check.
-func standardMoves(pos *Position, first bool) []Move {
+func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 	moves, _ := movePool.Get().(*[maxPossibleMoves]Move)
 	defer movePool.Put(moves)
 	count := 0
@@ -132,7 +138,7 @@ func standardMoves(pos *Position, first bool) []Move {
 					for _, pt := range promoPieceTypes {
 						m.promo = pt
 						addTags(&m, pos)
-						if !m.HasTag(inCheck) {
+						if m.HasTag(inCheck) == unsafeOnly {
 							// Copy the valid move to the array
 							moves[count] = m
 							count++
@@ -147,7 +153,7 @@ func standardMoves(pos *Position, first bool) []Move {
 				} else {
 					m.promo = 0
 					addTags(&m, pos)
-					if !m.HasTag(inCheck) {
+					if m.HasTag(inCheck) == unsafeOnly {
 						moves[count] = m
 						count++
 						if first {
