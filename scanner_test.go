@@ -328,3 +328,37 @@ func TestScannerMultiFromPosNoExpand(t *testing.T) {
 	scanner := NewScanner(reader)
 	validateExpand(t, scanner, expectedLastLines, expectedFinalPos)
 }
+
+func TestEscapedQuoteInTagValue(t *testing.T) {
+	const escapedQuoteGame = `[Event "Internet Section 08A g/8'+2\""]
+[Site "Dos Hermanas"]
+[Date "2004.03.08"]
+[Round "6"]
+[White "Di Berardino, Diego Rafael"]
+[Black "Mar, Fernando"]
+[Result "1/2-1/2"]
+[ECO "B96"]
+
+1. e4 c5 2. Nf3 1/2-1/2
+`
+
+	scanner := NewScanner(strings.NewReader(escapedQuoteGame))
+	if !scanner.HasNext() {
+		t.Fatal("scanner should report one game")
+	}
+	game, err := scanner.ParseNext()
+	if err != nil {
+		t.Fatalf("BUG: parser rejects spec-legal escaped quote in tag value: %v", err)
+	}
+
+	// The in-memory value should contain a literal double quote.
+	if game.GetTagPair("Event") != `Internet Section 08A g/8'+2"` {
+		t.Fatalf("expected unescaped quote in tag value, got %q", game.GetTagPair("Event"))
+	}
+
+	// Round-trip: String() must emit the escaped form again.
+	pgn := game.String()
+	if !strings.Contains(pgn, `[Event "Internet Section 08A g/8'+2\""]`) {
+		t.Fatalf("round-trip PGN does not contain escaped quote: %s", pgn)
+	}
+}

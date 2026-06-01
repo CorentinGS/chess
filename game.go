@@ -377,6 +377,20 @@ func (g *Game) FEN() string {
 	return g.pos.String()
 }
 
+// escapeTagValue escapes backslash and double-quote characters so that the
+// resulting string is safe to embed inside a PGN tag value.
+func escapeTagValue(v string) string {
+	var sb strings.Builder
+	for i := 0; i < len(v); i++ {
+		c := v[i]
+		if c == '\\' || c == '"' {
+			sb.WriteByte('\\')
+		}
+		sb.WriteByte(c)
+	}
+	return sb.String()
+}
+
 // String implements the fmt.Stringer interface and returns
 // the game's PGN.
 func (g *Game) String() string {
@@ -397,7 +411,7 @@ func (g *Game) String() string {
 
 	// Write tag pairs.
 	for _, tagPair := range tagPairList {
-		sb.WriteString(fmt.Sprintf("[%s \"%s\"]\n", tagPair.Key, tagPair.Value))
+		sb.WriteString(fmt.Sprintf("[%s \"%s\"]\n", tagPair.Key, escapeTagValue(tagPair.Value)))
 	}
 
 	// Append empty line after tag pairs as per definition
