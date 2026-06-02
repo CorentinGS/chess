@@ -519,6 +519,31 @@ fmt.Println(game)
 */
 ```
 
+#### PGN comment annotations
+
+Parsed PGN comments preserve comment block boundaries, command annotation order, and duplicate command annotations. Use
+`Move.CommentBlocks()` when an importer needs structured access to each `{...}` block and the ordered text or command
+items inside it. The returned blocks are defensive copies.
+
+```go
+game := chess.NewGame(pgn)
+move := game.Moves()[0]
+
+for _, block := range move.CommentBlocks() {
+	for _, item := range block.Items {
+		switch item.Kind {
+		case chess.CommentText:
+			fmt.Println(item.Text)
+		case chess.CommentCommand:
+			fmt.Printf("%s=%s\n", item.Key, item.Value)
+		}
+	}
+}
+```
+
+The legacy helpers `Move.Comments()`, `Move.GetCommand()`, `Move.SetCommand()`, `Move.SetComment()`, and
+`Move.AddComment()` remain available for callers that only need a flattened text comment or single command value.
+
 #### Scan PGN
 
 For parsing large PGN database files use Scanner:

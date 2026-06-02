@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## Unreleased
+#### Features
+- preserve PGN annotation block structure and add `Move.CommentBlocks()` for ordered comment items.
+
+- - -
 ## v2.3.2 - 2025-10-08
 
 - - -

@@ -433,7 +433,7 @@ func (g *Game) String() string {
 			needTrailingSpace = !writeMoves(g.rootMove,
 				g.rootMove.Position().moveCount,
 				g.rootMove.Position().Turn() == White, &sb, false, false, true)
-		} else if g.rootMove.comments != "" || len(g.rootMove.command) > 0 {
+		} else if g.rootMove.hasAnnotations() {
 			writeAnnotations(g.rootMove, &sb)
 		}
 	}
@@ -515,7 +515,7 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 	}
 
 	// Handle root move comments before processing children
-	if isRoot && (node.comments != "" || len(node.command) > 0) {
+	if isRoot && node.hasAnnotations() {
 		writeAnnotations(node, sb)
 	}
 
@@ -588,33 +588,13 @@ func writeMoveEncoding(node *Move, currentMove *Move, subVariation bool, sb *str
 	}
 }
 
-func writeComments(move *Move, sb *strings.Builder) {
-	if move.comments != "" {
-		sb.WriteString(" {" + move.comments + "}")
-	}
-}
-
-func writeCommands(move *Move, sb *strings.Builder) {
-	if len(move.command) > 0 {
-		sb.WriteString(" {")
-		writeSortedCommands(move, sb)
-		sb.WriteString("}")
-	}
-}
-
-func writeSortedCommands(move *Move, sb *strings.Builder) {
-	keys := make([]string, 0, len(move.command))
-	for key := range move.command {
+func sortedCommandKeys(commands map[string]string) []string {
+	keys := make([]string, 0, len(commands))
+	for key := range commands {
 		keys = append(keys, key)
 	}
 	slices.Sort(keys)
-	for _, key := range keys {
-		sb.WriteString(" [%")
-		sb.WriteString(key)
-		sb.WriteString(" ")
-		sb.WriteString(move.command[key])
-		sb.WriteString("]")
-	}
+	return keys
 }
 
 func writeAnnotations(move *Move, sb *strings.Builder) {
@@ -622,28 +602,42 @@ func writeAnnotations(move *Move, sb *strings.Builder) {
 		return
 	}
 
-	hasComment := move.comments != ""
-	hasCommands := len(move.command) > 0
-
-	if !hasComment && !hasCommands {
+	move.ensureCommentBlocksFromLegacy()
+	if len(move.commentBlocks) > 0 {
+		writeCommentBlocks(move.commentBlocks, sb)
 		return
 	}
+}
 
-	if hasComment && !hasCommands {
-		writeComments(move, sb)
-		return
+func writeCommentBlocks(blocks []CommentBlock, sb *strings.Builder) {
+	for _, block := range blocks {
+		if len(block.Items) == 0 {
+			continue
+		}
+
+		sb.WriteString(" {")
+		for _, item := range block.Items {
+			switch item.Kind {
+			case CommentText:
+				sb.WriteString(item.Text)
+			case CommentCommand:
+				if needsCommandSeparator(sb) {
+					sb.WriteString(" ")
+				}
+				sb.WriteString("[%")
+				sb.WriteString(item.Key)
+				sb.WriteString(" ")
+				sb.WriteString(item.Value)
+				sb.WriteString("]")
+			}
+		}
+		sb.WriteString("}")
 	}
+}
 
-	if !hasComment {
-		writeCommands(move, sb)
-		return
-	}
-
-	sb.WriteString(" {")
-	sb.WriteString(move.comments)
-	writeSortedCommands(move, sb)
-
-	sb.WriteString("}")
+func needsCommandSeparator(sb *strings.Builder) bool {
+	s := sb.String()
+	return len(s) > 0 && s[len(s)-1] != ' '
 }
 
 func writeVariations(node *Move, moveNum int, isWhite bool, sb *strings.Builder) bool {

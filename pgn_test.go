@@ -669,6 +669,274 @@ func TestRoundTripWithVariationsAndCommandAnnotations(t *testing.T) {
 	}
 }
 
+func TestPGNAnnotationFidelityRoundTrip(t *testing.T) {
+	pgn := withMinimalTags(`1. e4 {Good move [%clk 0:05:00]} {second [%eval 0.25]} *`)
+
+	game := mustParseSingleGame(t, pgn)
+	move := game.Moves()[0]
+	if move.Comments() != "Good move second" {
+		t.Fatalf("expected flattened comments, got %q", move.Comments())
+	}
+	if got, ok := move.GetCommand("clk"); !ok || got != "0:05:00" {
+		t.Fatalf("expected clk command, got %q, %v", got, ok)
+	}
+
+	roundTrip := game.String()
+	if strings.Contains(roundTrip, "{Good move }") || strings.Contains(roundTrip, "{ [%clk") {
+		t.Fatalf("expected mixed comment and command to stay in one block, got %s", roundTrip)
+	}
+
+	reparsed := mustParseSingleGame(t, roundTrip)
+	blocks := reparsed.Moves()[0].CommentBlocks()
+	if len(blocks) != 2 {
+		t.Fatalf("expected 2 comment blocks, got %#v", blocks)
+	}
+	assertCommentItem(t, blocks[0].Items[0], CommentText, "Good move", "", "")
+	assertCommentItem(t, blocks[0].Items[1], CommentCommand, "", "clk", "0:05:00")
+	assertCommentItem(t, blocks[1].Items[0], CommentText, "second", "", "")
+	assertCommentItem(t, blocks[1].Items[1], CommentCommand, "", "eval", "0.25")
+}
+
+func TestPGNAnnotationFidelityPreservesOrderAndDuplicateCommands(t *testing.T) {
+	pgn := withMinimalTags(`1. e4 {before [%clk 0:05:00] middle [%clk 0:04:59] after} *`)
+
+	game := mustParseSingleGame(t, pgn)
+	roundTrip := game.String()
+	reparsed := mustParseSingleGame(t, roundTrip)
+	move := reparsed.Moves()[0]
+
+	if got, ok := move.GetCommand("clk"); !ok || got != "0:04:59" {
+		t.Fatalf("expected last duplicate clk command, got %q, %v", got, ok)
+	}
+	move.SetCommand("clk", "0:04:00")
+	if got, ok := move.GetCommand("clk"); !ok || got != "0:04:00" {
+		t.Fatalf("expected SetCommand to update last duplicate clk command, got %q, %v", got, ok)
+	}
+
+	blocks := move.CommentBlocks()
+	if len(blocks) != 1 || len(blocks[0].Items) != 5 {
+		t.Fatalf("expected one block with 5 ordered items, got %#v", blocks)
+	}
+	assertCommentItem(t, blocks[0].Items[0], CommentText, "before", "", "")
+	assertCommentItem(t, blocks[0].Items[1], CommentCommand, "", "clk", "0:05:00")
+	assertCommentItem(t, blocks[0].Items[2], CommentText, "middle", "", "")
+	assertCommentItem(t, blocks[0].Items[3], CommentCommand, "", "clk", "0:04:00")
+	assertCommentItem(t, blocks[0].Items[4], CommentText, "after", "", "")
+}
+
+func TestPGNAnnotationFidelityCommandUsesFirstParameter(t *testing.T) {
+	game := mustParseSingleGame(t, withMinimalTags(`1. e4 {[%command 1:45:12,Nf6,"very interesting, but wrong"]} *`))
+	move := game.Moves()[0]
+
+	if got, ok := move.GetCommand("command"); !ok || got != "1:45:12" {
+		t.Fatalf("expected first command parameter, got %q, %v", got, ok)
+	}
+
+	blocks := move.CommentBlocks()
+	if len(blocks) != 1 || len(blocks[0].Items) != 1 {
+		t.Fatalf("expected one command item, got %#v", blocks)
+	}
+	assertCommentItem(t, blocks[0].Items[0], CommentCommand, "", "command", "1:45:12")
+}
+
+func TestPGNAnnotationFidelityVariationsAndExpansion(t *testing.T) {
+	pgn := withMinimalTags(`1. e4 e5 (1... c5 {Sicilian [%eval 0.12]} 2. Nf3 {develop [%clk 0:04:58]}) 2. Nf3 *`)
+
+	game := mustParseSingleGame(t, pgn)
+	roundTrip := game.String()
+	reparsed := mustParseSingleGame(t, roundTrip)
+
+	e4 := reparsed.Moves()[0]
+	if len(e4.Children()) < 2 {
+		t.Fatalf("expected e4 variation, got %d children", len(e4.Children()))
+	}
+	c5 := e4.Children()[1]
+	blocks := c5.CommentBlocks()
+	if len(blocks) != 1 || len(blocks[0].Items) != 2 {
+		t.Fatalf("expected variation annotation block, got %#v", blocks)
+	}
+	assertCommentItem(t, blocks[0].Items[0], CommentText, "Sicilian", "", "")
+	assertCommentItem(t, blocks[0].Items[1], CommentCommand, "", "eval", "0.12")
+
+	scanner := NewScanner(strings.NewReader(roundTrip), WithExpandVariations())
+	for scanner.HasNext() {
+		if _, err := scanner.ParseNext(); err != nil {
+			t.Fatalf("expanded annotated variation should parse: %v", err)
+		}
+	}
+}
+
+func TestPGNAnnotationFidelityLegacyAPIsAndDefensiveCopies(t *testing.T) {
+	game := NewGame()
+	if err := game.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	move := game.Moves()[0]
+	move.SetComment("Good move")
+	move.SetCommand("clk", "0:05:00")
+	move.SetCommand("clk", "0:04:59")
+	move.AddComment("!")
+
+	if move.Comments() != "Good move!" {
+		t.Fatalf("expected legacy comments, got %q", move.Comments())
+	}
+	if got, ok := move.GetCommand("clk"); !ok || got != "0:04:59" {
+		t.Fatalf("expected updated clk command, got %q, %v", got, ok)
+	}
+	if !strings.Contains(game.String(), "{Good move! [%clk 0:04:59]}") {
+		t.Fatalf("expected legacy comment serialization, got %s", game.String())
+	}
+
+	parsed := mustParseSingleGame(t, withMinimalTags(`1. e4 {Good [%clk 0:05:00]} *`))
+	parsedMove := parsed.Moves()[0]
+	blocks := parsedMove.CommentBlocks()
+	blocks[0].Items[0].Text = "mutated"
+	blocks[0].Items = append(blocks[0].Items, CommentItem{Kind: CommentCommand, Key: "eval", Value: "9"})
+
+	blocks = parsedMove.CommentBlocks()
+	assertCommentItem(t, blocks[0].Items[0], CommentText, "Good", "", "")
+	if strings.Contains(parsed.String(), "mutated") || strings.Contains(parsed.String(), "[%eval 9]") {
+		t.Fatalf("mutating CommentBlocks result changed move state: %s", parsed.String())
+	}
+}
+
+func mustParseSingleGame(t *testing.T, pgn string) *Game {
+	t.Helper()
+	scanner := NewScanner(strings.NewReader(pgn))
+	game, err := scanner.ParseNext()
+	if err != nil {
+		t.Fatalf("failed to parse pgn: %v", err)
+	}
+	if game == nil {
+		t.Fatal("expected game")
+	}
+	return game
+}
+
+func withMinimalTags(moveText string) string {
+	return `[Event "Test"]
+[Site "Internet"]
+[Date "2026.06.02"]
+[Round "1"]
+[White "White"]
+[Black "Black"]
+[Result "*"]
+
+` + moveText
+}
+
+func assertCommentItem(t *testing.T, item CommentItem, kind CommentItemKind, text, key, value string) {
+	t.Helper()
+	if item.Kind != kind || item.Text != text || item.Key != key || item.Value != value {
+		t.Fatalf("unexpected comment item: got %#v", item)
+	}
+}
+
+func TestParserAnnotationErrors(t *testing.T) {
+	t.Run("UnexpectedTokenInComment", func(t *testing.T) {
+		parser := NewParser([]Token{
+			{Type: CommentStart, Value: "{"},
+			{Type: MoveNumber, Value: "1"},
+			{Type: CommentEnd, Value: "}"},
+		})
+		_, err := parser.parseComment()
+		if err == nil {
+			t.Fatal("expected parseComment error")
+		}
+	})
+
+	t.Run("UnterminatedComment", func(t *testing.T) {
+		parser := NewParser([]Token{
+			{Type: CommentStart, Value: "{"},
+			{Type: COMMENT, Value: "missing close"},
+		})
+		_, err := parser.parseComment()
+		if err == nil {
+			t.Fatal("expected unterminated comment error")
+		}
+	})
+
+	t.Run("CommandErrorPropagatesFromComment", func(t *testing.T) {
+		parser := NewParser([]Token{
+			{Type: CommentStart, Value: "{"},
+			{Type: CommandStart, Value: "[%"},
+			{Type: MoveNumber, Value: "1"},
+			{Type: CommandEnd, Value: "]"},
+			{Type: CommentEnd, Value: "}"},
+		})
+		_, err := parser.parseComment()
+		if err == nil {
+			t.Fatal("expected command parse error")
+		}
+	})
+
+	t.Run("UnexpectedTokenInCommand", func(t *testing.T) {
+		parser := NewParser([]Token{
+			{Type: CommandStart, Value: "[%"},
+			{Type: MoveNumber, Value: "1"},
+			{Type: CommandEnd, Value: "]"},
+		})
+		_, err := parser.parseCommand()
+		if err == nil {
+			t.Fatal("expected parseCommand error")
+		}
+	})
+
+	t.Run("UnterminatedCommand", func(t *testing.T) {
+		parser := NewParser([]Token{
+			{Type: CommandStart, Value: "[%"},
+			{Type: CommandName, Value: "clk"},
+		})
+		_, err := parser.parseCommand()
+		if err == nil {
+			t.Fatal("expected unterminated command error")
+		}
+	})
+}
+
+func TestParserVariationErrors(t *testing.T) {
+	t.Run("UnterminatedVariation", func(t *testing.T) {
+		parser := NewParser([]Token{{Type: VariationStart, Value: "("}})
+		if err := parser.parseVariation(1, 1); err == nil {
+			t.Fatal("expected unterminated variation error")
+		}
+	})
+
+	t.Run("MoveColorMismatch", func(t *testing.T) {
+		parser := NewParser([]Token{
+			{Type: VariationStart, Value: "("},
+			{Type: MoveNumber, Value: "1"},
+			{Type: DOT, Value: "."},
+			{Type: ELLIPSIS, Value: "..."},
+			{Type: SQUARE, Value: "e5"},
+			{Type: VariationEnd, Value: ")"},
+		})
+		if err := parser.parseVariation(1, 1); err == nil {
+			t.Fatal("expected move color mismatch error")
+		}
+	})
+
+	t.Run("CommentErrorInsideVariation", func(t *testing.T) {
+		parser := NewParser([]Token{
+			{Type: VariationStart, Value: "("},
+			{Type: CommentStart, Value: "{"},
+			{Type: MoveNumber, Value: "1"},
+			{Type: VariationEnd, Value: ")"},
+		})
+		if err := parser.parseVariation(1, 1); err == nil {
+			t.Fatal("expected variation comment error")
+		}
+	})
+}
+
+func TestParseResultDraw(t *testing.T) {
+	parser := NewParser([]Token{{Type: RESULT, Value: "1/2-1/2"}})
+	parser.parseResult()
+	if parser.game.Outcome() != Draw {
+		t.Fatalf("expected draw outcome, got %s", parser.game.Outcome())
+	}
+}
+
 func TestVariationMoveNumbers(t *testing.T) {
 	pgn := `[Event "VariationTest"]
 [Site "Internet"]

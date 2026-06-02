@@ -17,8 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-
-	"maps"
 )
 
 // Parser holds the state needed during parsing.
@@ -211,21 +209,12 @@ func (p *Parser) parseMoveText() error {
 					p.currentMove.nag = tok.Value
 					p.advance()
 				case CommentStart:
-					comment, commandMap, err := p.parseComment()
+					block, err := p.parseComment()
 					if err != nil {
 						return err
 					}
 					if p.currentMove != nil {
-						if p.currentMove.command != nil {
-							maps.Copy(p.currentMove.command, commandMap)
-						} else {
-							p.currentMove.command = commandMap
-						}
-						if p.currentMove.comments != "" {
-							p.currentMove.comments += " " + comment
-						} else {
-							p.currentMove.comments = comment
-						}
+						p.currentMove.addCommentBlock(block)
 					}
 				default:
 					break collectLoop
@@ -233,21 +222,12 @@ func (p *Parser) parseMoveText() error {
 			}
 
 		case CommentStart:
-			comment, commandMap, err := p.parseComment()
+			block, err := p.parseComment()
 			if err != nil {
 				return err
 			}
 			if p.currentMove != nil {
-				if p.currentMove.command != nil {
-					maps.Copy(p.currentMove.command, commandMap)
-				} else {
-					p.currentMove.command = commandMap
-				}
-				if p.currentMove.comments != "" {
-					p.currentMove.comments += " " + comment
-				} else {
-					p.currentMove.comments = comment
-				}
+				p.currentMove.addCommentBlock(block)
 			}
 
 		case VariationStart:
@@ -508,32 +488,24 @@ func (p *Parser) parseMove() (*Move, error) {
 	return move, nil
 }
 
-func (p *Parser) parseComment() (string, map[string]string, error) {
+func (p *Parser) parseComment() (CommentBlock, error) {
 	p.advance() // Consume "{"
 
-	var comment string
-	var commandMap map[string]string
+	block := CommentBlock{}
 
 	for p.currentToken().Type != CommentEnd && p.position < len(p.tokens) {
 		switch p.currentToken().Type {
 		case CommandStart:
-			commands, err := p.parseCommand()
+			command, err := p.parseCommand()
 			if err != nil {
-				return "", nil, err
+				return CommentBlock{}, err
 			}
-
-			// merge commands into commandMap
-			if commandMap == nil {
-				commandMap = make(map[string]string)
-			}
-			for k, v := range commands {
-				commandMap[k] = v
-			}
+			block.Items = append(block.Items, command)
 
 		case COMMENT:
-			comment += p.currentToken().Value // Append plain comment text
+			block.Items = append(block.Items, CommentItem{Kind: CommentText, Text: p.currentToken().Value})
 		default:
-			return "", nil, &ParserError{
+			return CommentBlock{}, &ParserError{
 				Message:    "unexpected token in comment",
 				Position:   p.position,
 				TokenType:  p.currentToken().Type,
@@ -544,19 +516,19 @@ func (p *Parser) parseComment() (string, map[string]string, error) {
 	}
 
 	if p.position >= len(p.tokens) {
-		return "", nil, &ParserError{
+		return CommentBlock{}, &ParserError{
 			Message:  "unterminated comment",
 			Position: p.position,
 		}
 	}
 
 	p.advance() // Consume "}"
-	return comment, commandMap, nil
+	return block, nil
 }
 
-func (p *Parser) parseCommand() (map[string]string, error) {
-	command := make(map[string]string)
+func (p *Parser) parseCommand() (CommentItem, error) {
 	var key string
+	var value string
 
 	// Consume the opening "["
 	p.advance()
@@ -569,12 +541,11 @@ func (p *Parser) parseCommand() (map[string]string, error) {
 			key = p.currentToken().Value
 		case CommandParam:
 			// The second token is treated as the value for the current key
-			if key != "" {
-				command[key] = p.currentToken().Value
-				key = "" // Reset key after assigning value
+			if key != "" && value == "" {
+				value = p.currentToken().Value
 			}
 		default:
-			return nil, &ParserError{
+			return CommentItem{}, &ParserError{
 				Message:    "unexpected token in command",
 				Position:   p.position,
 				TokenType:  p.currentToken().Type,
@@ -585,14 +556,14 @@ func (p *Parser) parseCommand() (map[string]string, error) {
 	}
 
 	if p.position >= len(p.tokens) {
-		return nil, &ParserError{
+		return CommentItem{}, &ParserError{
 			Message:  "unterminated command",
 			Position: p.position,
 		}
 	}
 
 	// p.advance() // Consume the closing "]"
-	return command, nil
+	return CommentItem{Kind: CommentCommand, Key: key, Value: value}, nil
 }
 
 func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
@@ -651,21 +622,12 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 			}
 
 		case CommentStart:
-			comment, commandMap, err := p.parseComment()
+			block, err := p.parseComment()
 			if err != nil {
 				return err
 			}
 			if p.currentMove != nil {
-				if p.currentMove.command != nil {
-					maps.Copy(p.currentMove.command, commandMap)
-				} else {
-					p.currentMove.command = commandMap
-				}
-				if p.currentMove.comments != "" {
-					p.currentMove.comments += " " + comment
-				} else {
-					p.currentMove.comments = comment
-				}
+				p.currentMove.addCommentBlock(block)
 			}
 
 		case NAG:
@@ -708,21 +670,12 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 					p.currentMove.nag = tok.Value
 					p.advance()
 				case CommentStart:
-					comment, commandMap, err := p.parseComment()
+					block, err := p.parseComment()
 					if err != nil {
 						return err
 					}
 					if p.currentMove != nil {
-						if p.currentMove.command != nil {
-							maps.Copy(p.currentMove.command, commandMap)
-						} else {
-							p.currentMove.command = commandMap
-						}
-						if p.currentMove.comments != "" {
-							p.currentMove.comments += " " + comment
-						} else {
-							p.currentMove.comments = comment
-						}
+						p.currentMove.addCommentBlock(block)
 					}
 				default:
 					break collectVariationAnnotations

@@ -367,6 +367,43 @@ func TestAddComment(t *testing.T) {
 	})
 }
 
+func TestAddCommentToStructuredComments(t *testing.T) {
+	t.Run("AddsFirstTextBlock", func(t *testing.T) {
+		move := &Move{structuredComments: true}
+		move.AddComment("First comment.")
+
+		blocks := move.CommentBlocks()
+		if len(blocks) != 1 || len(blocks[0].Items) != 1 {
+			t.Fatalf("expected one text block, got %#v", blocks)
+		}
+		assertCommentItem(t, blocks[0].Items[0], CommentText, "First comment.", "", "")
+	})
+
+	t.Run("AppendsToExistingTextItem", func(t *testing.T) {
+		move := &Move{}
+		move.addCommentBlock(CommentBlock{Items: []CommentItem{{Kind: CommentText, Text: "First "}}})
+		move.AddComment("second")
+
+		blocks := move.CommentBlocks()
+		assertCommentItem(t, blocks[0].Items[0], CommentText, "First second", "", "")
+		if move.Comments() != "First second" {
+			t.Fatalf("expected flattened comment to sync, got %q", move.Comments())
+		}
+	})
+
+	t.Run("AppendsTextAfterCommandOnlyBlock", func(t *testing.T) {
+		move := &Move{}
+		move.addCommentBlock(CommentBlock{Items: []CommentItem{{Kind: CommentCommand, Key: "clk", Value: "0:05:00"}}})
+		move.AddComment("after command")
+
+		blocks := move.CommentBlocks()
+		if len(blocks[0].Items) != 2 {
+			t.Fatalf("expected command and text item, got %#v", blocks)
+		}
+		assertCommentItem(t, blocks[0].Items[1], CommentText, "after command", "", "")
+	})
+}
+
 func TestNAGReturnsCorrectValue(t *testing.T) {
 	t.Run("NAGReturnsCorrectValue", func(t *testing.T) {
 		move := &Move{nag: "!!"}
@@ -415,6 +452,54 @@ func TestGetCommand(t *testing.T) {
 			t.Fatalf("expected command map to be initialized, but it was nil")
 		}
 	})
+}
+
+func TestStructuredCommentCommandBranches(t *testing.T) {
+	t.Run("SetCommandAddsFirstStructuredBlock", func(t *testing.T) {
+		move := &Move{structuredComments: true}
+		move.SetCommand("eval", "0.25")
+
+		blocks := move.CommentBlocks()
+		if len(blocks) != 1 || len(blocks[0].Items) != 1 {
+			t.Fatalf("expected one command block, got %#v", blocks)
+		}
+		assertCommentItem(t, blocks[0].Items[0], CommentCommand, "", "eval", "0.25")
+	})
+
+	t.Run("EmptyCommentBlockIsIgnored", func(t *testing.T) {
+		move := &Move{}
+		move.addCommentBlock(CommentBlock{})
+		if move.hasAnnotations() {
+			t.Fatalf("empty comment block should not add annotations")
+		}
+	})
+
+	t.Run("LegacyCommandsBecomeCommentBlocks", func(t *testing.T) {
+		move := &Move{command: map[string]string{"eval": "0.25"}}
+		blocks := move.CommentBlocks()
+		if len(blocks) != 1 || len(blocks[0].Items) != 1 {
+			t.Fatalf("expected command-only legacy block, got %#v", blocks)
+		}
+		assertCommentItem(t, blocks[0].Items[0], CommentCommand, "", "eval", "0.25")
+	})
+
+	t.Run("EmptyLegacyAnnotationsProduceNoBlock", func(t *testing.T) {
+		move := &Move{}
+		move.rebuildLegacyCommentBlockWithCommands(nil)
+		if len(move.commentBlocks) != 0 {
+			t.Fatalf("expected no comment blocks, got %#v", move.commentBlocks)
+		}
+	})
+}
+
+func TestPlyNilAndMissingPosition(t *testing.T) {
+	var nilMove *Move
+	if nilMove.Ply() != 0 {
+		t.Fatalf("nil move should have ply 0")
+	}
+	if (&Move{}).Ply() != 0 {
+		t.Fatalf("move without position should have ply 0")
+	}
 }
 
 func BenchmarkValidMoves(b *testing.B) {

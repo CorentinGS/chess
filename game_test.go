@@ -1602,6 +1602,60 @@ func TestRootMoveComments(t *testing.T) {
 	})
 }
 
+func TestWriteAnnotationsLegacyBranches(t *testing.T) {
+	t.Run("NilMove", func(t *testing.T) {
+		var sb strings.Builder
+		writeAnnotations(nil, &sb)
+		if sb.String() != "" {
+			t.Fatalf("expected empty annotation output, got %q", sb.String())
+		}
+	})
+
+	t.Run("CommentOnly", func(t *testing.T) {
+		move := &Move{comments: "Good move"}
+		move.ensureCommentBlocksFromLegacy()
+		move.commentBlocks = nil
+
+		var sb strings.Builder
+		writeAnnotations(move, &sb)
+		if sb.String() != " {Good move}" {
+			t.Fatalf("expected comment-only annotation, got %q", sb.String())
+		}
+	})
+
+	t.Run("CommandOnly", func(t *testing.T) {
+		move := &Move{command: map[string]string{"clk": "0:05:00"}}
+		move.ensureCommentBlocksFromLegacy()
+		move.commentBlocks = nil
+
+		var sb strings.Builder
+		writeAnnotations(move, &sb)
+		if sb.String() != " { [%clk 0:05:00]}" {
+			t.Fatalf("expected command-only annotation, got %q", sb.String())
+		}
+	})
+
+	t.Run("CommentAndCommand", func(t *testing.T) {
+		move := &Move{comments: "Good move", command: map[string]string{"clk": "0:05:00"}}
+		move.ensureCommentBlocksFromLegacy()
+		move.commentBlocks = nil
+
+		var sb strings.Builder
+		writeAnnotations(move, &sb)
+		if sb.String() != " {Good move [%clk 0:05:00]}" {
+			t.Fatalf("expected merged annotation, got %q", sb.String())
+		}
+	})
+
+	t.Run("EmptyStructuredBlock", func(t *testing.T) {
+		var sb strings.Builder
+		writeCommentBlocks([]CommentBlock{{}}, &sb)
+		if sb.String() != "" {
+			t.Fatalf("expected empty structured block to be skipped, got %q", sb.String())
+		}
+	})
+}
+
 func TestValidateSAN(t *testing.T) {
 	tests := []struct {
 		name    string
