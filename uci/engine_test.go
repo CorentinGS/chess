@@ -40,7 +40,7 @@ func Test_EngineEval(t *testing.T) {
 			defer eng.Close()
 
 			cmdPos := uci.CmdPosition{Position: pos}
-			err = eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame, cmdPos, uci.CmdEval)
+			err = eng.Run(uci.CmdUCI{}, uci.CmdIsReady{}, uci.CmdUCINewGame{}, cmdPos, uci.CmdEval{})
 
 			if name == "stockfish" {
 				if err != nil {
@@ -83,7 +83,7 @@ func Test_EngineInfo(t *testing.T) {
 			cmdWDL := uci.CmdSetOption{Name: "UCI_ShowWDL", Value: "true"}
 			cmdPos := uci.CmdPosition{Position: pos}
 			cmdGo := uci.CmdGo{MoveTime: time.Second / 10}
-			if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame, cmdMultiPV, cmdWDL, cmdPos, cmdGo); err != nil {
+			if err := eng.Run(uci.CmdUCI{}, uci.CmdIsReady{}, uci.CmdUCINewGame{}, cmdMultiPV, cmdWDL, cmdPos, cmdGo); err != nil {
 				t.Fatal("failed to run command", err)
 			}
 
@@ -124,7 +124,7 @@ func Test_EngineMultiPVInfo(t *testing.T) {
 			cmdMultiPV := uci.CmdSetOption{Name: "multipv", Value: "2"}
 			cmdPos := uci.CmdPosition{Position: pos}
 			cmdGo := uci.CmdGo{MoveTime: time.Second / 10}
-			if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame, cmdMultiPV, cmdPos, cmdGo); err != nil {
+			if err := eng.Run(uci.CmdUCI{}, uci.CmdIsReady{}, uci.CmdUCINewGame{}, cmdMultiPV, cmdPos, cmdGo); err != nil {
 				t.Fatal("failed to run command", err)
 			}
 
@@ -164,7 +164,7 @@ func Test_UCIMovesTags(t *testing.T) {
 			setOpt := uci.CmdSetOption{Name: "UCI_Elo", Value: "1500"}
 			setPos := uci.CmdPosition{Position: chess.StartingPosition()}
 			setGo := uci.CmdGo{MoveTime: time.Second / 10}
-			if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, setOpt, uci.CmdUCINewGame, setPos, setGo); err != nil {
+			if err := eng.Run(uci.CmdUCI{}, uci.CmdIsReady{}, setOpt, uci.CmdUCINewGame{}, setPos, setGo); err != nil {
 				t.Fatal("failed to run command", err)
 			}
 
