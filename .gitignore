@@ -32,3 +32,7 @@ cpu.out
 .idea
 stockfish
 .worktrees/
+.agents/
+skills-lock.json
+CONTEXT.md
+docs/
