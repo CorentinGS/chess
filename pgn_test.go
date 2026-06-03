@@ -994,3 +994,29 @@ func TestVariationMoveNumbers(t *testing.T) {
 		t.Errorf("variation reply: expected move number 3 or 4, got %d", variation[0].children[0].Ply())
 	}
 }
+
+// BenchmarkPGNWithVariations measures parsing performance for a PGN with many nested variations.
+func BenchmarkPGNWithVariations(b *testing.B) {
+	pgn := `[Event "Variation Benchmark"]
+[Site "Internet"]
+[Date "2023.12.06"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Nf6 4. d3) a6 4. Ba4 Nf6 5. O-O Be7 1-0`
+
+	scanner := NewScanner(strings.NewReader(pgn))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Reset scanner for each iteration
+		scanner = NewScanner(strings.NewReader(pgn))
+		_, err := scanner.ParseNext()
+		if err != nil {
+			b.Fatalf("parse error: %v", err)
+		}
+	}
+}

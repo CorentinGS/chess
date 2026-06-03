@@ -257,7 +257,6 @@ func (p *Parser) parseMove() (*Move, error) {
 			if m.HasTag(KingSideCastle) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
-				move.position = p.game.pos.copy()
 				if m.HasTag(Check) {
 					move.AddTag(Check)
 				}
@@ -464,7 +463,6 @@ func (p *Parser) parseMove() (*Move, error) {
 	move.s2 = matchingMove.S2()
 	move.tags = matchingMove.tags
 	move.promo = matchingMove.promo
-	move.position = p.game.pos.copy() // Cache current position
 
 	// Handle check/checkmate if present
 	if p.currentToken().Type == CHECK {
@@ -580,10 +578,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	if parentMove != p.game.rootMove && parentMove.parent != nil {
 		variationParent = parentMove.parent
 		if variationParent.parent != nil && variationParent.parent.position != nil {
-			p.game.pos = variationParent.parent.position.copy()
-			if newPos := p.game.pos.Update(variationParent); newPos != nil {
-				p.game.pos = newPos
-			}
+			p.game.pos = variationParent.parent.position.Update(variationParent)
 		} else {
 			p.game.pos = p.game.rootMove.position.copy()
 		}
@@ -647,17 +642,14 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 				return err
 			}
 
-			move.parent = p.currentMove
-			p.currentMove.children = append(p.currentMove.children, move)
-			move.position = p.game.pos.copy()
-			move.number = uint(moveNumber)
+		move.parent = p.currentMove
+		p.currentMove.children = append(p.currentMove.children, move)
+		move.number = uint(moveNumber)
 
-			if newPos := p.game.pos.Update(move); newPos != nil {
-				p.game.pos = newPos
-			}
+		p.game.pos = p.game.pos.Update(move)
 
-			move.position = p.game.pos.copy()
-			p.currentMove = move
+		move.position = p.game.pos
+		p.currentMove = move
 			ply++
 			isBlackMove = !isBlackMove
 
@@ -735,8 +727,8 @@ func (p *Parser) addMove(move *Move) {
 		p.game.evaluatePositionStatus()
 	}
 
-	// Cache position before the move
-	move.position = p.game.pos.copy()
+	// Cache position after the move
+	move.position = p.game.pos
 
 	p.currentMove = move
 }
