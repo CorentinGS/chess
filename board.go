@@ -63,6 +63,7 @@ type Board struct {
 	emptySqs      bitboard // all empty squares
 	whiteKingSq   Square   // cached white king square
 	blackKingSq   Square   // cached black king square
+	mailbox       [numOfSquaresInBoard]Piece // O(1) piece lookup per square
 }
 
 // NewBoard returns a board from a square to piece mapping.
@@ -77,12 +78,16 @@ type Board struct {
 //	board, err := NewBoard(squares)
 func NewBoard(m map[Square]Piece) (*Board, error) {
 	b := &Board{}
+	for sq := range numOfSquaresInBoard {
+		b.mailbox[sq] = NoPiece
+	}
 	for _, p1 := range allPieces {
 		var bb uint64
 		for sq := range numOfSquaresInBoard {
 			bb <<= 1
 			if p2, exists := m[Square(sq)]; exists && p1 == p2 {
 				bb |= 1
+				b.mailbox[sq] = p1
 			}
 		}
 		if err := b.setBBForPiece(p1, bitboard(bb)); err != nil {
@@ -288,13 +293,7 @@ func (b *Board) String() string {
 // Piece returns the piece for the given square.
 // Returns NoPiece if the square is empty.
 func (b *Board) Piece(sq Square) Piece {
-	for _, p := range allPieces {
-		bb := b.bbForPiece(p)
-		if bb.Occupied(sq) {
-			return p
-		}
-	}
-	return NoPiece
+	return b.mailbox[sq]
 }
 
 // MarshalText implements the encoding.TextMarshaler interface and returns
@@ -351,6 +350,7 @@ func (b *Board) UnmarshalBinary(data []byte) error {
 	b.bbBlackKnight = bitboard(binary.BigEndian.Uint64(data[80:88]))
 	b.bbBlackPawn = bitboard(binary.BigEndian.Uint64(data[88:96]))
 	b.calcConvienceBBs(nil)
+	b.rebuildMailbox()
 	return nil
 }
 
@@ -388,25 +388,40 @@ func (b *Board) update(m *Move) {
 		if err := b.setBBForPiece(newPiece, bbPromo|s2BB); err != nil {
 			panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
 		}
+		b.mailbox[m.s1] = NoPiece
+		b.mailbox[m.s2] = newPiece
+	} else {
+		b.mailbox[m.s1] = NoPiece
+		b.mailbox[m.s2] = p1
 	}
 	// remove captured en passant piece
 	if m.HasTag(EnPassant) {
 		if p1.Color() == White {
 			b.bbBlackPawn = ^(bbForSquare(m.s2) << 8) & b.bbBlackPawn
+			b.mailbox[m.s2-8] = NoPiece
 		} else {
 			b.bbWhitePawn = ^(bbForSquare(m.s2) >> 8) & b.bbWhitePawn
+			b.mailbox[m.s2+8] = NoPiece
 		}
 	}
 	// move rook for castle
 	switch {
 	case p1.Color() == White && m.HasTag(KingSideCastle):
 		b.bbWhiteRook = b.bbWhiteRook & ^bbForSquare(H1) | bbForSquare(F1)
+		b.mailbox[H1] = NoPiece
+		b.mailbox[F1] = WhiteRook
 	case p1.Color() == White && m.HasTag(QueenSideCastle):
 		b.bbWhiteRook = (b.bbWhiteRook & ^bbForSquare(A1)) | bbForSquare(D1)
+		b.mailbox[A1] = NoPiece
+		b.mailbox[D1] = WhiteRook
 	case p1.Color() == Black && m.HasTag(KingSideCastle):
 		b.bbBlackRook = b.bbBlackRook & ^bbForSquare(H8) | bbForSquare(F8)
+		b.mailbox[H8] = NoPiece
+		b.mailbox[F8] = BlackRook
 	case p1.Color() == Black && m.HasTag(QueenSideCastle):
 		b.bbBlackRook = (b.bbBlackRook & ^bbForSquare(A8)) | bbForSquare(D8)
+		b.mailbox[A8] = NoPiece
+		b.mailbox[D8] = BlackRook
 	}
 
 	b.calcConvienceBBs(m)
@@ -440,7 +455,7 @@ func (b *Board) calcConvienceBBs(m *Move) {
 }
 
 func (b *Board) copy() *Board {
-	return &Board{
+	cp := &Board{
 		whiteSqs:      b.whiteSqs,
 		blackSqs:      b.blackSqs,
 		emptySqs:      b.emptySqs,
@@ -458,6 +473,24 @@ func (b *Board) copy() *Board {
 		bbBlackBishop: b.bbBlackBishop,
 		bbBlackKnight: b.bbBlackKnight,
 		bbBlackPawn:   b.bbBlackPawn,
+	}
+	cp.mailbox = b.mailbox
+	return cp
+}
+
+// rebuildMailbox reconstructs the mailbox from the current bitboard state.
+// Used after deserialization or when consistency is otherwise needed.
+func (b *Board) rebuildMailbox() {
+	for sq := range numOfSquaresInBoard {
+		b.mailbox[sq] = NoPiece
+	}
+	for _, p := range allPieces {
+		bb := b.bbForPiece(p)
+		for sq := range numOfSquaresInBoard {
+			if bb.Occupied(Square(sq)) {
+				b.mailbox[sq] = p
+			}
+		}
 	}
 }
 
