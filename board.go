@@ -66,6 +66,16 @@ type Board struct {
 	mailbox       [numOfSquaresInBoard]Piece // O(1) piece lookup per square
 }
 
+// kingSquare returns the cached king square for the given color.
+// Callers must ensure the board's convenience bitboards are up to date
+// (i.e., calcConvienceBBs has been called after any mutation).
+func (b *Board) kingSquare(c Color) Square {
+	if c == White {
+		return b.whiteKingSq
+	}
+	return b.blackKingSq
+}
+
 // NewBoard returns a board from a square to piece mapping.
 // The map should contain only occupied squares.
 //

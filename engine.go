@@ -152,8 +152,8 @@ func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 					}
 				} else {
 					m.promo = 0
-						m.tags = moveTags(m, pos)
-						if m.HasTag(inCheck) == unsafeOnly {
+					m.tags = moveTags(m, pos)
+					if m.HasTag(inCheck) == unsafeOnly {
 						moves[count] = m
 						count++
 						if first {
@@ -202,25 +202,27 @@ func moveTags(m Move, pos *Position) MoveTag {
 	local := m
 	local.tags = tags
 	// determine if in check after move (makes move invalid)
-	cp := pos.copy()
-	cp.board.update(&local)
-	if isInCheck(cp) {
-		tags |= inCheck
+	// Simulate the move on a temporary board copy so we can test
+	// check status without mutating the actual position.
+	tempBoard := *pos.board
+	tempBoard.update(&local)
+	if tempBoard.kingSquare(pos.turn) != NoSquare {
+		if isSquareAttackedBy(&tempBoard, tempBoard.kingSquare(pos.turn), pos.turn.Other()) {
+			tags |= inCheck
+		}
 	}
 	// determine if opponent in check after move
-	cp.turn = cp.turn.Other()
-	if isInCheck(cp) {
-		tags |= Check
+	if tempBoard.kingSquare(pos.turn.Other()) != NoSquare {
+		if isSquareAttackedBy(&tempBoard, tempBoard.kingSquare(pos.turn.Other()), pos.turn) {
+			tags |= Check
+		}
 	}
 	return tags
 }
 
 // isInCheck returns true if the side to move is in check in the given position.
 func isInCheck(pos *Position) bool {
-	kingSq := pos.board.whiteKingSq
-	if pos.Turn() == Black {
-		kingSq = pos.board.blackKingSq
-	}
+	kingSq := pos.board.kingSquare(pos.Turn())
 	// king should only be missing in tests / examples
 	if kingSq == NoSquare {
 		return false
@@ -228,72 +230,81 @@ func isInCheck(pos *Position) bool {
 	return squaresAreAttacked(pos, kingSq)
 }
 
-// squaresAreAttacked returns true if any of the given squares are attacked
-// by the opponent in the given position.
+// isSquareAttackedBy returns true if the given square is attacked by the specified color.
+// This is a board-level operation that does not require a full Position.
+//
+//nolint:mnd // this is a formula to determine if a square is attacked
+func isSquareAttackedBy(board *Board, sq Square, attacker Color) bool {
+	occ := ^board.emptySqs
+
+	// hot path check to see if attack vector is possible
+	s2BB := board.blackSqs
+	if attacker == White {
+		s2BB = board.whiteSqs
+	}
+	if ((diaAttack(occ, sq)|hvAttack(occ, sq))&s2BB)|(bbKnightMoves[sq]&s2BB) == 0 {
+		return false
+	}
+
+	// check queen attack vector
+	queenBB := board.bbForPiece(NewPiece(Queen, attacker))
+	bb := (diaAttack(occ, sq) | hvAttack(occ, sq)) & queenBB
+	if bb != 0 {
+		return true
+	}
+	// check rook attack vector
+	rookBB := board.bbForPiece(NewPiece(Rook, attacker))
+	bb = hvAttack(occ, sq) & rookBB
+	if bb != 0 {
+		return true
+	}
+	// check bishop attack vector
+	bishopBB := board.bbForPiece(NewPiece(Bishop, attacker))
+	bb = diaAttack(occ, sq) & bishopBB
+	if bb != 0 {
+		return true
+	}
+	// check knight attack vector
+	knightBB := board.bbForPiece(NewPiece(Knight, attacker))
+	bb = bbKnightMoves[sq] & knightBB
+	if bb != 0 {
+		return true
+	}
+	// check pawn attack vector
+	if attacker == Black {
+		capRight := (board.bbBlackPawn & ^bbFileH & ^bbRank1) << 7
+		capLeft := (board.bbBlackPawn & ^bbFileA & ^bbRank1) << 9
+		bb = (capRight | capLeft) & bbForSquare(sq)
+		if bb != 0 {
+			return true
+		}
+	} else {
+		capRight := (board.bbWhitePawn & ^bbFileH & ^bbRank8) >> 9
+		capLeft := (board.bbWhitePawn & ^bbFileA & ^bbRank8) >> 7
+		bb = (capRight | capLeft) & bbForSquare(sq)
+		if bb != 0 {
+			return true
+		}
+	}
+	// check king attack vector
+	kingBB := board.bbForPiece(NewPiece(King, attacker))
+	bb = bbKingMoves[sq] & kingBB
+	return bb != 0
+}
+
+// squaresAreAttacked returns true if the opponent attacks any of the given squares
+//
+//	in the given position.
 //
 // The function checks attacks from:
 //   - Sliding pieces (queen, rook, bishop)
 //   - Knights
 //   - Pawns
 //   - King
-//
-//nolint:mnd // this is a formula to determine if a square is attacked
 func squaresAreAttacked(pos *Position, sqs ...Square) bool {
 	otherColor := pos.Turn().Other()
-	occ := ^pos.board.emptySqs
 	for _, sq := range sqs {
-		// hot path check to see if attack vector is possible
-		s2BB := pos.board.blackSqs
-		if pos.Turn() == Black {
-			s2BB = pos.board.whiteSqs
-		}
-		if ((diaAttack(occ, sq)|hvAttack(occ, sq))&s2BB)|(bbKnightMoves[sq]&s2BB) == 0 {
-			continue
-		}
-		// check queen attack vector
-		queenBB := pos.board.bbForPiece(NewPiece(Queen, otherColor))
-		bb := (diaAttack(occ, sq) | hvAttack(occ, sq)) & queenBB
-		if bb != 0 {
-			return true
-		}
-		// check rook attack vector
-		rookBB := pos.board.bbForPiece(NewPiece(Rook, otherColor))
-		bb = hvAttack(occ, sq) & rookBB
-		if bb != 0 {
-			return true
-		}
-		// check bishop attack vector
-		bishopBB := pos.board.bbForPiece(NewPiece(Bishop, otherColor))
-		bb = diaAttack(occ, sq) & bishopBB
-		if bb != 0 {
-			return true
-		}
-		// check knight attack vector
-		knightBB := pos.board.bbForPiece(NewPiece(Knight, otherColor))
-		bb = bbKnightMoves[sq] & knightBB
-		if bb != 0 {
-			return true
-		}
-		// check pawn attack vector
-		if pos.Turn() == White {
-			capRight := (pos.board.bbBlackPawn & ^bbFileH & ^bbRank1) << 7
-			capLeft := (pos.board.bbBlackPawn & ^bbFileA & ^bbRank1) << 9
-			bb = (capRight | capLeft) & bbForSquare(sq)
-			if bb != 0 {
-				return true
-			}
-		} else {
-			capRight := (pos.board.bbWhitePawn & ^bbFileH & ^bbRank8) >> 9
-			capLeft := (pos.board.bbWhitePawn & ^bbFileA & ^bbRank8) >> 7
-			bb = (capRight | capLeft) & bbForSquare(sq)
-			if bb != 0 {
-				return true
-			}
-		}
-		// check king attack vector
-		kingBB := pos.board.bbForPiece(NewPiece(King, otherColor))
-		bb = bbKingMoves[sq] & kingBB
-		if bb != 0 {
+		if isSquareAttackedBy(pos.board, sq, otherColor) {
 			return true
 		}
 	}

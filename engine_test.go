@@ -276,6 +276,145 @@ func TestUnsafeMoves_KingIntoCheck(t *testing.T) {
 		}
 	}
 }
+
+func TestDiscoveredCheck(t *testing.T) {
+	// White rook on e1 is blocked by white knight on e4 from checking black king on e8
+	// Moving Ne4-f6 reveals the check
+	pos := mustPosition("4k3/8/8/8/4N3/8/8/4R1K1 w - - 0 1")
+	moves := pos.ValidMoves()
+
+	foundDiscoveredCheck := false
+	for _, m := range moves {
+		if m.s1 == E4 && m.HasTag(Check) {
+			foundDiscoveredCheck = true
+			break
+		}
+	}
+	if !foundDiscoveredCheck {
+		t.Error("expected at least one move from e4 with discovered check")
+	}
+}
+
+func TestEnPassantDiscoveredCheck(t *testing.T) {
+	// White king on e1, black rook on e8, black pawn on e4 blocks the rook.
+	// White pawn on d2 moves to d4. Black captures e4xd3 en passant.
+	// After capture, pawn is on d3 (not on e-file), rook gives check.
+	pos := mustPosition("4r3/8/8/8/4p3/8/3P4/4K1k1 w - - 0 1")
+	// White plays d2-d4
+	moves := pos.ValidMoves()
+	var d2d4 Move
+	found := false
+	for _, m := range moves {
+		if m.s1 == D2 && m.s2 == D4 {
+			d2d4 = m
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected d2-d4 move")
+	}
+
+	// Apply the move and get the new position
+	pos2 := pos.Update(&d2d4)
+	// Black to move, en passant on d3
+	moves2 := pos2.ValidMoves()
+
+	foundEPCheck := false
+	for _, m := range moves2 {
+		if m.HasTag(EnPassant) && m.HasTag(Check) {
+			foundEPCheck = true
+			break
+		}
+	}
+	if !foundEPCheck {
+		t.Error("expected en passant move with discovered check")
+	}
+}
+
+func TestDoubleCheck(t *testing.T) {
+	// Black king on e8 is in double check from white queen on h5 and knight on f6
+	// Clear diagonal h5-e8 by removing pawn on f7: white knight on f6, queen on h5
+	// The position itself should have inCheck=true, and only king moves should be legal
+	pos := mustPosition("rnb1kbnr/pppp2pp/5N2/6pQ/8/8/PPPPPPPP/RNB1KB1R b KQkq - 0 1")
+
+	// Verify the position itself has the black king in check
+	if !pos.inCheck {
+		t.Error("expected black king to be in check in this position")
+	}
+
+	moves := pos.ValidMoves()
+	// In double check, only king moves are legal
+	for _, m := range moves {
+		if m.s1 != E8 {
+			t.Errorf("in double check, only king moves should be legal, got %s", m.String())
+		}
+	}
+}
+
+func TestKingMoveEscapesCheck(t *testing.T) {
+	// Black king on e8 is in check from white rook on e1
+	// Ke8-d8 should escape check
+	pos := mustPosition("4k3/8/8/8/8/8/8/4R3 b - - 0 1")
+	moves := pos.ValidMoves()
+
+	findMove := func(s1, s2 Square) (Move, bool) {
+		for _, m := range moves {
+			if m.s1 == s1 && m.s2 == s2 {
+				return m, true
+			}
+		}
+		return Move{}, false
+	}
+
+	m, ok := findMove(E8, D8)
+	if !ok {
+		t.Fatal("expected to find Ke8-d8 move")
+	}
+	if m.HasTag(inCheck) {
+		t.Error("Ke8-d8 should not leave king in check")
+	}
+}
+
+func TestKingMoveWalksIntoCheck(t *testing.T) {
+	// White king on e1, black rook on e8
+	// Ke1-e2 should be illegal (walks into check)
+	pos := mustPosition("4r3/8/8/8/8/8/8/4K3 w - - 0 1")
+	moves := engine{}.UnsafeMoves(pos)
+
+	findMove := func(s1, s2 Square) (Move, bool) {
+		for _, m := range moves {
+			if m.s1 == s1 && m.s2 == s2 {
+				return m, true
+			}
+		}
+		return Move{}, false
+	}
+
+	m, ok := findMove(E1, E2)
+	if !ok {
+		t.Fatal("expected to find Ke1-e2 unsafe move")
+	}
+	if !m.HasTag(inCheck) {
+		t.Error("Ke1-e2 should have inCheck tag")
+	}
+}
+
+func BenchmarkMoveTags(b *testing.B) {
+	pos := mustPosition("r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 0 1")
+	moves := engine{}.CalcMoves(pos, false)
+	if len(moves) == 0 {
+		b.Fatal("expected moves")
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, m := range moves {
+			_ = moveTags(m, pos)
+		}
+	}
+}
 // Helper function to convert FEN to Position
 func mustPosition(fen string) *Position {
 	fenObject, err := FEN(fen)
