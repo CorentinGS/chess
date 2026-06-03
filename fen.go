@@ -43,14 +43,16 @@ func decodeFEN(fen string) (*Position, error) {
 	if err != nil || moveCount < 1 {
 		return nil, errors.New("chess: fen invalid move count")
 	}
-	return &Position{
+	pos := &Position{
 		board:           b,
 		turn:            turn,
 		castleRights:    rights,
 		enPassantSquare: sq,
 		halfMoveClock:   halfMoveClock,
 		moveCount:       moveCount,
-	}, nil
+	}
+	pos.hash = pos.computeHash()
+	return pos, nil
 }
 
 const (

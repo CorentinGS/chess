@@ -3,6 +3,7 @@ package chess
 import (
 	"encoding/hex"
 	"fmt"
+	"strconv"
 )
 
 var polyglotHashesBytes = func() [len(polyglotHashes)][8]byte {
@@ -13,6 +14,19 @@ var polyglotHashesBytes = func() [len(polyglotHashes)][8]byte {
 			panic(fmt.Errorf("invalid polyglot hash at index %d: %w", i, err))
 		}
 		copy(hashes[i][:], b)
+	}
+	return hashes
+}()
+
+// polyglotHashesUint64 provides the same hashes as uint64 values for fast XOR operations.
+var polyglotHashesUint64 = func() [len(polyglotHashes)]uint64 {
+	var hashes [len(polyglotHashes)]uint64
+	for i, hexStr := range polyglotHashes {
+		v, err := strconv.ParseUint(hexStr, 16, 64)
+		if err != nil {
+			panic(fmt.Errorf("invalid polyglot hash at index %d: %w", i, err))
+		}
+		hashes[i] = v
 	}
 	return hashes
 }()

@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -145,5 +146,170 @@ func TestSamePositionEnPassantFIDECompliance(t *testing.T) {
 
 	if posWithRelevantEPRight.samePosition(posWithRelevantEPRightNoEP) {
 		t.Error("positions with relevant en passant square (right adjacent pawn) should be considered different")
+	}
+}
+
+func TestValidMovesUnsafeEquivalence(t *testing.T) {
+	for _, fen := range validFENs {
+		pos, err := decodeFEN(fen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		safe := pos.ValidMoves()
+		unsafe := pos.ValidMovesUnsafe()
+		if !reflect.DeepEqual(safe, unsafe) {
+			t.Fatalf("ValidMovesUnsafe() differs from ValidMoves() for FEN %s", fen)
+		}
+	}
+}
+
+func TestValidMovesUnsafeMutation(t *testing.T) {
+	pos := StartingPosition()
+	unsafe1 := pos.ValidMovesUnsafe()
+	unsafe2 := pos.ValidMovesUnsafe()
+
+	// Modifying the unsafe slice should affect the position's cached moves
+	if len(unsafe1) == 0 {
+		t.Fatal("expected non-zero moves")
+	}
+	original := unsafe1[0]
+	unsafe1[0] = Move{s1: NoSquare, s2: NoSquare}
+	if unsafe2[0].s1 != NoSquare || unsafe2[0].s2 != NoSquare {
+		t.Error("modifying ValidMovesUnsafe() slice should affect internal cache")
+	}
+
+	// Reset for other tests
+	unsafe1[0] = original
+}
+
+func TestValidMovesIter(t *testing.T) {
+	for _, fen := range validFENs {
+		pos, err := decodeFEN(fen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		moves := pos.ValidMoves()
+		var iterMoves []Move
+		for move := range pos.ValidMovesIter {
+			iterMoves = append(iterMoves, move)
+		}
+		if !reflect.DeepEqual(moves, iterMoves) {
+			t.Fatalf("ValidMovesIter() yields different moves than ValidMoves() for FEN %s", fen)
+		}
+	}
+}
+
+func TestValidMovesIterEarlyReturn(t *testing.T) {
+	pos := StartingPosition()
+	count := 0
+	for range pos.ValidMovesIter {
+		count++
+		if count == 5 {
+			break
+		}
+	}
+	if count != 5 {
+		t.Fatalf("expected early return after 5 moves, got %d", count)
+	}
+}
+
+func BenchmarkValidMovesCopy(b *testing.B) {
+	pos := StartingPosition()
+	for i := 0; i < b.N; i++ {
+		_ = pos.ValidMoves()
+	}
+}
+
+func BenchmarkValidMovesUnsafe(b *testing.B) {
+	pos := StartingPosition()
+	for i := 0; i < b.N; i++ {
+		_ = pos.ValidMovesUnsafe()
+	}
+}
+
+func TestZobristHashConsistency(t *testing.T) {
+	// Same positions must have the same hash
+	pos1 := StartingPosition()
+	pos2 := StartingPosition()
+	if pos1.ZobristHash() != pos2.ZobristHash() {
+		t.Fatalf("identical positions have different hashes: %x vs %x", pos1.ZobristHash(), pos2.ZobristHash())
+	}
+
+	// Different positions should have different hashes (with very high probability)
+	pos3, _ := decodeFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")
+	if pos1.ZobristHash() == pos3.ZobristHash() {
+		t.Fatal("different positions have the same hash (unlikely collision)")
+	}
+}
+
+func TestZobristHashIncrementalCorrectness(t *testing.T) {
+	for _, fen := range validFENs {
+		pos, err := decodeFEN(fen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		moves := pos.ValidMovesUnsafe()
+		if len(moves) == 0 {
+			continue
+		}
+		for _, m := range moves {
+			newPos := pos.Update(&m)
+			// Recompute hash from scratch for the new position
+			recomputedHash := newPos.computeHash()
+			if newPos.ZobristHash() != recomputedHash {
+				t.Fatalf("incremental hash %x != recomputed hash %x for move %s in FEN %s",
+					newPos.ZobristHash(), recomputedHash, m.String(), fen)
+			}
+		}
+	}
+}
+
+func TestZobristHashSamePositionEquivalence(t *testing.T) {
+	// Test that hash-based samePosition matches the old logic for a variety of positions
+	for i, fen1 := range validFENs {
+		pos1, err := decodeFEN(fen1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for j, fen2 := range validFENs {
+			if j > i+10 && j < len(validFENs)-10 {
+				continue // Sample to keep test fast
+			}
+			pos2, err := decodeFEN(fen2)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// The old samePosition logic (using string comparison)
+			oldSame := pos1.board.String() == pos2.board.String() &&
+				pos1.turn == pos2.turn &&
+				pos1.castleRights.String() == pos2.castleRights.String() &&
+				pos1.relevantEnPassantSquare() == pos2.relevantEnPassantSquare()
+
+			newSame := pos1.samePosition(pos2)
+
+			if oldSame != newSame {
+				t.Fatalf("samePosition mismatch for FENs %s and %s: old=%v new=%v", fen1, fen2, oldSame, newSame)
+			}
+		}
+	}
+}
+
+func BenchmarkSamePositionHash(b *testing.B) {
+	pos1 := StartingPosition()
+	pos2 := StartingPosition()
+	for i := 0; i < b.N; i++ {
+		_ = pos1.samePosition(pos2)
+	}
+}
+
+func BenchmarkSamePositionString(b *testing.B) {
+	pos1 := StartingPosition()
+	pos2 := StartingPosition()
+	for i := 0; i < b.N; i++ {
+		_ = pos1.board.String() == pos2.board.String() &&
+			pos1.turn == pos2.turn &&
+			pos1.castleRights.String() == pos2.castleRights.String() &&
+			pos1.relevantEnPassantSquare() == pos2.relevantEnPassantSquare()
 	}
 }

@@ -352,7 +352,7 @@ func (AlgebraicNotation) Decode(pos *Position, s string) (*Move, error) {
 	cleanedInput := components.clean()
 
 	// Try matching against valid moves
-	for _, m := range pos.ValidMoves() {
+	for _, m := range pos.ValidMovesUnsafe() {
 		// Encode current move
 		moveStr := AlgebraicNotation{}.Encode(pos, &m)
 
@@ -454,7 +454,7 @@ func formS1(pos *Position, m *Move) string {
 	sb.Reset()
 	defer stringPool.Put(sb)
 
-	for _, mv := range pos.ValidMoves() {
+	for _, mv := range pos.ValidMovesUnsafe() {
 		if mv.s1 != m.s1 && mv.s2 == m.s2 && p == pos.board.Piece(mv.s1) {
 			req = true
 

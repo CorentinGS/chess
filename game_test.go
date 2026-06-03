@@ -283,8 +283,8 @@ func TestPositionHash(t *testing.T) {
 	for _, s := range []string{"Nf3", "e5", "Nc3"} {
 		g2.PushMove(s, nil)
 	}
-	if g1.Position().Hash() != g2.Position().Hash() {
-		t.Fatalf("expected position hashes to be equal but got %s and %s", g1.Position().Hash(), g2.Position().Hash())
+	if g1.Position().ZobristHash() != g2.Position().ZobristHash() {
+		t.Fatalf("expected position hashes to be equal but got %x and %x", g1.Position().ZobristHash(), g2.Position().ZobristHash())
 	}
 }
 
@@ -329,7 +329,7 @@ func BenchmarkPositionHash(b *testing.B) {
 	g := NewGame(fen)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		g.Position().Hash()
+		g.Position().ZobristHash()
 	}
 }
 

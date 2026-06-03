@@ -1031,7 +1031,7 @@ func (g *Game) validateMove(move *Move) error {
 	}
 
 	// Check if the move exists in the list of valid moves for the current position
-	validMoves := g.pos.ValidMoves()
+	validMoves := g.pos.ValidMovesUnsafe()
 	for _, validMove := range validMoves {
 		if validMove.s1 == move.s1 && validMove.s2 == move.s2 && validMove.promo == move.promo {
 			return nil // Move is valid

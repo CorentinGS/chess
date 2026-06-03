@@ -253,7 +253,7 @@ func (p *Parser) parseMove() (*Move, error) {
 	// Handle castling first as it's a special case
 	if p.currentToken().Type == KingsideCastle {
 		move.tags = KingSideCastle
-		for _, m := range p.game.pos.ValidMoves() {
+		for _, m := range p.game.pos.ValidMovesUnsafe() {
 			if m.HasTag(KingSideCastle) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
@@ -274,7 +274,7 @@ func (p *Parser) parseMove() (*Move, error) {
 
 	if p.currentToken().Type == QueensideCastle {
 		move.tags = QueenSideCastle
-		for _, m := range p.game.pos.ValidMoves() {
+		for _, m := range p.game.pos.ValidMovesUnsafe() {
 			if m.HasTag(QueenSideCastle) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
@@ -380,7 +380,7 @@ func (p *Parser) parseMove() (*Move, error) {
 	// Find matching legal move
 	var matchingMove *Move
 	var err error
-	validMoves := p.game.pos.ValidMoves()
+	validMoves := p.game.pos.ValidMovesUnsafe()
 	for _, m := range validMoves {
 		//nolint:nestif // readability
 		if m.S2() == targetSquare {
