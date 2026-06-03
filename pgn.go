@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"golang.org/x/exp/maps"
+	"maps"
 )
 
 // Parser holds the state needed during parsing.
