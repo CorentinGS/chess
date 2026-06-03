@@ -249,13 +249,19 @@ func TestGetRandomMove(t *testing.T) {
 	}
 
 	// Test with existing position
-	move := book.GetRandomMove(1)
+	move, err := book.GetRandomMove(1)
+	if err != nil {
+		t.Fatalf("GetRandomMove() error = %v", err)
+	}
 	if move == nil {
 		t.Error("GetRandomMove() returned nil for existing position")
 	}
 
 	// Test with non-existing position
-	move = book.GetRandomMove(999)
+	move, err = book.GetRandomMove(999)
+	if err != nil {
+		t.Fatalf("GetRandomMove() error = %v", err)
+	}
 	if move != nil {
 		t.Error("GetRandomMove() returned move for non-existing position")
 	}

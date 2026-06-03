@@ -379,15 +379,18 @@ func isCastlingMove(fromFile, fromRank, toFile, toRank int) bool {
 // Example:
 //
 //	hash := uint64(0x463b96181691fc9c) // Starting position
-//	move := book.GetRandomMove(hash)
+//	move, err := book.GetRandomMove(hash)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //	if move != nil {
 //	    decodedMove := DecodeMove(move.Move)
 //	    fmt.Printf("Selected move: %v\n", decodedMove)
 //	}
-func (book *PolyglotBook) GetRandomMove(positionHash uint64) *PolyglotEntry {
+func (book *PolyglotBook) GetRandomMove(positionHash uint64) (*PolyglotEntry, error) {
 	moves := book.FindMoves(positionHash)
 	if len(moves) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	totalWeight := 0
@@ -395,28 +398,32 @@ func (book *PolyglotBook) GetRandomMove(positionHash uint64) *PolyglotEntry {
 		totalWeight += int(move.Weight)
 	}
 
-	r := int(fastRand()) % totalWeight
+	r, err := fastRand()
+	if err != nil {
+		return nil, err
+	}
+	rn := int(r) % totalWeight
 	currentWeight := 0
 	for _, move := range moves {
 		currentWeight += int(move.Weight)
-		if r < currentWeight {
-			return &move
+		if rn < currentWeight {
+			return &move, nil
 		}
 	}
 
-	return &moves[0]
+	return &moves[0], nil
 }
 
 // fastRand returns a cryptographically secure random uint32.
 // This implementation uses crypto/rand instead of math/rand to ensure
 // that move selection cannot be predicted or manipulated.
-func fastRand() uint32 {
+func fastRand() (uint32, error) {
 	b := make([]byte, 4)
 	_, err := rand.Read(b)
 	if err != nil {
-		panic(fmt.Sprintf("failed to generate random number: %v", err))
+		return 0, fmt.Errorf("failed to generate random number: %w", err)
 	}
-	return binary.BigEndian.Uint32(b)
+	return binary.BigEndian.Uint32(b), nil
 }
 
 // NewPolyglotBookFromMap creates a PolyglotBook from a map where

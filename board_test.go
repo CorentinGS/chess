@@ -47,7 +47,11 @@ func TestBoardRotation(t *testing.T) {
 	g := NewGame()
 	board := g.Position().Board()
 	for i := range fens {
-		board = board.Rotate()
+		var err error
+		board, err = board.Rotate()
+		if err != nil {
+			t.Fatalf("Rotate() error = %v", err)
+		}
 		if fens[i] != board.String() {
 			t.Fatalf("expected board string %s but got %s", fens[i], board.String())
 		}
@@ -57,22 +61,35 @@ func TestBoardRotation(t *testing.T) {
 func TestBoardFlip(t *testing.T) {
 	g := NewGame()
 	board := g.Position().Board()
-	board = board.Flip(UpDown)
+	var err error
+	board, err = board.Flip(UpDown)
+	if err != nil {
+		t.Fatalf("Flip(UpDown) error = %v", err)
+	}
 	b := "RNBQKBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbqkbnr"
 	if b != board.String() {
 		t.Fatalf("expected board string %s but got %s", b, board.String())
 	}
-	board = board.Flip(UpDown)
+	board, err = board.Flip(UpDown)
+	if err != nil {
+		t.Fatalf("Flip(UpDown) error = %v", err)
+	}
 	b = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 	if b != board.String() {
 		t.Fatalf("expected board string %s but got %s", b, board.String())
 	}
-	board = board.Flip(LeftRight)
+	board, err = board.Flip(LeftRight)
+	if err != nil {
+		t.Fatalf("Flip(LeftRight) error = %v", err)
+	}
 	b = "rnbkqbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBKQBNR"
 	if b != board.String() {
 		t.Fatalf("expected board string %s but got %s", b, board.String())
 	}
-	board = board.Flip(LeftRight)
+	board, err = board.Flip(LeftRight)
+	if err != nil {
+		t.Fatalf("Flip(LeftRight) error = %v", err)
+	}
 	b = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 	if b != board.String() {
 		t.Fatalf("expected board string %s but got %s", b, board.String())
@@ -82,7 +99,11 @@ func TestBoardFlip(t *testing.T) {
 func TestBoardTranspose(t *testing.T) {
 	g := NewGame()
 	board := g.Position().Board()
-	board = board.Transpose()
+	var err error
+	board, err = board.Transpose()
+	if err != nil {
+		t.Fatalf("Transpose() error = %v", err)
+	}
 	b := "rp4PR/np4PN/bp4PB/qp4PQ/kp4PK/bp4PB/np4PN/rp4PR"
 	if b != board.String() {
 		t.Fatalf("expected board string %s but got %s", b, board.String())

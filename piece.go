@@ -193,10 +193,11 @@ const (
 	BlackPawn
 )
 
-// TODO: This is a constant slice
+// allPieces is an immutable array of all piece types.
+// Treat as read-only; do not modify elements.
 //
-//nolint:gochecknoglobals // This is a constant slice.
-var allPieces = []Piece{
+//nolint:gochecknoglobals // Immutable lookup table.
+var allPieces = [12]Piece{
 	WhiteKing, WhiteQueen, WhiteRook, WhiteBishop, WhiteKnight, WhitePawn,
 	BlackKing, BlackQueen, BlackRook, BlackBishop, BlackKnight, BlackPawn,
 }
@@ -256,12 +257,13 @@ func (p Piece) DarkString() string {
 	return pieceDarkUnicodes[int(p)]
 }
 
-// TODO: These are constant slices
+// pieceUnicodes and pieceDarkUnicodes are immutable lookup tables for piece unicode symbols.
+// Treat as read-only; do not modify elements.
+//
+//nolint:gochecknoglobals // Immutable lookup tables.
 var (
-	//nolint:gochecknoglobals // This is a constant slice.
-	pieceUnicodes = []string{" ", "♔", "♕", "♖", "♗", "♘", "♙", "♚", "♛", "♜", "♝", "♞", "♟"}
-	//nolint:gochecknoglobals // This is a constant slice.
-	pieceDarkUnicodes = []string{" ", "♚", "♛", "♜", "♝", "♞", "♟", "♔", "♕", "♖", "♗", "♘", "♙"}
+	pieceUnicodes     = [13]string{" ", "♔", "♕", "♖", "♗", "♘", "♙", "♚", "♛", "♜", "♝", "♞", "♟"}
+	pieceDarkUnicodes = [13]string{" ", "♚", "♛", "♜", "♝", "♞", "♟", "♔", "♕", "♖", "♗", "♘", "♙"}
 )
 
 // getFENChar returns the FEN character representation of a piece

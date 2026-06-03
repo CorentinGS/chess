@@ -154,7 +154,11 @@ func fenBoard(boardStr string) (*Board, error) {
 
 	// Create new board with the pooled map
 	// Note: NewBoard must copy the map since we're returning m to the pool
-	return NewBoard(m), nil
+	board, err := NewBoard(m)
+	if err != nil {
+		return nil, err
+	}
+	return board, nil
 }
 
 // fenFormRank converts a FEN rank string to a map of pieces, reusing the provided map.
@@ -210,7 +214,7 @@ func formEnPassant(enPassant string) (Square, error) {
 	if enPassant == "-" {
 		return NoSquare, nil
 	}
-	sq := strToSquareMap[enPassant]
+	sq := SquareFromString(enPassant)
 	if sq == NoSquare || !(sq.Rank() == Rank3 || sq.Rank() == Rank6) {
 		return NoSquare, fmt.Errorf("chess: fen invalid En Passant square %s", enPassant)
 	}

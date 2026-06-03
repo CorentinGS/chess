@@ -39,7 +39,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"log"
+	"fmt"
 )
 
 // Board represents a chess board and its relationship between squares and pieces.
@@ -74,8 +74,8 @@ type Board struct {
 //	    NewSquare(FileE, Rank1): WhiteKing,
 //	    NewSquare(FileE, Rank8): BlackKing,
 //	}
-//	board := NewBoard(squares)
-func NewBoard(m map[Square]Piece) *Board {
+//	board, err := NewBoard(squares)
+func NewBoard(m map[Square]Piece) (*Board, error) {
 	b := &Board{}
 	for _, p1 := range allPieces {
 		var bb uint64
@@ -85,10 +85,12 @@ func NewBoard(m map[Square]Piece) *Board {
 				bb |= 1
 			}
 		}
-		b.setBBForPiece(p1, bitboard(bb))
+		if err := b.setBBForPiece(p1, bitboard(bb)); err != nil {
+			return nil, err
+		}
 	}
 	b.calcConvienceBBs(nil)
-	return b
+	return b, nil
 }
 
 // SquareMap returns a mapping of squares to pieces.
@@ -105,8 +107,12 @@ func (b *Board) SquareMap() map[Square]Piece {
 }
 
 // Rotate rotates the board 90 degrees clockwise.
-func (b *Board) Rotate() *Board {
-	return b.Flip(UpDown).Transpose()
+func (b *Board) Rotate() (*Board, error) {
+	flipped, err := b.Flip(UpDown)
+	if err != nil {
+		return nil, err
+	}
+	return flipped.Transpose()
 }
 
 // FlipDirection is the direction for the Board.Flip method.
@@ -122,7 +128,7 @@ const (
 // Flip returns a new board flipped over the specified axis.
 // For UpDown, pieces are mirrored across the horizontal center line.
 // For LeftRight, pieces are mirrored across the vertical center line.
-func (b *Board) Flip(fd FlipDirection) *Board {
+func (b *Board) Flip(fd FlipDirection) (*Board, error) {
 	m := map[Square]Piece{}
 	for sq := range numOfSquaresInBoard {
 		var mv Square
@@ -142,7 +148,7 @@ func (b *Board) Flip(fd FlipDirection) *Board {
 }
 
 // Transpose flips the board over the A8 to H1 diagonal.
-func (b *Board) Transpose() *Board {
+func (b *Board) Transpose() (*Board, error) {
 	m := map[Square]Piece{}
 	for sq := range numOfSquaresInBoard {
 		file := File(7 - Square(sq).Rank())
@@ -358,11 +364,15 @@ func (b *Board) update(m *Move) {
 	for _, p := range allPieces {
 		bb := b.bbForPiece(p)
 		// remove what was at s2
-		b.setBBForPiece(p, bb & ^s2BB)
+		if err := b.setBBForPiece(p, bb & ^s2BB); err != nil {
+			panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
+		}
 		// move what was at s1 to s2
 		if bb.Occupied(m.s1) {
 			bb = b.bbForPiece(p)
-			b.setBBForPiece(p, (bb & ^s1BB)|s2BB)
+			if err := b.setBBForPiece(p, (bb & ^s1BB)|s2BB); err != nil {
+				panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
+			}
 		}
 	}
 	// check promotion
@@ -370,10 +380,14 @@ func (b *Board) update(m *Move) {
 		newPiece := NewPiece(m.promo, p1.Color())
 		// remove pawn
 		bbPawn := b.bbForPiece(p1)
-		b.setBBForPiece(p1, bbPawn & ^s1BB & ^s2BB)
+		if err := b.setBBForPiece(p1, bbPawn & ^s1BB & ^s2BB); err != nil {
+			panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
+		}
 		// add promo piece
 		bbPromo := b.bbForPiece(newPiece)
-		b.setBBForPiece(newPiece, bbPromo|s2BB)
+		if err := b.setBBForPiece(newPiece, bbPromo|s2BB); err != nil {
+			panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
+		}
 	}
 	// remove captured en passant piece
 	if m.HasTag(EnPassant) {
@@ -529,7 +543,7 @@ func (b *Board) bbForPiece(p Piece) bitboard {
 	return bitboard(0)
 }
 
-func (b *Board) setBBForPiece(p Piece, bb bitboard) {
+func (b *Board) setBBForPiece(p Piece, bb bitboard) error {
 	switch p {
 	case WhiteKing:
 		b.bbWhiteKing = bb
@@ -556,6 +570,7 @@ func (b *Board) setBBForPiece(p Piece, bb bitboard) {
 	case BlackPawn:
 		b.bbBlackPawn = bb
 	default:
-		log.Panicf("invalid piece %s", p)
+		return fmt.Errorf("invalid piece %s", p)
 	}
+	return nil
 }

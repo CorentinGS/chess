@@ -155,16 +155,139 @@ func (f File) Byte() byte {
 	return fileChars[f]
 }
 
-// TODO: This is a legacy map for converting strings to squares. (will be removed in the future)
-//
-//nolint:gochecknoglobals // this is a map of all squares
-var strToSquareMap = map[string]Square{
-	"a1": A1, "a2": A2, "a3": A3, "a4": A4, "a5": A5, "a6": A6, "a7": A7, "a8": A8,
-	"b1": B1, "b2": B2, "b3": B3, "b4": B4, "b5": B5, "b6": B6, "b7": B7, "b8": B8,
-	"c1": C1, "c2": C2, "c3": C3, "c4": C4, "c5": C5, "c6": C6, "c7": C7, "c8": C8,
-	"d1": D1, "d2": D2, "d3": D3, "d4": D4, "d5": D5, "d6": D6, "d7": D7, "d8": D8,
-	"e1": E1, "e2": E2, "e3": E3, "e4": E4, "e5": E5, "e6": E6, "e7": E7, "e8": E8,
-	"f1": F1, "f2": F2, "f3": F3, "f4": F4, "f5": F5, "f6": F6, "f7": F7, "f8": F8,
-	"g1": G1, "g2": G2, "g3": G3, "g4": G4, "g5": G5, "g6": G6, "g7": G7, "g8": G8,
-	"h1": H1, "h2": H2, "h3": H3, "h4": H4, "h5": H5, "h6": H6, "h7": H7, "h8": H8,
+// SquareFromString converts a 2-character square notation (e.g., "e4") to a Square.
+// Returns NoSquare if the string is not a valid square.
+func SquareFromString(s string) Square {
+	switch s {
+	case "a1":
+		return A1
+	case "a2":
+		return A2
+	case "a3":
+		return A3
+	case "a4":
+		return A4
+	case "a5":
+		return A5
+	case "a6":
+		return A6
+	case "a7":
+		return A7
+	case "a8":
+		return A8
+	case "b1":
+		return B1
+	case "b2":
+		return B2
+	case "b3":
+		return B3
+	case "b4":
+		return B4
+	case "b5":
+		return B5
+	case "b6":
+		return B6
+	case "b7":
+		return B7
+	case "b8":
+		return B8
+	case "c1":
+		return C1
+	case "c2":
+		return C2
+	case "c3":
+		return C3
+	case "c4":
+		return C4
+	case "c5":
+		return C5
+	case "c6":
+		return C6
+	case "c7":
+		return C7
+	case "c8":
+		return C8
+	case "d1":
+		return D1
+	case "d2":
+		return D2
+	case "d3":
+		return D3
+	case "d4":
+		return D4
+	case "d5":
+		return D5
+	case "d6":
+		return D6
+	case "d7":
+		return D7
+	case "d8":
+		return D8
+	case "e1":
+		return E1
+	case "e2":
+		return E2
+	case "e3":
+		return E3
+	case "e4":
+		return E4
+	case "e5":
+		return E5
+	case "e6":
+		return E6
+	case "e7":
+		return E7
+	case "e8":
+		return E8
+	case "f1":
+		return F1
+	case "f2":
+		return F2
+	case "f3":
+		return F3
+	case "f4":
+		return F4
+	case "f5":
+		return F5
+	case "f6":
+		return F6
+	case "f7":
+		return F7
+	case "f8":
+		return F8
+	case "g1":
+		return G1
+	case "g2":
+		return G2
+	case "g3":
+		return G3
+	case "g4":
+		return G4
+	case "g5":
+		return G5
+	case "g6":
+		return G6
+	case "g7":
+		return G7
+	case "g8":
+		return G8
+	case "h1":
+		return H1
+	case "h2":
+		return H2
+	case "h3":
+		return H3
+	case "h4":
+		return H4
+	case "h5":
+		return H5
+	case "h6":
+		return H6
+	case "h7":
+		return H7
+	case "h8":
+		return H8
+	default:
+		return NoSquare
+	}
 }

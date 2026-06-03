@@ -74,19 +74,6 @@ func xorArrays(a, b Hash) {
 	}
 }
 
-func xorArraysInto(a, b, out Hash) {
-	length := len(a)
-	if len(b) < length {
-		length = len(b)
-	}
-	if len(out) < length {
-		panic("output buffer too small")
-	}
-	for i := 0; i < length; i++ {
-		out[i] = a[i] ^ b[i]
-	}
-}
-
 // xorHash performs an in-place XOR operation on a hash
 func (ch *ZobristHasher) xorHash(arr Hash, num int) {
 	// Get the precomputed Polyglot hash as a byte slice

@@ -72,10 +72,11 @@ func (engine) Status(pos *Position) Method {
 	return NoMethod
 }
 
-// TODO: don't use globals
+// promoPieceTypes is an immutable array of promotion piece types.
+// Treat as read-only; do not modify elements.
 //
-//nolint:gochecknoglobals // this is a lookup table
-var promoPieceTypes = []PieceType{Queen, Rook, Bishop, Knight}
+//nolint:gochecknoglobals // Immutable lookup table.
+var promoPieceTypes = [4]PieceType{Queen, Rook, Bishop, Knight}
 
 const maxPossibleMoves = 218 // Maximum possible moves in any chess position
 
@@ -463,7 +464,9 @@ const (
 	bbRank8 bitboard = 255
 )
 
-// TODO make method on Square
+// bbForSquare returns the bitboard mask for the given square.
+// This is a package-level function rather than a Square method because it
+// accesses the package-level lookup table bbSquares.
 func bbForSquare(sq Square) bitboard {
 	return bbSquares[sq]
 }
@@ -492,9 +495,10 @@ var (
 	bbSquares = [64]bitboard{}
 )
 
-// TODO: remove this init function
+// init populates the bbSquares lookup table. This is done at package
+// initialization because the values are constants derived from square indices.
 //
-//nolint:gochecknoinits // will be removed
+//nolint:gochecknoinits // Required for lookup table initialization.
 func init() {
 	const numOfSquaresInBoard = 64
 	for sq := range numOfSquaresInBoard {
