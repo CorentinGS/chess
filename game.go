@@ -828,14 +828,35 @@ func (g *Game) Clone() *Game {
 	// clone do not impact the parent
 	ret.rootMove = g.rootMove.Clone()
 	ret.rootMove.cloneChildren(g.rootMove.children)
-	mlen := len(ret.Moves())
-	if mlen == 0 {
+	if g.currentMove == nil {
 		ret.currentMove = ret.rootMove
 	} else {
-		ret.currentMove = ret.Moves()[mlen-1]
+		ret.currentMove = findClonedMove(g.rootMove, ret.rootMove, g.currentMove)
+		if ret.currentMove == nil {
+			ret.currentMove = ret.rootMove
+		}
 	}
+	ret.pos = ret.currentMove.position
 
 	return ret
+}
+
+func findClonedMove(original, clone, target *Move) *Move {
+	if original == nil || clone == nil || target == nil {
+		return nil
+	}
+	if original == target {
+		return clone
+	}
+	for i, child := range original.children {
+		if i >= len(clone.children) {
+			return nil
+		}
+		if found := findClonedMove(child, clone.children[i], target); found != nil {
+			return found
+		}
+	}
+	return nil
 }
 
 // Positions returns all positions in the game in the main line.
