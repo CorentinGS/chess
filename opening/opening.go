@@ -2,17 +2,26 @@
 package opening
 
 import (
-	"bytes"
+	"sync"
 
 	"github.com/corentings/chess/v2"
 )
 
 // A Opening represents a specific sequence of moves from the staring position.
 type Opening struct {
-	game  *chess.Game
-	code  string
+	game *chess.Game
+	mu   sync.Mutex
+	code string
 	title string
 	pgn   string
+}
+
+func newOpening(code, title, pgn string) *Opening {
+	return &Opening{
+		code:  code,
+		title: title,
+		pgn:   pgn,
+	}
 }
 
 // Code returns the Encyclopaedia of Chess Openings (ECO) code.
@@ -31,11 +40,26 @@ func (o *Opening) PGN() string {
 }
 
 // Game returns the opening as a game.
+// It lazily constructs the game on first call and caches it.
+// It is safe for concurrent use.
 func (o *Opening) Game() *chess.Game {
-	if o.game == nil {
-		pgn, _ := chess.PGN(bytes.NewBufferString(o.pgn))
-		o.game = chess.NewGame(pgn)
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.game != nil {
+		return o.game
 	}
+	game := chess.NewGame()
+	for _, moveStr := range parseMoveList(o.pgn) {
+		pos := game.Position()
+		m, err := chess.UCINotation{}.Decode(pos, moveStr)
+		if err != nil {
+			return nil
+		}
+		if err := game.Move(m, nil); err != nil {
+			return nil
+		}
+	}
+	o.game = game
 	return o.game
 }
 

@@ -4,48 +4,73 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
-	"log"
-	"strconv"
+	"io"
 	"strings"
+	"sync"
 
 	"github.com/corentings/chess/v2"
 )
+
+var (
+	defaultBook     *BookECO
+	defaultBookErr  error
+	defaultBookOnce sync.Once
+)
+
+// DefaultBook returns the standard ECO opening book.
+// The book is parsed lazily on first call and cached for subsequent calls.
+// It is safe for concurrent use.
+func DefaultBook() (*BookECO, error) {
+	defaultBookOnce.Do(func() {
+		defaultBook, defaultBookErr = NewBook(bytes.NewReader(ecoData))
+	})
+	return defaultBook, defaultBookErr
+}
 
 // BookECO represents the Encyclopedia of Chess Openings https://en.wikipedia.org/wiki/Encyclopaedia_of_Chess_Openings
 // BookECO is safe for concurrent use.
 type BookECO struct {
 	root             *node
 	startingPosition *chess.Position
-	labelCount       int
 }
 
-// NewBookECO returns a new BookECO.  This operation has to parse 2k rows of CSV data and insert it into a graph
-// so it can take some time.
-func NewBookECO() *BookECO {
-	startingPosition := &chess.Position{}
-	if err := startingPosition.UnmarshalText([]byte("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")); err != nil {
-		panic(err)
-	}
+// NewBook creates a new opening book from an ECO TSV reader.
+// Use this for custom opening data or when you need isolation from the default book.
+func NewBook(r io.Reader) (*BookECO, error) {
 	b := &BookECO{
 		root: &node{
 			children: map[string]*node{},
 			pos:      chess.NewGame().Position(),
 		},
-		startingPosition: startingPosition,
+		startingPosition: chess.NewGame().Position(),
 	}
-	b.root.label = b.label()
-	r := csv.NewReader(bytes.NewBuffer(ecoData))
-	r.Comma = '\t'
-	records, err := r.ReadAll()
+	csvReader := csv.NewReader(r)
+	csvReader.Comma = '\t'
+	records, err := csvReader.ReadAll()
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("opening: failed to parse ECO data: %w", err)
 	}
 	for i, row := range records {
 		if i == 0 {
-			continue
+			continue // skip header
 		}
-		o := &Opening{code: row[0], title: row[1], pgn: row[3]}
-		_ = b.insert(o)
+		if len(row) < 4 {
+			continue // skip malformed rows
+		}
+		o := newOpening(row[0], row[1], row[3])
+		if err := b.insert(o); err != nil {
+			return nil, fmt.Errorf("opening: failed to insert opening %s: %w", o.code, err)
+		}
+	}
+	return b, nil
+}
+
+// NewBookECO returns a new BookECO using the default embedded ECO data.
+// Deprecated: Use DefaultBook() for the standard book or NewBook() for custom data.
+func NewBookECO() *BookECO {
+	b, err := DefaultBook()
+	if err != nil {
+		panic(err)
 	}
 	return b
 }
@@ -116,7 +141,6 @@ func (b *BookECO) ins(n *node, o *Opening, posList []*chess.Position, moves []*c
 			parent:   n,
 			children: map[string]*node{},
 			pos:      pos,
-			label:    b.label(),
 		}
 		n.children[moveStr] = child
 	}
@@ -132,33 +156,19 @@ type node struct {
 	children map[string]*node
 	opening  *Opening
 	pos      *chess.Position
-	label    string
-}
-
-func (b *BookECO) nodes(root *node, ch chan *node) {
-	ch <- root
-	for _, c := range root.children {
-		b.nodes(c, ch)
-	}
 }
 
 func (b *BookECO) nodeList(root *node) []*node {
-	ch := make(chan *node)
-	go func() {
-		b.nodes(root, ch)
-		close(ch)
-	}()
-	nodes := []*node{}
-	for n := range ch {
-		nodes = append(nodes, n)
-	}
-	return nodes
+	var result []*node
+	b.collectNodes(root, &result)
+	return result
 }
 
-func (b *BookECO) label() string {
-	s := "a" + strconv.Itoa(b.labelCount)
-	b.labelCount++
-	return s
+func (b *BookECO) collectNodes(n *node, result *[]*node) {
+	*result = append(*result, n)
+	for _, c := range n.children {
+		b.collectNodes(c, result)
+	}
 }
 
 // 1.b2b4 e7e5 2.c1b2 f7f6 3.e2e4 f8b4 4.f1c4 b8c6 5.f2f4 d8e7 6.f4f5 g7g6.
