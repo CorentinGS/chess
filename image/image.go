@@ -161,12 +161,12 @@ func (e *encoder) colorForText(sq chess.Square) color.Color {
 
 func colorToHex(c color.Color) string {
 	r, g, b, _ := c.RGBA()
-	return fmt.Sprintf("#%02x%02x%02x", uint8(float64(r)+0.5), uint8(float64(g)*1.0+0.5), uint8(float64(b)*1.0+0.5)) //nolint:mnd // this is a rounding factor
+	return fmt.Sprintf("#%02x%02x%02x", uint8(r>>8), uint8(g>>8), uint8(b>>8))
 }
 
 func pieceXML(x, y int, p chess.Piece) string {
 	fileName := fmt.Sprintf("pieces/%s%s.svg", p.Color().String(), pieceTypeMap[p.Type()])
-	svgStr := string(internal.MustAsset(fileName))
+	svgStr := internal.MustSVG(fileName)
 	old := `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="45" height="45">`
 	sprintf := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="360" height="360" viewBox="%d %d 360 360">`, -1*x, -1*y)
 	return strings.Replace(svgStr, old, sprintf, 1)
