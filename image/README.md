@@ -2,95 +2,128 @@
 
 ## Introduction
 
-**image** is an chess image utility that converts board positions into [SVG](https://en.wikipedia.org/wiki/Scalable_Vector_Graphics), or Scalable Vector Graphics, images.  [svgo](https://github.com/ajstarks/svgo), the only outside dependency, is used to construct the SVG document.
+**image** is a chess image utility that converts board positions into [SVG](https://en.wikipedia.org/wiki/Scalable_Vector_Graphics), or Scalable Vector Graphics, images. The package has no external dependencies; SVG is written directly to an `io.Writer`.
 
 ## Usage
 
-### SVG 
+### SVG
 
-The SVG function is the primary exported function of the package.  It writes an SVG document to the io.Writer given.  
+The `SVG` function is the primary exported function of the package. It writes an SVG document to the `io.Writer` given. Rendering options are configured through an `SVGOptions` value; `nil` or a zero-valued `SVGOptions` uses defaults (white perspective, default square colors, 45px squares, with rank/file coordinates visible).
 
 ```go
-file, _ := os.Open("output.svg")
-defer file.Close()
+f, err := os.Create("output.svg")
+if err != nil {
+    log.Fatal(err)
+}
+defer f.Close()
+
 fenStr := "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1"
 pos := &chess.Position{}
-pos.UnmarshalText([]byte(fenStr))
-image.SVG(file, pos.Board())
+if err := pos.UnmarshalText([]byte(fenStr)); err != nil {
+    log.Fatal(err)
+}
+
+if err := image.SVG(f, pos, nil); err != nil {
+    log.Fatal(err)
+}
 ```
 
-### Dark / Light Square Customization
+### Square Colors
 
-The default colors, shown in the example SVG below, are (235, 209, 166) for light squares and (165, 117, 81) for dark squares.  The light and dark squares can be customized using the SquareColors() option. 
+The default colors are `color.RGBA{235, 209, 166, 255}` for light squares and `color.RGBA{165, 117, 81, 255}` for dark squares. Both colors are opaque. Set `LightSquare` and `DarkSquare` on `SVGOptions` to customize them. Nil colors fall back to the defaults.
 
 ```go
-white := color.RGBA{255, 255, 255, 1}
-gray := color.RGBA{120, 120, 120, 1}
-sqrs := image.SquareColors(white, gray)
-image.SVG(file, pos.Board(), sqrs)
+white := color.RGBA{255, 255, 255, 255}
+gray := color.RGBA{120, 120, 120, 255}
+
+if err := image.SVG(f, pos, &image.SVGOptions{
+    LightSquare: white,
+    DarkSquare:  gray,
+}); err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### Marked Squares
 
-MarkSquares is designed to be used as an optional argument to the SVG function.  It marks the given squares with the color.  A possible usage includes marking squares of the previous move.
+`SVGOptions.Marks` highlights individual squares with a translucent overlay (fixed opacity 0.2; mark color controls hue only). A typical use is marking the squares involved in the previous move. Mark keys outside `A1`..`H8` and nil mark colors are ignored.
 
 ```go
-yellow := color.RGBA{255, 255, 0, 1}
-mark := image.MarkSquares(yellow, chess.D2, chess.D4)
-image.SVG(file, pos.Board(), mark)
+yellow := color.RGBA{255, 255, 0, 255}
+if err := image.SVG(f, pos, &image.SVGOptions{
+    Marks: map[chess.Square]color.Color{
+        chess.D2: yellow,
+        chess.D4: yellow,
+    },
+}); err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### Perspective
 
-Perspective is designed to be used as an optional argument
-to the SVG function.  It draws the board from the perspective
-of the given color.  White is the default.  The following 
-generates a board from Black's perspective:
+`SVGOptions.Perspective` selects the orientation of the board. White is the default. Any value other than `chess.Black` falls back to white without error.
 
 ```go
-fromBlack := image.Perspective(chess.Black)
-image.SVG(file, pos.Board(), fromBlack)
+if err := image.SVG(f, pos, &image.SVGOptions{
+    Perspective: chess.Black,
+}); err != nil {
+    log.Fatal(err)
+}
 ```
 
-### Example Program
+### Square Size and Coordinates
+
+`SquareSize` (in CSS pixels) scales the entire board. The default is 45. The board is always 8x8 squares, so the total SVG width and height are `8 * SquareSize`. A `SquareSize <= 0` falls back to the default. Set `HideCoordinates` to true to omit the rank and file labels.
+
+```go
+if err := image.SVG(f, pos, &image.SVGOptions{
+    SquareSize:      90,
+    HideCoordinates: true,
+}); err != nil {
+    log.Fatal(err)
+}
+```
+
+### Errors
+
+`SVG` returns a non-nil error when the writer is nil (`image: nil writer`), when the position is nil or has no board (`image: nil position`), or when an underlying write fails. The first write error is returned unchanged.
+
+## Example Program
 
 ```go
 package main
 
 import (
-	"image/color"
-	"log"
-	"os"
+    "image/color"
+    "log"
+    "os"
 
-	"github.com/corentings/chess"
-	"github.com/corentings/chess/image"
+    "github.com/corentings/chess"
+    "github.com/corentings/chess/image"
 )
 
 func main() {
-    // create file
-    f, err := os.Create("example.svg")
+    f, err := os.Create("output.svg")
     if err != nil {
         log.Fatal(err)
     }
     defer f.Close()
 
-    // create board position
     fenStr := "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1"
     pos := &chess.Position{}
     if err := pos.UnmarshalText([]byte(fenStr)); err != nil {
         log.Fatal(err)
     }
 
-    // write board SVG to file
-    yellow := color.RGBA{255, 255, 0, 1}
-    mark := image.MarkSquares(yellow, chess.D2, chess.D4)
-    if err := image.SVG(f, pos.Board(), mark); err != nil {
+    yellow := color.RGBA{255, 255, 0, 255}
+    if err := image.SVG(f, pos, &image.SVGOptions{
+        Marks: map[chess.Square]color.Color{
+            chess.D2: yellow,
+            chess.D4: yellow,
+        },
+    }); err != nil {
         log.Fatal(err)
     }
 }
 ```
-
-### Example Program Result
-
-![rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1](example.svg)
- 
