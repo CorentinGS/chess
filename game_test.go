@@ -384,7 +384,7 @@ func TestNavigateToMainLineFromLeaf(t *testing.T) {
 	}
 }
 
-func TestNavigateToMainLineFromBranch(t *testing.T) {
+func TestNavigateToMainLineFromVariation(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
 	for _, m := range moves {
@@ -480,7 +480,7 @@ func TestGoForwardFromLeaf(t *testing.T) {
 	}
 }
 
-func TestGoForwardFromBranch(t *testing.T) {
+func TestGoForwardFromVariation(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6"}
 	for _, m := range moves {
