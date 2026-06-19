@@ -3,6 +3,7 @@ package opening_test
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
@@ -135,6 +136,75 @@ func TestOpeningGameRace(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func TestNewBookFailsFastOnMalformedRow(t *testing.T) {
+	data := "eco\tname\tfyn\tmoves\nA00\tBroken\tonly-three-columns\n"
+
+	_, err := opening.NewBook(strings.NewReader(data))
+	if err == nil {
+		t.Fatal("NewBook() succeeded for malformed row")
+	}
+	if !strings.Contains(err.Error(), "ECO row 2") {
+		t.Fatalf("expected row-numbered error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "expected at least 4 columns") {
+		t.Fatalf("expected malformed column error, got %v", err)
+	}
+}
+
+func TestNewBookFailsFastOnInvalidOpeningMove(t *testing.T) {
+	data := "eco\tname\tfyn\tmoves\nA00\tBroken Opening\t\t1.e2e5\n"
+
+	_, err := opening.NewBook(strings.NewReader(data))
+	if err == nil {
+		t.Fatal("NewBook() succeeded for invalid opening move")
+	}
+	if !strings.Contains(err.Error(), "ECO row 2 (A00 Broken Opening)") {
+		t.Fatalf("expected row and opening context, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "apply move e2e5") {
+		t.Fatalf("expected invalid move context, got %v", err)
+	}
+}
+
+func TestOpeningGameReturnsCallerOwnedGame(t *testing.T) {
+	data := "eco\tname\tfyn\tmoves\nC20\tKing Pawn Game\t\t1.e2e4 e7e5\n"
+	book, err := opening.NewBook(strings.NewReader(data))
+	if err != nil {
+		t.Fatalf("NewBook() failed: %v", err)
+	}
+
+	g := chess.NewGame()
+	if err := g.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.PushMove("e5", nil); err != nil {
+		t.Fatal(err)
+	}
+	o := book.Find(g.Moves())
+	if o == nil {
+		t.Fatal("expected to find opening")
+	}
+
+	game1 := o.Game()
+	if game1 == nil {
+		t.Fatal("Game() returned nil")
+	}
+	if err := game1.PushMove("Nf3", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	game2 := o.Game()
+	if game2 == nil {
+		t.Fatal("Game() returned nil on second call")
+	}
+	if got := len(game2.Moves()); got != 2 {
+		t.Fatalf("expected second Game() result to have 2 moves, got %d", got)
+	}
+	if game1 == game2 {
+		t.Fatal("Game() returned the same pointer twice")
+	}
 }
 
 func BenchmarkDefaultBook(b *testing.B) {

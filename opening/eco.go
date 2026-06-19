@@ -36,46 +36,43 @@ type BookECO struct {
 
 // NewBook creates a new opening book from an ECO TSV reader.
 // Use this for custom opening data or when you need isolation from the default book.
+// NewBook validates the input during construction so malformed books fail
+// before use. Opening.Game replays validated move paths on demand instead of
+// storing games for every opening.
 func NewBook(r io.Reader) (*BookECO, error) {
 	b := &BookECO{
 		root: &node{
-			children: map[string]*node{},
+			children: map[uint32]*node{},
 			pos:      chess.NewGame().Position(),
 		},
 		startingPosition: chess.NewGame().Position(),
 	}
 	csvReader := csv.NewReader(r)
 	csvReader.Comma = '\t'
+	csvReader.FieldsPerRecord = -1
 	records, err := csvReader.ReadAll()
 	if err != nil {
 		return nil, fmt.Errorf("opening: failed to parse ECO data: %w", err)
 	}
 	for i, row := range records {
+		rowNum := i + 1
 		if i == 0 {
 			continue // skip header
 		}
 		if len(row) < 4 {
-			continue // skip malformed rows
+			return nil, fmt.Errorf("opening: ECO row %d: expected at least 4 columns, got %d", rowNum, len(row))
 		}
-		o := newOpening(row[0], row[1], row[3])
-		if err := b.insert(o); err != nil {
-			return nil, fmt.Errorf("opening: failed to insert opening %s: %w", o.code, err)
+		moveList := parseMoveList(row[3])
+		o := newOpening(row[0], row[1], row[3], moveList)
+		if err := b.insertOpening(o); err != nil {
+			return nil, fmt.Errorf("opening: ECO row %d (%s %s): %w", rowNum, row[0], row[1], err)
 		}
 	}
 	return b, nil
 }
 
-// NewBookECO returns a new BookECO using the default embedded ECO data.
-// Deprecated: Use DefaultBook() for the standard book or NewBook() for custom data.
-func NewBookECO() *BookECO {
-	b, err := DefaultBook()
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
 // Find implements the Book interface.
+// Use Find for performance-sensitive opening detection paths.
 func (b *BookECO) Find(moves []*chess.Move) *Opening {
 	for n := b.followPath(b.root, moves); n != nil; n = n.parent {
 		if n.opening != nil {
@@ -86,6 +83,7 @@ func (b *BookECO) Find(moves []*chess.Move) *Opening {
 }
 
 // Possible implements the Book interface.
+// Use Possible for performance-sensitive opening exploration paths.
 func (b *BookECO) Possible(moves []*chess.Move) []*Opening {
 	n := b.followPath(b.root, moves)
 	var openings []*Opening
@@ -101,59 +99,99 @@ func (b *BookECO) followPath(n *node, moves []*chess.Move) *node {
 	if len(moves) == 0 {
 		return n
 	}
-	c, ok := n.children[moves[0].String()]
+	c, ok := n.children[moveKey(moves[0])]
 	if !ok {
 		return n
 	}
 	return b.followPath(c, moves[1:])
 }
 
-func (b *BookECO) insert(o *Opening) error {
-	posList := []*chess.Position{b.startingPosition}
-	var moves []*chess.Move
-	for _, s := range parseMoveList(o.pgn) {
-		pos := posList[len(posList)-1]
-		m, err := chess.UCINotation{}.Decode(pos, s)
-		if err != nil {
-			return fmt.Errorf("error decoding move %s: %w", s, err)
-		}
-		moves = append(moves, m)
-		posList = append(posList, pos.Update(m))
+func (b *BookECO) insertOpening(o *Opening) error {
+	if len(o.moveList) == 0 {
+		return fmt.Errorf("opening has no moves")
 	}
+
 	n := b.root
-	b.ins(n, o, posList[1:], moves)
+	for _, moveStr := range o.moveList {
+		key, err := moveStringKey(moveStr)
+		if err != nil {
+			return err
+		}
+		if child, ok := n.children[key]; ok {
+			n = child
+			continue
+		}
+
+		m, err := chess.UCINotation{}.Decode(n.pos, moveStr)
+		if err != nil {
+			return fmt.Errorf("decode move %s: %w", moveStr, err)
+		}
+		if !isLegalMove(n.pos, m) {
+			return fmt.Errorf("apply move %s: move is not valid for the current position", moveStr)
+		}
+
+		child := &node{
+			parent:   n,
+			children: map[uint32]*node{},
+			pos:      n.pos.Update(m),
+		}
+		n.children[key] = child
+		n = child
+	}
+	n.opening = o
 	return nil
 }
 
-func (b *BookECO) ins(n *node, o *Opening, posList []*chess.Position, moves []*chess.Move) {
-	pos := posList[0]
-	move := moves[0]
-	moveStr := move.String()
-	var child *node
-	for mv, c := range n.children {
-		if mv == moveStr {
-			child = c
-			break
+func isLegalMove(pos *chess.Position, move *chess.Move) bool {
+	for _, validMove := range pos.ValidMovesUnsafe() {
+		if validMove.S1() == move.S1() && validMove.S2() == move.S2() && validMove.Promo() == move.Promo() {
+			return true
 		}
 	}
-	if child == nil {
-		child = &node{
-			parent:   n,
-			children: map[string]*node{},
-			pos:      pos,
+	return false
+}
+
+func moveKey(move *chess.Move) uint32 {
+	if move == nil {
+		return 0
+	}
+	return uint32(move.S1()) | uint32(move.S2())<<6 | uint32(move.Promo())<<12
+}
+
+func moveStringKey(move string) (uint32, error) {
+	if len(move) < 4 || len(move) > 5 {
+		return 0, fmt.Errorf("decode move %s: invalid UCI notation length %d", move, len(move))
+	}
+	if move[0] < 'a' || move[0] > 'h' || move[2] < 'a' || move[2] > 'h' {
+		return 0, fmt.Errorf("decode move %s: invalid UCI file", move)
+	}
+	if move[1] < '1' || move[1] > '8' || move[3] < '1' || move[3] > '8' {
+		return 0, fmt.Errorf("decode move %s: invalid UCI rank", move)
+	}
+
+	s1 := uint32(move[0]-'a') + uint32(move[1]-'1')*8
+	s2 := uint32(move[2]-'a') + uint32(move[3]-'1')*8
+	promo := uint32(chess.NoPieceType)
+	if len(move) == 5 {
+		switch move[4] {
+		case 'q':
+			promo = uint32(chess.Queen)
+		case 'r':
+			promo = uint32(chess.Rook)
+		case 'b':
+			promo = uint32(chess.Bishop)
+		case 'n':
+			promo = uint32(chess.Knight)
+		default:
+			return 0, fmt.Errorf("decode move %s: invalid promotion piece", move)
 		}
-		n.children[moveStr] = child
 	}
-	if len(posList) == 1 {
-		child.opening = o
-		return
-	}
-	b.ins(child, o, posList[1:], moves[1:])
+	return s1 | s2<<6 | promo<<12, nil
 }
 
 type node struct {
 	parent   *node
-	children map[string]*node
+	children map[uint32]*node
 	opening  *Opening
 	pos      *chess.Position
 }
@@ -173,7 +211,7 @@ func (b *BookECO) collectNodes(n *node, result *[]*node) {
 
 // 1.b2b4 e7e5 2.c1b2 f7f6 3.e2e4 f8b4 4.f1c4 b8c6 5.f2f4 d8e7 6.f4f5 g7g6.
 func parseMoveList(pgn string) []string {
-	strs := strings.Split(pgn, " ")
+	strs := strings.Fields(pgn)
 	var cp []string
 	for _, s := range strs {
 		i := strings.Index(s, ".")
