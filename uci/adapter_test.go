@@ -3,8 +3,8 @@ package uci_test
 import (
 	"testing"
 
-	"github.com/corentings/chess/v2"
-	"github.com/corentings/chess/v2/uci"
+	"github.com/corentings/chess/v3"
+	"github.com/corentings/chess/v3/uci"
 )
 
 func Test_FakeAdapter_CmdUCI(t *testing.T) {

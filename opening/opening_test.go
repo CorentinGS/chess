@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/corentings/chess/v2"
-	"github.com/corentings/chess/v2/opening"
+	"github.com/corentings/chess/v3"
+	"github.com/corentings/chess/v3/opening"
 )
 
 func ExampleDefaultBook_find() {

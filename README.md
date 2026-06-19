@@ -85,7 +85,7 @@ If you have ideas or want to help make this package more robust and widely usabl
 **chess** can be installed using "go get".
 
 ```bash
-go get -u github.com/corentings/chess/v2
+go get -u github.com/corentings/chess/v3
 ``` 
 
 ## Usage
@@ -99,7 +99,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
 func main() {
@@ -146,8 +146,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/corentings/chess/v2"
-	"github.com/corentings/chess/v2/uci"
+	"github.com/corentings/chess/v3"
+	"github.com/corentings/chess/v3/uci"
 )
 
 func main() {
@@ -694,7 +694,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
 func main() {

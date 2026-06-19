@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
 func TestSVGDefaultRender(t *testing.T) {

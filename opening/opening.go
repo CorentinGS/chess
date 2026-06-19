@@ -2,7 +2,7 @@
 package opening
 
 import (
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
 // A Opening represents a specific sequence of moves from the staring position.

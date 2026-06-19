@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
 func BenchmarkNewBookECOData(b *testing.B) {

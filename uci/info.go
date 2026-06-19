@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
 var missingWdlErr = errors.New("uci: wdl unavailable; this is mostly likely because UCI_ShowWDL has not been set")

@@ -9,7 +9,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
 const (
