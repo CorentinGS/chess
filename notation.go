@@ -135,15 +135,17 @@ func (UCINotation) Decode(pos *Position, s string) (Move, error) {
 	if l < 4 || l > 5 {
 		return Move{}, fmt.Errorf("chess: invalid UCI notation length %d in %q", l, s)
 	}
-	for idx := 0; idx < 2; idx += 2 {
-		if s[idx+0] < 'a' || s[idx+0] > 'h' {
-			return Move{}, fmt.Errorf("chess: invalid UCI notation sq:%v file:%v",
-				idx/2, s[0])
-		}
-		if s[idx+1] < '1' || s[idx+1] > '8' {
-			return Move{}, fmt.Errorf("chess: invalid UCI notation sq:%v rank:%v",
-				idx/2, s[0])
-		}
+	if s[0] < 'a' || s[0] > 'h' {
+		return Move{}, fmt.Errorf("chess: invalid UCI notation sq:0 file:%c", s[0])
+	}
+	if s[1] < '1' || s[1] > '8' {
+		return Move{}, fmt.Errorf("chess: invalid UCI notation sq:0 rank:%c", s[1])
+	}
+	if s[2] < 'a' || s[2] > 'h' {
+		return Move{}, fmt.Errorf("chess: invalid UCI notation sq:1 file:%c", s[2])
+	}
+	if s[3] < '1' || s[3] > '8' {
+		return Move{}, fmt.Errorf("chess: invalid UCI notation sq:1 rank:%c", s[3])
 	}
 
 	// Convert directly instead of using map lookups

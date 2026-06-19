@@ -180,6 +180,30 @@ func TestUCINotationDecode(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "invalid source file character",
+			pos:     nil,
+			input:   "i1e4",
+			wantErr: true,
+		},
+		{
+			name:    "invalid destination file character",
+			pos:     nil,
+			input:   "e1i4",
+			wantErr: true,
+		},
+		{
+			name:    "invalid destination rank character",
+			pos:     nil,
+			input:   "e1e0",
+			wantErr: true,
+		},
+		{
+			name:    "invalid source rank character",
+			pos:     nil,
+			input:   "e0e4",
+			wantErr: true,
+		},
+		{
 			name:        "valid en passant move",
 			pos:         unsafeFEN("rnbqkbnr/ppp2ppp/4p3/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3"),
 			input:       "e5d6",
