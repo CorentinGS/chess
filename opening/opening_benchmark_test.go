@@ -16,6 +16,18 @@ func BenchmarkNewBookECOData(b *testing.B) {
 	}
 }
 
+// BenchmarkDefaultBookCached measures the warm path promised by ADR-005:
+// repeated DefaultBook() lookups must be ~0ms / 0 allocs after the first call
+// initialises the singleton via sync.Once.
+func BenchmarkDefaultBookCached(b *testing.B) {
+	// Warm up the cache so we measure the steady-state lookup, not the parse.
+	_, _ = DefaultBook()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = DefaultBook()
+	}
+}
+
 func BenchmarkFind(b *testing.B) {
 	book, err := NewBook(bytes.NewReader(ecoData))
 	if err != nil {

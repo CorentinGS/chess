@@ -216,15 +216,6 @@ func BenchmarkDefaultBook(b *testing.B) {
 	}
 }
 
-func BenchmarkDefaultBookCached(b *testing.B) {
-	// Warm up the cache
-	_, _ = opening.DefaultBook()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = opening.DefaultBook()
-	}
-}
-
 func BenchmarkNewBookParse(b *testing.B) {
 	// This benchmark measures the full parse cost
 	for i := 0; i < b.N; i++ {
