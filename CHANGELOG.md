@@ -6,6 +6,36 @@ All notable changes to this project will be documented in this file. See [conven
 
 - - -
 
+## v3.0.0-beta.1 - 2026-06-19
+
+v3 is a major redesign implementing [RFC-001](docs/adr/RFC-001-v3-redesign.md).
+See [MIGRATION.md](MIGRATION.md) for a detailed guide to upgrading from v2.
+
+#### Breaking Changes
+- module path changed to `github.com/corentings/chess/v3`.
+- `Move` is now a 4-field value type (`s1`, `s2`, `promo`, `tags`), passed by value everywhere — `Move()` and `UnsafeMove()` accept `Move` not `*Move`.
+- UCI command globals replaced with struct literals: `CmdUCI{}`, `CmdIsReady{}`, `CmdUCINewGame{}`, etc.
+- `Game.Resign(color)` now returns `error`.
+- `Game.Outcome` and `Game.Method` merged into `Outcome` + `OutcomeMethodPair` with `SetOutcomeMethod`/`ClearOutcome`.
+- `Opening.Game()` returns a caller-owned clone of a pre-computed game.
+- `Position.Hash()` (MD5) deprecated in favour of `Position.ZobristHash()` (uint64).
+
+#### Features
+- move tree with full variation support (`Variations`, `AddVariation`, `Split`).
+- extracted PGN renderer (`PGNRenderer`, `DefaultPGNRenderer`, `RenderGameTo`).
+- `Game.WritePGN(w)` for direct writer output.
+- UCI Adapter pattern (`Adapter`, `SubprocessAdapter`, `FakeAdapter`) for testability.
+- SVG image generation API: `SVG(w, *Position, *SVGOptions)` with `//go:embed` piece assets.
+- opening book: `NewBook(io.Reader)` for custom data, `DefaultBook()` singleton.
+- notation `Encode`/`Decode` with value semantics.
+
+#### Performance
+- incremental Zobrist hashing with `Position.ZobristHash()`.
+- mailbox `[64]Piece` for O(1) `Board.Piece()` lookups.
+- zero-allocation `BookECO.Find` via compact `uint32` move keys.
+- non-allocating `Position.samePosition` fallback (direct struct comparison).
+- `Position.ValidMovesUnsafe()` and `Position.ValidMovesIter()` for allocation-sensitive callers.
+
 ## v2.5.1 - 2026-06-19
 #### Features
 - preserve PGN annotation block structure and add `Move.CommentBlocks()` for ordered comment items.
