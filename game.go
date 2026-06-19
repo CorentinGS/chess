@@ -689,7 +689,7 @@ func (g *Game) numOfRepetitions() int {
 		if pos == nil {
 			continue
 		}
-		if g.pos.samePosition(pos) {
+		if g.pos.SamePosition(pos) {
 			count++
 		}
 	}

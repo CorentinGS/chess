@@ -96,7 +96,7 @@ func TestSamePositionEnPassantFIDECompliance(t *testing.T) {
 
 	// These should be considered the same position because no en passant
 	// capture is possible (no black pawn on d4 or f4).
-	if !posWithIrrelevantEP.samePosition(posWithoutEP) {
+	if !posWithIrrelevantEP.SamePosition(posWithoutEP) {
 		t.Error("positions with irrelevant en passant square should be considered the same")
 	}
 
@@ -116,7 +116,7 @@ func TestSamePositionEnPassantFIDECompliance(t *testing.T) {
 
 	// These should NOT be considered the same because the en passant
 	// capture is actually possible.
-	if posWithRelevantEP.samePosition(posWithRelevantNoEP) {
+	if posWithRelevantEP.SamePosition(posWithRelevantNoEP) {
 		t.Error("positions with relevant en passant square should be considered different")
 	}
 
@@ -131,7 +131,7 @@ func TestSamePositionEnPassantFIDECompliance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if posWithRelevantEPRight.samePosition(posWithRelevantEPRightNoEP) {
+	if posWithRelevantEPRight.SamePosition(posWithRelevantEPRightNoEP) {
 		t.Error("positions with relevant en passant square (right adjacent pawn) should be considered different")
 	}
 }
@@ -252,7 +252,7 @@ func TestZobristHashIncrementalCorrectness(t *testing.T) {
 }
 
 func TestZobristHashSamePositionEquivalence(t *testing.T) {
-	// Test that hash-based samePosition matches the old logic for a variety of positions
+	// Test that hash-based SamePosition matches the old logic for a variety of positions
 	for i, fen1 := range validFENs {
 		pos1, err := decodeFEN(fen1)
 		if err != nil {
@@ -267,16 +267,16 @@ func TestZobristHashSamePositionEquivalence(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// The old samePosition logic (using string comparison)
+			// The old SamePosition logic (using string comparison)
 			oldSame := pos1.board.String() == pos2.board.String() &&
 				pos1.turn == pos2.turn &&
 				pos1.castleRights.String() == pos2.castleRights.String() &&
 				pos1.relevantEnPassantSquare() == pos2.relevantEnPassantSquare()
 
-			newSame := pos1.samePosition(pos2)
+			newSame := pos1.SamePosition(pos2)
 
 			if oldSame != newSame {
-				t.Fatalf("samePosition mismatch for FENs %s and %s: old=%v new=%v", fen1, fen2, oldSame, newSame)
+				t.Fatalf("SamePosition mismatch for FENs %s and %s: old=%v new=%v", fen1, fen2, oldSame, newSame)
 			}
 		}
 	}
@@ -286,7 +286,7 @@ func BenchmarkSamePositionHash(b *testing.B) {
 	pos1 := StartingPosition()
 	pos2 := StartingPosition()
 	for i := 0; i < b.N; i++ {
-		_ = pos1.samePosition(pos2)
+		_ = pos1.SamePosition(pos2)
 	}
 }
 

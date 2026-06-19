@@ -33,7 +33,7 @@ See [MIGRATION.md](MIGRATION.md) for a detailed guide to upgrading from v2.
 - incremental Zobrist hashing with `Position.ZobristHash()`.
 - mailbox `[64]Piece` for O(1) `Board.Piece()` lookups.
 - zero-allocation `BookECO.Find` via compact `uint32` move keys.
-- non-allocating `Position.samePosition` fallback (direct struct comparison).
+- non-allocating `Position.SamePosition` fallback (direct struct comparison).
 - `Position.ValidMovesUnsafe()` and `Position.ValidMovesIter()` for allocation-sensitive callers.
 
 ## v2.5.1 - 2026-06-19

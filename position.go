@@ -644,10 +644,10 @@ func (pos *Position) updateEnPassantSquare(m Move) Square {
 	return NoSquare
 }
 
-// samePosition returns true if the two positions are the same
+// SamePosition returns true if the two positions are the same
 // according to FIDE Article 9.2.3. Uses Zobrist hash as a fast-path,
 // falling back to full field comparison on hash collision.
-func (pos *Position) samePosition(pos2 *Position) bool {
+func (pos *Position) SamePosition(pos2 *Position) bool {
 	if pos.hash != pos2.hash {
 		return false
 	}
