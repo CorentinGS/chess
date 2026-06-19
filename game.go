@@ -1158,7 +1158,54 @@ func (g *Game) buildOneGameFromPath(path []*MoveNode) *Game {
 	newG.currentMove = cur
 	newG.pos = cur.position
 
+	newG.recomputeOutcomeFromLeaf()
+
 	return newG
+}
+
+func (g *Game) recomputeOutcomeFromLeaf() {
+	leaf := g.pos
+	if leaf == nil {
+		g.outcome = NoOutcome
+		g.method = NoMethod
+		g.syncResultTag()
+		return
+	}
+
+	switch leaf.Status() {
+	case Checkmate:
+		g.method = Checkmate
+		if leaf.Turn() == White {
+			g.outcome = BlackWon
+		} else {
+			g.outcome = WhiteWon
+		}
+	case Stalemate:
+		g.method = Stalemate
+		g.outcome = Draw
+	default:
+		g.outcome = NoOutcome
+		g.method = NoMethod
+		if leaf.board != nil && !leaf.board.hasSufficientMaterial() {
+			g.outcome = Draw
+			g.method = InsufficientMaterial
+		}
+	}
+
+	g.syncResultTag()
+}
+
+func (g *Game) syncResultTag() {
+	switch g.outcome {
+	case NoOutcome:
+		delete(g.tagPairs, "Result")
+	case WhiteWon:
+		g.tagPairs["Result"] = "1-0"
+	case BlackWon:
+		g.tagPairs["Result"] = "0-1"
+	case Draw:
+		g.tagPairs["Result"] = "1/2-1/2"
+	}
 }
 
 // ValidateSAN checks if a string is valid Standard Algebraic Notation (SAN) syntax.

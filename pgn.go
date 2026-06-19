@@ -21,11 +21,13 @@ import (
 
 // Parser holds the state needed during parsing.
 type Parser struct {
-	game        *Game
-	currentMove *MoveNode
-	tokens      []Token
-	errors      []ParserError
-	position    int
+	game         *Game
+	currentMove  *MoveNode
+	tokens       []Token
+	errors       []ParserError
+	position     int
+	tagOutcome   Outcome
+	tokenOutcome Outcome
 }
 
 // NewParser creates a new parser instance initialized with the given tokens.
@@ -83,6 +85,8 @@ func (p *Parser) Parse() (*Game, error) {
 		return nil, errors.New("parsing header")
 	}
 
+	p.tagOutcome = outcomeFromTagString(p.game.tagPairs["Result"])
+
 	// check if the game has a starting position
 	if value, ok := p.game.tagPairs["FEN"]; ok {
 		pos, err := decodeFEN(value)
@@ -98,12 +102,68 @@ func (p *Parser) Parse() (*Game, error) {
 		return nil, err
 	}
 
-	if p.game.outcome == UnknownOutcome {
-		p.game.outcome = NoOutcome
+	if err := p.resolveOutcome(); err != nil {
+		return nil, err
 	}
 	p.game.currentMove = p.currentMove
 
 	return p.game, nil
+}
+
+func (p *Parser) resolveOutcome() error {
+	boardMethod := p.game.method
+	boardOutcome := p.game.outcome
+	tagOutcome := normalizeOutcome(p.tagOutcome)
+	tokenOutcome := normalizeOutcome(p.tokenOutcome)
+
+	boardTerminal := boardMethod == Checkmate || boardMethod == Stalemate
+
+	if boardTerminal {
+		if tokenOutcome != NoOutcome && tokenOutcome != boardOutcome {
+			return &ParserError{
+				Message:  "movetext result token conflicts with board-derivable outcome",
+				Position: p.position,
+			}
+		}
+		if tagOutcome != NoOutcome && tagOutcome != boardOutcome {
+			return &ParserError{
+				Message:  "Result tag conflicts with board-derivable outcome",
+				Position: p.position,
+			}
+		}
+		p.game.outcome = boardOutcome
+		p.game.method = boardMethod
+		return nil
+	}
+
+	if tokenOutcome != NoOutcome {
+		if tagOutcome != NoOutcome && tagOutcome != tokenOutcome {
+			return &ParserError{
+				Message:  "movetext result token conflicts with Result tag",
+				Position: p.position,
+			}
+		}
+		p.game.outcome = tokenOutcome
+		p.game.method = NoMethod
+		return nil
+	}
+
+	if tagOutcome != NoOutcome {
+		p.game.outcome = tagOutcome
+		p.game.method = NoMethod
+		return nil
+	}
+
+	p.game.outcome = NoOutcome
+	p.game.method = NoMethod
+	return nil
+}
+
+func normalizeOutcome(o Outcome) Outcome {
+	if o == UnknownOutcome {
+		return NoOutcome
+	}
+	return o
 }
 
 func (p *Parser) parseHeader() error {
@@ -672,18 +732,34 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 }
 
 func (p *Parser) parseResult() {
-	result := p.currentToken().Value
-	switch result {
-	case "1-0":
-		p.game.outcome = WhiteWon
-	case "0-1":
-		p.game.outcome = BlackWon
-	case "1/2-1/2":
-		p.game.outcome = Draw
-	default:
-		p.game.outcome = NoOutcome
-	}
+	p.tokenOutcome = outcomeFromResultString(p.currentToken().Value)
 	p.advance()
+}
+
+func outcomeFromResultString(s string) Outcome {
+	switch s {
+	case "1-0":
+		return WhiteWon
+	case "0-1":
+		return BlackWon
+	case "1/2-1/2":
+		return Draw
+	default:
+		return NoOutcome
+	}
+}
+
+func outcomeFromTagString(s string) Outcome {
+	switch s {
+	case "1-0":
+		return WhiteWon
+	case "0-1":
+		return BlackWon
+	case "1/2-1/2":
+		return Draw
+	default:
+		return NoOutcome
+	}
 }
 
 func (p *Parser) addMove(move Move, number uint) *MoveNode {
