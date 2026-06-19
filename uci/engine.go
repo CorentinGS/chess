@@ -127,9 +127,6 @@ func (e *Engine) processCommand(cmd Cmd) error {
 			e.logger.Println(line)
 		}
 	}
-	if posCmd, ok := cmd.(*CmdPosition); ok {
-		e.position = posCmd
-	}
 	if posCmd, ok := cmd.(CmdPosition); ok {
 		e.position = &posCmd
 	}

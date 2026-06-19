@@ -138,7 +138,7 @@ func (cmd CmdSetOption) String() string {
 
 func (CmdSetOption) IsDone(_ string) bool { return true }
 
-func (CmdSetOption) LockRequired() bool { return true }
+func (CmdSetOption) LockRequired() bool { return false }
 
 func (CmdSetOption) Handle(_ []string, _ *Engine) error { return nil }
 

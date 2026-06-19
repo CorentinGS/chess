@@ -148,6 +148,143 @@ func Test_FakeAdapter_FireAndForgetPassthrough(t *testing.T) {
 	}
 }
 
+func Test_FakeAdapter_CmdPositionStoredOnEngine(t *testing.T) {
+	fake := &uci.FakeAdapter{
+		Responses: map[string][]string{
+			"position": {"readyok"},
+			"go":       {"bestmove e7e5"},
+		},
+	}
+	eng := uci.NewWithAdapter(fake)
+	defer eng.Close()
+
+	fenStr := "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+	pos := &chess.Position{}
+	if err := pos.UnmarshalText([]byte(fenStr)); err != nil {
+		t.Fatal(err)
+	}
+	cmdPos := uci.CmdPosition{Position: pos}
+	cmdGo := uci.CmdGo{MoveTime: 100}
+	if err := eng.Run(cmdPos, cmdGo); err != nil {
+		t.Fatal(err)
+	}
+
+	bestMove := eng.SearchResults().BestMove
+	if bestMove == (chess.Move{}) {
+		t.Fatal("expected best move decoded against non-starting position")
+	}
+	if bestMove.S1().String() != "e7" || bestMove.S2().String() != "e5" {
+		t.Errorf("expected e7e5, got %s%s", bestMove.S1(), bestMove.S2())
+	}
+}
+
+func Test_EngineIDReturnsDefensiveCopy(t *testing.T) {
+	fake := &uci.FakeAdapter{
+		Responses: map[string][]string{
+			"uci": {"id name TestEngine", "uciok"},
+		},
+	}
+	eng := uci.NewWithAdapter(fake)
+	defer eng.Close()
+
+	if err := eng.Run(uci.CmdUCI{}); err != nil {
+		t.Fatal(err)
+	}
+
+	id := eng.ID()
+	id["name"] = "Mutated"
+	id["injected"] = "value"
+
+	id2 := eng.ID()
+	if id2["name"] != "TestEngine" {
+		t.Errorf("ID() returned shared map; external mutation leaked back, got name=%q", id2["name"])
+	}
+	if _, ok := id2["injected"]; ok {
+		t.Errorf("ID() returned shared map; injected key persisted across calls")
+	}
+}
+
+func Test_EngineOptionsReturnsDefensiveCopy(t *testing.T) {
+	fake := &uci.FakeAdapter{
+		Responses: map[string][]string{
+			"uci": {"option name Hash type spin default 16 min 1 max 1024", "uciok"},
+		},
+	}
+	eng := uci.NewWithAdapter(fake)
+	defer eng.Close()
+
+	if err := eng.Run(uci.CmdUCI{}); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := eng.Options()
+	opts["Hash"] = uci.Option{Name: "Hash", Type: uci.OptionSpin, Default: "9999"}
+	opts["Injected"] = uci.Option{Name: "Injected"}
+
+	opts2 := eng.Options()
+	if opts2["Hash"].Default != "16" {
+		t.Errorf("Options() returned shared map; external mutation leaked back, got Hash.Default=%q", opts2["Hash"].Default)
+	}
+	if _, ok := opts2["Injected"]; ok {
+		t.Errorf("Options() returned shared map; injected key persisted across calls")
+	}
+}
+
+func Test_FakeAdapter_FireAndForgetNoResponseShortCircuit(t *testing.T) {
+	fake := &uci.FakeAdapter{
+		Responses: map[string][]string{},
+	}
+	eng := uci.NewWithAdapter(fake)
+	defer eng.Close()
+
+	if err := eng.Run(uci.CmdUCINewGame{}); err != nil {
+		t.Fatalf("CmdUCINewGame should short-circuit on empty response: %v", err)
+	}
+	if err := eng.Run(uci.CmdStop{}); err != nil {
+		t.Fatalf("CmdStop should short-circuit on empty response: %v", err)
+	}
+	if err := eng.Run(uci.CmdPonderHit{}); err != nil {
+		t.Fatalf("CmdPonderHit should short-circuit on empty response: %v", err)
+	}
+}
+
+func Test_FakeAdapter_CmdSetOptionRendersCorrectly(t *testing.T) {
+	fake := &uci.FakeAdapter{
+		Responses: map[string][]string{
+			"setoption": {},
+		},
+	}
+	eng := uci.NewWithAdapter(fake)
+	defer eng.Close()
+
+	cmd := uci.CmdSetOption{Name: "UCI_Elo", Value: "1500"}
+	got := cmd.String()
+	want := "setoption name UCI_Elo value 1500"
+	if got != want {
+		t.Errorf("CmdSetOption.String() = %q, want %q", got, want)
+	}
+	if err := eng.Run(cmd); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_InfoUnmarshalTextWDL(t *testing.T) {
+	info := &uci.Info{}
+	line := "info depth 24 seldepth 32 multipv 1 score cp 29 wdl 791 209 0 nodes 5130101 nps 819897 hashfull 967 tbhits 0 time 6257 pv d2d4"
+	if err := info.UnmarshalText([]byte(line)); err != nil {
+		t.Fatal(err)
+	}
+	if info.Score.Win != 791 || info.Score.Draw != 209 || info.Score.Loss != 0 {
+		t.Errorf("wdl parse: got Win=%d Draw=%d Loss=%d, want 791/209/0", info.Score.Win, info.Score.Draw, info.Score.Loss)
+	}
+	if info.Score.CP != 29 {
+		t.Errorf("cp parse: got %d, want 29", info.Score.CP)
+	}
+	if info.Depth != 24 || info.Nodes != 5130101 || info.Hashfull != 967 {
+		t.Errorf("field parse: got depth=%d nodes=%d hashfull=%d, want 24/5130101/967", info.Depth, info.Nodes, info.Hashfull)
+	}
+}
+
 func Test_FakeAdapter_FullGame(t *testing.T) {
 	fake := &uci.FakeAdapter{
 		Responses: map[string][]string{
