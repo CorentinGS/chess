@@ -78,7 +78,7 @@ var pieceTypeToChar = map[PieceType]string{
 // encode a move into a string given the position.  It is not
 // the encoders responsibility to validate the move.
 type Encoder interface {
-	Encode(pos *Position, m *Move) string
+	Encode(pos *Position, m Move) string
 }
 
 // Decoder is the interface implemented by objects that can
@@ -86,7 +86,7 @@ type Encoder interface {
 // the decoders responsibility to validate the move.  An error
 // is returned if the string could not be decoded.
 type Decoder interface {
-	Decode(pos *Position, s string) (*Move, error)
+	Decode(pos *Position, s string) (Move, error)
 }
 
 // Notation is the interface implemented by objects that can
@@ -108,7 +108,7 @@ func (UCINotation) String() string {
 }
 
 // Encode implements the Encoder interface.
-func (UCINotation) Encode(_ *Position, m *Move) string {
+func (UCINotation) Encode(_ *Position, m Move) string {
 	const maxLen = 5
 	// Get a string builder from the pool
 	sb, _ := stringPool.Get().(*strings.Builder)
@@ -128,20 +128,20 @@ func (UCINotation) Encode(_ *Position, m *Move) string {
 }
 
 // Decode implements the Decoder interface.
-func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
+func (UCINotation) Decode(pos *Position, s string) (Move, error) {
 	const promoLen = 5
 
 	l := len(s)
 	if l < 4 || l > 5 {
-		return nil, fmt.Errorf("chess: invalid UCI notation length %d in %q", l, s)
+		return Move{}, fmt.Errorf("chess: invalid UCI notation length %d in %q", l, s)
 	}
 	for idx := 0; idx < 2; idx += 2 {
 		if s[idx+0] < 'a' || s[idx+0] > 'h' {
-			return nil, fmt.Errorf("chess: invalid UCI notation sq:%v file:%v",
+			return Move{}, fmt.Errorf("chess: invalid UCI notation sq:%v file:%v",
 				idx/2, s[0])
 		}
 		if s[idx+1] < '1' || s[idx+1] > '8' {
-			return nil, fmt.Errorf("chess: invalid UCI notation sq:%v rank:%v",
+			return Move{}, fmt.Errorf("chess: invalid UCI notation sq:%v rank:%v",
 				idx/2, s[0])
 		}
 	}
@@ -151,7 +151,7 @@ func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
 	s2 := Square((s[2] - 'a') + (s[3]-'1')*8)
 
 	if s1 < A1 || s1 > H8 || s2 < A1 || s2 > H8 {
-		return nil, fmt.Errorf("chess: invalid squares in UCI notation %q", s)
+		return Move{}, fmt.Errorf("chess: invalid squares in UCI notation %q", s)
 	}
 
 	m := Move{s1: s1, s2: s2}
@@ -163,20 +163,18 @@ func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
 		}
 		promo := promoMap[s[4]]
 		if promo == NoPieceType {
-			return nil, fmt.Errorf("chess: invalid promotion piece in UCI notation %q", s)
+			return Move{}, fmt.Errorf("chess: invalid promotion piece in UCI notation %q", s)
 		}
 		m.promo = promo
 	}
 
 	if pos == nil {
-		return &m, nil
+		return m, nil
 	}
 
 	m.tags = moveTags(m, pos)
 
-	m.position = pos.Update(&m)
-
-	return &m, nil
+	return m, nil
 }
 
 // AlgebraicNotation (or Standard Algebraic Notation) is the
@@ -191,7 +189,7 @@ func (AlgebraicNotation) String() string {
 }
 
 // Encode implements the Encoder interface.
-func (AlgebraicNotation) Encode(pos *Position, m *Move) string {
+func (AlgebraicNotation) Encode(pos *Position, m Move) string {
 	// Handle castling without builder
 	checkChar := getCheckChar(pos, m)
 	if m.HasTag(KingSideCastle) {
@@ -341,11 +339,11 @@ func (mc moveComponents) generateOptions() []string {
 }
 
 // Decode implements the Decoder interface.
-func (AlgebraicNotation) Decode(pos *Position, s string) (*Move, error) {
+func (AlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
 	// Parse move components
 	components, err := algebraicNotationParts(s)
 	if err != nil {
-		return nil, err
+		return Move{}, err
 	}
 
 	// Get cleaned input move
@@ -354,7 +352,7 @@ func (AlgebraicNotation) Decode(pos *Position, s string) (*Move, error) {
 	// Try matching against valid moves
 	for _, m := range pos.ValidMovesUnsafe() {
 		// Encode current move
-		moveStr := AlgebraicNotation{}.Encode(pos, &m)
+		moveStr := AlgebraicNotation{}.Encode(pos, m)
 
 		// Parse and clean encoded move
 		notationParts, algebraicNotationError := algebraicNotationParts(moveStr)
@@ -364,18 +362,18 @@ func (AlgebraicNotation) Decode(pos *Position, s string) (*Move, error) {
 
 		// Compare cleaned versions
 		if cleanedInput == notationParts.clean() {
-			return &m, nil
+			return m, nil
 		}
 
 		// Try alternative notations
 		for _, opt := range components.generateOptions() {
 			if opt == notationParts.clean() {
-				return &m, nil
+				return m, nil
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("chess: move %s is not valid", s)
+	return Move{}, fmt.Errorf("chess: move %s is not valid", s)
 }
 
 // LongAlgebraicNotation is a fully expanded version of
@@ -391,7 +389,7 @@ func (LongAlgebraicNotation) String() string {
 }
 
 // Encode implements the Encoder interface.
-func (LongAlgebraicNotation) Encode(pos *Position, m *Move) string {
+func (LongAlgebraicNotation) Encode(pos *Position, m Move) string {
 	checkChar := getCheckChar(pos, m)
 	if m.HasTag(KingSideCastle) {
 		return "O-O" + checkChar
@@ -413,11 +411,11 @@ func (LongAlgebraicNotation) Encode(pos *Position, m *Move) string {
 }
 
 // Decode implements the Decoder interface.
-func (LongAlgebraicNotation) Decode(pos *Position, s string) (*Move, error) {
+func (LongAlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
 	return AlgebraicNotation{}.Decode(pos, s)
 }
 
-func getCheckChar(pos *Position, move *Move) string {
+func getCheckChar(pos *Position, move Move) string {
 	if !move.HasTag(Check) {
 		return ""
 	}
@@ -431,7 +429,7 @@ func getCheckChar(pos *Position, move *Move) string {
 // getCheckBytes returns the check or mate bytes for a move
 //
 //nolint:unused // I don't care about this
-func getCheckBytes(pos *Position, move *Move) []byte {
+func getCheckBytes(pos *Position, move Move) []byte {
 	if !move.HasTag(Check) {
 		return []byte{}
 	}
@@ -441,7 +439,7 @@ func getCheckBytes(pos *Position, move *Move) []byte {
 	return []byte(checkStr)
 }
 
-func formS1(pos *Position, m *Move) string {
+func formS1(pos *Position, m Move) string {
 	p := pos.board.Piece(m.s1)
 	if p.Type() == Pawn {
 		return ""

@@ -179,7 +179,7 @@ func TestSingleGameFromPGN(t *testing.T) {
 		t.Fatalf("game moves are not correct, expected 6, got %d", len(game.Moves()))
 	}
 
-	for i, move := range game.Moves() {
+	for i, move := range game.MoveNodes() {
 		// check move number for each move
 		// Get the full move number
 		fullMoveNumber := (i / 2) + 1
@@ -193,10 +193,10 @@ func TestSingleGameFromPGN(t *testing.T) {
 	}
 
 	// print all moves
-	moves := game.Moves()
+	moves := game.MoveNodes()
 
-	if moves[4].comments == "" {
-		t.Fatalf("game move 6 is not correct, expected comment, got %s", moves[5].comments)
+	if moves[4].Comments() == "" {
+		t.Fatalf("game move 6 is not correct, expected comment, got %s", moves[5].Comments())
 	}
 }
 
@@ -241,7 +241,7 @@ func TestBigPgn(t *testing.T) {
 				t.Skip("Skipping test for From Position")
 			}
 
-			for i, move := range game.Moves() {
+			for i, move := range game.MoveNodes() {
 				// check move number for each move
 				// Get the full move number
 				fullMoveNumber := (i / 2) + 1
@@ -338,23 +338,23 @@ func TestCompleteGame(t *testing.T) {
 		t.Fatalf("game move 1 is not correct, expected d4, got %s", game.Moves()[0].String())
 	}
 
-	if game.Moves()[0].comments != "" {
-		t.Fatalf("game move 1 is not correct, expected no comment, got %s", game.Moves()[0].comments)
+	if game.MoveNodes()[0].Comments() != "" {
+		t.Fatalf("game move 1 is not correct, expected no comment, got %s", game.MoveNodes()[0].Comments())
 	}
 
 	// print all moves
-	moves := game.Moves()
+	moves := game.MoveNodes()
 
-	if game.Moves()[0].command["eval"] != "0.17" {
-		t.Fatalf("game move 1 is not correct, expected eval, got %s", game.Moves()[0].command["eval"])
+	if got, ok := game.MoveNodes()[0].GetCommand("eval"); !ok || got != "0.17" {
+		t.Fatalf("game move 1 is not correct, expected eval, got %s", got)
 	}
 
-	if moves[6].comments != "A57 Benko Gambit Declined: Main Line" {
-		t.Fatalf("game move 4 is not correct, expected comment, got %s", moves[6].comments)
+	if moves[6].Comments() != "A57 Benko Gambit Declined: Main Line" {
+		t.Fatalf("game move 4 is not correct, expected comment, got %s", moves[6].Comments())
 	}
 
-	if moves[44].nag != "?!" {
-		t.Fatalf("game move 44 is not correct, expected nag '!?', got %s", moves[44].nag)
+	if moves[44].NAG() != "?!" {
+		t.Fatalf("game move 44 is not correct, expected nag '!?', got %s", moves[44].NAG())
 	}
 }
 
@@ -381,27 +381,27 @@ func TestLichessMultipleCommand(t *testing.T) {
 	}
 
 	// Check if move one has the correct command
-	if game.Moves()[0].command["eval"] != "0.0" {
-		t.Fatalf("game move 1 is not correct, expected eval, got %s", game.Moves()[0].command["eval"])
+	if got, ok := game.MoveNodes()[0].GetCommand("eval"); !ok || got != "0.0" {
+		t.Fatalf("game move 1 is not correct, expected eval, got %s", got)
 	}
 
 	// Check for clock also
-	if game.Moves()[0].command["clk"] != "0:03:00" {
-		t.Fatalf("game move 1 is not correct, expected clock, got %s", game.Moves()[0].command["clk"])
+	if got, ok := game.MoveNodes()[0].GetCommand("clk"); !ok || got != "0:03:00" {
+		t.Fatalf("game move 1 is not correct, expected clock, got %s", got)
 	}
 
 	// Check move 5 for comment and eval
-	if game.Moves()[4].comments != "E00 Catalan Opening" {
-		t.Fatalf("game move 5 is not correct, expected comment, got %s", game.Moves()[4].comments)
+	if game.MoveNodes()[4].Comments() != "E00 Catalan Opening" {
+		t.Fatalf("game move 5 is not correct, expected comment, got %s", game.MoveNodes()[4].Comments())
 	}
 
-	if game.Moves()[4].command["eval"] != "0.14" {
-		t.Fatalf("game move 5 is not correct, expected eval, got %s", game.Moves()[4].command["eval"])
+	if got, ok := game.MoveNodes()[4].GetCommand("eval"); !ok || got != "0.14" {
+		t.Fatalf("game move 5 is not correct, expected eval, got %s", got)
 	}
 
 	// check for clock
-	if game.Moves()[4].command["clk"] != "0:02:58" {
-		t.Fatalf("game move 5 is not correct, expected clock, got %s", game.Moves()[4].command["clk"])
+	if got, ok := game.MoveNodes()[4].GetCommand("clk"); !ok || got != "0:02:58" {
+		t.Fatalf("game move 5 is not correct, expected clock, got %s", got)
 	}
 }
 
@@ -422,22 +422,22 @@ func TestParseMoveWithNAGAndComment(t *testing.T) {
 		t.Fatalf("fail to parse game: %v", err)
 	}
 
-	moves := game.Moves()
+	moves := game.MoveNodes()
 	if len(moves) < 4 {
 		t.Fatalf("expected at least 4 moves, got %d", len(moves))
 	}
 
-	if moves[0].nag == "" || moves[0].comments == "" {
-		t.Errorf("move 1 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[0].nag, moves[0].comments)
+	if moves[0].NAG() == "" || moves[0].Comments() == "" {
+		t.Errorf("move 1 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[0].NAG(), moves[0].Comments())
 	}
-	if moves[1].nag == "" || moves[1].comments == "" {
-		t.Errorf("move 2 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[1].nag, moves[1].comments)
+	if moves[1].NAG() == "" || moves[1].Comments() == "" {
+		t.Errorf("move 2 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[1].NAG(), moves[1].Comments())
 	}
-	if moves[2].nag == "" || moves[2].comments == "" {
-		t.Errorf("move 3 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[2].nag, moves[2].comments)
+	if moves[2].NAG() == "" || moves[2].Comments() == "" {
+		t.Errorf("move 3 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[2].NAG(), moves[2].Comments())
 	}
-	if moves[3].nag == "" || moves[3].comments == "" {
-		t.Errorf("move 4 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[3].nag, moves[3].comments)
+	if moves[3].NAG() == "" || moves[3].Comments() == "" {
+		t.Errorf("move 4 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[3].NAG(), moves[3].Comments())
 	}
 }
 
@@ -459,9 +459,9 @@ func TestVariationComments(t *testing.T) {
 	}
 
 	// Check main line comment on 1. e4
-	mainMoves := game.Moves()
-	if mainMoves[0].comments != "main line comment" {
-		t.Errorf("expected main line comment on e4, got %q", mainMoves[0].comments)
+	mainMoves := game.MoveNodes()
+	if mainMoves[0].Comments() != "main line comment" {
+		t.Errorf("expected main line comment on e4, got %q", mainMoves[0].Comments())
 	}
 
 	// 1... e5 is mainMoves[1], and its parent (rootMove child for e4) should have
@@ -474,8 +474,8 @@ func TestVariationComments(t *testing.T) {
 	// First child is the main line 1... e5
 	// Second child is the variation 1... d5
 	d5Move := e4Move.children[1]
-	if d5Move.comments != "variation comment on d5" {
-		t.Errorf("expected 'variation comment on d5' on 1...d5, got %q", d5Move.comments)
+	if d5Move.Comments() != "variation comment on d5" {
+		t.Errorf("expected 'variation comment on d5' on 1...d5, got %q", d5Move.Comments())
 	}
 
 	// d5's first child should be 2. exd5
@@ -483,8 +483,8 @@ func TestVariationComments(t *testing.T) {
 		t.Fatalf("expected children on d5 variation move")
 	}
 	exd5Move := d5Move.children[0]
-	if exd5Move.comments != "variation comment on exd5" {
-		t.Errorf("expected 'variation comment on exd5' on 2.exd5, got %q", exd5Move.comments)
+	if exd5Move.Comments() != "variation comment on exd5" {
+		t.Errorf("expected 'variation comment on exd5' on 2.exd5, got %q", exd5Move.Comments())
 	}
 }
 
@@ -512,27 +512,27 @@ func TestVariationNAGs(t *testing.T) {
 	}
 
 	d5Move := e4Move.children[1]
-	if d5Move.nag != "$1" {
-		t.Errorf("expected NAG '$1' on 1...d5, got %q", d5Move.nag)
+	if d5Move.NAG() != "$1" {
+		t.Errorf("expected NAG '$1' on 1...d5, got %q", d5Move.NAG())
 	}
-	if d5Move.comments != "great move" {
-		t.Errorf("expected comment 'great move' on 1...d5, got %q", d5Move.comments)
+	if d5Move.Comments() != "great move" {
+		t.Errorf("expected comment 'great move' on 1...d5, got %q", d5Move.Comments())
 	}
 
 	if len(d5Move.children) == 0 {
 		t.Fatalf("expected children on d5")
 	}
 	exd5Move := d5Move.children[0]
-	if exd5Move.nag != "$6" {
-		t.Errorf("expected NAG '$6' on 2.exd5, got %q", exd5Move.nag)
+	if exd5Move.NAG() != "$6" {
+		t.Errorf("expected NAG '$6' on 2.exd5, got %q", exd5Move.NAG())
 	}
 
 	if len(exd5Move.children) == 0 {
 		t.Fatalf("expected children on exd5")
 	}
 	qxd5Move := exd5Move.children[0]
-	if qxd5Move.nag != "$2" {
-		t.Errorf("expected NAG '$2' on 2...Qxd5, got %q", qxd5Move.nag)
+	if qxd5Move.NAG() != "$2" {
+		t.Errorf("expected NAG '$2' on 2...Qxd5, got %q", qxd5Move.NAG())
 	}
 }
 
@@ -559,14 +559,14 @@ func TestVariationCommands(t *testing.T) {
 	}
 
 	d5Move := e4Move.children[1]
-	if d5Move.comments != "good move" {
-		t.Errorf("expected comment 'good move' on 1...d5, got %q", d5Move.comments)
+	if d5Move.Comments() != "good move" {
+		t.Errorf("expected comment 'good move' on 1...d5, got %q", d5Move.Comments())
 	}
-	if d5Move.command["eval"] != "-0.5" {
-		t.Errorf("expected eval command '-0.5' on 1...d5, got %q", d5Move.command["eval"])
+	if got, ok := d5Move.GetCommand("eval"); !ok || got != "-0.5" {
+		t.Errorf("expected eval command '-0.5' on 1...d5, got %q", got)
 	}
-	if d5Move.command["clk"] != "0:05:00" {
-		t.Errorf("expected clk command '0:05:00' on 1...d5, got %q", d5Move.command["clk"])
+	if got, ok := d5Move.GetCommand("clk"); !ok || got != "0:05:00" {
+		t.Errorf("expected clk command '0:05:00' on 1...d5, got %q", got)
 	}
 }
 
@@ -588,14 +588,14 @@ func TestNestedVariationComments(t *testing.T) {
 	}
 
 	// Main line: 3. Bb5 should have comment "Ruy Lopez"
-	mainMoves := game.Moves()
+	mainMoves := game.MoveNodes()
 	// Moves: e4, e5, Nf3, Nc6, Bb5, a6 => index 4 is Bb5
 	if len(mainMoves) < 5 {
 		t.Fatalf("expected at least 5 main line moves, got %d", len(mainMoves))
 	}
 	bb5Move := mainMoves[4]
-	if bb5Move.comments != "Ruy Lopez" {
-		t.Errorf("expected 'Ruy Lopez' comment on 3.Bb5, got %q", bb5Move.comments)
+	if bb5Move.Comments() != "Ruy Lopez" {
+		t.Errorf("expected 'Ruy Lopez' comment on 3.Bb5, got %q", bb5Move.Comments())
 	}
 
 	// Variation: 3. Bc4 should have comment "Italian Game"
@@ -604,8 +604,8 @@ func TestNestedVariationComments(t *testing.T) {
 		t.Fatalf("expected variation at move 3, got %d children", len(nc6Move.children))
 	}
 	bc4Move := nc6Move.children[1]
-	if bc4Move.comments != "Italian Game" {
-		t.Errorf("expected 'Italian Game' comment on 3.Bc4, got %q", bc4Move.comments)
+	if bc4Move.Comments() != "Italian Game" {
+		t.Errorf("expected 'Italian Game' comment on 3.Bc4, got %q", bc4Move.Comments())
 	}
 
 	// Nested variation: 3... Bc5 should have comment "Giuoco Piano"
@@ -613,8 +613,8 @@ func TestNestedVariationComments(t *testing.T) {
 		t.Fatalf("expected nested variation on Bc4, got %d children", len(bc4Move.children))
 	}
 	bc5Move := bc4Move.children[1]
-	if bc5Move.comments != "Giuoco Piano" {
-		t.Errorf("expected 'Giuoco Piano' comment on 3...Bc5, got %q", bc5Move.comments)
+	if bc5Move.Comments() != "Giuoco Piano" {
+		t.Errorf("expected 'Giuoco Piano' comment on 3...Bc5, got %q", bc5Move.Comments())
 	}
 }
 
@@ -638,8 +638,8 @@ func TestRoundTripWithVariationsAndCommandAnnotations(t *testing.T) {
 		t.Fatalf("failed to parse input pgn: %v", err)
 	}
 
-	var walk func(*Move)
-	walk = func(m *Move) {
+	var walk func(*MoveNode)
+	walk = func(m *MoveNode) {
 		if m == nil {
 			return
 		}
@@ -673,7 +673,7 @@ func TestPGNAnnotationFidelityRoundTrip(t *testing.T) {
 	pgn := withMinimalTags(`1. e4 {Good move [%clk 0:05:00]} {second [%eval 0.25]} *`)
 
 	game := mustParseSingleGame(t, pgn)
-	move := game.Moves()[0]
+	move := game.MoveNodes()[0]
 	if move.Comments() != "Good move second" {
 		t.Fatalf("expected flattened comments, got %q", move.Comments())
 	}
@@ -687,7 +687,7 @@ func TestPGNAnnotationFidelityRoundTrip(t *testing.T) {
 	}
 
 	reparsed := mustParseSingleGame(t, roundTrip)
-	blocks := reparsed.Moves()[0].CommentBlocks()
+	blocks := reparsed.MoveNodes()[0].CommentBlocks()
 	if len(blocks) != 2 {
 		t.Fatalf("expected 2 comment blocks, got %#v", blocks)
 	}
@@ -703,7 +703,7 @@ func TestPGNAnnotationFidelityPreservesOrderAndDuplicateCommands(t *testing.T) {
 	game := mustParseSingleGame(t, pgn)
 	roundTrip := game.String()
 	reparsed := mustParseSingleGame(t, roundTrip)
-	move := reparsed.Moves()[0]
+	move := reparsed.MoveNodes()[0]
 
 	if got, ok := move.GetCommand("clk"); !ok || got != "0:04:59" {
 		t.Fatalf("expected last duplicate clk command, got %q, %v", got, ok)
@@ -726,7 +726,7 @@ func TestPGNAnnotationFidelityPreservesOrderAndDuplicateCommands(t *testing.T) {
 
 func TestPGNAnnotationFidelityCommandUsesFirstParameter(t *testing.T) {
 	game := mustParseSingleGame(t, withMinimalTags(`1. e4 {[%command 1:45:12,Nf6,"very interesting, but wrong"]} *`))
-	move := game.Moves()[0]
+	move := game.MoveNodes()[0]
 
 	if got, ok := move.GetCommand("command"); !ok || got != "1:45:12" {
 		t.Fatalf("expected first command parameter, got %q, %v", got, ok)
@@ -746,7 +746,7 @@ func TestPGNAnnotationFidelityVariationsAndExpansion(t *testing.T) {
 	roundTrip := game.String()
 	reparsed := mustParseSingleGame(t, roundTrip)
 
-	e4 := reparsed.Moves()[0]
+	e4 := reparsed.MoveNodes()[0]
 	if len(e4.Children()) < 2 {
 		t.Fatalf("expected e4 variation, got %d children", len(e4.Children()))
 	}
@@ -771,7 +771,7 @@ func TestPGNAnnotationFidelityLegacyAPIsAndDefensiveCopies(t *testing.T) {
 	if err := game.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	move := game.Moves()[0]
+	move := game.MoveNodes()[0]
 	move.SetComment("Good move")
 	move.SetCommand("clk", "0:05:00")
 	move.SetCommand("clk", "0:04:59")
@@ -788,7 +788,7 @@ func TestPGNAnnotationFidelityLegacyAPIsAndDefensiveCopies(t *testing.T) {
 	}
 
 	parsed := mustParseSingleGame(t, withMinimalTags(`1. e4 {Good [%clk 0:05:00]} *`))
-	parsedMove := parsed.Moves()[0]
+	parsedMove := parsed.MoveNodes()[0]
 	blocks := parsedMove.CommentBlocks()
 	blocks[0].Items[0].Text = "mutated"
 	blocks[0].Items = append(blocks[0].Items, CommentItem{Kind: CommentCommand, Key: "eval", Value: "9"})
@@ -955,15 +955,15 @@ func TestVariationMoveNumbers(t *testing.T) {
 	}
 
 	// Helper to recursively check move numbers
-	var checkMoveNumbers func(m *Move, expectedNum int)
-	checkMoveNumbers = func(m *Move, expectedNum int) {
+	var checkMoveNumbers func(m *MoveNode, expectedNum int)
+	checkMoveNumbers = func(m *MoveNode, expectedNum int) {
 		fullMove := (expectedNum-1)/2 + 1
 		for _, child := range m.children {
 			if child.number != 0 && int(child.Ply()) != expectedNum {
-				t.Errorf("move %s: expected move number %d, got %d", child.String(), expectedNum, child.Ply())
+				t.Errorf("move %s: expected move number %d, got %d", child.Move().String(), expectedNum, child.Ply())
 			}
 			if child.FullMoveNumber() != fullMove {
-				t.Errorf("move %s: expected full move number %d, got %d", child.String(), fullMove, child.FullMoveNumber())
+				t.Errorf("move %s: expected full move number %d, got %d", child.Move().String(), fullMove, child.FullMoveNumber())
 			}
 			// If this move starts a variation, the move number should be correct for the branch
 			checkMoveNumbers(child, expectedNum+1)
@@ -979,7 +979,7 @@ func TestVariationMoveNumbers(t *testing.T) {
 	checkMoveNumbers(game.rootMove, 1)
 
 	// Check specific variation branch
-	mainMoves := game.Moves()
+	mainMoves := game.MoveNodes()
 	if len(mainMoves) < 3 {
 		t.Fatalf("expected at least 3 mainline moves, got %d", len(mainMoves))
 	}

@@ -144,7 +144,7 @@ func (CmdSetOption) Handle(_ []string, _ *Engine) error { return nil }
 
 type CmdPosition struct {
 	Position *chess.Position
-	Moves    []*chess.Move
+	Moves    []chess.Move
 }
 
 func (cmd CmdPosition) String() string {
@@ -169,7 +169,7 @@ func (CmdPosition) LockRequired() bool { return true }
 func (CmdPosition) Handle(_ []string, _ *Engine) error { return nil }
 
 type CmdGo struct {
-	SearchMoves    []*chess.Move
+	SearchMoves    []chess.Move
 	WhiteTime      time.Duration
 	BlackTime      time.Duration
 	WhiteIncrement time.Duration

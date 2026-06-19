@@ -335,33 +335,33 @@ func BenchmarkPositionHash(b *testing.B) {
 
 func TestAddVariationToEmptyParent(t *testing.T) {
 	g := NewGame()
-	parent := &Move{}
-	newMove := &Move{}
+	parent := &MoveNode{}
+	newMove := Move{}
 	g.AddVariation(parent, newMove)
-	if len(parent.children) != 1 || parent.children[0] != newMove {
+	if len(parent.children) != 1 || parent.children[0].move != newMove {
 		t.Fatalf("expected newMove to be added to parent's children")
 	}
-	if newMove.parent != parent {
+	if parent.children[0].parent != parent {
 		t.Fatalf("expected newMove's parent to be set to parent")
 	}
 }
 
 func TestAddVariationToNonEmptyParent(t *testing.T) {
 	g := NewGame()
-	parent := &Move{children: []*Move{{}}}
-	newMove := &Move{}
+	parent := &MoveNode{children: []*MoveNode{{}}}
+	newMove := Move{}
 	g.AddVariation(parent, newMove)
-	if len(parent.children) != 2 || parent.children[1] != newMove {
+	if len(parent.children) != 2 || parent.children[1].move != newMove {
 		t.Fatalf("expected newMove to be added to parent's children")
 	}
-	if newMove.parent != parent {
+	if parent.children[1].parent != parent {
 		t.Fatalf("expected newMove's parent to be set to parent")
 	}
 }
 
 func TestAddVariationWithNilParent(t *testing.T) {
 	g := NewGame()
-	newMove := &Move{}
+	newMove := Move{}
 	defer func() {
 		if r := recover(); r == nil {
 			t.Fatalf("expected panic when parent is nil")
@@ -392,9 +392,9 @@ func TestNavigateToMainLineFromBranch(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	variationMove := &Move{}
+	variationMove := Move{}
 	g.AddVariation(g.currentMove, variationMove)
-	g.currentMove = variationMove
+	g.currentMove = g.currentMove.children[len(g.currentMove.children)-1]
 	g.NavigateToMainLine()
 	if g.currentMove != g.rootMove.children[0] {
 		t.Fatalf("expected to navigate to main line root move")
@@ -488,15 +488,16 @@ func TestGoForwardFromBranch(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	variationMove := &Move{}
+	variationMove := Move{}
 	g.AddVariation(g.currentMove, variationMove)
-	childMove := &Move{}                     // Add this line
-	g.AddVariation(variationMove, childMove) // Add this line
-	g.currentMove = variationMove
+	variationNode := g.currentMove.children[len(g.currentMove.children)-1]
+	childMove := Move{}
+	g.AddVariation(variationNode, childMove)
+	g.currentMove = variationNode
 	if !g.GoForward() {
 		t.Fatalf("expected to go forward from branch move")
 	}
-	if g.currentMove != childMove { // Change this line
+	if g.currentMove.move != childMove {
 		t.Fatalf("expected current move to be the child of the variation move")
 	}
 }
@@ -545,7 +546,7 @@ func TestIsAtEndWhenNotAtLeaf(t *testing.T) {
 
 func TestVariationsWithNoChildren(t *testing.T) {
 	g := NewGame()
-	move := &Move{}
+	move := &MoveNode{}
 	variations := g.Variations(move)
 	if variations != nil {
 		t.Fatalf("expected no variations for move with no children")
@@ -554,7 +555,7 @@ func TestVariationsWithNoChildren(t *testing.T) {
 
 func TestVariationsWithOneChild(t *testing.T) {
 	g := NewGame()
-	move := &Move{children: []*Move{{}}}
+	move := &MoveNode{children: []*MoveNode{{}}}
 	variations := g.Variations(move)
 	if variations != nil {
 		t.Fatalf("expected no variations for move with one child")
@@ -563,7 +564,7 @@ func TestVariationsWithOneChild(t *testing.T) {
 
 func TestVariationsWithMultipleChildren(t *testing.T) {
 	g := NewGame()
-	move := &Move{children: []*Move{{}, {}}}
+	move := &MoveNode{children: []*MoveNode{{}, {}}}
 	variations := g.Variations(move)
 	if len(variations) != 1 {
 		t.Fatalf("expected one variation for move with multiple children")
@@ -757,20 +758,21 @@ func getMainline(game *Game) []string {
 }
 
 // Helper function to convert a move to algebraic notation
-func algebraicMove(move *Move) string {
+func algebraicMove(move *MoveNode) string {
+	mv := move.Move()
 	// This is a simplified version - you might want to implement proper algebraic notation
-	if move.HasTag(KingSideCastle) {
+	if mv.HasTag(KingSideCastle) {
 		return "O-O"
 	}
-	if move.HasTag(QueenSideCastle) {
+	if mv.HasTag(QueenSideCastle) {
 		return "O-O-O"
 	}
 
-	s1 := move.s1.String()
-	s2 := move.s2.String()
+	s1 := mv.s1.String()
+	s2 := mv.s2.String()
 
-	if move.promo != NoPieceType {
-		return s1 + s2 + "=" + move.promo.String()
+	if mv.promo != NoPieceType {
+		return s1 + s2 + "=" + mv.promo.String()
 	}
 
 	return s1 + s2
@@ -850,7 +852,7 @@ func TestCloneGameState(t *testing.T) {
 	if clone.pos.String() != original.pos.String() {
 		t.Fatalf("expected position %s but got %s", original.pos.String(), clone.pos.String())
 	}
-	if clone.currentMove.String() != original.currentMove.String() {
+	if clone.currentMove.Move().String() != original.currentMove.Move().String() {
 		t.Fatalf("expected current move to be %v but got %v", original.currentMove, clone.currentMove)
 	}
 	if clone.currentMove == original.currentMove {
@@ -1078,8 +1080,8 @@ func TestPGNWithValidData(t *testing.T) {
 	if len(g.Positions()) != 7 {
 		t.Fatalf("expected 7 positions got %v", len(g.Positions()))
 	}
-	if g.currentMove.String() != "a7a6" {
-		t.Fatalf("expected current move a7a6 but got %v", g.currentMove.String())
+	if g.currentMove.Move().String() != "a7a6" {
+		t.Fatalf("expected current move a7a6 but got %v", g.currentMove.Move().String())
 	}
 }
 
@@ -1162,7 +1164,7 @@ func TestGameString(t *testing.T) {
 			setup: func() *Game {
 				g := NewGame()
 				_ = g.PushMove("e4", nil)
-				g.currentMove.comments = "Good move"
+				g.currentMove.SetComment("Good move")
 				return g
 			},
 			expected: "1. e4 {Good move} *",
@@ -1222,7 +1224,7 @@ func TestGameString(t *testing.T) {
 			setup: func() *Game {
 				g := NewGame()
 				_ = g.PushMove("e4", nil)
-				g.currentMove.comments = "Good move"
+				g.currentMove.SetComment("Good move")
 				g.currentMove.SetCommand("clk", "10:00:00")
 				return g
 			},
@@ -1237,19 +1239,19 @@ func TestGameString(t *testing.T) {
 				g.currentMove.SetCommand("clk", "10:00:00")
 				return g
 			},
-			expected: "1. e4 { [%clk 10:00:00] [%eval 0.24]} *",
+			expected: "1. e4 { [%eval 0.24] [%clk 10:00:00]} *",
 		},
 		{
 			name: "GameStringWithCommentsAndMultipleCommands",
 			setup: func() *Game {
 				g := NewGame()
 				_ = g.PushMove("e4", nil)
-				g.currentMove.comments = "Good move"
+				g.currentMove.SetComment("Good move")
 				g.currentMove.SetCommand("eval", "0.24")
 				g.currentMove.SetCommand("clk", "10:00:00")
 				return g
 			},
-			expected: "1. e4 {Good move [%clk 10:00:00] [%eval 0.24]} *",
+			expected: "1. e4 {Good move [%eval 0.24] [%clk 10:00:00]} *",
 		},
 		{
 			name: "GameStringWithMultipleNestedVariations",
@@ -1602,7 +1604,7 @@ func TestRootMoveComments(t *testing.T) {
 	})
 }
 
-func TestWriteAnnotationsLegacyBranches(t *testing.T) {
+func TestWriteAnnotations(t *testing.T) {
 	t.Run("NilMove", func(t *testing.T) {
 		var sb strings.Builder
 		writeAnnotations(nil, &sb)
@@ -1611,35 +1613,10 @@ func TestWriteAnnotationsLegacyBranches(t *testing.T) {
 		}
 	})
 
-	t.Run("CommentOnly", func(t *testing.T) {
-		move := &Move{comments: "Good move"}
-		move.ensureCommentBlocksFromLegacy()
-		move.commentBlocks = nil
-
-		var sb strings.Builder
-		writeAnnotations(move, &sb)
-		if sb.String() != " {Good move}" {
-			t.Fatalf("expected comment-only annotation, got %q", sb.String())
-		}
-	})
-
-	t.Run("CommandOnly", func(t *testing.T) {
-		move := &Move{command: map[string]string{"clk": "0:05:00"}}
-		move.ensureCommentBlocksFromLegacy()
-		move.commentBlocks = nil
-
-		var sb strings.Builder
-		writeAnnotations(move, &sb)
-		if sb.String() != " { [%clk 0:05:00]}" {
-			t.Fatalf("expected command-only annotation, got %q", sb.String())
-		}
-	})
-
-	t.Run("CommentAndCommand", func(t *testing.T) {
-		move := &Move{comments: "Good move", command: map[string]string{"clk": "0:05:00"}}
-		move.ensureCommentBlocksFromLegacy()
-		move.commentBlocks = nil
-
+	t.Run("StructuredCommentAndCommand", func(t *testing.T) {
+		move := &MoveNode{}
+		move.SetComment("Good move")
+		move.SetCommand("clk", "0:05:00")
 		var sb strings.Builder
 		writeAnnotations(move, &sb)
 		if sb.String() != " {Good move [%clk 0:05:00]}" {
@@ -1911,13 +1888,13 @@ func TestGameMoveValidation(t *testing.T) {
 	tests := []struct {
 		name        string
 		setupMoves  []string // Moves to set up the position
-		move        *Move    // Move to test
+		move        Move     // Move to test
 		wantErr     bool     // Whether we expect an error
 		errorString string   // Expected error string (if wantErr is true)
 	}{
 		{
 			name: "valid move should succeed",
-			move: &Move{
+			move: Move{
 				s1: E2,
 				s2: E4,
 			},
@@ -1925,7 +1902,7 @@ func TestGameMoveValidation(t *testing.T) {
 		},
 		{
 			name: "invalid move should fail",
-			move: &Move{
+			move: Move{
 				s1: E2,
 				s2: E5, // Invalid move - pawn can't move three squares from e2 to e5
 			},
@@ -1933,15 +1910,9 @@ func TestGameMoveValidation(t *testing.T) {
 			errorString: "move e2e5 is not valid for the current position",
 		},
 		{
-			name:        "nil move should fail",
-			move:        nil,
-			wantErr:     true,
-			errorString: "move cannot be nil",
-		},
-		{
 			name:       "invalid move from valid position should fail",
 			setupMoves: []string{"e4", "e5"},
-			move: &Move{
+			move: Move{
 				s1: E4,
 				s2: E6, // Invalid move - pawn can't move two squares from e4 to e6
 			},
@@ -1951,7 +1922,7 @@ func TestGameMoveValidation(t *testing.T) {
 		{
 			name:       "valid move from valid position should succeed",
 			setupMoves: []string{"e4", "e5"},
-			move: &Move{
+			move: Move{
 				s1: G1,
 				s2: F3,
 			},
@@ -1960,7 +1931,7 @@ func TestGameMoveValidation(t *testing.T) {
 		{
 			name:       "valid promotion move should succeed",
 			setupMoves: []string{"e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"},
-			move: &Move{
+			move: Move{
 				s1:    B7,
 				s2:    A8,
 				promo: Queen,
@@ -1970,7 +1941,7 @@ func TestGameMoveValidation(t *testing.T) {
 		{
 			name:       "invalid promotion move should fail",
 			setupMoves: []string{"e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"},
-			move: &Move{
+			move: Move{
 				s1:    B7,
 				s2:    A8,
 				promo: King, // Invalid promotion piece
@@ -1981,7 +1952,7 @@ func TestGameMoveValidation(t *testing.T) {
 		{
 			name:       "valid castling move should succeed",
 			setupMoves: []string{"e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "d3", "Nf6"},
-			move: &Move{
+			move: Move{
 				s1:   E1,
 				s2:   G1,
 				tags: KingSideCastle,
@@ -1991,7 +1962,7 @@ func TestGameMoveValidation(t *testing.T) {
 		{
 			name:       "invalid castling move should fail",
 			setupMoves: []string{"e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "d3", "Nf6"},
-			move: &Move{
+			move: Move{
 				s1:   E1,
 				s2:   H1, // Invalid castling destination
 				tags: KingSideCastle,
@@ -2030,18 +2001,15 @@ func TestGameMoveValidation(t *testing.T) {
 				return
 			}
 
-			// If the move was successful, verify it was added to the game
-			if tt.move != nil {
-				// Check that the current move matches our move
-				if game.currentMove == nil {
-					t.Errorf("Move() succeeded but currentMove is nil")
-					return
-				}
+			// Check that the current move matches our move
+			if game.currentMove == nil {
+				t.Errorf("Move() succeeded but currentMove is nil")
+				return
+			}
 
-				if game.currentMove.s1 != tt.move.s1 || game.currentMove.s2 != tt.move.s2 || game.currentMove.promo != tt.move.promo {
-					t.Errorf("Move() succeeded but currentMove doesn't match: got %v, want %v",
-						game.currentMove, tt.move)
-				}
+			if game.currentMove.Move() != tt.move {
+				t.Errorf("Move() succeeded but currentMove doesn't match: got %v, want %v",
+					game.currentMove.Move(), tt.move)
 			}
 		})
 	}
@@ -2051,12 +2019,12 @@ func TestGameUnsafeMove(t *testing.T) {
 	tests := []struct {
 		name       string
 		setupMoves []string // Moves to set up the position
-		move       *Move    // Move to test
+		move       Move     // Move to test
 		wantErr    bool     // Whether we expect an error
 	}{
 		{
 			name: "valid move should succeed without validation",
-			move: &Move{
+			move: Move{
 				s1: E2,
 				s2: E4,
 			},
@@ -2064,21 +2032,16 @@ func TestGameUnsafeMove(t *testing.T) {
 		},
 		{
 			name: "invalid move should still succeed (no validation)",
-			move: &Move{
+			move: Move{
 				s1: E2,
 				s2: E5, // Invalid move but UnsafeMove doesn't validate
 			},
 			wantErr: false, // UnsafeMove doesn't validate, so no error expected
 		},
 		{
-			name:    "nil move should fail",
-			move:    nil,
-			wantErr: true,
-		},
-		{
 			name:       "complex valid move should succeed",
 			setupMoves: []string{"e4", "e5"},
-			move: &Move{
+			move: Move{
 				s1: G1,
 				s2: F3,
 			},
@@ -2087,7 +2050,7 @@ func TestGameUnsafeMove(t *testing.T) {
 		{
 			name:       "promotion move should succeed without validation",
 			setupMoves: []string{"e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"},
-			move: &Move{
+			move: Move{
 				s1:    B7,
 				s2:    A8,
 				promo: Queen,
@@ -2122,18 +2085,15 @@ func TestGameUnsafeMove(t *testing.T) {
 				return
 			}
 
-			// If the move was successful, verify it was added to the game
-			if tt.move != nil {
-				// Check that the current move matches our move
-				if game.currentMove == nil {
-					t.Errorf("UnsafeMove() succeeded but currentMove is nil")
-					return
-				}
+			// Check that the current move matches our move
+			if game.currentMove == nil {
+				t.Errorf("UnsafeMove() succeeded but currentMove is nil")
+				return
+			}
 
-				if game.currentMove.s1 != tt.move.s1 || game.currentMove.s2 != tt.move.s2 || game.currentMove.promo != tt.move.promo {
-					t.Errorf("UnsafeMove() succeeded but currentMove doesn't match: got %v, want %v",
-						game.currentMove, tt.move)
-				}
+			if game.currentMove.Move() != tt.move {
+				t.Errorf("UnsafeMove() succeeded but currentMove doesn't match: got %v, want %v",
+					game.currentMove.Move(), tt.move)
 			}
 		})
 	}
@@ -2151,7 +2111,7 @@ func TestMoveVsUnsafeMovePerformance(t *testing.T) {
 		t.Fatal("no valid moves available")
 	}
 
-	move := &validMoves[0]
+	move := validMoves[0]
 
 	// Test Move (with validation)
 	start := time.Now()
@@ -2476,7 +2436,7 @@ func TestMoveHistoryMainLine(t *testing.T) {
 	if history[0].PrePosition != g.rootMove.position {
 		t.Fatalf("expected first pre-position to be root position")
 	}
-	if history[0].PostPosition != history[0].Move.position {
+	if history[0].PostPosition != g.MoveNodes()[0].position {
 		t.Fatalf("expected post-position to match move position")
 	}
 	if history[1].PrePosition != history[0].PostPosition {
@@ -2518,7 +2478,7 @@ func TestMoveHistoryWithVariations(t *testing.T) {
 	if err := g.PushMove("e5", nil); err != nil {
 		t.Fatal(err)
 	}
-	variationMove := &Move{}
+	variationMove := Move{}
 	g.AddVariation(g.rootMove.children[0], variationMove)
 	history := g.MoveHistory()
 	if len(history) != 2 {
@@ -2555,9 +2515,6 @@ func TestMoveHistoryFromPGN(t *testing.T) {
 	}
 
 	for i, h := range history {
-		if h.Move == nil {
-			t.Fatalf("entry %d: Move is nil", i)
-		}
 		if h.PrePosition == nil {
 			t.Fatalf("entry %d: PrePosition is nil", i)
 		}

@@ -22,7 +22,7 @@ import (
 // Parser holds the state needed during parsing.
 type Parser struct {
 	game        *Game
-	currentMove *Move
+	currentMove *MoveNode
 	tokens      []Token
 	errors      []ParserError
 	position    int
@@ -36,7 +36,7 @@ type Parser struct {
 //	tokens := TokenizeGame(game)
 //	parser := NewParser(tokens)
 func NewParser(tokens []Token) *Parser {
-	rootMove := &Move{
+	rootMove := &MoveNode{
 		position: StartingPosition(),
 	}
 	return &Parser{
@@ -194,10 +194,7 @@ func (p *Parser) parseMoveText() error {
 			if err != nil {
 				return err
 			}
-			if moveNumber > 0 {
-				move.number = uint(moveNumber)
-			}
-			p.addMove(move)
+			p.addMove(move, uint(moveNumber))
 			ply++
 
 			// Collect all NAGs and comments that follow the move
@@ -247,8 +244,8 @@ func (p *Parser) parseMoveText() error {
 }
 
 // parseMove processes tokens until it has a complete move, then validates against legal moves.
-func (p *Parser) parseMove() (*Move, error) {
-	move := &Move{}
+func (p *Parser) parseMove() (Move, error) {
+	move := Move{}
 
 	// Handle castling first as it's a special case
 	if p.currentToken().Type == KingsideCastle {
@@ -258,13 +255,13 @@ func (p *Parser) parseMove() (*Move, error) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
 				if m.HasTag(Check) {
-					move.AddTag(Check)
+					move = move.WithTag(Check)
 				}
 				p.advance()
 				return move, nil
 			}
 		}
-		return nil, &ParserError{
+		return Move{}, &ParserError{
 			Message:    "illegal kingside castle",
 			TokenType:  p.currentToken().Type,
 			TokenValue: p.currentToken().Value,
@@ -278,15 +275,14 @@ func (p *Parser) parseMove() (*Move, error) {
 			if m.HasTag(QueenSideCastle) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
-				move.position = p.game.pos
 				if m.HasTag(Check) {
-					move.AddTag(Check)
+					move = move.WithTag(Check)
 				}
 				p.advance()
 				return move, nil
 			}
 		}
-		return nil, &ParserError{
+		return Move{}, &ParserError{
 			Message:    "illegal queenside castle",
 			TokenType:  p.currentToken().Type,
 			TokenValue: p.currentToken().Value,
@@ -341,7 +337,7 @@ func (p *Parser) parseMove() (*Move, error) {
 
 	// Get destination square
 	if p.currentToken().Type != SQUARE {
-		return nil, &ParserError{
+		return Move{}, &ParserError{
 			Message:    "expected destination square",
 			TokenType:  p.currentToken().Type,
 			TokenValue: p.currentToken().Value,
@@ -355,7 +351,7 @@ func (p *Parser) parseMove() (*Move, error) {
 	if p.currentToken().Type == PROMOTION {
 		p.advance()
 		if p.currentToken().Type != PromotionPiece {
-			return nil, &ParserError{
+			return Move{}, &ParserError{
 				Message:    "expected promotion piece",
 				TokenType:  p.currentToken().Type,
 				TokenValue: p.currentToken().Value,
@@ -369,7 +365,7 @@ func (p *Parser) parseMove() (*Move, error) {
 	// Get target square
 	targetSquare := parseSquare(moveData.destSquare)
 	if targetSquare == NoSquare {
-		return nil, &ParserError{
+		return Move{}, &ParserError{
 			Message:    "invalid destination square",
 			TokenType:  p.currentToken().Type,
 			TokenValue: p.currentToken().Value,
@@ -447,12 +443,12 @@ func (p *Parser) parseMove() (*Move, error) {
 
 	if matchingMove == nil {
 		if err != nil {
-			return nil, &ParserError{
+			return Move{}, &ParserError{
 				Message:  fmt.Sprintf("no legal move found for position: %s", err.Error()),
 				Position: p.position,
 			}
 		}
-		return nil, &ParserError{
+		return Move{}, &ParserError{
 			Message:  "no legal move found for position",
 			Position: p.position,
 		}
@@ -468,19 +464,6 @@ func (p *Parser) parseMove() (*Move, error) {
 	if p.currentToken().Type == CHECK {
 		move.tags |= Check
 		p.advance()
-	}
-
-	// Handle NAG if present
-	if p.currentToken().Type == NAG {
-		move.nag = p.currentToken().Value
-		p.advance()
-	}
-
-	// Set move number for both white and black moves
-	if p.game.pos != nil && p.game.pos.Turn() == Black {
-		if parentMoveNum := p.currentMove.number; parentMoveNum > 0 {
-			move.number = parentMoveNum
-		}
 	}
 
 	return move, nil
@@ -578,7 +561,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	if parentMove != p.game.rootMove && parentMove.parent != nil {
 		variationParent = parentMove.parent
 		if variationParent.parent != nil && variationParent.parent.position != nil {
-			p.game.pos = variationParent.parent.position.Update(variationParent)
+			p.game.pos = variationParent.parent.position.Update(variationParent.move)
 		} else {
 			p.game.pos = p.game.rootMove.position.copy()
 		}
@@ -642,14 +625,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 				return err
 			}
 
-		move.parent = p.currentMove
-		p.currentMove.children = append(p.currentMove.children, move)
-		move.number = uint(moveNumber)
-
-		p.game.pos = p.game.pos.Update(move)
-
-		move.position = p.game.pos
-		p.currentMove = move
+			p.addMove(move, uint(moveNumber))
 			ply++
 			isBlackMove = !isBlackMove
 
@@ -710,16 +686,9 @@ func (p *Parser) parseResult() {
 	p.advance()
 }
 
-func (p *Parser) addMove(move *Move) {
-	// For the first move in the game
-	if p.currentMove == p.game.rootMove {
-		move.parent = p.game.rootMove
-		p.game.rootMove.children = append(p.game.rootMove.children, move)
-	} else {
-		// Normal move in the main line
-		move.parent = p.currentMove
-		p.currentMove.children = append(p.currentMove.children, move)
-	}
+func (p *Parser) addMove(move Move, number uint) *MoveNode {
+	node := &MoveNode{move: move, parent: p.currentMove, number: number}
+	p.currentMove.children = append(p.currentMove.children, node)
 
 	// Update position
 	if newPos := p.game.pos.Update(move); newPos != nil {
@@ -728,9 +697,10 @@ func (p *Parser) addMove(move *Move) {
 	}
 
 	// Cache position after the move
-	move.position = p.game.pos
+	node.position = p.game.pos
 
-	p.currentMove = move
+	p.currentMove = node
+	return node
 }
 
 // parsePieceType converts a piece character into a PieceType.

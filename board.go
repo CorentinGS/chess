@@ -58,11 +58,11 @@ type Board struct {
 	bbBlackBishop bitboard
 	bbBlackKnight bitboard
 	bbBlackPawn   bitboard
-	whiteSqs      bitboard // all white pieces
-	blackSqs      bitboard // all black pieces
-	emptySqs      bitboard // all empty squares
-	whiteKingSq   Square   // cached white king square
-	blackKingSq   Square   // cached black king square
+	whiteSqs      bitboard                   // all white pieces
+	blackSqs      bitboard                   // all black pieces
+	emptySqs      bitboard                   // all empty squares
+	whiteKingSq   Square                     // cached white king square
+	blackKingSq   Square                     // cached black king square
 	mailbox       [numOfSquaresInBoard]Piece // O(1) piece lookup per square
 }
 
@@ -365,7 +365,7 @@ func (b *Board) UnmarshalBinary(data []byte) error {
 }
 
 //nolint:mnd // magic number is used for bitboard size.
-func (b *Board) update(m *Move) {
+func (b *Board) update(m Move) {
 	p1 := b.Piece(m.s1)
 	s1BB := bbForSquare(m.s1)
 	s2BB := bbForSquare(m.s2)
@@ -434,7 +434,7 @@ func (b *Board) update(m *Move) {
 		b.mailbox[D8] = BlackRook
 	}
 
-	b.calcConvienceBBs(m)
+	b.calcConvienceBBs(&m)
 }
 
 func (b *Board) calcConvienceBBs(m *Move) {

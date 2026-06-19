@@ -99,24 +99,10 @@ func StartingPosition() *Position {
 // Example:
 //
 //	newPos := pos.Update(move)
-func (pos *Position) Update(m *Move) *Position {
+func (pos *Position) Update(m Move) *Position {
 	moveCount := pos.moveCount
 	if pos.turn == Black {
 		moveCount++
-	}
-
-	if m == nil {
-		newPos := &Position{
-			board:           pos.board.copy(),
-			turn:            pos.turn.Other(),
-			castleRights:    pos.castleRights,
-			enPassantSquare: NoSquare,
-			halfMoveClock:   pos.halfMoveClock + 1,
-			moveCount:       moveCount,
-			inCheck:         false,
-		}
-		newPos.hash = newPos.computeHash()
-		return newPos
 	}
 
 	ncr := pos.updateCastleRights(m)
@@ -143,7 +129,7 @@ func (pos *Position) Update(m *Move) *Position {
 }
 
 // updateHash computes the new Zobrist hash incrementally from a move.
-func (pos *Position) updateHash(m *Move, newCR CastleRights, newEP Square) uint64 {
+func (pos *Position) updateHash(m Move, newCR CastleRights, newEP Square) uint64 {
 	hash := pos.hash
 
 	// Toggle side to move
@@ -619,7 +605,7 @@ func (pos *Position) computeHash() uint64 {
 	return hash
 }
 
-func (pos *Position) updateCastleRights(m *Move) CastleRights {
+func (pos *Position) updateCastleRights(m Move) CastleRights {
 	cr := string(pos.castleRights)
 	p := pos.board.Piece(m.s1)
 	if p == WhiteKing || m.s1 == H1 || m.s2 == H1 {
@@ -640,7 +626,7 @@ func (pos *Position) updateCastleRights(m *Move) CastleRights {
 	return CastleRights(cr)
 }
 
-func (pos *Position) updateEnPassantSquare(m *Move) Square {
+func (pos *Position) updateEnPassantSquare(m Move) Square {
 	const squaresPerRank = 8
 	p := pos.board.Piece(m.s1)
 	if p.Type() != Pawn {

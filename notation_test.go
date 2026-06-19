@@ -64,7 +64,7 @@ func TestInvalidDecoding(t *testing.T) {
 func TestEncodeUCINotation(t *testing.T) {
 	notation := UCINotation{}
 	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-	move := &Move{s1: E2, s2: E4}
+	move := Move{s1: E2, s2: E4}
 	expected := "e2e4"
 	result := notation.Encode(pos, move)
 	if result != expected {
@@ -75,7 +75,7 @@ func TestEncodeUCINotation(t *testing.T) {
 func TestEncodeUCINotationWithPromotion(t *testing.T) {
 	notation := UCINotation{}
 	pos := unsafeFEN("8/P7/8/8/8/8/8/8 w - - 0 1")
-	move := &Move{s1: A7, s2: A8, promo: Queen}
+	move := Move{s1: A7, s2: A8, promo: Queen}
 	expected := "a7a8q"
 	result := notation.Encode(pos, move)
 	if result != expected {
@@ -86,7 +86,7 @@ func TestEncodeUCINotationWithPromotion(t *testing.T) {
 func TestEncodeUCINotationWithInvalidMove(t *testing.T) {
 	notation := UCINotation{}
 	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-	move := &Move{s1: E2, s2: E5}
+	move := Move{s1: E2, s2: E5}
 	expected := "e2e5"
 	result := notation.Encode(pos, move)
 	if result != expected {
@@ -95,14 +95,13 @@ func TestEncodeUCINotationWithInvalidMove(t *testing.T) {
 }
 
 func TestUCINotationDecode(t *testing.T) {
-	moveWithCheckCapture := &Move{s1: D1, s2: D8, tags: Check}
-	moveWithCheckCapture.AddTag(Capture)
+	moveWithCheckCapture := Move{s1: D1, s2: D8, tags: Check}.WithTag(Capture)
 
 	tests := []struct {
 		name        string
 		pos         *Position
 		input       string
-		want        *Move
+		want        Move
 		wantErr     bool
 		expectedPos *Position
 	}{
@@ -110,7 +109,7 @@ func TestUCINotationDecode(t *testing.T) {
 			name:        "valid move without promotion",
 			pos:         unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
 			input:       "e2e4",
-			want:        &Move{s1: E2, s2: E4},
+			want:        Move{s1: E2, s2: E4},
 			expectedPos: unsafeFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"),
 			wantErr:     false,
 		},
@@ -118,7 +117,7 @@ func TestUCINotationDecode(t *testing.T) {
 			name:        "valid move with promotion",
 			pos:         unsafeFEN("8/P7/8/8/8/8/8/8 w - - 0 1"),
 			input:       "a7a8q",
-			want:        &Move{s1: A7, s2: A8, promo: Queen},
+			want:        Move{s1: A7, s2: A8, promo: Queen},
 			expectedPos: unsafeFEN("Q7/8/8/8/8/8/8/8 b - - 0 1"),
 			wantErr:     false,
 		},
@@ -126,7 +125,7 @@ func TestUCINotationDecode(t *testing.T) {
 			name:        "valid move with capture",
 			pos:         unsafeFEN("rnbqkb1r/ppp2ppp/3p1n2/4P3/4P3/2N5/PPP2PPP/R1BQKBNR b KQkq - 0 4"),
 			input:       "d6e5",
-			want:        &Move{s1: D6, s2: E5, tags: Capture},
+			want:        Move{s1: D6, s2: E5, tags: Capture},
 			wantErr:     false,
 			expectedPos: unsafeFEN("rnbqkb1r/ppp2ppp/5n2/4p3/4P3/2N5/PPP2PPP/R1BQKBNR w KQkq - 0 5"),
 		},
@@ -134,7 +133,7 @@ func TestUCINotationDecode(t *testing.T) {
 			name:        "valid move with check only",
 			pos:         unsafeFEN("rnbqkb1r/ppp2ppp/5n2/4p3/4P3/2N5/PPP2PPP/R1BQKBNR w KQkq - 0 5"),
 			input:       "f1b5",
-			want:        &Move{s1: F1, s2: B5, tags: Check},
+			want:        Move{s1: F1, s2: B5, tags: Check},
 			expectedPos: unsafeFEN("rnbqkb1r/ppp2ppp/5n2/1B2p3/4P3/2N5/PPP2PPP/R1BQK1NR b KQkq - 1 5"),
 			wantErr:     false,
 		},
@@ -150,7 +149,7 @@ func TestUCINotationDecode(t *testing.T) {
 			name:        "valid move with castle with check",
 			pos:         unsafeFEN("r4b1r/ppp3pp/8/4p3/2Pq4/3P1Q2/PP3PPP/1k2K2R w K - 2 19"),
 			input:       "e1g1",
-			want:        &Move{s1: E1, s2: G1, tags: Check | KingSideCastle},
+			want:        Move{s1: E1, s2: G1, tags: Check | KingSideCastle},
 			wantErr:     false,
 			expectedPos: unsafeFEN("r4b1r/ppp3pp/8/4p3/2Pq4/3P1Q2/PP3PPP/1k3RK1 b - - 3 19"),
 		},
@@ -158,7 +157,7 @@ func TestUCINotationDecode(t *testing.T) {
 			name:        "valid en passant move with check",
 			pos:         unsafeFEN("r3k1r1/pbppqpb1/1pn3p1/7p/1N2pPn1/1PP4N/PB1P2PP/2QRK1R1 b q f3 0 2"),
 			input:       "e4f3",
-			want:        &Move{s1: E4, s2: F3, tags: Check | EnPassant},
+			want:        Move{s1: E4, s2: F3, tags: Check | EnPassant},
 			wantErr:     false,
 			expectedPos: unsafeFEN("r3k1r1/pbppqpb1/1pn3p1/7p/1N4n1/1PP2p1N/PB1P2PP/2QRK1R1 w q - 0 3"),
 		},
@@ -166,28 +165,25 @@ func TestUCINotationDecode(t *testing.T) {
 			name:    "invalid UCI notation length",
 			pos:     nil,
 			input:   "e2e",
-			want:    nil,
 			wantErr: true,
 		},
 		{
 			name:    "invalid squares in UCI notation",
 			pos:     nil,
 			input:   "e9e4",
-			want:    nil,
 			wantErr: true,
 		},
 		{
 			name:    "invalid promotion piece",
 			pos:     nil,
 			input:   "a7a8x",
-			want:    nil,
 			wantErr: true,
 		},
 		{
 			name:        "valid en passant move",
 			pos:         unsafeFEN("rnbqkbnr/ppp2ppp/4p3/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3"),
 			input:       "e5d6",
-			want:        &Move{s1: E5, s2: D6, tags: EnPassant},
+			want:        Move{s1: E5, s2: D6, tags: EnPassant},
 			wantErr:     false,
 			expectedPos: unsafeFEN("rnbqkbnr/ppp2ppp/3Pp3/8/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3"),
 		},
@@ -204,12 +200,9 @@ func TestUCINotationDecode(t *testing.T) {
 			if !tt.wantErr && (got.String() != tt.want.String() || got.promo != tt.want.promo || got.tags != tt.want.tags) {
 				t.Errorf("Decode() = %v (%d), want %v (%d)", got, got.tags, tt.want, tt.want.tags)
 			}
-			if !tt.wantErr && tt.want.position != nil && got.position != nil && tt.want.position.String() != got.position.String() {
-				t.Errorf("Decode() = %v, want %v", got.position, tt.want.position)
-			}
 
-			if !tt.wantErr && tt.expectedPos != nil && got.position.String() != tt.expectedPos.String() {
-				t.Errorf("Decode() = %v, want %v", got.position.String(), tt.expectedPos)
+			if !tt.wantErr && tt.expectedPos != nil && tt.pos.Update(got).String() != tt.expectedPos.String() {
+				t.Errorf("Decode() position = %v, want %v", tt.pos.Update(got).String(), tt.expectedPos)
 			}
 		})
 	}
@@ -227,17 +220,17 @@ var (
 
 // Test moves for each position
 var (
-	startMoves = []*Move{
+	startMoves = []Move{
 		{s1: E2, s2: E4}, // e4
 		{s1: G1, s2: F3}, // Nf3
 		{s1: B1, s2: C3}, // Nc3
 	}
-	midMoves = []*Move{
+	midMoves = []Move{
 		{s1: E1, s2: G1, tags: KingSideCastle},  // O-O
 		{s1: F3, s2: E5, tags: Capture},         // Nxe5
 		{s1: C4, s2: F7, tags: Check | Capture}, // d4+
 	}
-	complexMoves = []*Move{
+	complexMoves = []Move{
 		{s1: B7, s2: B8, promo: Knight},                // b8=N
 		{s1: B7, s2: A8, promo: Bishop, tags: Capture}, // bxa8=B
 		{s1: B7, s2: C8, promo: Rook, tags: Check},     // bxc8=R+
@@ -250,7 +243,7 @@ var (
 func BenchmarkUCIEncode(b *testing.B) {
 	notation := UCINotation{}
 	positions := []*Position{startPos, midPos, complexPos}
-	moves := [][]*Move{startMoves, midMoves, complexMoves}
+	moves := [][]Move{startMoves, midMoves, complexMoves}
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -289,7 +282,7 @@ func BenchmarkUCIDecode(b *testing.B) {
 func BenchmarkAlgebraicEncode(b *testing.B) {
 	notation := AlgebraicNotation{}
 	positions := []*Position{startPos, midPos, complexPos}
-	moves := [][]*Move{startMoves, midMoves, complexMoves}
+	moves := [][]Move{startMoves, midMoves, complexMoves}
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -328,7 +321,7 @@ func BenchmarkAlgebraicDecode(b *testing.B) {
 func BenchmarkLongAlgebraicEncode(b *testing.B) {
 	notation := LongAlgebraicNotation{}
 	positions := []*Position{startPos, midPos, complexPos}
-	moves := [][]*Move{startMoves, midMoves, complexMoves}
+	moves := [][]Move{startMoves, midMoves, complexMoves}
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -386,7 +379,7 @@ func BenchmarkAlgebraicDecodeComplex(b *testing.B) {
 
 func TestPromotionWithCheck(t *testing.T) {
 	promoPos := unsafeFEN("8/1P2k3/8/8/8/8/8/8 w - - 0 1")
-	promoMove := &Move{s1: B7, s2: B8, promo: Queen, tags: Check}
+	promoMove := Move{s1: B7, s2: B8, promo: Queen, tags: Check}
 
 	algebraicNotation := AlgebraicNotation{}
 	result := algebraicNotation.Encode(promoPos, promoMove)
@@ -403,8 +396,7 @@ func TestPromotionWithCheck(t *testing.T) {
 
 func TestPromotionWithCheckFromIssue84(t *testing.T) {
 	promoPos := unsafeFEN("8/1P2k3/8/8/8/8/8/8 w - - 0 1")
-	promoMove := &Move{s1: B7, s2: B8, promo: Queen}
-	promoMove.AddTag(Check)
+	promoMove := Move{s1: B7, s2: B8, promo: Queen}.WithTag(Check)
 
 	algebraicNotation := AlgebraicNotation{}
 	result := algebraicNotation.Encode(promoPos, promoMove)
@@ -444,7 +436,7 @@ func TestIssue84FullGame(t *testing.T) {
 		t.Fatalf("Failed to parse PGN: %v", err)
 	}
 	game := NewGame(pgnObj)
-	moves := game.Moves()
+	moves := game.MoveNodes()
 
 	for i, mv := range moves {
 		moveNum := (i / 2) + 1
@@ -453,13 +445,13 @@ func TestIssue84FullGame(t *testing.T) {
 			color = "B"
 		}
 
-		_, err := safeEncode(LongAlgebraicNotation{}, mv.Position(), mv)
+		_, err := safeEncode(LongAlgebraicNotation{}, mv.Position(), mv.Move())
 		if err != nil {
 			t.Fatalf("Error: LongAlgebraicNotation.Encode panic at half-move %d (%d. %s): %v",
 				i, moveNum, color, err)
 		}
 
-		_, err = safeEncode(AlgebraicNotation{}, mv.Position(), mv)
+		_, err = safeEncode(AlgebraicNotation{}, mv.Position(), mv.Move())
 		if err != nil {
 			t.Fatalf("Error: AlgebraicNotation.Encode panic at half-move %d (%d. %s): %v",
 				i, moveNum, color, err)
@@ -467,7 +459,7 @@ func TestIssue84FullGame(t *testing.T) {
 	}
 }
 
-func safeEncode(notation Encoder, pos *Position, mv *Move) (s string, err error) {
+func safeEncode(notation Encoder, pos *Position, mv Move) (s string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
@@ -479,7 +471,7 @@ func safeEncode(notation Encoder, pos *Position, mv *Move) (s string, err error)
 // Benchmark promotion scenarios
 func BenchmarkPromotionEncoding(b *testing.B) {
 	promoPos := unsafeFEN("rnbqkbnr/pPpppppp/8/8/8/8/P1PPPPPP/RNBQKBNR w KQkq - 0 1")
-	promoMove := &Move{s1: B7, s2: B8, promo: Queen, tags: Check}
+	promoMove := Move{s1: B7, s2: B8, promo: Queen, tags: Check}
 	notations := []Notation{
 		UCINotation{},
 		AlgebraicNotation{},

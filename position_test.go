@@ -33,7 +33,7 @@ func TestPositionUpdate(t *testing.T) {
 		}
 
 		{
-			np := pos.Update(&pos.ValidMoves()[0])
+			np := pos.Update(pos.ValidMoves()[0])
 			if pos.Turn().Other() != np.turn {
 				t.Fatal("expected other turn")
 			}
@@ -42,19 +42,6 @@ func TestPositionUpdate(t *testing.T) {
 			}
 			if pos.board.String() == np.board.String() {
 				t.Fatal("expected board update")
-			}
-		}
-
-		{
-			np := pos.Update(nil)
-			if pos.Turn().Other() != np.turn {
-				t.Fatal("expected other turn")
-			}
-			if pos.halfMoveClock+1 != np.halfMoveClock {
-				t.Fatal("expected half move clock increment")
-			}
-			if pos.board.String() != np.board.String() {
-				t.Fatal("expected same board")
 			}
 		}
 	}
@@ -253,7 +240,7 @@ func TestZobristHashIncrementalCorrectness(t *testing.T) {
 			continue
 		}
 		for _, m := range moves {
-			newPos := pos.Update(&m)
+			newPos := pos.Update(m)
 			// Recompute hash from scratch for the new position
 			recomputedHash := newPos.computeHash()
 			if newPos.ZobristHash() != recomputedHash {

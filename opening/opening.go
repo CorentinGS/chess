@@ -62,8 +62,8 @@ func (o *Opening) Game() *chess.Game {
 type Book interface {
 	// Find returns the most specific opening for the list of moves. If no opening is found, Find returns nil.
 	// Use Find for performance-sensitive opening detection paths.
-	Find(moves []*chess.Move) *Opening
+	Find(moves []chess.Move) *Opening
 	// Possible returns the possible openings after the moves given. If moves is empty or nil all openings are returned.
 	// Use Possible for performance-sensitive opening exploration paths.
-	Possible(moves []*chess.Move) []*Opening
+	Possible(moves []chess.Move) []*Opening
 }

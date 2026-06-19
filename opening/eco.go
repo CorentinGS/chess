@@ -73,7 +73,7 @@ func NewBook(r io.Reader) (*BookECO, error) {
 
 // Find implements the Book interface.
 // Use Find for performance-sensitive opening detection paths.
-func (b *BookECO) Find(moves []*chess.Move) *Opening {
+func (b *BookECO) Find(moves []chess.Move) *Opening {
 	for n := b.followPath(b.root, moves); n != nil; n = n.parent {
 		if n.opening != nil {
 			return n.opening
@@ -84,7 +84,7 @@ func (b *BookECO) Find(moves []*chess.Move) *Opening {
 
 // Possible implements the Book interface.
 // Use Possible for performance-sensitive opening exploration paths.
-func (b *BookECO) Possible(moves []*chess.Move) []*Opening {
+func (b *BookECO) Possible(moves []chess.Move) []*Opening {
 	n := b.followPath(b.root, moves)
 	var openings []*Opening
 	for _, n := range b.nodeList(n) {
@@ -95,7 +95,7 @@ func (b *BookECO) Possible(moves []*chess.Move) []*Opening {
 	return openings
 }
 
-func (b *BookECO) followPath(n *node, moves []*chess.Move) *node {
+func (b *BookECO) followPath(n *node, moves []chess.Move) *node {
 	if len(moves) == 0 {
 		return n
 	}
@@ -142,7 +142,7 @@ func (b *BookECO) insertOpening(o *Opening) error {
 	return nil
 }
 
-func isLegalMove(pos *chess.Position, move *chess.Move) bool {
+func isLegalMove(pos *chess.Position, move chess.Move) bool {
 	for _, validMove := range pos.ValidMovesUnsafe() {
 		if validMove.S1() == move.S1() && validMove.S2() == move.S2() && validMove.Promo() == move.Promo() {
 			return true
@@ -151,10 +151,7 @@ func isLegalMove(pos *chess.Position, move *chess.Move) bool {
 	return false
 }
 
-func moveKey(move *chess.Move) uint32 {
-	if move == nil {
-		return 0
-	}
+func moveKey(move chess.Move) uint32 {
 	return uint32(move.S1()) | uint32(move.S2())<<6 | uint32(move.Promo())<<12
 }
 

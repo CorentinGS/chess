@@ -316,7 +316,7 @@ func TestEnPassantDiscoveredCheck(t *testing.T) {
 	}
 
 	// Apply the move and get the new position
-	pos2 := pos.Update(&d2d4)
+	pos2 := pos.Update(d2d4)
 	// Black to move, en passant on d3
 	moves2 := pos2.ValidMoves()
 
@@ -415,6 +415,7 @@ func BenchmarkMoveTags(b *testing.B) {
 		}
 	}
 }
+
 // Helper function to convert FEN to Position
 func mustPosition(fen string) *Position {
 	fenObject, err := FEN(fen)

@@ -46,56 +46,69 @@ const (
 
 // A Move is the movement of a piece from one square to another.
 type Move struct {
-	parent             *Move
-	position           *Position // Position after the move
-	nag                string
-	comments           string
-	command            map[string]string // Store commands as key-value pairs
-	commentBlocks      []CommentBlock
-	structuredComments bool
-	children           []*Move // Main line and variations
-	number             uint
-	tags               MoveTag
-	s1                 Square
-	s2                 Square
-	promo              PieceType
+	tags  MoveTag
+	s1    Square
+	s2    Square
+	promo PieceType
 }
 
-// String returns a string useful for debugging.  String doesn't return
+// String returns a string useful for debugging. String doesn't return
 // algebraic notation.
-func (m *Move) String() string {
+func (m Move) String() string {
 	return m.s1.String() + m.s2.String() + m.promo.String()
 }
 
 // S1 returns the origin square of the move.
-func (m *Move) S1() Square {
+func (m Move) S1() Square {
 	return m.s1
 }
 
 // S2 returns the destination square of the move.
-func (m *Move) S2() Square {
+func (m Move) S2() Square {
 	return m.s2
 }
 
 // Promo returns promotion piece type of the move.
-func (m *Move) Promo() PieceType {
+func (m Move) Promo() PieceType {
 	return m.promo
 }
 
 // HasTag returns true if the move contains the MoveTag given.
-func (m *Move) HasTag(tag MoveTag) bool {
+func (m Move) HasTag(tag MoveTag) bool {
 	return (tag & m.tags) > 0
 }
 
-// AddTag adds the given MoveTag to the move's tags using a bitwise OR operation.
-// Multiple tags can be combined by calling AddTag multiple times.
-func (m *Move) AddTag(tag MoveTag) {
+// WithTag returns a copy of the move with the given MoveTag added.
+func (m Move) WithTag(tag MoveTag) Move {
 	m.tags |= tag
+	return m
 }
 
-func (m *Move) GetCommand(key string) (string, bool) {
-	for i := len(m.commentBlocks) - 1; i >= 0; i-- {
-		block := m.commentBlocks[i]
+// MoveNode is one occurrence of a move in a game's move tree.
+type MoveNode struct {
+	move          Move
+	parent        *MoveNode
+	position      *Position
+	children      []*MoveNode
+	number        uint
+	nag           string
+	commentBlocks []CommentBlock
+}
+
+// Move returns the move value for this move node.
+func (n *MoveNode) Move() Move {
+	if n == nil {
+		return Move{}
+	}
+	return n.move
+}
+
+func (n *MoveNode) GetCommand(key string) (string, bool) {
+	if n == nil {
+		return "", false
+	}
+	for i := len(n.commentBlocks) - 1; i >= 0; i-- {
+		block := n.commentBlocks[i]
 		for j := len(block.Items) - 1; j >= 0; j-- {
 			item := block.Items[j]
 			if item.Kind == CommentCommand && item.Key == key {
@@ -103,243 +116,168 @@ func (m *Move) GetCommand(key string) (string, bool) {
 			}
 		}
 	}
-
-	if m.command == nil {
-		m.command = make(map[string]string)
-		return "", false
-	}
-	value, ok := m.command[key]
-	return value, ok
+	return "", false
 }
 
-func (m *Move) SetCommand(key, value string) {
-	if m.command == nil {
-		m.command = make(map[string]string)
-	}
-	m.command[key] = value
-
-	if !m.structuredComments {
-		m.rebuildLegacyCommentBlock()
+func (n *MoveNode) SetCommand(key, value string) {
+	if n == nil {
 		return
 	}
-
-	m.ensureCommentBlocksFromLegacy()
-	for blockIdx := len(m.commentBlocks) - 1; blockIdx >= 0; blockIdx-- {
-		for itemIdx := len(m.commentBlocks[blockIdx].Items) - 1; itemIdx >= 0; itemIdx-- {
-			item := &m.commentBlocks[blockIdx].Items[itemIdx]
+	for blockIdx := len(n.commentBlocks) - 1; blockIdx >= 0; blockIdx-- {
+		for itemIdx := len(n.commentBlocks[blockIdx].Items) - 1; itemIdx >= 0; itemIdx-- {
+			item := &n.commentBlocks[blockIdx].Items[itemIdx]
 			if item.Kind == CommentCommand && item.Key == key {
 				item.Value = value
 				return
 			}
 		}
 	}
-
-	if len(m.commentBlocks) == 0 {
-		m.commentBlocks = append(m.commentBlocks, CommentBlock{})
+	if len(n.commentBlocks) == 0 {
+		n.commentBlocks = append(n.commentBlocks, CommentBlock{})
 	}
-	last := len(m.commentBlocks) - 1
-	m.commentBlocks[last].Items = append(m.commentBlocks[last].Items, CommentItem{
+	last := len(n.commentBlocks) - 1
+	n.commentBlocks[last].Items = append(n.commentBlocks[last].Items, CommentItem{
 		Kind:  CommentCommand,
 		Key:   key,
 		Value: value,
 	})
 }
 
-func (m *Move) SetComment(comment string) {
-	commands := m.command
-	m.comments = comment
-	m.commentBlocks = nil
-	m.structuredComments = false
-	if comment != "" || len(commands) > 0 {
-		m.rebuildLegacyCommentBlockWithCommands(commands)
+func (n *MoveNode) SetComment(comment string) {
+	if n == nil {
+		return
 	}
+	if comment == "" {
+		n.commentBlocks = nil
+		return
+	}
+	n.commentBlocks = []CommentBlock{{Items: []CommentItem{{Kind: CommentText, Text: comment}}}}
 }
 
-func (m *Move) AddComment(comment string) {
-	if !m.structuredComments {
-		m.comments += comment
-		m.rebuildLegacyCommentBlock()
+func (n *MoveNode) AddComment(comment string) {
+	if n == nil || comment == "" {
 		return
 	}
-
-	m.ensureCommentBlocksFromLegacy()
-	if len(m.commentBlocks) == 0 {
-		m.commentBlocks = []CommentBlock{{Items: []CommentItem{{Kind: CommentText, Text: comment}}}}
-		m.syncLegacyAnnotationsFromBlocks()
+	if len(n.commentBlocks) == 0 {
+		n.commentBlocks = []CommentBlock{{Items: []CommentItem{{Kind: CommentText, Text: comment}}}}
 		return
 	}
-
-	lastBlock := len(m.commentBlocks) - 1
-	for i := len(m.commentBlocks[lastBlock].Items) - 1; i >= 0; i-- {
-		item := &m.commentBlocks[lastBlock].Items[i]
+	lastBlock := len(n.commentBlocks) - 1
+	for i := len(n.commentBlocks[lastBlock].Items) - 1; i >= 0; i-- {
+		item := &n.commentBlocks[lastBlock].Items[i]
 		if item.Kind == CommentText {
 			item.Text += comment
-			m.syncLegacyAnnotationsFromBlocks()
 			return
 		}
 	}
-	m.commentBlocks[lastBlock].Items = append(m.commentBlocks[lastBlock].Items, CommentItem{Kind: CommentText, Text: comment})
-	m.syncLegacyAnnotationsFromBlocks()
+	n.commentBlocks[lastBlock].Items = append(n.commentBlocks[lastBlock].Items, CommentItem{Kind: CommentText, Text: comment})
 }
 
-func (m *Move) Comments() string {
-	if len(m.commentBlocks) > 0 {
-		return flattenCommentText(m.commentBlocks)
+func (n *MoveNode) Comments() string {
+	if n == nil {
+		return ""
 	}
-	return m.comments
+	return flattenCommentText(n.commentBlocks)
 }
 
-// CommentBlocks returns a defensive copy of the move's structured PGN comment blocks.
-func (m *Move) CommentBlocks() []CommentBlock {
-	m.ensureCommentBlocksFromLegacy()
-	blocks := make([]CommentBlock, len(m.commentBlocks))
-	for i, block := range m.commentBlocks {
-		blocks[i].Items = append([]CommentItem(nil), block.Items...)
+// CommentBlocks returns a defensive copy of the move node's structured PGN comment blocks.
+func (n *MoveNode) CommentBlocks() []CommentBlock {
+	if n == nil {
+		return nil
 	}
-	return blocks
+	return copyCommentBlocks(n.commentBlocks)
 }
 
-func (m *Move) NAG() string {
-	return m.nag
+func (n *MoveNode) NAG() string {
+	if n == nil {
+		return ""
+	}
+	return n.nag
 }
 
-func (m *Move) SetNAG(nag string) {
-	m.nag = nag
+func (n *MoveNode) SetNAG(nag string) {
+	if n != nil {
+		n.nag = nag
+	}
 }
 
-func (m *Move) Parent() *Move {
-	return m.parent
+func (n *MoveNode) Parent() *MoveNode {
+	if n == nil {
+		return nil
+	}
+	return n.parent
 }
 
-func (m *Move) Position() *Position {
-	return m.position
+func (n *MoveNode) Position() *Position {
+	if n == nil {
+		return nil
+	}
+	return n.position
 }
 
-func (m *Move) Children() []*Move {
-	return m.children
+func (n *MoveNode) Children() []*MoveNode {
+	if n == nil {
+		return nil
+	}
+	return n.children
 }
 
-func (m *Move) Number() int {
-	ret := int(m.number)
-	if ret == 0 { // 0 indicates the 'dummy' rootMove
+func (n *MoveNode) Number() int {
+	if n == nil {
+		return 0
+	}
+	ret := int(n.number)
+	if ret == 0 {
 		ret = 1
 	}
-
 	return ret
 }
 
 // FullMoveNumber returns the full move number (increments after Black's move).
-func (m *Move) FullMoveNumber() int {
-	return m.Number()
+func (n *MoveNode) FullMoveNumber() int {
+	return n.Number()
 }
 
 // Ply returns the half-move number (increments every move).
-func (m *Move) Ply() int {
-	if m == nil {
+func (n *MoveNode) Ply() int {
+	if n == nil || n.position == nil {
 		return 0
 	}
-	if m.position == nil {
-		return 0
-	}
-	moveNumber := int(m.number)
-	// we reverse the color because the position is after the move has been played
-	if m.position.turn == Black {
-		// After the move, it's White's turn, so the move was by Black
+	moveNumber := int(n.number)
+	if n.position.turn == Black {
 		return (moveNumber-1)*2 + 1
 	}
-	// After the move, it's Black's turn, so the move was by White
-	return (moveNumber)*2 + 0
+	return moveNumber * 2
 }
 
-// Clone returns a deep copy of a move.
-//
-// Per-field exceptions:
-//
-//	parent: not copied; the clone'd move has no parent
-//	children: not copied; the clone'd move has no children
-func (m *Move) Clone() *Move {
-	ret := &Move{}
-	ret.parent = nil
-	ret.position = m.position.copy()
-	ret.nag = m.nag
-	ret.comments = m.comments
-	ret.commentBlocks = copyCommentBlocks(m.commentBlocks)
-	ret.structuredComments = m.structuredComments
-	ret.children = make([]*Move, 0)
-	ret.number = m.number
-	ret.tags = m.tags
-	ret.s1 = m.s1
-	ret.s2 = m.s2
-	ret.promo = m.promo
-
-	ret.command = make(map[string]string)
-	for k, v := range m.command {
-		ret.command[k] = v
+func (n *MoveNode) addCommentBlock(block CommentBlock) {
+	if n == nil || len(block.Items) == 0 {
+		return
 	}
+	n.commentBlocks = append(n.commentBlocks, block)
+}
 
+func (n *MoveNode) hasAnnotations() bool {
+	return n != nil && len(n.commentBlocks) > 0
+}
+
+func (n *MoveNode) clone() *MoveNode {
+	if n == nil {
+		return nil
+	}
+	ret := &MoveNode{
+		move:          n.move,
+		position:      n.position.copy(),
+		number:        n.number,
+		nag:           n.nag,
+		commentBlocks: copyCommentBlocks(n.commentBlocks),
+	}
+	for _, child := range n.children {
+		childClone := child.clone()
+		childClone.parent = ret
+		ret.children = append(ret.children, childClone)
+	}
 	return ret
-}
-
-func (m *Move) addCommentBlock(block CommentBlock) {
-	if len(block.Items) == 0 {
-		return
-	}
-	m.commentBlocks = append(m.commentBlocks, block)
-	m.structuredComments = true
-	m.syncLegacyAnnotationsFromBlocks()
-}
-
-func (m *Move) hasAnnotations() bool {
-	return len(m.commentBlocks) > 0 || m.comments != "" || len(m.command) > 0
-}
-
-func (m *Move) syncLegacyAnnotationsFromBlocks() {
-	m.comments = flattenCommentText(m.commentBlocks)
-	m.command = make(map[string]string)
-	for _, block := range m.commentBlocks {
-		for _, item := range block.Items {
-			if item.Kind == CommentCommand {
-				m.command[item.Key] = item.Value
-			}
-		}
-	}
-	if len(m.command) == 0 {
-		m.command = nil
-	}
-}
-
-func (m *Move) ensureCommentBlocksFromLegacy() {
-	if len(m.commentBlocks) > 0 || (m.comments == "" && len(m.command) == 0) {
-		return
-	}
-
-	block := CommentBlock{}
-	if m.comments != "" {
-		block.Items = append(block.Items, CommentItem{Kind: CommentText, Text: m.comments})
-	}
-	for _, key := range sortedCommandKeys(m.command) {
-		block.Items = append(block.Items, CommentItem{Kind: CommentCommand, Key: key, Value: m.command[key]})
-	}
-	m.commentBlocks = []CommentBlock{block}
-}
-
-func (m *Move) rebuildLegacyCommentBlock() {
-	m.rebuildLegacyCommentBlockWithCommands(m.command)
-}
-
-func (m *Move) rebuildLegacyCommentBlockWithCommands(commands map[string]string) {
-	block := CommentBlock{}
-	if m.comments != "" {
-		block.Items = append(block.Items, CommentItem{Kind: CommentText, Text: m.comments})
-	}
-	for _, key := range sortedCommandKeys(commands) {
-		block.Items = append(block.Items, CommentItem{Kind: CommentCommand, Key: key, Value: commands[key]})
-	}
-	if len(block.Items) == 0 {
-		m.commentBlocks = nil
-		return
-	}
-	m.commentBlocks = []CommentBlock{block}
 }
 
 func flattenCommentText(blocks []CommentBlock) string {
@@ -364,17 +302,4 @@ func copyCommentBlocks(src []CommentBlock) []CommentBlock {
 		blocks[i].Items = append([]CommentItem(nil), block.Items...)
 	}
 	return blocks
-}
-
-func (m *Move) cloneChildren(srcChildren []*Move) {
-	if len(srcChildren) == 0 {
-		return
-	}
-
-	for _, srcMv := range srcChildren {
-		dstMv := srcMv.Clone()
-		dstMv.parent = m
-		dstMv.cloneChildren(srcMv.children)
-		m.children = append(m.children, dstMv)
-	}
 }

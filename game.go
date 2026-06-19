@@ -89,8 +89,8 @@ type Game struct {
 	pos                            *Position  // Current position
 	outcome                        Outcome    // Game result
 	tagPairs                       TagPairs   // PGN tag pairs
-	rootMove                       *Move      // Root of move tree
-	currentMove                    *Move      // Current position in tree
+	rootMove                       *MoveNode  // Root of move tree
+	currentMove                    *MoveNode  // Current position in tree
 	comments                       [][]string // Game comments
 	method                         Method     // How the game ended
 	ignoreFivefoldRepetitionDraw   bool       // Flag for automatic FivefoldRepetition draw handling
@@ -165,7 +165,7 @@ func FEN(fen string) (func(*Game), error) {
 //	game := NewGame(FEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"))
 func NewGame(options ...func(*Game)) *Game {
 	pos := StartingPosition()
-	rootMove := &Move{
+	rootMove := &MoveNode{
 		position: pos,
 	}
 
@@ -187,9 +187,9 @@ func NewGame(options ...func(*Game)) *Game {
 
 // AddVariation adds a new variation to the game.
 // The parent move must be a move in the game or nil to add a variation to the root.
-func (g *Game) AddVariation(parent *Move, newMove *Move) {
-	parent.children = append(parent.children, newMove)
-	newMove.parent = parent
+func (g *Game) AddVariation(parent *MoveNode, newMove Move) {
+	node := &MoveNode{move: newMove, parent: parent}
+	parent.children = append(parent.children, node)
 }
 
 // NavigateToMainLine navigates to the main line of the game.
@@ -212,7 +212,7 @@ func (g *Game) NavigateToMainLine() {
 	g.currentMove = g.rootMove.children[0]
 }
 
-func isMainLine(move *Move) bool {
+func isMainLine(move *MoveNode) bool {
 	if move.parent == nil {
 		return true
 	}
@@ -265,13 +265,23 @@ func (g *Game) UnsafeMoves() []Move {
 	return g.pos.UnsafeMoves()
 }
 
-// Moves returns the move history of the game following the main line.
-func (g *Game) Moves() []*Move {
+// Moves returns the main-line move values of the game.
+func (g *Game) Moves() []Move {
+	nodes := g.MoveNodes()
+	moves := make([]Move, len(nodes))
+	for i, node := range nodes {
+		moves[i] = node.move
+	}
+	return moves
+}
+
+// MoveNodes returns the move nodes of the game following the main line.
+func (g *Game) MoveNodes() []*MoveNode {
 	if g.rootMove == nil {
 		return nil
 	}
 
-	moves := make([]*Move, 0)
+	moves := make([]*MoveNode, 0)
 	current := g.rootMove
 
 	// Traverse the main line (first child of each move)
@@ -292,7 +302,7 @@ func (g *Game) Moves() []*Move {
 type MoveHistory struct {
 	PrePosition  *Position
 	PostPosition *Position
-	Move         *Move
+	Move         Move
 	Comments     []string
 }
 
@@ -320,7 +330,7 @@ func (g *Game) MoveHistory() []*MoveHistory {
 		history = append(history, &MoveHistory{
 			PrePosition:  current.position,
 			PostPosition: move.position,
-			Move:         move,
+			Move:         move.move,
 			Comments:     comments,
 		})
 		current = move
@@ -330,12 +340,12 @@ func (g *Game) MoveHistory() []*MoveHistory {
 }
 
 // GetRootMove returns the root move of the game.
-func (g *Game) GetRootMove() *Move {
+func (g *Game) GetRootMove() *MoveNode {
 	return g.rootMove
 }
 
 // Variations returns all alternative moves at the given position.
-func (g *Game) Variations(move *Move) []*Move {
+func (g *Game) Variations(move *MoveNode) []*MoveNode {
 	if move == nil || len(move.children) <= 1 {
 		return nil
 	}
@@ -504,7 +514,7 @@ func cmpTags(a, b sortableTagPair) int {
 // The function recurses through the move tree, writing the main line first and then processing any additional variations,
 // ensuring that the output adheres to standard PGN conventions. Future enhancements may include support for all NAG values.
 // the function returns whether or not a trailing space was added to the output
-func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
+func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
 	subVariation, closedVariation, isRoot bool,
 ) bool {
 	trailingSpace := false
@@ -519,7 +529,7 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 		writeAnnotations(node, sb)
 	}
 
-	var currentMove *Move
+	var currentMove *MoveNode
 
 	// The main line is the first child.
 	if subVariation {
@@ -579,12 +589,12 @@ func writeMoveNumber(moveNum int, isWhite bool, subVariation, closedVariation,
 	}
 }
 
-func writeMoveEncoding(node *Move, currentMove *Move, subVariation bool, sb *strings.Builder) {
+func writeMoveEncoding(node *MoveNode, currentMove *MoveNode, subVariation bool, sb *strings.Builder) {
 	if subVariation && node.Parent() != nil {
-		moveStr := AlgebraicNotation{}.Encode(node.Parent().Position(), currentMove)
+		moveStr := AlgebraicNotation{}.Encode(node.Parent().Position(), currentMove.move)
 		sb.WriteString(moveStr)
 	} else {
-		sb.WriteString(AlgebraicNotation{}.Encode(node.Position(), currentMove))
+		sb.WriteString(AlgebraicNotation{}.Encode(node.Position(), currentMove.move))
 	}
 }
 
@@ -597,12 +607,11 @@ func sortedCommandKeys(commands map[string]string) []string {
 	return keys
 }
 
-func writeAnnotations(move *Move, sb *strings.Builder) {
+func writeAnnotations(move *MoveNode, sb *strings.Builder) {
 	if move == nil {
 		return
 	}
 
-	move.ensureCommentBlocksFromLegacy()
 	if len(move.commentBlocks) > 0 {
 		writeCommentBlocks(move.commentBlocks, sb)
 		return
@@ -640,7 +649,7 @@ func needsCommandSeparator(sb *strings.Builder) bool {
 	return len(s) > 0 && s[len(s)-1] != ' '
 }
 
-func writeVariations(node *Move, moveNum int, isWhite bool, sb *strings.Builder) bool {
+func writeVariations(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder) bool {
 	wroteAtLeastOneVar := false
 
 	if len(node.children) > 1 {
@@ -826,8 +835,7 @@ func (g *Game) Clone() *Game {
 
 	// we have to also deep copy the moves so that modifications to the
 	// clone do not impact the parent
-	ret.rootMove = g.rootMove.Clone()
-	ret.rootMove.cloneChildren(g.rootMove.children)
+	ret.rootMove = g.rootMove.clone()
 	if g.currentMove == nil {
 		ret.currentMove = ret.rootMove
 	} else {
@@ -841,7 +849,7 @@ func (g *Game) Clone() *Game {
 	return ret
 }
 
-func findClonedMove(original, clone, target *Move) *Move {
+func findClonedMove(original, clone, target *MoveNode) *MoveNode {
 	if original == nil || clone == nil || target == nil {
 		return nil
 	}
@@ -966,7 +974,7 @@ func (g *Game) UnsafePushNotationMove(moveStr string, notation Notation, options
 //	if err != nil {
 //	    panic(err)
 //	}
-func (g *Game) Move(move *Move, options *PushMoveOptions) error {
+func (g *Game) Move(move Move, options *PushMoveOptions) error {
 	if options == nil {
 		options = &PushMoveOptions{}
 	}
@@ -993,7 +1001,7 @@ func (g *Game) Move(move *Move, options *PushMoveOptions) error {
 //	if err != nil {
 //	    panic(err) // Should not happen with valid moves
 //	}
-func (g *Game) UnsafeMove(move *Move, options *PushMoveOptions) error {
+func (g *Game) UnsafeMove(move Move, options *PushMoveOptions) error {
 	if options == nil {
 		options = &PushMoveOptions{}
 	}
@@ -1003,16 +1011,12 @@ func (g *Game) UnsafeMove(move *Move, options *PushMoveOptions) error {
 
 // moveUnchecked is the internal implementation that performs the move without validation.
 // This is shared by both Move (after validation) and MoveUnchecked.
-func (g *Game) moveUnchecked(move *Move, options *PushMoveOptions) error {
-	if move == nil {
-		return errors.New("move cannot be nil")
-	}
-
+func (g *Game) moveUnchecked(move Move, options *PushMoveOptions) error {
 	existingMove := g.findExistingMove(move)
-	g.addOrReorderMove(move, existingMove, options.ForceMainline)
+	node := g.addOrReorderMove(move, existingMove, options.ForceMainline)
 
-	g.updatePosition(move)
-	g.currentMove = move
+	g.updatePosition(node)
+	g.currentMove = node
 
 	g.evaluatePositionStatus()
 
@@ -1021,11 +1025,7 @@ func (g *Game) moveUnchecked(move *Move, options *PushMoveOptions) error {
 
 // validateMove checks if the given move is valid for the current position.
 // It returns an error if the move is invalid.
-func (g *Game) validateMove(move *Move) error {
-	if move == nil {
-		return errors.New("move cannot be nil")
-	}
-
+func (g *Game) validateMove(move Move) error {
 	if g.pos == nil {
 		return errors.New("no current position")
 	}
@@ -1041,31 +1041,29 @@ func (g *Game) validateMove(move *Move) error {
 	return fmt.Errorf("move %s is not valid for the current position", move.String())
 }
 
-func (g *Game) findExistingMove(move *Move) *Move {
+func (g *Game) findExistingMove(move Move) *MoveNode {
 	if g.currentMove == nil {
 		return nil
 	}
 	for _, child := range g.currentMove.children {
-		if child.s1 == move.s1 && child.s2 == move.s2 && child.promo == move.promo {
+		if child.move.s1 == move.s1 && child.move.s2 == move.s2 && child.move.promo == move.promo {
 			return child
 		}
 	}
 	return nil
 }
 
-func (g *Game) addOrReorderMove(move, existingMove *Move, forceMainline bool) {
-	move.parent = g.currentMove
-
+func (g *Game) addOrReorderMove(move Move, existingMove *MoveNode, forceMainline bool) *MoveNode {
 	if existingMove != nil {
 		if forceMainline && existingMove != g.currentMove.children[0] {
 			g.reorderMoveToFront(existingMove)
 		}
-	} else {
-		g.addNewMove(move, forceMainline)
+		return existingMove
 	}
+	return g.addNewMove(move, forceMainline)
 }
 
-func (g *Game) reorderMoveToFront(move *Move) {
+func (g *Game) reorderMoveToFront(move *MoveNode) {
 	children := g.currentMove.children
 	for i, child := range children {
 		if child == move {
@@ -1076,18 +1074,20 @@ func (g *Game) reorderMoveToFront(move *Move) {
 	}
 }
 
-func (g *Game) addNewMove(move *Move, forceMainline bool) {
+func (g *Game) addNewMove(move Move, forceMainline bool) *MoveNode {
+	node := &MoveNode{move: move, parent: g.currentMove}
 	if forceMainline {
-		g.currentMove.children = append([]*Move{move}, g.currentMove.children...)
+		g.currentMove.children = append([]*MoveNode{node}, g.currentMove.children...)
 	} else {
-		g.currentMove.children = append(g.currentMove.children, move)
+		g.currentMove.children = append(g.currentMove.children, node)
 	}
+	return node
 }
 
-func (g *Game) updatePosition(move *Move) {
-	if newPos := g.pos.Update(move); newPos != nil {
+func (g *Game) updatePosition(node *MoveNode) {
+	if newPos := g.pos.Update(node.move); newPos != nil {
 		g.pos = newPos
-		move.position = newPos
+		node.position = newPos
 	}
 }
 
@@ -1096,7 +1096,7 @@ func (g *Game) updatePosition(move *Move) {
 // line and 0 variations
 func (g *Game) Split() []*Game {
 	// Collect all move paths starting from the root's children
-	var paths [][]*Move
+	var paths [][]*MoveNode
 	for _, m := range g.rootMove.children {
 		paths = append(paths, collectPaths(m)...)
 	}
@@ -1112,37 +1112,43 @@ func (g *Game) Split() []*Game {
 }
 
 // collectPaths returns all paths from the given move to each leaf node.
-// Each path is represented as a slice of *Move, starting with the given node
+// Each path is represented as a slice of *MoveNode, starting with the given node
 // and ending with a leaf (a move with no children).
-func collectPaths(node *Move) [][]*Move {
+func collectPaths(node *MoveNode) [][]*MoveNode {
 	if node == nil {
 		return nil
 	}
 	// If leaf, return a single path containing this node
 	if len(node.children) == 0 {
-		return [][]*Move{{node}}
+		return [][]*MoveNode{{node}}
 	}
 	// Otherwise, collect paths from each child and prepend this node
-	var paths [][]*Move
+	var paths [][]*MoveNode
 	for _, c := range node.children {
 		childPaths := collectPaths(c)
 		for _, p := range childPaths {
-			path := append([]*Move{node}, p...)
+			path := append([]*MoveNode{node}, p...)
 			paths = append(paths, path)
 		}
 	}
 	return paths
 }
 
-func (g *Game) buildOneGameFromPath(path []*Move) *Game {
-	rootMove := &Move{position: g.rootMove.position.copy()}
+func (g *Game) buildOneGameFromPath(path []*MoveNode) *Game {
+	rootMove := &MoveNode{position: g.rootMove.position.copy()}
 	cur := rootMove
 
 	for _, m := range path {
-		child := m.Clone()
+		child := &MoveNode{
+			move:          m.move,
+			position:      m.position.copy(),
+			number:        m.number,
+			nag:           m.nag,
+			commentBlocks: copyCommentBlocks(m.commentBlocks),
+		}
 		child.parent = cur
 
-		cur.children = []*Move{child}
+		cur.children = []*MoveNode{child}
 		cur = child
 	}
 

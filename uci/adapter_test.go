@@ -52,7 +52,7 @@ func Test_FakeAdapter_CmdGo(t *testing.T) {
 	}
 
 	results := eng.SearchResults()
-	if results.BestMove == nil {
+	if results.BestMove == (chess.Move{}) {
 		t.Fatal("expected best move")
 	}
 	if results.Info.Depth != 10 {
@@ -176,7 +176,7 @@ func Test_FakeAdapter_FullGame(t *testing.T) {
 	}
 
 	bestMove := eng.SearchResults().BestMove
-	if bestMove == nil {
+	if bestMove == (chess.Move{}) {
 		t.Fatal("expected best move")
 	}
 	san := chess.AlgebraicNotation{}.Encode(pos, bestMove)

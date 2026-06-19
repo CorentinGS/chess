@@ -119,13 +119,13 @@ func (pm PolyglotMove) ToMove() Move {
 
 	if pm.CastlingMove {
 		if pm.FromFile == 4 && (pm.ToFile == 0 || pm.ToFile == 2) {
-			decode.AddTag(QueenSideCastle)
+			decode = decode.WithTag(QueenSideCastle)
 		} else {
-			decode.AddTag(KingSideCastle)
+			decode = decode.WithTag(KingSideCastle)
 		}
 	}
 
-	return *decode
+	return decode
 }
 
 // BookSource defines the interface for reading polyglot book data.

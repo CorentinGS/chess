@@ -16,8 +16,8 @@ var missingWdlErr = errors.New("uci: wdl unavailable; this is mostly likely beca
 // info depth 21 seldepth 31 multipv 1 score cp 39 nodes 862438 nps 860716 hashfull 409 tbhits 0 time 1002 pv e2e4
 // bestmove e2e4 ponder c7c5.
 type SearchResults struct {
-	BestMove    *chess.Move
-	Ponder      *chess.Move
+	BestMove    chess.Move
+	Ponder      chess.Move
 	MultiPVInfo []Info
 	Info        Info
 }
@@ -89,8 +89,8 @@ type SearchResults struct {
 //     If  is greater than 1, always send all k lines in k strings together.
 //     The engine should only send this if the option "UCI_ShowCurrLine" is set to true.
 type Info struct {
-	CurrentMove       *chess.Move
-	PV                []*chess.Move
+	CurrentMove       chess.Move
+	PV                []chess.Move
 	Score             Score
 	Depth             int
 	Seldepth          int

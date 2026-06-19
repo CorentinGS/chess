@@ -205,7 +205,7 @@ func moveTags(m Move, pos *Position) MoveTag {
 	// Simulate the move on a temporary board copy so we can test
 	// check status without mutating the actual position.
 	tempBoard := *pos.board
-	tempBoard.update(&local)
+	tempBoard.update(local)
 	if tempBoard.kingSquare(pos.turn) != NoSquare {
 		if isSquareAttackedBy(&tempBoard, tempBoard.kingSquare(pos.turn), pos.turn.Other()) {
 			tags |= inCheck
