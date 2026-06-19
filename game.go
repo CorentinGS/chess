@@ -190,6 +190,9 @@ func NewGame(options ...func(*Game)) *Game {
 // guard enforced by Move / UnsafeMove / Resign. A caller reviewing or analysing
 // a finished game can still shape variations without first calling ClearOutcome.
 func (g *Game) AddVariation(parent *MoveNode, newMove Move) {
+	if parent == nil {
+		parent = g.rootMove
+	}
 	node := &MoveNode{move: newMove, parent: parent}
 	parent.children = append(parent.children, node)
 }

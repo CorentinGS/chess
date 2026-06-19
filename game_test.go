@@ -361,13 +361,17 @@ func TestAddVariationToNonEmptyParent(t *testing.T) {
 
 func TestAddVariationWithNilParent(t *testing.T) {
 	g := NewGame()
-	newMove := Move{}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("expected panic when parent is nil")
-		}
-	}()
+	newMove := Move{s1: E2, s2: E4}
 	g.AddVariation(nil, newMove)
+	if len(g.rootMove.children) != 1 {
+		t.Fatalf("expected variation attached to root, got %d children", len(g.rootMove.children))
+	}
+	if g.rootMove.children[0].move != newMove {
+		t.Fatalf("expected variation move %v, got %v", newMove, g.rootMove.children[0].move)
+	}
+	if g.rootMove.children[0].parent != g.rootMove {
+		t.Fatal("expected variation parent pointer to be the root move")
+	}
 }
 
 func TestNavigateToMainLineFromLeaf(t *testing.T) {
