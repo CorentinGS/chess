@@ -3,8 +3,24 @@ All notable changes to this project will be documented in this file. See [conven
 
 - - -
 ## Unreleased
+
+- - -
+
+## v2.5.1 - 2026-06-19
 #### Features
 - preserve PGN annotation block structure and add `Move.CommentBlocks()` for ordered comment items.
+#### Performance
+- cache board mailbox lookups for O(1) `Piece()` access.
+- eliminate heap allocations in move tag generation.
+- reduce PGN parser position copies.
+- add `Position.ValidMovesUnsafe()` and `Position.ValidMovesIter()` for allocation-sensitive callers.
+- cache Zobrist hashes for fast current position comparison and repetition detection.
+#### Refactoring
+- standardize error handling and remove dead code.
+- replace image module go-bindata assets with `//go:embed`.
+- add opening book singleton and concurrency safety.
+#### Tests
+- add Game current position invariant coverage.
 
 - - -
 ## v2.3.2 - 2025-10-08
