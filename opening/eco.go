@@ -85,14 +85,22 @@ func (b *BookECO) Find(moves []chess.Move) *Opening {
 // Possible implements the Book interface.
 // Use Possible for performance-sensitive opening exploration paths.
 func (b *BookECO) Possible(moves []chess.Move) []*Opening {
-	n := b.followPath(b.root, moves)
+	root := b.followPath(b.root, moves)
 	var openings []*Opening
-	for _, n := range b.nodeList(n) {
-		if n.opening != nil {
-			openings = append(openings, n.opening)
-		}
-	}
+	b.collectOpenings(root, &openings)
 	return openings
+}
+
+// collectOpenings walks the subtree rooted at n and appends each node's
+// opening (if any) directly into the result slice, avoiding the intermediate
+// []*node allocation that nodeList/collectNodes used to require.
+func (b *BookECO) collectOpenings(n *node, result *[]*Opening) {
+	if n.opening != nil {
+		*result = append(*result, n.opening)
+	}
+	for _, c := range n.children {
+		b.collectOpenings(c, result)
+	}
 }
 
 func (b *BookECO) followPath(n *node, moves []chess.Move) *node {
@@ -167,19 +175,6 @@ type node struct {
 	children map[uint32]*node
 	opening  *Opening
 	pos      *chess.Position
-}
-
-func (b *BookECO) nodeList(root *node) []*node {
-	var result []*node
-	b.collectNodes(root, &result)
-	return result
-}
-
-func (b *BookECO) collectNodes(n *node, result *[]*node) {
-	*result = append(*result, n)
-	for _, c := range n.children {
-		b.collectNodes(c, result)
-	}
 }
 
 // 1.b2b4 e7e5 2.c1b2 f7f6 3.e2e4 f8b4 4.f1c4 b8c6 5.f2f4 d8e7 6.f4f5 g7g6.
