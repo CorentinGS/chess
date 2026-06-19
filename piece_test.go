@@ -1,21 +1,23 @@
-package chess
+package chess_test
 
 import (
 	"bytes"
 	"testing"
+
+	"github.com/corentings/chess/v3"
 )
 
 func TestPieceString(t *testing.T) {
 	tables := []struct {
-		piece PieceType
+		piece chess.PieceType
 		str   string
 	}{
-		{King, "k"},
-		{Queen, "q"},
-		{Rook, "r"},
-		{Bishop, "b"},
-		{Knight, "n"},
-		{Pawn, "p"},
+		{chess.King, "k"},
+		{chess.Queen, "q"},
+		{chess.Rook, "r"},
+		{chess.Bishop, "b"},
+		{chess.Knight, "n"},
+		{chess.Pawn, "p"},
 	}
 
 	for _, table := range tables {
@@ -27,16 +29,16 @@ func TestPieceString(t *testing.T) {
 
 func TestBytesForPieceTypes(t *testing.T) {
 	tests := []struct {
-		pieceType PieceType
+		pieceType chess.PieceType
 		expected  []byte
 	}{
-		{King, []byte{'k'}},
-		{Queen, []byte{'q'}},
-		{Rook, []byte{'r'}},
-		{Bishop, []byte{'b'}},
-		{Knight, []byte{'n'}},
-		{Pawn, []byte{'p'}},
-		{NoPieceType, []byte{}},
+		{chess.King, []byte{'k'}},
+		{chess.Queen, []byte{'q'}},
+		{chess.Rook, []byte{'r'}},
+		{chess.Bishop, []byte{'b'}},
+		{chess.Knight, []byte{'n'}},
+		{chess.Pawn, []byte{'p'}},
+		{chess.NoPieceType, []byte{}},
 	}
 
 	for _, tt := range tests {

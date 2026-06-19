@@ -1,13 +1,15 @@
-package chess
+package chess_test
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/corentings/chess/v3"
 )
 
 func TestChessHasher(t *testing.T) {
 	t.Run("Basic Position Validation", func(t *testing.T) {
-		hasher := NewZobristHasher()
+		hasher := chess.NewZobristHasher()
 
 		t.Run("should correctly hash the starting position", func(t *testing.T) {
 			startPos := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -36,7 +38,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Known Position Hashes", func(t *testing.T) {
-		hasher := NewZobristHasher()
+		hasher := chess.NewZobristHasher()
 		knownPositions := []struct {
 			fen  string
 			hash string
@@ -77,7 +79,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Error Handling", func(t *testing.T) {
-		hasher := NewZobristHasher()
+		hasher := chess.NewZobristHasher()
 
 		t.Run("should return error for invalid FEN format", func(t *testing.T) {
 			invalidFen := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
@@ -105,7 +107,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Color Handling", func(t *testing.T) {
-		hasher := NewZobristHasher()
+		hasher := chess.NewZobristHasher()
 
 		t.Run("should produce different hashes for white and black to move", func(t *testing.T) {
 			positionWhite := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -127,7 +129,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Castling Rights", func(t *testing.T) {
-		hasher := NewZobristHasher()
+		hasher := chess.NewZobristHasher()
 
 		t.Run("should produce different hashes for different castling rights", func(t *testing.T) {
 			withAllCastling := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -145,7 +147,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("En Passant", func(t *testing.T) {
-		hasher := NewZobristHasher()
+		hasher := chess.NewZobristHasher()
 
 		t.Run("should handle en passant squares correctly", func(t *testing.T) {
 			afterE4E5 := "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"
@@ -178,7 +180,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Position Equality", func(t *testing.T) {
-		hasher := NewZobristHasher()
+		hasher := chess.NewZobristHasher()
 
 		t.Run("should produce identical hashes for identical positions", func(t *testing.T) {
 			position := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -204,7 +206,7 @@ func TestChessHasher(t *testing.T) {
 	})
 
 	t.Run("Piece Placement", func(t *testing.T) {
-		hasher := NewZobristHasher()
+		hasher := chess.NewZobristHasher()
 
 		t.Run("should handle individual piece placement correctly", func(t *testing.T) {
 			positions := []string{
@@ -241,7 +243,7 @@ func TestZobristHashToUint64(t *testing.T) {
 	t.Run("valid 16-digit hexadecimal hash is converted correctly", func(t *testing.T) {
 		hash := "463b96181691fc9c"
 		expected := uint64(0x463b96181691fc9c)
-		result := ZobristHashToUint64(hash)
+		result := chess.ZobristHashToUint64(hash)
 
 		if result != expected {
 			t.Fatalf("expected value %v but got %v", expected, result)
@@ -250,17 +252,17 @@ func TestZobristHashToUint64(t *testing.T) {
 
 	t.Run("invalid hash format returns error", func(t *testing.T) {
 		hash := "invalidhash"
-		_ = ZobristHashToUint64(hash)
+		_ = chess.ZobristHashToUint64(hash)
 	})
 
 	t.Run("empty hash returns error", func(t *testing.T) {
 		hash := ""
-		_ = ZobristHashToUint64(hash)
+		_ = chess.ZobristHashToUint64(hash)
 	})
 }
 
 func BenchmarkHashPosition(b *testing.B) {
-	hasher := NewZobristHasher()
+	hasher := chess.NewZobristHasher()
 	fen := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 	b.ReportAllocs()

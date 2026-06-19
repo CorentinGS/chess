@@ -1,4 +1,4 @@
-package chess
+package chess_test
 
 import (
 	"errors"
@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/corentings/chess/v3"
 )
 
 func TestScanner(t *testing.T) {
@@ -16,7 +18,7 @@ func TestScanner(t *testing.T) {
 	}
 	defer file.Close()
 
-	scanner := NewScanner(file)
+	scanner := chess.NewScanner(file)
 
 	// Test first game
 	game, err := scanner.ScanGame()
@@ -24,64 +26,64 @@ func TestScanner(t *testing.T) {
 		t.Fatalf("Failed to read first game: %v", err)
 	}
 
-	tokens, err := TokenizeGame(game)
+	tokens, err := chess.TokenizeGame(game)
 	if err != nil {
 		t.Fatalf("Failed to tokenize first game: %v", err)
 	}
 
 	expectedFirstGame := []struct {
-		typ   TokenType
+		typ   chess.TokenType
 		value string
 	}{
-		{TagStart, "["},
-		{TagKey, "Event"},
-		{TagValue, "Example"},
-		{TagEnd, "]"},
-		{TagStart, "["},
-		{TagKey, "Site"},
-		{TagValue, "Internet"},
-		{TagEnd, "]"},
-		{TagStart, "["},
-		{TagKey, "Date"},
-		{TagValue, "2023.12.06"},
-		{TagEnd, "]"},
-		{TagStart, "["},
-		{TagKey, "Round"},
-		{TagValue, "1"},
-		{TagEnd, "]"},
-		{TagStart, "["},
-		{TagKey, "White"},
-		{TagValue, "Player1"},
-		{TagEnd, "]"},
-		{TagStart, "["},
-		{TagKey, "Black"},
-		{TagValue, "Player2"},
-		{TagEnd, "]"},
-		{TagStart, "["},
-		{TagKey, "Result"},
-		{TagValue, "1-0"},
-		{TagEnd, "]"},
-		{MoveNumber, "1"},
-		{DOT, "."},
-		{SQUARE, "e4"},
-		{SQUARE, "e5"},
-		{MoveNumber, "2"},
-		{DOT, "."},
-		{PIECE, "N"},
-		{SQUARE, "f3"},
-		{PIECE, "N"},
-		{SQUARE, "c6"},
-		{MoveNumber, "3"},
-		{DOT, "."},
-		{PIECE, "B"},
-		{SQUARE, "b5"},
-		{CommentStart, "{"},
-		{COMMENT, "This is the Ruy Lopez."},
-		{CommentEnd, "}"},
-		{MoveNumber, "3"},
-		{ELLIPSIS, "..."},
-		{SQUARE, "a6"},
-		{RESULT, "1-0"},
+		{chess.TagStart, "["},
+		{chess.TagKey, "Event"},
+		{chess.TagValue, "Example"},
+		{chess.TagEnd, "]"},
+		{chess.TagStart, "["},
+		{chess.TagKey, "Site"},
+		{chess.TagValue, "Internet"},
+		{chess.TagEnd, "]"},
+		{chess.TagStart, "["},
+		{chess.TagKey, "Date"},
+		{chess.TagValue, "2023.12.06"},
+		{chess.TagEnd, "]"},
+		{chess.TagStart, "["},
+		{chess.TagKey, "Round"},
+		{chess.TagValue, "1"},
+		{chess.TagEnd, "]"},
+		{chess.TagStart, "["},
+		{chess.TagKey, "White"},
+		{chess.TagValue, "Player1"},
+		{chess.TagEnd, "]"},
+		{chess.TagStart, "["},
+		{chess.TagKey, "Black"},
+		{chess.TagValue, "Player2"},
+		{chess.TagEnd, "]"},
+		{chess.TagStart, "["},
+		{chess.TagKey, "Result"},
+		{chess.TagValue, "1-0"},
+		{chess.TagEnd, "]"},
+		{chess.MoveNumber, "1"},
+		{chess.DOT, "."},
+		{chess.SQUARE, "e4"},
+		{chess.SQUARE, "e5"},
+		{chess.MoveNumber, "2"},
+		{chess.DOT, "."},
+		{chess.PIECE, "N"},
+		{chess.SQUARE, "f3"},
+		{chess.PIECE, "N"},
+		{chess.SQUARE, "c6"},
+		{chess.MoveNumber, "3"},
+		{chess.DOT, "."},
+		{chess.PIECE, "B"},
+		{chess.SQUARE, "b5"},
+		{chess.CommentStart, "{"},
+		{chess.COMMENT, "This is the Ruy Lopez."},
+		{chess.CommentEnd, "}"},
+		{chess.MoveNumber, "3"},
+		{chess.ELLIPSIS, "..."},
+		{chess.SQUARE, "a6"},
+		{chess.RESULT, "1-0"},
 	}
 
 	if len(tokens) != len(expectedFirstGame) {
@@ -109,7 +111,7 @@ func TestScanner(t *testing.T) {
 
 	// Test HasNext functionality by counting games
 	file.Seek(0, 0) // Reset file to beginning
-	scanner = NewScanner(file)
+	scanner = chess.NewScanner(file)
 
 	var gameCount int
 	for scanner.HasNext() {
@@ -118,7 +120,7 @@ func TestScanner(t *testing.T) {
 			t.Fatalf("Error reading game %d: %v", gameCount+1, err)
 		}
 
-		tokens, err = TokenizeGame(game)
+		tokens, err = chess.TokenizeGame(game)
 		if err != nil {
 			t.Fatalf("Error tokenizing game %d: %v", gameCount+1, err)
 		}
@@ -144,7 +146,7 @@ func TestScannerEmptyFile(t *testing.T) {
 	defer os.Remove(tmpfile.Name())
 	defer tmpfile.Close()
 
-	scanner := NewScanner(tmpfile)
+	scanner := chess.NewScanner(tmpfile)
 
 	if scanner.HasNext() {
 		t.Error("Expected HasNext() to return false for empty file")
@@ -166,9 +168,9 @@ func TestSequentialProcessing(t *testing.T) {
 	}
 	defer file.Close()
 
-	scanner := NewScanner(file)
-	var games []*GameScanned
-	var allTokens [][]Token
+	scanner := chess.NewScanner(file)
+	var games []*chess.GameScanned
+	var allTokens [][]chess.Token
 
 	// Read all games using ScanGame in a loop
 	for {
@@ -181,7 +183,7 @@ func TestSequentialProcessing(t *testing.T) {
 		}
 		games = append(games, game)
 
-		tokens, err := TokenizeGame(game)
+		tokens, err := chess.TokenizeGame(game)
 		if err != nil {
 			t.Fatalf("Failed to tokenize game: %v", err)
 		}
@@ -207,7 +209,7 @@ func TestHasNextDoesntConsume(t *testing.T) {
 	}
 	defer file.Close()
 
-	scanner := NewScanner(file)
+	scanner := chess.NewScanner(file)
 
 	// Call HasNext multiple times
 	for i := range 3 {
@@ -222,7 +224,7 @@ func TestHasNextDoesntConsume(t *testing.T) {
 		t.Fatalf("Failed to read first game after HasNext calls: %v", err)
 	}
 
-	tokens, err := TokenizeGame(game)
+	tokens, err := chess.TokenizeGame(game)
 	if err != nil {
 		t.Fatalf("Failed to tokenize first game: %v", err)
 	}
@@ -232,7 +234,7 @@ func TestHasNextDoesntConsume(t *testing.T) {
 	}
 }
 
-func validateExpand(t *testing.T, scanner *Scanner, expectedLastLines []string,
+func validateExpand(t *testing.T, scanner *chess.Scanner, expectedLastLines []string,
 	expectedFinalPos []string,
 ) {
 	count := 0
@@ -291,7 +293,7 @@ func TestScannerExpand(t *testing.T) {
 
 	pgn := mustParsePGN("fixtures/pgns/variations.pgn")
 	reader := strings.NewReader(pgn)
-	scanner := NewScanner(reader, WithExpandVariations())
+	scanner := chess.NewScanner(reader, chess.WithExpandVariations())
 	validateExpand(t, scanner, expectedLastLines, expectedFinalPos)
 }
 
@@ -305,7 +307,7 @@ func TestScannerNoExpand(t *testing.T) {
 
 	pgn := mustParsePGN("fixtures/pgns/variations.pgn")
 	reader := strings.NewReader(pgn)
-	scanner := NewScanner(reader)
+	scanner := chess.NewScanner(reader)
 	validateExpand(t, scanner, expectedLastLines, expectedFinalPos)
 }
 
@@ -325,7 +327,7 @@ func TestScannerMultiFromPosNoExpand(t *testing.T) {
 
 	pgn := mustParsePGN("fixtures/pgns/multi_frompos_games.pgn")
 	reader := strings.NewReader(pgn)
-	scanner := NewScanner(reader)
+	scanner := chess.NewScanner(reader)
 	validateExpand(t, scanner, expectedLastLines, expectedFinalPos)
 }
 
@@ -342,7 +344,7 @@ func TestEscapedQuoteInTagValue(t *testing.T) {
 1. e4 c5 2. Nf3 1/2-1/2
 `
 
-	scanner := NewScanner(strings.NewReader(escapedQuoteGame))
+	scanner := chess.NewScanner(strings.NewReader(escapedQuoteGame))
 	if !scanner.HasNext() {
 		t.Fatal("scanner should report one game")
 	}

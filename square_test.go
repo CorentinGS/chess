@@ -1,27 +1,31 @@
-package chess
+package chess_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/corentings/chess/v3"
+)
 
 type newSquareTest struct {
-	f  File
-	r  Rank
-	sq Square
+	f  chess.File
+	r  chess.Rank
+	sq chess.Square
 }
 
 func TestNewSquare(t *testing.T) {
 	testCases := []newSquareTest{
-		{FileA, Rank1, A1},
-		{FileA, Rank8, A8},
-		{FileH, Rank1, H1},
-		{FileH, Rank8, H8},
-		{FileB, Rank4, B4},
-		{FileE, Rank8, E8},
-		{FileH, Rank3, H3},
-		{FileD, Rank7, D7},
+		{chess.FileA, chess.Rank1, chess.A1},
+		{chess.FileA, chess.Rank8, chess.A8},
+		{chess.FileH, chess.Rank1, chess.H1},
+		{chess.FileH, chess.Rank8, chess.H8},
+		{chess.FileB, chess.Rank4, chess.B4},
+		{chess.FileE, chess.Rank8, chess.E8},
+		{chess.FileH, chess.Rank3, chess.H3},
+		{chess.FileD, chess.Rank7, chess.D7},
 	}
 
 	for _, testCase := range testCases {
-		square := NewSquare(testCase.f, testCase.r)
+		square := chess.NewSquare(testCase.f, testCase.r)
 		if square != testCase.sq {
 			t.Fatalf("expected %s, got %s", testCase.sq.String(), square.String())
 		}
