@@ -194,6 +194,9 @@ func (g *Game) AddVariation(parent *MoveNode, newMove Move) {
 		parent = g.rootMove
 	}
 	node := &MoveNode{move: newMove, parent: parent}
+	if parent.position != nil {
+		node.position = parent.position.Update(newMove)
+	}
 	parent.children = append(parent.children, node)
 }
 
@@ -243,7 +246,7 @@ func (g *Game) GoForward() bool {
 	// Check if current move exists and has children
 	if g.currentMove != nil && len(g.currentMove.children) > 0 {
 		g.currentMove = g.currentMove.children[0] // Follow main line
-		g.pos = g.currentMove.position
+		g.pos = g.currentMove.position.copy()
 		return true
 	}
 	return false

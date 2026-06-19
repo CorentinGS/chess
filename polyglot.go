@@ -237,7 +237,7 @@ func LoadFromSource(source BookSource) (*PolyglotBook, error) {
 	buf := make([]byte, 16)
 	for {
 		_, readErr := source.Read(buf)
-		if readErr == io.EOF {
+		if errors.Is(readErr, io.EOF) {
 			break
 		}
 		if readErr != nil {

@@ -261,12 +261,13 @@ func writeCommentBlocks(blocks []CommentBlock, sb *strings.Builder) {
 		}
 
 		sb.WriteString(" {")
+		lastByte := byte('{')
 		for _, item := range block.Items {
 			switch item.Kind {
 			case CommentText:
-				sb.WriteString(item.Text)
+				lastByte = writeEscapedCommentText(sb, item.Text, lastByte)
 			case CommentCommand:
-				if needsCommandSeparator(sb) {
+				if needsCommandSeparator(lastByte) {
 					sb.WriteString(" ")
 				}
 				sb.WriteString("[%")
@@ -274,15 +275,27 @@ func writeCommentBlocks(blocks []CommentBlock, sb *strings.Builder) {
 				sb.WriteString(" ")
 				sb.WriteString(item.Value)
 				sb.WriteString("]")
+				lastByte = ']'
 			}
 		}
 		sb.WriteString("}")
 	}
 }
 
-func needsCommandSeparator(sb *strings.Builder) bool {
-	s := sb.String()
-	return len(s) > 0 && s[len(s)-1] != ' '
+func writeEscapedCommentText(sb *strings.Builder, text string, lastByte byte) byte {
+	for i := 0; i < len(text); i++ {
+		if text[i] == '}' {
+			sb.WriteByte('\\')
+			lastByte = '\\'
+		}
+		sb.WriteByte(text[i])
+		lastByte = text[i]
+	}
+	return lastByte
+}
+
+func needsCommandSeparator(lastByte byte) bool {
+	return lastByte != ' '
 }
 
 func writeVariations(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder) bool {

@@ -38,7 +38,9 @@ func NewSubprocessAdapter(path string) (*SubprocessAdapter, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("uci: failed to start executable %s: %w", path, err)
 	}
-	go cmd.Wait()
+	go func() {
+		_ = cmd.Wait()
+	}()
 	return &SubprocessAdapter{
 		cmd:     cmd,
 		writer:  wIn,

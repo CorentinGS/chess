@@ -1,6 +1,9 @@
 package chess
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestSetOutcomeMethodAcceptsValidPair(t *testing.T) {
 	g := NewGame()
@@ -54,6 +57,20 @@ func TestClearOutcomeResetsToNoOutcomeNoMethod(t *testing.T) {
 	}
 }
 
+func TestClearOutcomeDoesNotModifyResultTag(t *testing.T) {
+	g := NewGame()
+	g.tagPairs["Result"] = "1-0"
+	if err := g.SetOutcomeMethod(OutcomeMethodPair{WhiteWon, Checkmate}); err != nil {
+		t.Fatal(err)
+	}
+
+	g.ClearOutcome()
+
+	if got := g.tagPairs["Result"]; got != "1-0" {
+		t.Errorf("Result tag after ClearOutcome = %q, want 1-0", got)
+	}
+}
+
 func TestMoveRejectedAfterTerminalOutcome(t *testing.T) {
 	g := NewGame()
 	if err := g.SetOutcomeMethod(OutcomeMethodPair{WhiteWon, Checkmate}); err != nil {
@@ -64,7 +81,7 @@ func TestMoveRejectedAfterTerminalOutcome(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when moving after terminal outcome, got nil")
 	}
-	if err != ErrGameAlreadyEnded {
+	if !errors.Is(err, ErrGameAlreadyEnded) {
 		t.Errorf("error = %v, want ErrGameAlreadyEnded", err)
 	}
 }
@@ -78,7 +95,7 @@ func TestResignAfterTerminalReturnsErrGameAlreadyEnded(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when resigning after terminal outcome, got nil")
 	}
-	if err != ErrGameAlreadyEnded {
+	if !errors.Is(err, ErrGameAlreadyEnded) {
 		t.Errorf("error = %v, want ErrGameAlreadyEnded", err)
 	}
 }
@@ -113,7 +130,7 @@ func TestMoveAfterGoBackFromTerminalStillRejected(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when moving after GoBack from terminal, got nil")
 	}
-	if err != ErrGameAlreadyEnded {
+	if !errors.Is(err, ErrGameAlreadyEnded) {
 		t.Errorf("error = %v, want ErrGameAlreadyEnded", err)
 	}
 }
@@ -148,7 +165,7 @@ func TestDrawRejectedAfterTerminalOutcome(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when calling Draw after terminal, got nil")
 	}
-	if err != ErrGameAlreadyEnded {
+	if !errors.Is(err, ErrGameAlreadyEnded) {
 		t.Errorf("error = %v, want ErrGameAlreadyEnded", err)
 	}
 	if g.Outcome() != WhiteWon {

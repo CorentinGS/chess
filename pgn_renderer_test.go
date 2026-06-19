@@ -76,3 +76,30 @@ func TestPGNRendererRenderAnnotatesEmptyGame(t *testing.T) {
 		t.Errorf("expected output to end with NoOutcome %q, got %q", NoOutcome, out)
 	}
 }
+
+func TestPGNRendererEscapesCommentEndBrace(t *testing.T) {
+	g := NewGame()
+	if err := g.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	g.currentMove.SetComment("keeps } inside")
+
+	out := DefaultPGNRenderer.Render(g)
+	if !strings.Contains(out, `keeps \} inside`) {
+		t.Fatalf("rendered PGN did not escape comment brace: %q", out)
+	}
+
+	parsed := NewGame(mustPGNOption(t, out))
+	if got := parsed.currentMove.Comments(); got != "keeps } inside" {
+		t.Fatalf("round-tripped comment = %q, want %q", got, "keeps } inside")
+	}
+}
+
+func mustPGNOption(t *testing.T, pgn string) func(*Game) {
+	t.Helper()
+	opt, err := PGN(strings.NewReader(pgn))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return opt
+}

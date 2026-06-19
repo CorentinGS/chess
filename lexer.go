@@ -264,10 +264,15 @@ func (l *Lexer) readComment() Token {
 
 	// Look for command start sequence
 	for l.ch != '}' && l.ch != 0 {
+		if l.ch == '\\' && l.peekChar() == '}' {
+			l.readChar()
+			l.readChar()
+			continue
+		}
 		if l.ch == '[' && l.peekChar() == '%' {
 			if position != l.position {
 				// Return accumulated comment text before the command
-				return Token{Type: COMMENT, Value: strings.TrimSpace(l.input[position:l.position])}
+				return Token{Type: COMMENT, Value: cleanCommentText(l.input[position:l.position])}
 			}
 			// Start command processing
 			l.readChar() // skip [
@@ -296,10 +301,15 @@ func (l *Lexer) readComment() Token {
 
 	// Return remaining comment text if any
 	if position != l.position {
-		return Token{Type: COMMENT, Value: strings.TrimSpace(l.input[position:l.position])}
+		return Token{Type: COMMENT, Value: cleanCommentText(l.input[position:l.position])}
 	}
 
 	return Token{Type: CommentEnd, Value: "}"}
+}
+
+func cleanCommentText(text string) string {
+	text = strings.TrimSpace(text)
+	return strings.ReplaceAll(text, `\}`, "}")
 }
 
 // Update readPieceMove to handle piece moves.

@@ -9,7 +9,7 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-var missingWdlErr = errors.New("uci: wdl unavailable; this is mostly likely because UCI_ShowWDL has not been set")
+var errMissingWdl = errors.New("uci: wdl unavailable; this is mostly likely because UCI_ShowWDL has not been set")
 
 // SearchResults is the result from the most recent CmdGo invocation.  It includes
 // data such as the following:
@@ -138,7 +138,7 @@ type Score struct {
 func (score Score) WinPct() (float32, error) {
 	total := score.Win + score.Draw + score.Loss
 	if total == 0 {
-		return 0.0, missingWdlErr
+		return 0.0, errMissingWdl
 	}
 	return float32(score.Win) / float32(total), nil
 }
@@ -150,7 +150,7 @@ func (score Score) WinPct() (float32, error) {
 func (score Score) DrawPct() (float32, error) {
 	total := score.Win + score.Draw + score.Loss
 	if total == 0 {
-		return 0.0, missingWdlErr
+		return 0.0, errMissingWdl
 	}
 	return float32(score.Draw) / float32(total), nil
 }
@@ -162,7 +162,7 @@ func (score Score) DrawPct() (float32, error) {
 func (score Score) LossPct() (float32, error) {
 	total := score.Win + score.Draw + score.Loss
 	if total == 0 {
-		return 0.0, missingWdlErr
+		return 0.0, errMissingWdl
 	}
 	return float32(score.Loss) / float32(total), nil
 }

@@ -1,9 +1,13 @@
 /*
 Package chess is a go library designed to accomplish the following:
-  - chess game / turn management
+  - chess game state and move tree management
   - move validation
   - PGN encoding / decoding
   - FEN encoding / decoding
+
+Game values are mutable and are not safe for concurrent use by multiple
+goroutines. Callers that share a Game between goroutines must provide their own
+synchronization.
 
 Using Moves
 

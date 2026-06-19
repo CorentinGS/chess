@@ -61,6 +61,29 @@ func TestInvalidDecoding(t *testing.T) {
 	}
 }
 
+func TestAlgebraicNotationDecodeRoundTripsLegalMoves(t *testing.T) {
+	positions := []*Position{
+		startPos,
+		midPos,
+		complexPos,
+		unsafeFEN("r3k2r/pppq1ppp/2npbn2/3Np3/2B1P3/2N2Q2/PPP2PPP/R3K2R w KQkq - 0 10"),
+	}
+	notation := AlgebraicNotation{}
+
+	for _, pos := range positions {
+		for _, move := range pos.ValidMovesUnsafe() {
+			encoded := notation.Encode(pos, move)
+			decoded, err := notation.Decode(pos, encoded)
+			if err != nil {
+				t.Fatalf("Decode(%q) from %s: %v", encoded, pos, err)
+			}
+			if decoded.s1 != move.s1 || decoded.s2 != move.s2 || decoded.promo != move.promo {
+				t.Fatalf("Decode(%q) = %s, want %s", encoded, decoded, move)
+			}
+		}
+	}
+}
+
 func TestEncodeUCINotation(t *testing.T) {
 	notation := UCINotation{}
 	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")

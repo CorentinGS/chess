@@ -13,7 +13,7 @@ import (
 
 var (
 	defaultBook     *BookECO
-	defaultBookErr  error
+	errDefaultBook  error
 	defaultBookOnce sync.Once
 )
 
@@ -22,9 +22,9 @@ var (
 // It is safe for concurrent use.
 func DefaultBook() (*BookECO, error) {
 	defaultBookOnce.Do(func() {
-		defaultBook, defaultBookErr = NewBook(bytes.NewReader(ecoData))
+		defaultBook, errDefaultBook = NewBook(bytes.NewReader(ecoData))
 	})
-	return defaultBook, defaultBookErr
+	return defaultBook, errDefaultBook
 }
 
 // BookECO represents the Encyclopedia of Chess Openings https://en.wikipedia.org/wiki/Encyclopaedia_of_Chess_Openings

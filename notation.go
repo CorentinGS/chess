@@ -275,65 +275,30 @@ func (mc moveComponents) clean() string {
 // generateMoveOptions creates possible alternative notations for a move.
 func (mc moveComponents) generateOptions() []string {
 	// Get pre-allocated slice from pool
-	options := pieceOptionsPool.Get().(*[]string)
+	options, ok := pieceOptionsPool.Get().(*[]string)
+	if !ok {
+		options = &[]string{}
+	}
 	*options = (*options)[:0]           // Clear but keep capacity
 	defer pieceOptionsPool.Put(options) // Now passing pointer
 
-	// Build move options using string builder for efficiency
-	sb, _ := stringPool.Get().(*strings.Builder)
-	defer stringPool.Put(sb)
-
 	if mc.piece != "" {
 		// Option 1: no origin coordinates
-		sb.Reset()
-		sb.WriteString(mc.piece)
-		sb.WriteString(mc.capture)
-		sb.WriteString(mc.file)
-		sb.WriteString(mc.rank)
-		sb.WriteString(mc.promotes)
-		sb.WriteString(mc.castles)
-		*options = append(*options, sb.String())
+		*options = append(*options, mc.piece+mc.capture+mc.file+mc.rank+mc.promotes+mc.castles)
 
 		// Option 2: with rank, no file
-		sb.Reset()
-		sb.WriteString(mc.piece)
-		sb.WriteString(mc.originRank)
-		sb.WriteString(mc.capture)
-		sb.WriteString(mc.file)
-		sb.WriteString(mc.rank)
-		sb.WriteString(mc.promotes)
-		sb.WriteString(mc.castles)
-		*options = append(*options, sb.String())
+		*options = append(*options, mc.piece+mc.originRank+mc.capture+mc.file+mc.rank+mc.promotes+mc.castles)
 
 		// Option 3: with file, no rank
-		sb.Reset()
-		sb.WriteString(mc.piece)
-		sb.WriteString(mc.originFile)
-		sb.WriteString(mc.capture)
-		sb.WriteString(mc.file)
-		sb.WriteString(mc.rank)
-		sb.WriteString(mc.promotes)
-		sb.WriteString(mc.castles)
-		*options = append(*options, sb.String())
+		*options = append(*options, mc.piece+mc.originFile+mc.capture+mc.file+mc.rank+mc.promotes+mc.castles)
 	} else {
 		if mc.capture != "" {
 			// Pawn capture without rank
-			sb.Reset()
-			sb.WriteString(mc.originFile)
-			sb.WriteString(mc.capture)
-			sb.WriteString(mc.file)
-			sb.WriteString(mc.rank)
-			sb.WriteString(mc.promotes)
-			*options = append(*options, sb.String())
+			*options = append(*options, mc.originFile+mc.capture+mc.file+mc.rank+mc.promotes)
 		}
 		if mc.originFile != "" && mc.originRank != "" {
 			// Full coordinates version
-			sb.Reset()
-			sb.WriteString(mc.capture)
-			sb.WriteString(mc.file)
-			sb.WriteString(mc.rank)
-			sb.WriteString(mc.promotes)
-			*options = append(*options, sb.String())
+			*options = append(*options, mc.capture+mc.file+mc.rank+mc.promotes)
 		}
 	}
 
@@ -342,40 +307,110 @@ func (mc moveComponents) generateOptions() []string {
 
 // Decode implements the Decoder interface.
 func (AlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
-	// Parse move components
 	components, err := algebraicNotationParts(s)
 	if err != nil {
 		return Move{}, err
 	}
 
-	// Get cleaned input move
-	cleanedInput := components.clean()
-
-	// Try matching against valid moves
 	for _, m := range pos.ValidMovesUnsafe() {
-		// Encode current move
-		moveStr := AlgebraicNotation{}.Encode(pos, m)
-
-		// Parse and clean encoded move
-		notationParts, algebraicNotationError := algebraicNotationParts(moveStr)
-		if algebraicNotationError != nil {
-			continue // Skip invalid moves
-		}
-
-		// Compare cleaned versions
-		if cleanedInput == notationParts.clean() {
+		if algebraicMoveMatches(pos, m, components) {
 			return m, nil
-		}
-
-		// Try alternative notations
-		for _, opt := range components.generateOptions() {
-			if opt == notationParts.clean() {
-				return m, nil
-			}
 		}
 	}
 
 	return Move{}, fmt.Errorf("chess: move %s is not valid", s)
+}
+
+func algebraicMoveMatches(pos *Position, m Move, components moveComponents) bool {
+	if components.castles != "" {
+		return matchesCastle(m, components.castles)
+	}
+
+	if components.file == "" || components.rank == "" {
+		return false
+	}
+
+	dest := Square((components.file[0] - 'a') + (components.rank[0]-'1')*8)
+	if m.s2 != dest {
+		return false
+	}
+
+	piece := pos.Board().Piece(m.s1)
+	if piece.Type() != algebraicPieceType(components.piece) {
+		return false
+	}
+
+	if components.originFile != "" && m.s1.File().Byte() != components.originFile[0] {
+		return false
+	}
+	if components.originRank != "" && m.s1.Rank().Byte() != components.originRank[0] {
+		return false
+	}
+	if !satisfiesRequiredDisambiguation(pos, m, components) {
+		return false
+	}
+
+	moveCaptures := m.HasTag(Capture) || m.HasTag(EnPassant)
+	if (components.capture != "") != moveCaptures {
+		return false
+	}
+
+	return m.promo == algebraicPromotion(components.promotes)
+}
+
+func satisfiesRequiredDisambiguation(pos *Position, m Move, components moveComponents) bool {
+	required := formS1(pos, m)
+	if required == "" {
+		return true
+	}
+
+	for i := 0; i < len(required); i++ {
+		switch required[i] {
+		case m.s1.File().Byte():
+			if components.originFile == "" {
+				return false
+			}
+		case m.s1.Rank().Byte():
+			if components.originRank == "" {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func matchesCastle(m Move, castles string) bool {
+	switch castles {
+	case castleKS:
+		return m.HasTag(KingSideCastle)
+	case castleQS:
+		return m.HasTag(QueenSideCastle)
+	}
+	return false
+}
+
+func algebraicPieceType(piece string) PieceType {
+	switch piece {
+	case kingStr:
+		return King
+	case queenStr:
+		return Queen
+	case rookStr:
+		return Rook
+	case bishopStr:
+		return Bishop
+	case knightStr:
+		return Knight
+	default:
+		return Pawn
+	}
+}
+
+func algebraicPromotion(promotes string) PieceType {
+	if len(promotes) != 2 || promotes[0] != '=' {
+		return NoPieceType
+	}
+	return algebraicPieceType(promotes[1:])
 }
 
 // LongAlgebraicNotation is a fully expanded version of
