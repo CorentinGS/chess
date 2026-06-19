@@ -46,11 +46,8 @@ open-source community and allowing for faster development.
 
 ## Disclaimer
 
-**Breaking Changes**: This package is under the `/v2` namespace to signify that it might not be backward compatible with
-the original package.
-While some parts might work as plug-and-play, others might require changes.
-Unfortunately, I do not plan to maintain a breaking change list at this time, but I expect in-code comments and the
-compiler/linter to assist with migration.
+**Breaking Changes**: v3 is a major release with API changes that are not backward compatible with v2. See the
+[MIGRATION.md](MIGRATION.md) guide for a detailed list of breaking changes and how to update your code.
 
 **Maintenance**: This package is primarily maintained for my current work and projects.
 It is shared as a respect for the original work and to contribute to the community. My main focus is:
@@ -109,7 +106,7 @@ func main() {
 		// select a random move
 		moves := game.ValidMoves()
 		move := moves[rand.Intn(len(moves))]
-		if err := game.Move(&move, nil); err != nil {
+		if err := game.Move(move, nil); err != nil {
 			panic(err) // Should not happen with valid moves
 		}
 	}
@@ -158,7 +155,7 @@ func main() {
 	}
 	defer eng.Close()
 	// initialize uci with new game
-	if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame); err != nil {
+	if err := eng.Run(uci.CmdUCI{}, uci.CmdIsReady{}, uci.CmdUCINewGame{}); err != nil {
 		panic(err)
 	}
 	// have stockfish play speed chess against itself (10 msec per move)
@@ -194,7 +191,7 @@ The library offers two move execution methods to balance safety and performance:
 ```go
 game := chess.NewGame()
 moves := game.ValidMoves()
-err := game.Move(&moves[0], nil)
+err := game.Move(moves[0], nil)
 if err != nil {
 // Handle invalid move error
 }
@@ -206,7 +203,7 @@ if err != nil {
 game := chess.NewGame()
 moves := game.ValidMoves()
 // Only use when you're certain the move is valid
-err := game.UnsafeMove(&moves[0], nil)
+err := game.UnsafeMove(moves[0], nil)
 if err != nil {
 // Handle error (should not occur with valid moves)
 }
@@ -246,7 +243,7 @@ Valid moves generated from the game's current position:
 ```go
 game := chess.NewGame()
 moves := game.ValidMoves()
-game.Move(&moves[0], nil)
+game.Move(moves[0], nil)
 fmt.Println(moves[0]) // b1a3
 ```
 
@@ -273,7 +270,7 @@ game := chess.NewGame()
 validMoves := game.ValidMoves()
 if len(validMoves) > 0 {
 // This will succeed - move is known to be valid
-if err := game.Move(&validMoves[0], nil); err != nil {
+if err := game.Move(validMoves[0], nil); err != nil {
 fmt.Println("Move failed:", err)
 } else {
 fmt.Println("Move succeeded")
@@ -301,7 +298,7 @@ game := chess.NewGame()
 
 // Option 1: Using Move structs directly (~1.5x faster)
 validMoves := game.ValidMoves()
-selectedMove := &validMoves[0] // We know this is valid
+selectedMove := validMoves[0] // We know this is valid
 if err := game.UnsafeMove(selectedMove, nil); err != nil {
 panic(err) // Should not happen with pre-validated moves
 }
@@ -373,7 +370,9 @@ Black resigns and white wins:
 ```go
 game := chess.NewGame()
 game.PushNotationMove("f3", chess.AlgebraicNotation{}, nil)
-game.Resign(chess.Black)
+if err := game.Resign(chess.Black); err != nil {
+	panic(err)
+}
 fmt.Println(game.Outcome()) // 1-0
 fmt.Println(game.Method()) // Resignation
 ```
