@@ -356,7 +356,6 @@ func (g *Game) Variations(move *MoveNode) []*MoveNode {
 }
 
 // Comments returns the comments for the game indexed by moves.
-// Comments returns the comments for the game indexed by moves.
 func (g *Game) Comments() [][]string {
 	if g.comments == nil {
 		return [][]string{}
@@ -768,7 +767,7 @@ func (g *Game) UnsafePushNotationMove(moveStr string, notation Notation, options
 //
 //	possibleMove := game.ValidMoves()[0]
 //
-//	err := game.Move(&possibleMove, nil)
+//	err := game.Move(possibleMove, nil)
 //	if err != nil {
 //	    panic(err)
 //	}
@@ -794,7 +793,7 @@ func (g *Game) Move(move Move, options *PushMoveOptions) error {
 //
 //	// Only use when you're certain the move is valid
 //	validMoves := game.ValidMoves()
-//	move := &validMoves[0] // We know this is valid
+//	move := validMoves[0] // We know this is valid
 //	err := game.UnsafeMove(move, nil)
 //	if err != nil {
 //	    panic(err) // Should not happen with valid moves

@@ -495,7 +495,7 @@ func TestGoForwardFromBranch(t *testing.T) {
 	g.AddVariation(variationNode, childMove)
 	g.currentMove = variationNode
 	if !g.GoForward() {
-		t.Fatalf("expected to go forward from branch move")
+		t.Fatalf("expected to go forward from variation move")
 	}
 	if g.currentMove.move != childMove {
 		t.Fatalf("expected current move to be the child of the variation move")

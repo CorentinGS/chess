@@ -273,8 +273,8 @@ func (pos *Position) UnsafeMoves() []Move {
 	return engine{}.UnsafeMoves(pos)
 }
 
-// Status returns the position's status as one of the outcome methods.
-// Possible returns values include Checkmate, Stalemate, and NoMethod.
+// Status returns the position's outcome Method (e.g. Checkmate, Stalemate, or
+// NoMethod).
 func (pos *Position) Status() Method {
 	return engine{}.Status(pos)
 }

@@ -617,7 +617,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	// For variations at game start, we attach to root
 	variationParent := p.game.rootMove
 
-	// Find the move this variation should branch from
+	// Find the move this variation should diverge from
 	if parentMove != p.game.rootMove && parentMove.parent != nil {
 		variationParent = parentMove.parent
 		if variationParent.parent != nil && variationParent.parent.position != nil {

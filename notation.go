@@ -421,22 +421,9 @@ func getCheckChar(pos *Position, move Move) string {
 	}
 	nextPos := pos.Update(move)
 	if nextPos.Status() == Checkmate {
-		return "#"
+		return mateStr
 	}
-	return "+"
-}
-
-// getCheckBytes returns the check or mate bytes for a move
-//
-//nolint:unused // I don't care about this
-func getCheckBytes(pos *Position, move Move) []byte {
-	if !move.HasTag(Check) {
-		return []byte{}
-	}
-	if pos.Update(move).Status() == Checkmate {
-		return []byte(mateStr)
-	}
-	return []byte(checkStr)
+	return checkStr
 }
 
 func formS1(pos *Position, m Move) string {

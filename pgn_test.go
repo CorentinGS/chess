@@ -979,7 +979,7 @@ func TestVariationMoveNumbers(t *testing.T) {
 			if child.FullMoveNumber() != fullMove {
 				t.Errorf("move %s: expected full move number %d, got %d", child.Move().String(), fullMove, child.FullMoveNumber())
 			}
-			// If this move starts a variation, the move number should be correct for the branch
+			// If this move starts a variation, the move number should be correct for the variation
 			checkMoveNumbers(child, expectedNum+1)
 		}
 	}
@@ -992,7 +992,7 @@ func TestVariationMoveNumbers(t *testing.T) {
 	// Mainline starts at move 1
 	checkMoveNumbers(game.rootMove, 1)
 
-	// Check specific variation branch
+	// Check specific variation
 	mainMoves := game.MoveNodes()
 	if len(mainMoves) < 3 {
 		t.Fatalf("expected at least 3 mainline moves, got %d", len(mainMoves))

@@ -48,15 +48,15 @@ func (engine) UnsafeMoves(pos *Position) []Move {
 	return standardMoves(pos, false, true)
 }
 
-// Status returns the current game status (Checkmate, Stalemate, or NoMethod)
-// based on the position.
+// Status returns the current position's Method (Checkmate, Stalemate, or
+// NoMethod).
 //
-// The status is determined by:
+// The Method is determined by:
 //   - Whether the side to move is in check
 //   - Whether any legal moves exist
 //
 // If the position has cached valid moves in pos.validMoves, those will be
-// used. Otherwise, moves will be calculated to determine the status.
+// used. Otherwise, moves will be calculated to determine the Method.
 func (engine) Status(pos *Position) Method {
 	var hasMove bool
 	if pos.validMoves != nil {

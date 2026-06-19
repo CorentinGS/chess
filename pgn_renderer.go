@@ -186,8 +186,6 @@ func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
 
 	writeAnnotations(currentMove, sb)
 
-	// TODO: Add support for all nags values in the future
-
 	if len(node.children) > 1 || len(currentMove.children) > 0 {
 		sb.WriteString(" ")
 	}
