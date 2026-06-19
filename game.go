@@ -187,6 +187,10 @@ func NewGame(options ...func(*Game)) *Game {
 
 // AddVariation adds a new variation to the game.
 // The parent move must be a move in the game or nil to add a variation to the root.
+//
+// AddVariation edits the move tree directly and bypasses the terminal outcome
+// guard enforced by Move / UnsafeMove / Resign. A caller reviewing or analysing
+// a finished game can still shape variations without first calling ClearOutcome.
 func (g *Game) AddVariation(parent *MoveNode, newMove Move) {
 	node := &MoveNode{move: newMove, parent: parent}
 	parent.children = append(parent.children, node)
@@ -386,6 +390,57 @@ func (g *Game) Outcome() Outcome {
 // Method returns the method in which the outcome occurred.
 func (g *Game) Method() Method {
 	return g.method
+}
+
+// OutcomeMethodPair pairs an Outcome with the Method that produced it.
+type OutcomeMethodPair struct {
+	Outcome Outcome
+	Method  Method
+}
+
+// SetOutcomeMethod sets the game's outcome and method together after validating
+// that the pair is internally consistent. It returns an error for invalid pairs
+// such as WhiteWon with Stalemate or Draw with Checkmate. It does not modify
+// any Result tag in tagPairs.
+func (g *Game) SetOutcomeMethod(pair OutcomeMethodPair) error {
+	if !validOutcomeMethodPair(pair) {
+		return fmt.Errorf("chess: invalid outcome/method pair: outcome=%s method=%s", pair.Outcome, pair.Method)
+	}
+	g.outcome = pair.Outcome
+	g.method = pair.Method
+	return nil
+}
+
+func validOutcomeMethodPair(pair OutcomeMethodPair) bool {
+	if pair.Outcome == UnknownOutcome {
+		return false
+	}
+	switch pair.Outcome {
+	case NoOutcome:
+		return pair.Method == NoMethod
+	case WhiteWon, BlackWon:
+		switch pair.Method {
+		case NoMethod, Checkmate, Resignation:
+			return true
+		}
+	case Draw:
+		switch pair.Method {
+		case NoMethod, DrawOffer, Stalemate, ThreefoldRepetition,
+			FivefoldRepetition, FiftyMoveRule, SeventyFiveMoveRule, InsufficientMaterial:
+			return true
+		}
+	}
+	return false
+}
+
+// ClearOutcome resets the game to NoOutcome/NoMethod. It does not modify any
+// tag in tagPairs (including the Result tag): PGN tag metadata is treated as
+// caller-owned data, separate from the live outcome. Callers that want PGN
+// tag parity must update tagPairs["Result"] themselves, or rebuild from the
+// game state via Split which does sync the tag.
+func (g *Game) ClearOutcome() {
+	g.outcome = NoOutcome
+	g.method = NoMethod
 }
 
 // FEN returns the FEN notation of the current position.
@@ -692,10 +747,14 @@ func (g *Game) UnmarshalText(text []byte) error {
 // Draw attempts to draw the game by the given method.  If the
 // method is valid, then the game is updated to a draw by that
 // method.  If the method isn't valid then an error is returned.
+// Returns ErrGameAlreadyEnded if the game is already in a terminal state.
 func (g *Game) Draw(method Method) error {
 	const halfMoveClockForFiftyMoveRule = 100
 	const numOfRepetitionsForThreefoldRepetition = 3
 
+	if g.outcome != NoOutcome {
+		return ErrGameAlreadyEnded
+	}
 	switch method {
 	case ThreefoldRepetition:
 		if g.numOfRepetitions() < numOfRepetitionsForThreefoldRepetition {
@@ -715,10 +774,14 @@ func (g *Game) Draw(method Method) error {
 }
 
 // Resign resigns the game for the given color.  If the game has
-// already been completed then the game is not updated.
-func (g *Game) Resign(color Color) {
-	if g.outcome != NoOutcome || color == NoColor {
-		return
+// already been completed or the color is invalid, Resign returns an error
+// and does not update the game.
+func (g *Game) Resign(color Color) error {
+	if color == NoColor {
+		return errors.New("chess: cannot resign with NoColor")
+	}
+	if g.outcome != NoOutcome {
+		return ErrGameAlreadyEnded
 	}
 	if color == White {
 		g.outcome = BlackWon
@@ -726,6 +789,7 @@ func (g *Game) Resign(color Color) {
 		g.outcome = WhiteWon
 	}
 	g.method = Resignation
+	return nil
 }
 
 // EligibleDraws returns valid inputs for the Draw() method.
@@ -1012,6 +1076,10 @@ func (g *Game) UnsafeMove(move Move, options *PushMoveOptions) error {
 // moveUnchecked is the internal implementation that performs the move without validation.
 // This is shared by both Move (after validation) and MoveUnchecked.
 func (g *Game) moveUnchecked(move Move, options *PushMoveOptions) error {
+	if g.outcome != NoOutcome {
+		return ErrGameAlreadyEnded
+	}
+
 	existingMove := g.findExistingMove(move)
 	node := g.addOrReorderMove(move, existingMove, options.ForceMainline)
 

@@ -37,6 +37,10 @@ var (
 	ErrInvalidRank         = func(pos int) error { return &PGNError{"invalid rank", pos} }
 
 	ErrNoGameFound = errors.New("no game found in PGN data")
+
+	// ErrGameAlreadyEnded is returned when a move is applied to a Game that
+	// already has a terminal Outcome. Callers must ClearOutcome first.
+	ErrGameAlreadyEnded = errors.New("chess: game already ended")
 )
 
 type ParserError struct {
