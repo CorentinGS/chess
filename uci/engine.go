@@ -15,7 +15,8 @@ type Engine struct {
 	id       map[string]string
 	options  map[string]Option
 	mu       *sync.RWMutex
-	position *CmdPosition
+	position CmdPosition
+	hasPos   bool
 	results  SearchResults
 	eval     int
 	debug    bool
@@ -54,7 +55,7 @@ func NewWithAdapter(adapter Adapter, opts ...func(e *Engine)) *Engine {
 		adapter:  adapter,
 		logger:   log.New(os.Stdout, "uci", log.LstdFlags),
 		mu:       &sync.RWMutex{},
-		position: &CmdPosition{},
+		position: CmdPosition{},
 		results:  SearchResults{MultiPVInfo: []Info{}},
 	}
 	for _, opt := range opts {
@@ -152,7 +153,8 @@ func (e *Engine) processCommand(cmd Cmd) error {
 		}
 	}
 	if posCmd, ok := cmd.(CmdPosition); ok {
-		e.position = &posCmd
+		e.position = posCmd
+		e.hasPos = true
 	}
 	return cmd.Handle(lines, e)
 }

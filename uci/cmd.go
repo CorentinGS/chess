@@ -267,7 +267,7 @@ func (CmdGo) Handle(lines []string, e *Engine) error {
 				return errors.New("best move not found " + text)
 			}
 			var position *chess.Position
-			if e.position != nil {
+			if e.hasPos {
 				position = e.position.Position
 			}
 			bestMove, err := chess.UCINotation{}.Decode(position, parts[1])
