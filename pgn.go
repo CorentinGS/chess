@@ -444,7 +444,8 @@ func (p *Parser) parseMove() (Move, error) {
 			piece := pos.Board().Piece(m.S1())
 
 			// Check piece type
-			if moveData.piece != "" && piece.Type() != PieceTypeFromString(moveData.piece) || moveData.piece == "" && piece.Type() != Pawn {
+			if (moveData.piece != "" && piece.Type() != PieceTypeFromString(moveData.piece)) ||
+				(moveData.piece == "" && piece.Type() != Pawn) {
 				err = &ParserError{
 					Message:    "piece type mismatch",
 					TokenType:  p.currentToken().Type,
