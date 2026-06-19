@@ -113,19 +113,16 @@ func (b *BookECO) insertOpening(o *Opening) error {
 
 	n := b.root
 	for _, moveStr := range o.moveList {
-		key, err := moveStringKey(moveStr)
+		m, err := chess.UCINotation{}.Decode(n.pos, moveStr)
 		if err != nil {
-			return err
+			return fmt.Errorf("decode move %s: %w", moveStr, err)
 		}
+		key := moveKey(m)
 		if child, ok := n.children[key]; ok {
 			n = child
 			continue
 		}
 
-		m, err := chess.UCINotation{}.Decode(n.pos, moveStr)
-		if err != nil {
-			return fmt.Errorf("decode move %s: %w", moveStr, err)
-		}
 		if !isLegalMove(n.pos, m) {
 			return fmt.Errorf("apply move %s: move is not valid for the current position", moveStr)
 		}
@@ -163,37 +160,6 @@ func moveKey(move chess.Move) uint32 {
 	return uint32(move.S1()) |
 		uint32(move.S2())<<moveKeySquareBits |
 		uint32(move.Promo())<<moveKeyPromoShift
-}
-
-func moveStringKey(move string) (uint32, error) {
-	if len(move) < 4 || len(move) > 5 {
-		return 0, fmt.Errorf("decode move %s: invalid UCI notation length %d", move, len(move))
-	}
-	if move[0] < 'a' || move[0] > 'h' || move[2] < 'a' || move[2] > 'h' {
-		return 0, fmt.Errorf("decode move %s: invalid UCI file", move)
-	}
-	if move[1] < '1' || move[1] > '8' || move[3] < '1' || move[3] > '8' {
-		return 0, fmt.Errorf("decode move %s: invalid UCI rank", move)
-	}
-
-	s1 := uint32(move[0]-'a') + uint32(move[1]-'1')*8
-	s2 := uint32(move[2]-'a') + uint32(move[3]-'1')*8
-	promo := uint32(chess.NoPieceType)
-	if len(move) == 5 {
-		switch move[4] {
-		case 'q':
-			promo = uint32(chess.Queen)
-		case 'r':
-			promo = uint32(chess.Rook)
-		case 'b':
-			promo = uint32(chess.Bishop)
-		case 'n':
-			promo = uint32(chess.Knight)
-		default:
-			return 0, fmt.Errorf("decode move %s: invalid promotion piece", move)
-		}
-	}
-	return s1 | s2<<6 | promo<<12, nil
 }
 
 type node struct {
