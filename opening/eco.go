@@ -151,8 +151,18 @@ func isLegalMove(pos *chess.Position, move chess.Move) bool {
 	return false
 }
 
+// Bit layout for moveKey: a Square fits in 6 bits (0..63), a PieceType fits
+// in the low 3 bits of the second 6-bit field. The packed key is therefore
+// S1 | S2<<6 | Promo<<12 (18 bits total, fits in a uint32).
+const (
+	moveKeySquareBits = 6
+	moveKeyPromoShift = moveKeySquareBits * 2
+)
+
 func moveKey(move chess.Move) uint32 {
-	return uint32(move.S1()) | uint32(move.S2())<<6 | uint32(move.Promo())<<12
+	return uint32(move.S1()) |
+		uint32(move.S2())<<moveKeySquareBits |
+		uint32(move.Promo())<<moveKeyPromoShift
 }
 
 func moveStringKey(move string) (uint32, error) {
