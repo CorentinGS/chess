@@ -8,6 +8,7 @@ import (
 // A Opening represents a specific sequence of moves from the staring position.
 type Opening struct {
 	moveList []string
+	game     *chess.Game
 	code     string
 	title    string
 	pgn      string
@@ -19,7 +20,22 @@ func newOpening(code, title, pgn string, moveList []string) *Opening {
 		code:     code,
 		title:    title,
 		pgn:      pgn,
+		game:     buildGame(moveList),
 	}
+}
+
+func buildGame(moveList []string) *chess.Game {
+	game := chess.NewGame()
+	for _, moveStr := range moveList {
+		m, err := chess.UCINotation{}.Decode(game.Position(), moveStr)
+		if err != nil {
+			return nil
+		}
+		if err := game.Move(m, nil); err != nil {
+			return nil
+		}
+	}
+	return game
 }
 
 // Code returns the Encyclopaedia of Chess Openings (ECO) code.
@@ -39,23 +55,14 @@ func (o *Opening) PGN() string {
 
 // Game returns the opening as a caller-owned game.
 //
-// Game is a convenience conversion API. The opening's moves were validated when
-// the book was constructed, and each call replays them into a new game so
-// callers may mutate the returned game without changing the opening book.
-// Repeated calls allocate; use Book.Find or Book.Possible for
-// performance-sensitive opening lookup and exploration paths.
+// The game is pre-computed when the opening is constructed (per ADR-005), so
+// Game does not replay UCI moves. Each call returns an independent clone so
+// callers may mutate the returned game without affecting the opening book.
 func (o *Opening) Game() *chess.Game {
-	game := chess.NewGame()
-	for _, moveStr := range o.moveList {
-		m, err := chess.UCINotation{}.Decode(game.Position(), moveStr)
-		if err != nil {
-			return nil
-		}
-		if err := game.Move(m, nil); err != nil {
-			return nil
-		}
+	if o.game == nil {
+		return nil
 	}
-	return game
+	return o.game.Clone()
 }
 
 // Book is an opening book that returns openings for move sequences.
