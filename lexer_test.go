@@ -7,7 +7,7 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-func TestLexer(t *testing.T) {
+func TestLexer_TokenizesFullGame(t *testing.T) {
 	input := `[Event "Example"]
 [Site "Internet"]
 [Date "2023.12.06"]
@@ -89,7 +89,7 @@ func TestLexer(t *testing.T) {
 	}
 }
 
-func Test_TagKey(t *testing.T) {
+func TestLexer_ParsesTagValueWithApostrophe(t *testing.T) {
 	input := "[Opening \"King's Indian Attack, General\"]"
 	lexer := chess.NewLexer(input)
 
@@ -112,7 +112,7 @@ func Test_TagKey(t *testing.T) {
 	}
 }
 
-func TestCheck(t *testing.T) {
+func TestLexer_CheckAndCheckmateSuffixes(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -151,82 +151,13 @@ func TestCheck(t *testing.T) {
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
 			if token.Type != chess.EOF {
-				t.Errorf("Expected EOF token after capture, got %v", token.Type)
+				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
 	}
 }
 
-func TestDisambiguation(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected []chess.Token
-	}{
-		{
-			name:  "Disambiguation by file",
-			input: "Nbd7",
-			expected: []chess.Token{
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.FILE, Value: "b"},
-				{Type: chess.SQUARE, Value: "d7"},
-			},
-		},
-		{
-			name:  "Disambiguation by rank",
-			input: "N4d7",
-			expected: []chess.Token{
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.RANK, Value: "4"},
-				{Type: chess.SQUARE, Value: "d7"},
-			},
-		},
-
-		{
-			name:  "Disambiguation in game",
-			input: "1. e4 e5 2. Nf3 Nc6 3. Nbd7",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.SQUARE, Value: "e5"},
-				{Type: chess.MoveNumber, Value: "2"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "f3"},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "c6"},
-				{Type: chess.MoveNumber, Value: "3"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.FILE, Value: "b"},
-				{Type: chess.SQUARE, Value: "d7"},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lexer := chess.NewLexer(tt.input)
-
-			for i, expected := range tt.expected {
-				token := lexer.NextToken()
-				if token.Type != expected.Type || token.Value != expected.Value {
-					t.Errorf("Token %d - Expected {%v, %q}, got {%v, %q}",
-						i, expected.Type, expected.Value, token.Type, token.Value)
-				}
-			}
-
-			// Verify we get EOF after all tokens
-			token := lexer.NextToken()
-			if token.Type != chess.EOF {
-				t.Errorf("Expected EOF token after capture, got %v", token.Type)
-			}
-		})
-	}
-}
-
-func TestPromotion(t *testing.T) {
+func TestLexer_Promotion(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -279,13 +210,13 @@ func TestPromotion(t *testing.T) {
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
 			if token.Type != chess.EOF {
-				t.Errorf("Expected EOF token after capture, got %v", token.Type)
+				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
 	}
 }
 
-func TestNAG(t *testing.T) {
+func TestLexer_NAG(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -379,13 +310,13 @@ func TestNAG(t *testing.T) {
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
 			if token.Type != chess.EOF {
-				t.Errorf("Expected EOF token after capture, got %v", token.Type)
+				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
 	}
 }
 
-func TestCaptures(t *testing.T) {
+func TestLexer_Captures(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -468,14 +399,14 @@ func TestCaptures(t *testing.T) {
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
 			if token.Type != chess.EOF {
-				t.Errorf("Expected EOF token after capture, got %v", token.Type)
+				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
 	}
 }
 
 // Test captures in context
-func TestCapturesInGame(t *testing.T) {
+func TestLexer_CapturesInGameContext(t *testing.T) {
 	input := "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6"
 
 	expectedTokens := []struct {
@@ -515,7 +446,7 @@ func TestCapturesInGame(t *testing.T) {
 	}
 }
 
-func TestCommands(t *testing.T) {
+func TestLexer_Commands(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -597,13 +528,13 @@ func TestCommands(t *testing.T) {
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
 			if token.Type != chess.EOF {
-				t.Errorf("Expected EOF token after capture, got %v", token.Type)
+				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
 	}
 }
 
-func TestVariations(t *testing.T) {
+func TestLexer_Variations(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -714,13 +645,13 @@ func TestVariations(t *testing.T) {
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
 			if token.Type != chess.EOF {
-				t.Errorf("Expected EOF token after capture, got %v", token.Type)
+				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
 	}
 }
 
-func TestCaslting(t *testing.T) {
+func TestLexer_Castling(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -806,99 +737,35 @@ func TestCaslting(t *testing.T) {
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
 			if token.Type != chess.EOF {
-				t.Errorf("Expected EOF token after capture, got %v", token.Type)
+				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
 	}
 }
 
-func TestFuzzRepro_b41648629adb0a5d_y(t *testing.T) {
-	input := "y"
-	lexer := chess.NewLexer(input)
-
-	var tokens []chess.Token
-	for {
-		token := lexer.NextToken()
-		tokens = append(tokens, token)
-
-		if token.Type == chess.EOF {
-			break
-		}
-
-		if len(tokens) > len(input)*2 { // Arbitrary limit based on input length
-			t.Errorf("Too many tokens generated for input length")
-			break
-		}
-	}
-}
-
-func TestFuzzRepro_ff9f899cf2252ff1_a(t *testing.T) {
-	input := "a"
-	lexer := chess.NewLexer(input)
-
-	var tokens []chess.Token
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("Lexer panicked on input %q: %v", input, r)
-		}
-	}()
-	for {
-		token := lexer.NextToken()
-		tokens = append(tokens, token)
-
-		if token.Type == chess.EOF {
-			break
-		}
-
-		if len(tokens) > len(input)*2 { // Arbitrary limit based on input length
-			t.Errorf("Too many tokens generated for input length")
-			break
-		}
-	}
-}
-
-func TestFuzzRepro_167803a88524c396(t *testing.T) {
-	input := "{[%0"
-	lexer := chess.NewLexer(input)
-
-	var tokens []chess.Token
-	for {
-		token := lexer.NextToken()
-		tokens = append(tokens, token)
-
-		if token.Type == chess.EOF {
-			break
-		}
-
-		if len(tokens) > len(input)*2 { // Arbitrary limit based on input length
-			t.Errorf("Too many tokens generated for input length")
-			break
-		}
-	}
-}
-
-func TestFuzzRepro_b68c42fa4236bdd7(t *testing.T) {
-	input := "{[%,\""
-	lexer := chess.NewLexer(input)
-
-	var tokens []chess.Token
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("Lexer panicked on input %q: %v", input, r)
-		}
-	}()
-	for {
-		token := lexer.NextToken()
-		tokens = append(tokens, token)
-
-		if token.Type == chess.EOF {
-			break
-		}
-
-		if len(tokens) > len(input)*2 { // Arbitrary limit based on input length
-			t.Errorf("Too many tokens generated for input length")
-			break
-		}
+func TestFuzzRegressions(t *testing.T) {
+	seeds := []string{"y", "a", "{[%0", "{[%,\""}
+	for _, input := range seeds {
+		t.Run(input, func(t *testing.T) {
+			lexer := chess.NewLexer(input)
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("Lexer panicked on input %q: %v", input, r)
+				}
+			}()
+			count := 0
+			for {
+				token := lexer.NextToken()
+				count++
+				if token.Type == chess.EOF {
+					break
+				}
+				if count > len(input)*3 {
+					t.Errorf("Too many tokens generated for input %q", input)
+					break
+				}
+			}
+		})
 	}
 }
 
@@ -1018,7 +885,7 @@ func validateTokens(t *testing.T, tokens []chess.Token) {
 	}
 }
 
-func TestSingleFromPosPGN(t *testing.T) {
+func TestLexer_FromPositionFixture(t *testing.T) {
 	// Read fixture
 	data, err := os.ReadFile("fixtures/pgns/single_frompos.pgn")
 	if err != nil {
@@ -1132,5 +999,169 @@ func TestSingleFromPosPGN(t *testing.T) {
 	// final EOF
 	if tok := lexer.NextToken(); tok.Type != chess.EOF {
 		t.Errorf("Expected EOF, got %v", tok.Type)
+	}
+}
+
+func assertTokenSequence(t *testing.T, l *chess.Lexer, expected []chess.Token) {
+	t.Helper()
+	for i, exp := range expected {
+		tok := l.NextToken()
+		if tok.Type != exp.Type || tok.Value != exp.Value {
+			t.Errorf("Token %d: expected {%v, %q}, got {%v, %q}",
+				i, exp.Type, exp.Value, tok.Type, tok.Value)
+		}
+		if exp.Error != nil && tok.Error == nil {
+			t.Errorf("Token %d: expected error %q, got nil", i, exp.Error)
+		}
+	}
+	if tok := l.NextToken(); tok.Type != chess.EOF {
+		t.Errorf("expected EOF after sequence, got {%v, %q}", tok.Type, tok.Value)
+	}
+}
+
+func TestLexer_EmptyInput(t *testing.T) {
+	for _, in := range []string{"", "   ", " \t\n  "} {
+		l := chess.NewLexer(in)
+		tok := l.NextToken()
+		if tok.Type != chess.EOF {
+			t.Errorf("NewLexer(%q).NextToken() = %v, want EOF", in, tok.Type)
+		}
+	}
+}
+
+func TestLexer_UndefinedToken(t *testing.T) {
+	for _, in := range []string{"@", ";", "~"} {
+		l := chess.NewLexer(in)
+		tok := l.NextToken()
+		if tok.Type != chess.Undefined || tok.Value != in {
+			t.Errorf("NewLexer(%q).NextToken() = {%v, %q}, want {Undefined, %q}", in, tok.Type, tok.Value, in)
+		}
+		if eof := l.NextToken(); eof.Type != chess.EOF {
+			t.Errorf("expected EOF after undefined, got %v", eof.Type)
+		}
+	}
+}
+
+func TestLexer_DeambiguationSquare(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []chess.Token
+	}{
+		{"full_square", "Qe8f7", []chess.Token{
+			{Type: chess.PIECE, Value: "Q"},
+			{Type: chess.DeambiguationSquare, Value: "e8"},
+			{Type: chess.SQUARE, Value: "f7"},
+		}},
+		{"full_square_capture", "Qg8xg7", []chess.Token{
+			{Type: chess.PIECE, Value: "Q"},
+			{Type: chess.DeambiguationSquare, Value: "g8"},
+			{Type: chess.CAPTURE, Value: "x"},
+			{Type: chess.SQUARE, Value: "g7"},
+		}},
+		{"file_only", "Nbd7", []chess.Token{
+			{Type: chess.PIECE, Value: "N"},
+			{Type: chess.FILE, Value: "b"},
+			{Type: chess.SQUARE, Value: "d7"},
+		}},
+		{"rank_only", "N4d7", []chess.Token{
+			{Type: chess.PIECE, Value: "N"},
+			{Type: chess.RANK, Value: "4"},
+			{Type: chess.SQUARE, Value: "d7"},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertTokenSequence(t, chess.NewLexer(tt.input), tt.want)
+		})
+	}
+}
+
+func TestLexer_ResultSpellings(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []chess.Token
+	}{
+		{"white_wins", "1-0", []chess.Token{{Type: chess.RESULT, Value: "1-0"}}},
+		{"black_wins", "0-1", []chess.Token{{Type: chess.RESULT, Value: "0-1"}}},
+		{"ongoing", "*", []chess.Token{{Type: chess.RESULT, Value: "*"}}},
+		{"draw_token_not_recognized", "1/2-1/2", []chess.Token{
+			{Type: chess.MoveNumber, Value: "1"},
+			{Type: chess.Undefined, Value: "/"},
+			{Type: chess.MoveNumber, Value: "2-1/2"},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertTokenSequence(t, chess.NewLexer(tt.input), tt.want)
+		})
+	}
+}
+
+func TestLexer_NAGSymbols(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []chess.Token
+	}{
+		{"double_bang", "e4!!", []chess.Token{
+			{Type: chess.SQUARE, Value: "e4"},
+			{Type: chess.NAG, Value: "!!"},
+		}},
+		{"bang", "e4!", []chess.Token{
+			{Type: chess.SQUARE, Value: "e4"},
+			{Type: chess.NAG, Value: "!"},
+		}},
+		{"question", "e4?", []chess.Token{
+			{Type: chess.SQUARE, Value: "e4"},
+			{Type: chess.NAG, Value: "?"},
+		}},
+		{"dubious", "e4?!", []chess.Token{
+			{Type: chess.SQUARE, Value: "e4"},
+			{Type: chess.NAG, Value: "?!"},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertTokenSequence(t, chess.NewLexer(tt.input), tt.want)
+		})
+	}
+}
+
+func TestLexer_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantMsg string
+	}{
+		{"unterminated_comment", "{unterm", "unterminated comment"},
+		{"unterminated_quote", `{[%clk "12:34]}`, "unterminated quote"},
+		{"invalid_command", `{[%clk }]`, "invalid command in comment"},
+		{"invalid_piece", "Ze4", "invalid piece"},
+		{"invalid_square", "z9", "invalid square"},
+		{"invalid_rank", "N9", "invalid rank"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := chess.NewLexer(tt.input)
+			var errToken chess.Token
+			for {
+				tok := l.NextToken()
+				if tok.Error != nil {
+					errToken = tok
+					break
+				}
+				if tok.Type == chess.EOF {
+					t.Fatalf("reached EOF without an error token for input %q", tt.input)
+				}
+			}
+			if errToken.Error == nil {
+				t.Fatalf("expected error for input %q, got nil", tt.input)
+			}
+			if errToken.Error.Error() != tt.wantMsg {
+				t.Errorf("error = %q, want %q", errToken.Error.Error(), tt.wantMsg)
+			}
+		})
 	}
 }

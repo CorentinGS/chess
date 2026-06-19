@@ -9,7 +9,7 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-func TestPGNRendererRenderMatchesGameString(t *testing.T) {
+func TestPGNRenderer_RenderMatchesGameString(t *testing.T) {
 	g := chess.NewGame()
 	g.AddTagPair("Event", "Test Event")
 	g.AddTagPair("Site", "Test Site")
@@ -33,7 +33,7 @@ func TestPGNRendererRenderMatchesGameString(t *testing.T) {
 	}
 }
 
-func TestGameWritePGNMatchesGameString(t *testing.T) {
+func TestGame_WritePGNMatchesString(t *testing.T) {
 	g := chess.NewGame()
 	if err := g.PushMove("d4", nil); err != nil {
 		t.Fatal(err)
@@ -60,7 +60,7 @@ func (w *errWriter) Write(p []byte) (int, error) {
 	return 0, w.err
 }
 
-func TestPGNRendererRenderGameToPropagatesWriterError(t *testing.T) {
+func TestPGNRenderer_RenderGameToPropagatesWriterError(t *testing.T) {
 	g := chess.NewGame()
 	want := errors.New("disk full")
 	w := &errWriter{err: want}
@@ -71,7 +71,7 @@ func TestPGNRendererRenderGameToPropagatesWriterError(t *testing.T) {
 	}
 }
 
-func TestPGNRendererRenderAnnotatesEmptyGame(t *testing.T) {
+func TestPGNRenderer_EndsEmptyGameWithNoOutcome(t *testing.T) {
 	g := chess.NewGame()
 	out := chess.DefaultPGNRenderer.Render(g)
 	if !strings.HasSuffix(out, string(chess.NoOutcome)) {
@@ -79,7 +79,7 @@ func TestPGNRendererRenderAnnotatesEmptyGame(t *testing.T) {
 	}
 }
 
-func TestPGNRendererEscapesCommentEndBrace(t *testing.T) {
+func TestPGNRenderer_EscapesCommentEndBrace(t *testing.T) {
 	g := chess.NewGame()
 	if err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
@@ -97,11 +97,109 @@ func TestPGNRendererEscapesCommentEndBrace(t *testing.T) {
 	}
 }
 
-func mustPGNOption(t *testing.T, pgn string) func(*chess.Game) {
-	t.Helper()
-	opt, err := chess.PGN(strings.NewReader(pgn))
-	if err != nil {
+func TestPGNRenderer_EscapesTagValueQuotes(t *testing.T) {
+	g := chess.NewGame()
+	g.AddTagPair("White", `A "B" C`)
+	if err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	return opt
+
+	out := chess.DefaultPGNRenderer.Render(g)
+	if !strings.Contains(out, `A \"B\" C`) {
+		t.Fatalf("rendered PGN did not escape tag value quotes: %q", out)
+	}
+}
+
+func TestPGNRenderer_EmitsCommandAnnotation(t *testing.T) {
+	g := chess.NewGame()
+	if err := g.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	g.GetRootMove().Children()[0].SetCommand("clk", "0:01:23")
+
+	out := chess.DefaultPGNRenderer.Render(g)
+	if !strings.Contains(out, "[%clk 0:01:23]") {
+		t.Fatalf("rendered PGN did not contain command annotation: %q", out)
+	}
+}
+
+func TestPGNRenderer_OrdersTagsBySevenTagRosterThenAlpha(t *testing.T) {
+	g := chess.NewGame()
+	g.AddTagPair("Result", "*")
+	g.AddTagPair("Zebra", "z")
+	g.AddTagPair("Date", "2026.06.19")
+	g.AddTagPair("Black", "B")
+	g.AddTagPair("Alpha", "a")
+	g.AddTagPair("Round", "1")
+	g.AddTagPair("White", "A")
+	g.AddTagPair("Event", "E")
+	g.AddTagPair("Site", "S")
+	if err := g.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	out := chess.DefaultPGNRenderer.Render(g)
+	idx := func(tag string) int { return strings.Index(out, "["+tag+" \"") }
+	order := []string{"Event", "Site", "Date", "Round", "White", "Black", "Result", "Alpha", "Zebra"}
+	for i := 1; i < len(order); i++ {
+		if idx(order[i]) <= idx(order[i-1]) {
+			t.Fatalf("tags out of order: %q (idx %d) should come after %q (idx %d)\n%s",
+				order[i], idx(order[i]), order[i-1], idx(order[i-1]), out)
+		}
+	}
+}
+
+func TestPGNRenderer_DoesNotMutateGame(t *testing.T) {
+	g := chess.NewGame()
+	if err := g.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	g.GetRootMove().Children()[0].SetComment("a comment")
+	g.AddTagPair("Custom", "value")
+
+	before := g.String()
+	beforePos := g.Position().XFENString()
+	_ = chess.DefaultPGNRenderer.Render(g)
+	if g.String() != before {
+		t.Errorf("Render mutated game string:\nbefore:\n%s\nafter:\n%s", before, g.String())
+	}
+	if g.Position().XFENString() != beforePos {
+		t.Errorf("Render mutated position: before %q after %q", beforePos, g.Position().XFENString())
+	}
+}
+
+func TestPGNRenderer_RoundTripsVariations(t *testing.T) {
+	pgn := withMinimalTags("1. e4 {main} e5 (1...c5 {sicilian} 2. Nf3) 2. Nf3 *")
+	g := mustParseSingleGame(t, pgn)
+
+	first := chess.DefaultPGNRenderer.Render(g)
+	reparsed := mustParseSingleGame(t, first)
+	second := chess.DefaultPGNRenderer.Render(reparsed)
+
+	if first != second {
+		t.Fatalf("render not idempotent for variations:\nfirst:\n%s\nsecond:\n%s", first, second)
+	}
+	if !strings.Contains(first, "c5") {
+		t.Fatalf("variation move c5 missing from render: %q", first)
+	}
+}
+
+func TestPGNRenderer_IsIdempotentOnAnnotations(t *testing.T) {
+	g := chess.NewGame()
+	if err := g.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	g.GetRootMove().Children()[0].SetComment("best move")
+	g.GetRootMove().Children()[0].SetNAG("$1")
+	if err := g.PushMove("e5", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	first := chess.DefaultPGNRenderer.Render(g)
+	reparsed := chess.NewGame(mustPGNOption(t, first))
+	second := chess.DefaultPGNRenderer.Render(reparsed)
+
+	if first != second {
+		t.Fatalf("render not idempotent:\nfirst:\n%s\nsecond:\n%s", first, second)
+	}
 }

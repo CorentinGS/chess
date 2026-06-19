@@ -8,59 +8,60 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-func TestPGNResultTagSetsOutcomeWhenNoMovetextToken(t *testing.T) {
-	pgn := `[Result "1-0"]
+func TestPGN_ResolvesOutcomeFromTagTokenAndBoard(t *testing.T) {
+	moves := "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6"
+	scholarMate := "1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6?? 4. Qxf7#"
 
-1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 *`
+	tests := []struct {
+		name        string
+		pgn         string
+		wantErr     bool
+		wantOutcome chess.Outcome
+		wantMethod  chess.Method
+	}{
+		{"tag_white_won", "[Result \"1-0\"]\n\n" + moves + " *", false, chess.WhiteWon, chess.NoMethod},
+		{"tag_draw", "[Result \"1/2-1/2\"]\n\n" + moves + " *", false, chess.Draw, chess.NoMethod},
+		{"tag_black_won", "[Result \"0-1\"]\n\n" + moves + " *", false, chess.BlackWon, chess.NoMethod},
+		{"token_white_won", moves + " 1-0", false, chess.WhiteWon, chess.NoMethod},
+		{"token_black_won", moves + " 0-1", false, chess.BlackWon, chess.NoMethod},
+		{"token_no_outcome", moves + " *", false, chess.NoOutcome, chess.NoMethod},
+		{"tag_token_agree", "[Result \"1-0\"]\n\n" + moves + " 1-0", false, chess.WhiteWon, chess.NoMethod},
+		{"tag_token_conflict", "[Result \"0-1\"]\n\n" + moves + " 1-0", true, chess.NoOutcome, chess.NoMethod},
+		{"board_checkmate_conflicts_with_tag", "[Result \"0-1\"]\n\n" + scholarMate + " 1-0", true, chess.NoOutcome, chess.NoMethod},
+		{"board_checkmate_agrees_with_tag", "[Result \"1-0\"]\n\n" + scholarMate + " 1-0", false, chess.WhiteWon, chess.Checkmate},
+		{"tag_overrides_star_token", "[Result \"0-1\"]\n\n" + moves + " *", false, chess.BlackWon, chess.NoMethod},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opt, err := chess.PGN(strings.NewReader(tt.pgn))
+			if tt.wantErr {
+				var pe *chess.ParserError
+				if !errors.As(err, &pe) {
+					t.Fatalf("expected *ParserError, got %T (%v)", err, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			g := chess.NewGame(opt)
+			if got := g.Outcome(); got != tt.wantOutcome {
+				t.Errorf("Outcome() = %v, want %v", got, tt.wantOutcome)
+			}
+			if got := g.Method(); got != tt.wantMethod {
+				t.Errorf("Method() = %v, want %v", got, tt.wantMethod)
+			}
+		})
+	}
+}
 
-	opt, err := chess.PGN(strings.NewReader(pgn))
+func TestPGNDrawMovetextTokenNotRecognized(t *testing.T) {
+	opt, err := chess.PGN(strings.NewReader("1. e4 e5 1/2-1/2"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	g := chess.NewGame(opt)
-
-	if g.Outcome() != chess.WhiteWon {
-		t.Errorf("outcome = %s, want WhiteWon (from Result tag)", g.Outcome())
-	}
-	if g.Method() != chess.NoMethod {
-		t.Errorf("method = %s, want NoMethod (Method not set by tag alone)", g.Method())
-	}
-}
-
-func TestPGNMovetextTokenWinsOverResultTag(t *testing.T) {
-	pgn := `1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 1-0`
-
-	opt, err := chess.PGN(strings.NewReader(pgn))
-	if err != nil {
-		t.Fatal(err)
-	}
-	g := chess.NewGame(opt)
-
-	if g.Outcome() != chess.WhiteWon {
-		t.Errorf("outcome = %s, want WhiteWon (movetext token only)", g.Outcome())
-	}
-}
-
-func TestPGNTagTokenConflictReturnsError(t *testing.T) {
-	pgn := `[Result "0-1"]
-
-1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 1-0`
-
-	_, err := chess.PGN(strings.NewReader(pgn))
-	var pe *chess.ParserError
-	if !errors.As(err, &pe) {
-		t.Fatalf("expected *ParserError on tag-vs-token conflict, got %T (%v)", err, err)
-	}
-}
-
-func TestPGNBoardCheckmateOverridesResultTag(t *testing.T) {
-	pgn := `[Result "0-1"]
-
-1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6?? 4. Qxf7# 1-0`
-
-	_, err := chess.PGN(strings.NewReader(pgn))
-	var pe *chess.ParserError
-	if !errors.As(err, &pe) {
-		t.Fatalf("expected *ParserError on board-vs-tag mismatch, got %T (%v)", err, err)
+	if got := g.Outcome(); got != chess.NoOutcome {
+		t.Errorf("draw movetext token currently yields %v; lexer does not recognize 1/2-1/2 as a RESULT (only the Result tag produces draws). If this changed, update this test", got)
 	}
 }
