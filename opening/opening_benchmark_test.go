@@ -8,7 +8,7 @@ import (
 )
 
 func BenchmarkNewBookECOData(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := NewBook(bytes.NewReader(ecoData))
 		if err != nil {
 			b.Fatal(err)
@@ -23,7 +23,7 @@ func BenchmarkDefaultBookCached(b *testing.B) {
 	// Warm up the cache so we measure the steady-state lookup, not the parse.
 	_, _ = DefaultBook()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = DefaultBook()
 	}
 }
@@ -42,7 +42,7 @@ func BenchmarkFind(b *testing.B) {
 	moves := g.Moves()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if book.Find(moves) == nil {
 			b.Fatal("expected opening")
 		}
@@ -61,7 +61,7 @@ func BenchmarkPossible(b *testing.B) {
 	moves := g.Moves()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if len(book.Possible(moves)) == 0 {
 			b.Fatal("expected possible openings")
 		}
@@ -85,7 +85,7 @@ func BenchmarkOpeningGame(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if o.Game() == nil {
 			b.Fatal("expected game")
 		}

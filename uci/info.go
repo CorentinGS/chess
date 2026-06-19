@@ -2,6 +2,7 @@ package uci
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -224,6 +225,9 @@ func (info *Info) UnmarshalText(text []byte) error {
 			}
 			info.Score.CP = v
 		case "wdl":
+			if i+2 >= len(parts) {
+				return fmt.Errorf("uci: truncated wdl score: %s", string(text))
+			}
 			var err error
 			info.Score.Win, err = strconv.Atoi(parts[i])
 			if err != nil {

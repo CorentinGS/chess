@@ -4,6 +4,10 @@
 
 **image** is a chess image utility that converts board positions into [SVG](https://en.wikipedia.org/wiki/Scalable_Vector_Graphics), or Scalable Vector Graphics, images. The package has no external dependencies; SVG is written directly to an `io.Writer`.
 
+### Piece Set
+
+The package ships with a single fixed piece set embedded from `internal/pieces/` (one SVG per color and piece type: `wK`, `wQ`, `wR`, `wB`, `wN`, `wP`, `bK`, …). The set cannot be changed at runtime; if you need custom piece artwork, fork the package or post-process the generated SVG.
+
 ## Usage
 
 ### SVG

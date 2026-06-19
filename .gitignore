@@ -29,6 +29,9 @@ _testmain.go
 
 # Benchmarking
 cpu.out
+
+# Coverage
+coverage.out
 .idea
 stockfish
 .worktrees/

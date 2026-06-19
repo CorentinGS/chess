@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -901,6 +902,49 @@ func TestParserAnnotationErrors(t *testing.T) {
 		_, err := parser.parseCommand()
 		if err == nil {
 			t.Fatal("expected unterminated command error")
+		}
+	})
+
+	t.Run("ParseMoveJoinsMismatchReasons", func(t *testing.T) {
+		// Position: white rook on a1 and bishop on c1, both can reach e1.
+		// Asking for "Nxe1" (knight captures e1) should fail with reasons
+		// from both candidates joined into a single ParserError.
+		opt, err := FEN("1k6/8/8/8/8/8/8/1BR4K w - - 0 1")
+		if err != nil {
+			t.Fatalf("FEN: %v", err)
+		}
+		g := NewGame(opt)
+		parser := NewParser([]Token{
+			{Type: PIECE, Value: "N"},
+			{Type: CAPTURE, Value: "x"},
+			{Type: SQUARE, Value: "e1"},
+		})
+		parser.game = g
+		_, err = parser.parseMove()
+		if err == nil {
+			t.Fatal("expected parser error for Nxe1")
+		}
+		var pe *ParserError
+		if !errors.As(err, &pe) {
+			t.Fatalf("expected *ParserError, got %T: %v", err, err)
+		}
+		if !strings.Contains(pe.Message, "piece type mismatch") {
+			t.Errorf("expected joined message to contain 'piece type mismatch', got %q", pe.Message)
+		}
+	})
+
+	t.Run("DuplicateCommandName", func(t *testing.T) {
+		parser := NewParser([]Token{
+			{Type: CommandStart, Value: "[%"},
+			{Type: CommandName, Value: "clk"},
+			{Type: CommandParam, Value: "0:05:00"},
+			{Type: CommandName, Value: "eval"},
+			{Type: CommandParam, Value: "0.24"},
+			{Type: CommandEnd, Value: "]"},
+		})
+		_, err := parser.parseCommand()
+		if err == nil {
+			t.Fatal("expected parseCommand error for duplicate command name")
 		}
 	})
 }

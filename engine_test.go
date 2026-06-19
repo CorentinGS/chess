@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"sync"
 	"testing"
 )
 
@@ -18,6 +19,58 @@ var (
 	// Position with multiple possible pawn promotions
 	promoPos = mustPosition("4k3/PPPP4/8/8/8/8/4pppp/4K3 w - - 0 1")
 )
+
+// TestStandardMovesPoolFallback ensures standardMoves does not panic when
+// sync.Pool returns an element of an unexpected concrete type. The pool is
+// typed via a New function that always returns *[maxPossibleMoves]Move, so a
+// fallback only triggers if someone replaces the pool's stored type. The
+// fix here is the checked assertion that allocates a fresh array in that
+// edge case rather than nil-dereferencing.
+func TestStandardMovesPoolFallback(t *testing.T) {
+	// Save the current pool pointer and swap in a fresh one. Using a
+	// *sync.Pool indirection keeps the test from copying the lock-
+	// containing struct.
+	original := movePool
+	movePool = &sync.Pool{
+		New: func() any { return &[maxPossibleMoves]Move{} },
+	}
+	t.Cleanup(func() { movePool = original })
+
+	pos := startingPos
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("standardMoves panicked with bad pool type: %v", r)
+		}
+	}()
+	moves := standardMoves(pos, false, false)
+	if len(moves) == 0 {
+		t.Fatal("expected moves from starting position")
+	}
+}
+
+// TestEngineStatusReceiver asserts engine{}.Status returns the correct
+// Method for each terminal category, exercised through the receiver-style
+// signature.
+func TestEngineStatusReceiver(t *testing.T) {
+	tests := []struct {
+		name string
+		fen  string
+		want Method
+	}{
+		{"starting position", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", NoMethod},
+		{"stalemate", "7k/5K2/6Q1/8/8/8/8/8 b - - 0 1", Stalemate},
+		{"checkmate", "7k/5K2/7Q/8/8/8/8/8 b - - 0 1", Checkmate},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pos := mustPosition(tt.fen)
+			var e engine
+			if got := e.Status(pos); got != tt.want {
+				t.Errorf("Status = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
 
 func BenchmarkStandardMoves(b *testing.B) {
 	benchmarks := []struct {

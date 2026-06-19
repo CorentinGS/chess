@@ -57,12 +57,12 @@ func (engine) UnsafeMoves(pos *Position) []Move {
 //
 // If the position has cached valid moves in pos.validMoves, those will be
 // used. Otherwise, moves will be calculated to determine the Method.
-func (engine) Status(pos *Position) Method {
+func (e engine) Status(pos *Position) Method {
 	var hasMove bool
 	if pos.validMoves != nil {
 		hasMove = len(pos.validMoves) > 0
 	} else {
-		hasMove = len(engine{}.CalcMoves(pos, true)) > 0
+		hasMove = len(e.CalcMoves(pos, true)) > 0
 	}
 	if !pos.inCheck && !hasMove {
 		return Stalemate
@@ -84,7 +84,7 @@ const maxPossibleMoves = 218 // Maximum possible moves in any chess position
 // in the standardMoves function.
 //
 //nolint:gochecknoglobals // this is a sync pool
-var movePool = sync.Pool{
+var movePool = &sync.Pool{
 	New: func() interface{} {
 		return &[maxPossibleMoves]Move{}
 	},
@@ -97,7 +97,12 @@ var movePool = sync.Pool{
 // The function uses a sync.Pool of move arrays to reduce allocations. Each
 // move is validated to ensure it doesn't leave the king in check.
 func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
-	moves, _ := movePool.Get().(*[maxPossibleMoves]Move)
+	moves, ok := movePool.Get().(*[maxPossibleMoves]Move)
+	if !ok {
+		// Pool returned an unexpected type; allocate a fresh array rather
+		// than dereferencing a nil pointer below.
+		moves = &[maxPossibleMoves]Move{}
+	}
 	defer movePool.Put(moves)
 	count := 0
 

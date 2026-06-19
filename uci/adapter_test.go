@@ -7,6 +7,80 @@ import (
 	"github.com/corentings/chess/v3/uci"
 )
 
+func Test_FakeAdapter_ExchangeEmptyCommand(t *testing.T) {
+	emptyCmd := fakeEmptyCmd{}
+	fake := &uci.FakeAdapter{
+		Responses: map[string][]string{
+			"":   {"ignored"},
+			"go": {"bestmove e2e4"},
+		},
+	}
+	t.Run("explicit empty key configured", func(t *testing.T) {
+		lines, err := fake.Exchange(emptyCmd)
+		if err != nil {
+			t.Fatalf("Exchange returned error: %v", err)
+		}
+		if len(lines) != 1 || lines[0] != "ignored" {
+			t.Errorf("expected canned response for empty key, got %v", lines)
+		}
+	})
+	t.Run("unconfigured empty key returns nil", func(t *testing.T) {
+		fake2 := &uci.FakeAdapter{Responses: map[string][]string{}}
+		lines, err := fake2.Exchange(emptyCmd)
+		if err != nil {
+			t.Fatalf("Exchange returned error: %v", err)
+		}
+		if lines != nil {
+			t.Errorf("expected nil for unconfigured empty key, got %v", lines)
+		}
+	})
+}
+
+type fakeEmptyCmd struct{}
+
+func (fakeEmptyCmd) String() string                         { return "" }
+func (fakeEmptyCmd) IsDone(_ string) bool                   { return false }
+func (fakeEmptyCmd) LockRequired() bool                     { return false }
+func (fakeEmptyCmd) Handle(_ []string, _ *uci.Engine) error { return nil }
+
+func Test_InfoUnmarshalText_WDLBounds(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{
+			name:    "valid wdl with three values",
+			input:   "info depth 24 seldepth 32 multipv 1 score cp 29 wdl 791 209 0 nodes 5130101 nps 819897",
+			wantErr: false,
+		},
+		{
+			name:    "truncated wdl missing draw and loss",
+			input:   "info depth 24 score cp 29 wdl 791",
+			wantErr: true,
+		},
+		{
+			name:    "truncated wdl missing loss",
+			input:   "info depth 24 score cp 29 wdl 791 209",
+			wantErr: true,
+		},
+		{
+			name:    "wdl non-integer value",
+			input:   "info depth 24 score cp 29 wdl 791 x 0",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var info uci.Info
+			err := info.UnmarshalText([]byte(tt.input))
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("UnmarshalText(%q) err = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func Test_FakeAdapter_CmdUCI(t *testing.T) {
 	fake := &uci.FakeAdapter{
 		Responses: map[string][]string{

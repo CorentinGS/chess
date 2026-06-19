@@ -183,8 +183,8 @@ func NewGame(options ...func(*Game)) *Game {
 	return game
 }
 
-// AddVariation adds a new variation to the game.
-// The parent move must be a move in the game or nil to add a variation to the root.
+// AddVariation appends a new variation as a sibling of parent's main-line
+// child. Pass nil for parent to add a variation at the root.
 //
 // AddVariation edits the move tree directly and bypasses the terminal outcome
 // guard enforced by Move / UnsafeMove / Resign. A caller reviewing or analysing
@@ -366,7 +366,26 @@ func (g *Game) Comments() [][]string {
 	if g.comments == nil {
 		return [][]string{}
 	}
-	return append([][]string(nil), g.comments...)
+	return copyComments(g.comments)
+}
+
+// copyComments returns a deep copy of comments. Internal use; the exported
+// Comments method goes through it as well.
+func copyComments(src [][]string) [][]string {
+	if src == nil {
+		return [][]string{}
+	}
+	out := make([][]string, len(src))
+	for i, c := range src {
+		if c == nil {
+			out[i] = nil
+			continue
+		}
+		cc := make([]string, len(c))
+		copy(cc, c)
+		out[i] = cc
+	}
+	return out
 }
 
 // Position returns the game's current position.
@@ -625,7 +644,7 @@ func (g *Game) copy(game *Game) {
 	g.pos = game.pos
 	g.outcome = game.outcome
 	g.method = game.method
-	g.comments = game.Comments()
+	g.comments = copyComments(game.comments)
 	g.ignoreFivefoldRepetitionDraw = game.ignoreFivefoldRepetitionDraw
 	g.ignoreSeventyFiveMoveRuleDraw = game.ignoreSeventyFiveMoveRuleDraw
 	g.ignoreInsufficientMaterialDraw = game.ignoreInsufficientMaterialDraw

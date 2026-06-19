@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -44,8 +45,9 @@ func TestPGNTagTokenConflictReturnsError(t *testing.T) {
 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 1-0`
 
 	_, err := PGN(strings.NewReader(pgn))
-	if err == nil {
-		t.Fatal("expected parser error on tag-vs-token conflict, got nil")
+	var pe *ParserError
+	if !errors.As(err, &pe) {
+		t.Fatalf("expected *ParserError on tag-vs-token conflict, got %T (%v)", err, err)
 	}
 }
 
@@ -55,7 +57,8 @@ func TestPGNBoardCheckmateOverridesResultTag(t *testing.T) {
 1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6?? 4. Qxf7# 1-0`
 
 	_, err := PGN(strings.NewReader(pgn))
-	if err == nil {
-		t.Fatal("expected parser error on board-vs-token mismatch, got nil")
+	var pe *ParserError
+	if !errors.As(err, &pe) {
+		t.Fatalf("expected *ParserError on board-vs-tag mismatch, got %T (%v)", err, err)
 	}
 }

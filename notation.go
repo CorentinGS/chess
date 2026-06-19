@@ -359,22 +359,14 @@ func algebraicMoveMatches(pos *Position, m Move, components moveComponents) bool
 }
 
 func satisfiesRequiredDisambiguation(pos *Position, m Move, components moveComponents) bool {
-	required := formS1(pos, m)
-	if required == "" {
-		return true
+	if components.originFile == "" && components.originRank == "" {
+		return formS1(pos, m) == ""
 	}
-
-	for i := 0; i < len(required); i++ {
-		switch required[i] {
-		case m.s1.File().Byte():
-			if components.originFile == "" {
-				return false
-			}
-		case m.s1.Rank().Byte():
-			if components.originRank == "" {
-				return false
-			}
-		}
+	if components.originFile != "" && components.originFile[0] != m.s1.File().Byte() {
+		return false
+	}
+	if components.originRank != "" && components.originRank[0] != m.s1.Rank().Byte() {
+		return false
 	}
 	return true
 }
@@ -469,7 +461,11 @@ func formS1(pos *Position, m Move) string {
 		return ""
 	}
 
-	var req, fileReq, rankReq bool
+	var (
+		disambiguationNeeded bool
+		otherOnSameFile      bool
+		otherOnSameRank      bool
+	)
 
 	// Use a string builder from the pool
 	sb, _ := stringPool.Get().(*strings.Builder)
@@ -477,27 +473,38 @@ func formS1(pos *Position, m Move) string {
 	defer stringPool.Put(sb)
 
 	for _, mv := range pos.ValidMovesUnsafe() {
-		if mv.s1 != m.s1 && mv.s2 == m.s2 && p == pos.board.Piece(mv.s1) {
-			req = true
-
-			if mv.s1.File() == m.s1.File() {
-				rankReq = true
-			}
-
-			if mv.s1.Rank() == m.s1.Rank() {
-				fileReq = true
-			}
+		if mv.s1 == m.s1 || mv.s2 != m.s2 {
+			continue
+		}
+		if p != pos.board.Piece(mv.s1) {
+			continue
+		}
+		disambiguationNeeded = true
+		if mv.s1.File() == m.s1.File() {
+			otherOnSameFile = true
+		}
+		if mv.s1.Rank() == m.s1.Rank() {
+			otherOnSameRank = true
 		}
 	}
 
-	if fileReq || !rankReq && req {
+	// SAN disambiguation rules (FIDE):
+	//   * If no other same-type piece can move to s2, no disambiguation needed.
+	//   * If file alone disambiguates, emit the file.
+	//   * Otherwise (file shared with another same-target piece), emit the rank.
+	//   * If three or more pieces share the same file, emit both.
+	if !disambiguationNeeded {
+		return ""
+	}
+	if !otherOnSameFile {
+		sb.WriteByte(m.s1.File().Byte())
+		return sb.String()
+	}
+	if otherOnSameRank {
+		// Three or more same-file pieces: emit both file and rank.
 		sb.WriteByte(m.s1.File().Byte())
 	}
-
-	if rankReq {
-		sb.WriteByte(m.s1.Rank().Byte())
-	}
-
+	sb.WriteByte(m.s1.Rank().Byte())
 	return sb.String()
 }
 

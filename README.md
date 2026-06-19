@@ -1,11 +1,49 @@
-# Chess Library
+# Chess — Go (Golang) chess library
 
-[![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/corentings/chess)
+[![pkg.go.dev](https://pkg.go.dev/badge/github.com/corentings/chess/v3.svg)](https://pkg.go.dev/github.com/corentings/chess/v3)
 [![Go Report Card](https://goreportcard.com/badge/corentings/chess)](https://goreportcard.com/report/corentings/chess)
 [![License](http://img.shields.io/badge/license-mit-blue.svg?style=flat-square)](https://raw.githubusercontent.com/corentings/chess/master/LICENSE)
 [![codecov](https://codecov.io/gh/corentings/chess/branch/main/graph/badge.svg)](https://codecov.io/gh/corentings/chess)
 [![CI](https://github.com/corentings/chess/actions/workflows/ci.yaml/badge.svg)](https://github.com/corentings/chess/actions/workflows/ci.yaml)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/corentings/chess)](https://golang.org/doc/devel/release.html)
+
+> A fast, well-tested Go chess library for move generation, PGN/FEN, UCI/Stockfish,
+> opening books, and board image generation.
+
+## Features
+
+- Legal **move generation** via [bitboards](https://chessprogramming.org/Bitboards)
+- **PGN** encode/decode, plus a streaming **Scanner** for large game databases
+- **FEN** encode/decode for board positions
+- **UCI** client to drive engines like [Stockfish](https://stockfishchess.org/)
+- **Opening book** exploration (ECO — Encyclopaedia of Chess Openings)
+- SVG board **image generation**
+- **Notations**: Algebraic (SAN), Long Algebraic, and UCI
+- Checkmate, stalemate, repetition, and draw detection
+- **Variations** support in the move tree
+- `Unsafe*` fast-path APIs for performance-critical paths
+
+## Table of Contents
+
+- [Introduction](#introduction)
+- [Recent Updates](#recent-updates)
+- [Why I Forked](#why-i-forked)
+- [Credits](#credits)
+- [Disclaimer](#disclaimer)
+- [Contributions](#contributions)
+- [Repo Structure](#repo-structure)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Example Random Game](#example-random-game)
+  - [Example Stockfish v. Stockfish](#example-stockfish-v-stockfish)
+  - [Movement](#movement)
+  - [Outcome](#outcome)
+  - [PGN](#pgn)
+  - [FEN](#fen)
+  - [Notations](#notations)
+  - [Moves](#moves)
+- [Performance](#performance)
+  - [Benchmarks](#benchmarks)
 
 ## Introduction
 
@@ -13,7 +51,7 @@
 checkmate detection, PGN encoding, UCI interoperability, image generation, opening book exploration, and others. It is
 well tested and optimized for performance.
 
-![rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1](example.png)
+![Chess board rendered from the starting position by the Go chess library](example.png)
 
 ## Recent Updates
 

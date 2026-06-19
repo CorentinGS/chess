@@ -2,11 +2,10 @@ package chess
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
+	"math/rand/v2"
 	"sort"
 )
 
@@ -398,11 +397,7 @@ func (book *PolyglotBook) GetRandomMove(positionHash uint64) (*PolyglotEntry, er
 		totalWeight += int(move.Weight)
 	}
 
-	r, err := fastRand()
-	if err != nil {
-		return nil, err
-	}
-	rn := int(r) % totalWeight
+	rn := int(rand.Uint32()) % totalWeight
 	currentWeight := 0
 	for _, move := range moves {
 		currentWeight += int(move.Weight)
@@ -414,16 +409,12 @@ func (book *PolyglotBook) GetRandomMove(positionHash uint64) (*PolyglotEntry, er
 	return &moves[0], nil
 }
 
-// fastRand returns a cryptographically secure random uint32.
-// This implementation uses crypto/rand instead of math/rand to ensure
-// that move selection cannot be predicted or manipulated.
-func fastRand() (uint32, error) {
-	b := make([]byte, 4)
-	_, err := rand.Read(b)
-	if err != nil {
-		return 0, fmt.Errorf("failed to generate random number: %w", err)
-	}
-	return binary.BigEndian.Uint32(b), nil
+// fastRand returns a pseudorandom uint32 from math/rand/v2. The package-level
+// source is automatically seeded, so callers do not need to seed it. Note that
+// this is no longer cryptographically secure; opening book selection is for
+// casual play and does not require cryptographic randomness.
+func fastRand() uint32 {
+	return rand.Uint32()
 }
 
 // NewPolyglotBookFromMap creates a PolyglotBook from a map where

@@ -61,6 +61,42 @@ func TestInvalidDecoding(t *testing.T) {
 	}
 }
 
+func TestAlgebraicDisambiguation(t *testing.T) {
+	tests := []struct {
+		name string
+		fen  string
+		move Move
+		want string
+	}{
+		{
+			// Two white rooks, one on a2 and one on d5, both can move to a5
+			// (same destination, different file and rank). Standard SAN
+			// requires only the file: Raa5 and Rda5.
+			name: "file disambiguation, no shared file or rank",
+			fen:  "1k6/8/8/3R4/8/8/R7/K7 w - - 0 1",
+			move: Move{s1: A2, s2: A5},
+			want: "Raa5",
+		},
+		{
+			// Same position, the other rook: should encode Rda5.
+			name: "file disambiguation, no shared file or rank, other rook",
+			fen:  "1k6/8/8/3R4/8/8/R7/K7 w - - 0 1",
+			move: Move{s1: D5, s2: A5},
+			want: "Rda5",
+		},
+	}
+	notation := AlgebraicNotation{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pos := unsafeFEN(tt.fen)
+			got := notation.Encode(pos, tt.move)
+			if got != tt.want {
+				t.Fatalf("Encode = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestAlgebraicNotationDecodeRoundTripsLegalMoves(t *testing.T) {
 	positions := []*Position{
 		startPos,

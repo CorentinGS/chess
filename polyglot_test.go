@@ -782,3 +782,17 @@ func BenchmarkToMoveMap(b *testing.B) {
 		_ = book.ToMoveMap()
 	}
 }
+
+func TestFastRandDistribution(t *testing.T) {
+	// fastRand now wraps math/rand/v2.Uint32. We don't test randomness
+	// quality (that's the std lib's job), just that the helper returns
+	// a uint32 without panicking and produces varying values.
+	seen := make(map[uint32]struct{}, 32)
+	for i := 0; i < 32; i++ {
+		v := fastRand()
+		seen[v] = struct{}{}
+	}
+	if len(seen) < 16 {
+		t.Errorf("fastRand produced too few distinct values: %d/32", len(seen))
+	}
+}

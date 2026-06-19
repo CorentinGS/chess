@@ -1,4 +1,9 @@
-// Package image renders chess positions as images.
+// Package image renders chess positions as SVG images.
+//
+// The package embeds a single piece set in internal/pieces (one SVG per
+// color and piece type: wK, wQ, wR, wB, wN, wP, bK, ...). The set is fixed:
+// there is no API to swap in a different piece set. To render with custom
+// artwork, post-process the SVG or fork the package.
 package image
 
 import (

@@ -80,13 +80,17 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 	return err
 }
 
-// sortableTagPair is its own
+// sortableTagPair is the key/value row used to sort a Game's tag pairs into
+// PGN output order.
 type sortableTagPair struct {
 	Key   string
 	Value string
 }
 
-// Compares two tags to determine in which order they should be brought up
+// cmpTags orders two tag pairs. The Seven Tag Roster (Event, Site, Date,
+// Round, White, Black, Result) takes priority; everything else is sorted
+// ascending by key. Duplicate keys are treated as equal so the sort is
+// stable.
 func cmpTags(a, b sortableTagPair) int {
 	// Don't re-order duplicate keys
 	if a.Key == b.Key {

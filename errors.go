@@ -25,9 +25,9 @@ func (e *PGNError) Is(target error) bool {
 	return e.msg == t.msg
 }
 
-// Custom error types for different PGN errors
-//
-//nolint:gochecknoglobals // this is a custom error type.
+// Package-level error sentinels and constructors used throughout the PGN
+// parser. These are immutable factories, not mutable global state, so the
+// gochecknoglobals warning is a false positive.
 var (
 	ErrUnterminatedComment = func(pos int) error { return &PGNError{"unterminated comment", pos} }
 	ErrUnterminatedQuote   = func(pos int) error { return &PGNError{"unterminated quote", pos} }

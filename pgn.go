@@ -435,7 +435,7 @@ func (p *Parser) parseMove() (Move, error) {
 
 	// Find matching legal move
 	var matchingMove *Move
-	var err error
+	var mismatchReasons []error
 	validMoves := p.game.pos.ValidMovesUnsafe()
 	for _, m := range validMoves {
 		//nolint:nestif // readability
@@ -446,54 +446,54 @@ func (p *Parser) parseMove() (Move, error) {
 			// Check piece type
 			if (moveData.piece != "" && piece.Type() != PieceTypeFromString(moveData.piece)) ||
 				(moveData.piece == "" && piece.Type() != Pawn) {
-				err = &ParserError{
+				mismatchReasons = append(mismatchReasons, &ParserError{
 					Message:    "piece type mismatch",
 					TokenType:  p.currentToken().Type,
 					TokenValue: p.currentToken().Value,
 					Position:   p.position,
-				}
+				})
 				continue
 			}
 
 			// Check disambiguation
 			if moveData.originFile != "" && m.S1().File().String() != moveData.originFile {
-				err = &ParserError{
+				mismatchReasons = append(mismatchReasons, &ParserError{
 					Message:    "origin file mismatch",
 					TokenType:  p.currentToken().Type,
 					TokenValue: p.currentToken().Value,
 					Position:   p.position,
-				}
+				})
 				continue
 			}
 			if moveData.originRank != "" && strconv.Itoa(int((m.S1()/8)+1)) != moveData.originRank {
-				err = &ParserError{
+				mismatchReasons = append(mismatchReasons, &ParserError{
 					Message:    fmt.Sprintf("origin rank mismatch: %d", m.S1()/8+1),
 					TokenType:  p.currentToken().Type,
 					TokenValue: p.currentToken().Value,
 					Position:   p.position,
-				}
+				})
 				continue
 			}
 
 			// Check capture
 			if moveData.isCapture != (m.HasTag(Capture) || m.HasTag(EnPassant)) {
-				err = &ParserError{
+				mismatchReasons = append(mismatchReasons, &ParserError{
 					Message:    "capture mismatch",
 					TokenType:  p.currentToken().Type,
 					TokenValue: p.currentToken().Value,
 					Position:   p.position,
-				}
+				})
 				continue
 			}
 
 			// Check promotion
 			if moveData.promotion != NoPieceType && m.promo != moveData.promotion {
-				err = &ParserError{
+				mismatchReasons = append(mismatchReasons, &ParserError{
 					Message:    "promotion mismatch",
 					TokenType:  p.currentToken().Type,
 					TokenValue: p.currentToken().Value,
 					Position:   p.position,
-				}
+				})
 				continue
 			}
 
@@ -503,9 +503,9 @@ func (p *Parser) parseMove() (Move, error) {
 	}
 
 	if matchingMove == nil {
-		if err != nil {
+		if len(mismatchReasons) > 0 {
 			return Move{}, &ParserError{
-				Message:  fmt.Sprintf("no legal move found for position: %s", err.Error()),
+				Message:  fmt.Sprintf("no legal move found for position: %s", errors.Join(mismatchReasons...)),
 				Position: p.position,
 			}
 		}
@@ -579,6 +579,14 @@ func (p *Parser) parseCommand() (CommentItem, error) {
 		switch p.currentToken().Type {
 
 		case CommandName:
+			if key != "" {
+				return CommentItem{}, &ParserError{
+					Message:    "duplicate command name in command",
+					Position:   p.position,
+					TokenType:  p.currentToken().Type,
+					TokenValue: p.currentToken().Value,
+				}
+			}
 			// The first token in a command is treated as the key
 			key = p.currentToken().Value
 		case CommandParam:
@@ -604,7 +612,6 @@ func (p *Parser) parseCommand() (CommentItem, error) {
 		}
 	}
 
-	// p.advance() // Consume the closing "]"
 	return CommentItem{Kind: CommentCommand, Key: key, Value: value}, nil
 }
 
