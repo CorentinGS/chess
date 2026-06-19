@@ -651,9 +651,9 @@ func (pos *Position) samePosition(pos2 *Position) bool {
 	if pos.hash != pos2.hash {
 		return false
 	}
-	return pos.board.String() == pos2.board.String() &&
+	return *pos.board == *pos2.board &&
 		pos.turn == pos2.turn &&
-		pos.castleRights.String() == pos2.castleRights.String() &&
+		pos.castleRights == pos2.castleRights &&
 		pos.relevantEnPassantSquare() == pos2.relevantEnPassantSquare()
 }
 
