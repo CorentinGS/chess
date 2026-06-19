@@ -2,10 +2,14 @@ package uci
 
 import "strings"
 
+// FakeAdapter is a test Adapter that returns canned responses keyed by the
+// first word of each command string (e.g. "uci", "go", "isready").
 type FakeAdapter struct {
 	Responses map[string][]string
 }
 
+// Exchange returns the canned response lines for the given command, or nil if
+// no response is configured for the command key.
 func (f *FakeAdapter) Exchange(cmd Cmd) ([]string, error) {
 	key := strings.SplitN(cmd.String(), " ", 2)[0]
 	responses, ok := f.Responses[key]
@@ -25,6 +29,7 @@ func (f *FakeAdapter) Exchange(cmd Cmd) ([]string, error) {
 	return lines, nil
 }
 
+// Close is a no-op for FakeAdapter.
 func (f *FakeAdapter) Close() error {
 	return nil
 }

@@ -7,11 +7,15 @@ import (
 	"os/exec"
 )
 
+// Adapter abstracts the transport layer between the Engine and a UCI process.
+// Implementations send a command and return the engine's response lines.
 type Adapter interface {
 	Exchange(cmd Cmd) ([]string, error)
 	Close() error
 }
 
+// SubprocessAdapter is an Adapter that communicates with a UCI engine running
+// as a subprocess via stdin/stdout pipes.
 type SubprocessAdapter struct {
 	cmd     *exec.Cmd
 	writer  *io.PipeWriter
@@ -19,6 +23,8 @@ type SubprocessAdapter struct {
 	scanner *bufio.Scanner
 }
 
+// NewSubprocessAdapter locates the executable at the given path, starts it as a
+// subprocess, and returns a SubprocessAdapter wired to its stdin/stdout.
 func NewSubprocessAdapter(path string) (*SubprocessAdapter, error) {
 	path, err := exec.LookPath(path)
 	if err != nil {
@@ -41,6 +47,8 @@ func NewSubprocessAdapter(path string) (*SubprocessAdapter, error) {
 	}, nil
 }
 
+// Exchange sends a command to the engine and returns the response lines, or an
+// error if communication fails.
 func (s *SubprocessAdapter) Exchange(cmd Cmd) ([]string, error) {
 	if _, err := fmt.Fprintln(s.writer, cmd.String()); err != nil {
 		return nil, err
@@ -62,6 +70,7 @@ func (s *SubprocessAdapter) Exchange(cmd Cmd) ([]string, error) {
 	return lines, nil
 }
 
+// Close closes the communication pipes and kills the subprocess.
 func (s *SubprocessAdapter) Close() error {
 	if err := s.writer.Close(); err != nil {
 		return err
@@ -72,6 +81,7 @@ func (s *SubprocessAdapter) Close() error {
 	return s.cmd.Process.Kill()
 }
 
+// Pid returns the operating system process ID of the engine subprocess.
 func (s *SubprocessAdapter) Pid() int {
 	return s.cmd.Process.Pid
 }

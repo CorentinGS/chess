@@ -11,6 +11,10 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
+// Cmd represents a command sent to a UCI engine. Each implementation defines
+// how the command is serialized (String), when the engine's response is
+// complete (IsDone), how to process the response (Handle), and whether the
+// command requires exclusive access to the engine (LockRequired).
 type Cmd interface {
 	fmt.Stringer
 	IsDone(line string) bool
@@ -18,6 +22,8 @@ type Cmd interface {
 	LockRequired() bool
 }
 
+// CmdUCI sends the "uci" command and waits for the "uciok" response. The engine
+// reports its identity and available options.
 type CmdUCI struct{}
 
 func (CmdUCI) String() string { return "uci" }
@@ -43,6 +49,8 @@ func (CmdUCI) Handle(lines []string, e *Engine) error {
 	return nil
 }
 
+// CmdIsReady sends the "isready" command and waits for the "readyok" response,
+// confirming the engine is ready to accept further commands.
 type CmdIsReady struct{}
 
 func (CmdIsReady) String() string { return "isready" }
@@ -53,6 +61,8 @@ func (CmdIsReady) LockRequired() bool { return true }
 
 func (CmdIsReady) Handle(_ []string, _ *Engine) error { return nil }
 
+// CmdUCINewGame sends the "ucinewgame" command, signaling the engine to clear
+// any state from previous games (e.g. hash tables).
 type CmdUCINewGame struct{}
 
 func (CmdUCINewGame) String() string { return "ucinewgame" }
@@ -63,6 +73,8 @@ func (CmdUCINewGame) LockRequired() bool { return true }
 
 func (CmdUCINewGame) Handle(_ []string, _ *Engine) error { return nil }
 
+// CmdPonderHit sends the "ponderhit" command, informing the engine that the
+// opponent has played the move it was pondering.
 type CmdPonderHit struct{}
 
 func (CmdPonderHit) String() string { return "ponderhit" }
@@ -73,6 +85,8 @@ func (CmdPonderHit) LockRequired() bool { return false }
 
 func (CmdPonderHit) Handle(_ []string, _ *Engine) error { return nil }
 
+// CmdStop sends the "stop" command, instructing the engine to stop calculating
+// and return the best move found so far.
 type CmdStop struct{}
 
 func (CmdStop) String() string { return "stop" }
@@ -83,6 +97,7 @@ func (CmdStop) LockRequired() bool { return false }
 
 func (CmdStop) Handle(_ []string, _ *Engine) error { return nil }
 
+// CmdQuit sends the "quit" command, instructing the engine to exit.
 type CmdQuit struct{}
 
 func (CmdQuit) String() string { return "quit" }
@@ -93,6 +108,8 @@ func (CmdQuit) LockRequired() bool { return true }
 
 func (CmdQuit) Handle(_ []string, _ *Engine) error { return nil }
 
+// CmdEval sends the "eval" command and parses the engine's static evaluation
+// output. Not all engines support this command.
 type CmdEval struct{}
 
 func (CmdEval) String() string { return "eval" }
@@ -127,6 +144,7 @@ func (CmdEval) Handle(lines []string, e *Engine) error {
 	return nil
 }
 
+// CmdSetOption sends a "setoption" command to change an engine option at runtime.
 type CmdSetOption struct {
 	Name  string
 	Value string
@@ -142,6 +160,8 @@ func (CmdSetOption) LockRequired() bool { return false }
 
 func (CmdSetOption) Handle(_ []string, _ *Engine) error { return nil }
 
+// CmdPosition sends a "position" command to set the engine's current position,
+// optionally applying a sequence of moves from the starting position or a FEN.
 type CmdPosition struct {
 	Position *chess.Position
 	Moves    []chess.Move
@@ -168,6 +188,8 @@ func (CmdPosition) LockRequired() bool { return true }
 
 func (CmdPosition) Handle(_ []string, _ *Engine) error { return nil }
 
+// CmdGo sends a "go" command to start the engine's search. The fields control
+// search parameters such as time limits, depth, and node counts.
 type CmdGo struct {
 	SearchMoves    []chess.Move
 	WhiteTime      time.Duration
