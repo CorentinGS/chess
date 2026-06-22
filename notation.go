@@ -428,19 +428,6 @@ func getCheckChar(pos *Position, move *Move) string {
 	return "+"
 }
 
-// getCheckBytes returns the check or mate bytes for a move
-//
-//nolint:unused // I don't care about this
-func getCheckBytes(pos *Position, move *Move) []byte {
-	if !move.HasTag(Check) {
-		return []byte{}
-	}
-	if pos.Update(move).Status() == Checkmate {
-		return []byte(mateStr)
-	}
-	return []byte(checkStr)
-}
-
 func formS1(pos *Position, m *Move) string {
 	p := pos.board.Piece(m.s1)
 	if p.Type() == Pawn {
@@ -501,18 +488,4 @@ func charFromPieceType(p PieceType) string {
 		return "N"
 	}
 	return ""
-}
-
-func pieceTypeFromChar(c string) PieceType {
-	switch c {
-	case "q":
-		return Queen
-	case "r":
-		return Rook
-	case "b":
-		return Bishop
-	case "n":
-		return Knight
-	}
-	return NoPieceType
 }
