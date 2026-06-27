@@ -513,6 +513,11 @@ func pawnMoves(pos *Position, sq Square) bitboard {
 // bits.Reverse64 twice per invocation and was the largest single CPU
 // hotspot in PGN parsing (~20% of total CPU).
 func diaAttack(occupied bitboard, sq Square) bitboard {
+	return slidingAttacks[slideDiag][sq][lineIndex(occupied, slideDiag, sq)] |
+		slidingAttacks[slideAntiDiag][sq][lineIndex(occupied, slideAntiDiag, sq)]
+}
+
+func slowDiaAttack(occupied bitboard, sq Square) bitboard {
 	f := int(sq) & 7
 	r := int(sq) >> 3
 	occ := uint64(occupied)
@@ -560,6 +565,11 @@ func diaAttack(occupied bitboard, sq Square) bitboard {
 // S) outward from sq, stopping at the first blocker in each. See diaAttack
 // for the rationale (drops math/bits.Reverse64 calls).
 func hvAttack(occupied bitboard, sq Square) bitboard {
+	return slidingAttacks[slideRank][sq][lineIndex(occupied, slideRank, sq)] |
+		slidingAttacks[slideFile][sq][lineIndex(occupied, slideFile, sq)]
+}
+
+func slowHVAttack(occupied bitboard, sq Square) bitboard {
 	f := int(sq) & 7
 	r := int(sq) >> 3
 	occ := uint64(occupied)
@@ -647,8 +657,29 @@ var (
 
 	bbKingMoves = [64]bitboard{4665729213955833856, 11592265440851656704, 5796132720425828352, 2898066360212914176, 1449033180106457088, 724516590053228544, 362258295026614272, 144959613005987840, 13853283560024178688, 16186183351374184448, 8093091675687092224, 4046545837843546112, 2023272918921773056, 1011636459460886528, 505818229730443264, 216739030602088448, 54114388906344448, 63227278716305408, 31613639358152704, 15806819679076352, 7903409839538176, 3951704919769088, 1975852459884544, 846636838289408, 211384331665408, 246981557485568, 123490778742784, 61745389371392, 30872694685696, 15436347342848, 7718173671424, 3307175149568, 825720045568, 964771708928, 482385854464, 241192927232, 120596463616, 60298231808, 30149115904, 12918652928, 3225468928, 3768639488, 1884319744, 942159872, 471079936, 235539968, 117769984, 50463488, 12599488, 14721248, 7360624, 3680312, 1840156, 920078, 460039, 197123, 49216, 57504, 28752, 14376, 7188, 3594, 1797, 770}
 
-	bbSquares = [64]bitboard{}
+	bbSquares       = [64]bitboard{}
+	lineSquares     = [4][64][8]Square{}
+	lineLens        = [4][64]int{}
+	slidingAttacks  = [4][64][256]bitboard{}
 )
+
+const (
+	slideRank = iota
+	slideFile
+	slideDiag
+	slideAntiDiag
+	slideLineCount
+)
+
+func lineIndex(occupied bitboard, line int, sq Square) uint8 {
+	var idx uint8
+	for i := range lineLens[line][sq] {
+		if occupied&bbForSquare(lineSquares[line][sq][i]) != 0 {
+			idx |= 1 << i
+		}
+	}
+	return idx
+}
 
 // init populates the bbSquares lookup table. This is done at package
 // initialization because the values are constants derived from square indices.
@@ -659,4 +690,85 @@ func init() {
 	for sq := range numOfSquaresInBoard {
 		bbSquares[sq] = bitboard(uint64(1) << (uint8(63) - uint8(sq)))
 	}
+	initSlidingAttackTables()
+}
+
+func initSlidingAttackTables() {
+	for sq := range numOfSquaresInBoard {
+		initSlidingLines(Square(sq))
+	}
+	for line := range slideLineCount {
+		for sq := range numOfSquaresInBoard {
+			for idx := range 256 {
+				slidingAttacks[line][sq][idx] = attackOnLine(line, Square(sq), uint8(idx))
+			}
+		}
+	}
+}
+
+func initSlidingLines(sq Square) {
+	f := int(sq.File())
+	r := int(sq.Rank())
+
+	for file := range numOfSquaresInRow {
+		appendLineSquare(slideRank, sq, NewSquare(File(file), Rank(r)))
+	}
+	for rank := range numOfSquaresInRow {
+		appendLineSquare(slideFile, sq, NewSquare(File(f), Rank(rank)))
+	}
+
+	startF, startR := f, r
+	for startF > 0 && startR > 0 {
+		startF--
+		startR--
+	}
+	for startF < 8 && startR < 8 {
+		appendLineSquare(slideDiag, sq, NewSquare(File(startF), Rank(startR)))
+		startF++
+		startR++
+	}
+
+	startF, startR = f, r
+	for startF > 0 && startR < 7 {
+		startF--
+		startR++
+	}
+	for startF < 8 && startR >= 0 {
+		appendLineSquare(slideAntiDiag, sq, NewSquare(File(startF), Rank(startR)))
+		startF++
+		startR--
+	}
+}
+
+func appendLineSquare(line int, src Square, sq Square) {
+	idx := lineLens[line][src]
+	lineSquares[line][src][idx] = sq
+	lineLens[line][src]++
+}
+
+func attackOnLine(line int, src Square, idx uint8) bitboard {
+	var srcIdx int
+	for i := range lineLens[line][src] {
+		if lineSquares[line][src][i] == src {
+			srcIdx = i
+			break
+		}
+	}
+
+	var attacks bitboard
+	for i := srcIdx + 1; i < lineLens[line][src]; i++ {
+		sq := lineSquares[line][src][i]
+		attacks |= bbForSquare(sq)
+		if idx&(1<<i) != 0 {
+			break
+		}
+	}
+	for i := srcIdx - 1; i >= 0; i-- {
+		sq := lineSquares[line][src][i]
+		attacks |= bbForSquare(sq)
+		if idx&(1<<i) != 0 {
+			break
+		}
+	}
+	return attacks
 }

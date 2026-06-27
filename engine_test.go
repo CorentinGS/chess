@@ -57,6 +57,32 @@ func TestSquareFromBit(t *testing.T) {
 	}
 }
 
+func TestSlidingAttacksMatchSlowImplementation(t *testing.T) {
+	occupancies := []bitboard{
+		0,
+		bbRank1,
+		bbRank4,
+		bbFileA,
+		bbFileH,
+		bbDiagonals[D4],
+		bbAntiDiagonals[D4],
+		^bitboard(0),
+		newBitboard(map[Square]bool{A1: true, D4: true, H8: true, C6: true, F2: true}),
+	}
+
+	for sq := range numOfSquaresInBoard {
+		for _, occupied := range occupancies {
+			square := Square(sq)
+			if got, want := diaAttack(occupied, square), slowDiaAttack(occupied, square); got != want {
+				t.Fatalf("diaAttack(%s) = %s, want %s", square, got, want)
+			}
+			if got, want := hvAttack(occupied, square), slowHVAttack(occupied, square); got != want {
+				t.Fatalf("hvAttack(%s) = %s, want %s", square, got, want)
+			}
+		}
+	}
+}
+
 // TestEngineStatusReceiver asserts engine{}.Status returns the correct
 // Method for each terminal category, exercised through the receiver-style
 // signature.
