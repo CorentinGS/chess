@@ -519,10 +519,23 @@ func (b *Board) hasSufficientMaterial() bool {
 	if b.bbWhiteKing == 0 || b.bbBlackKing == 0 {
 		return true
 	}
-	count := map[PieceType]int{}
-	pieceMap := b.SquareMap()
-	for _, p := range pieceMap {
-		count[p.Type()]++
+	var count [7]int
+	whiteCount := 0
+	blackCount := 0
+	for sq, p := range b.mailbox {
+		pieceType := p.Type()
+		if pieceType == NoPieceType {
+			continue
+		}
+		count[pieceType]++
+		if pieceType == Bishop {
+			switch Square(sq).color() {
+			case White:
+				whiteCount++
+			case Black:
+				blackCount++
+			}
+		}
 	}
 	// 	king versus king
 	if count[Bishop] == 0 && count[Knight] == 0 {
@@ -538,18 +551,6 @@ func (b *Board) hasSufficientMaterial() bool {
 	}
 	// king and bishop(s) versus king and bishop(s) with the bishops on the same colour.
 	if count[Knight] == 0 {
-		whiteCount := 0
-		blackCount := 0
-		for sq, p := range pieceMap {
-			if p.Type() == Bishop {
-				switch sq.color() {
-				case White:
-					whiteCount++
-				case Black:
-					blackCount++
-				}
-			}
-		}
 		if whiteCount == 0 || blackCount == 0 {
 			return false
 		}

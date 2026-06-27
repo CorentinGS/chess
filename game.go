@@ -729,13 +729,14 @@ func (g *Game) Positions() []*Position {
 
 func (g *Game) numOfRepetitions() int {
 	count := 0
-	for _, pos := range g.Positions() {
-		if pos == nil {
-			continue
-		}
-		if g.pos.SamePosition(pos) {
+	for current := g.rootMove; current != nil; {
+		if current.position != nil && g.pos.SamePosition(current.position) {
 			count++
 		}
+		if len(current.children) == 0 {
+			break
+		}
+		current = current.children[0]
 	}
 	return count
 }
