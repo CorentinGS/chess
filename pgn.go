@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // Parser holds the state needed during parsing.
@@ -444,7 +445,19 @@ func (p *Parser) parseMove() (Move, error) {
 	// body forces the loop variable onto the heap, which previously caused
 	// ~12M extra Move allocations per `big.pgn` run.
 	var matchingIdx int = -1
-	var mismatchReasons []error
+	var mismatchReasons []string
+	movePieceType := Pawn
+	if moveData.piece != "" {
+		movePieceType = PieceTypeFromString(moveData.piece)
+	}
+	originFile := byte(0)
+	if moveData.originFile != "" {
+		originFile = moveData.originFile[0]
+	}
+	originRank := int8(-1)
+	if moveData.originRank != "" {
+		originRank = int8(moveData.originRank[0] - '1')
+	}
 	validMoves := p.game.pos.ValidMovesUnsafe()
 	for i := range validMoves {
 		m := validMoves[i]
@@ -454,56 +467,30 @@ func (p *Parser) parseMove() (Move, error) {
 			piece := pos.Board().Piece(m.S1())
 
 			// Check piece type
-			if (moveData.piece != "" && piece.Type() != PieceTypeFromString(moveData.piece)) ||
-				(moveData.piece == "" && piece.Type() != Pawn) {
-				mismatchReasons = append(mismatchReasons, &ParserError{
-					Message:    "piece type mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				})
+			if piece.Type() != movePieceType {
+				mismatchReasons = append(mismatchReasons, "piece type mismatch")
 				continue
 			}
 
 			// Check disambiguation
-			if moveData.originFile != "" && m.S1().File().String() != moveData.originFile {
-				mismatchReasons = append(mismatchReasons, &ParserError{
-					Message:    "origin file mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				})
+			if originFile != 0 && m.S1().File().Byte() != originFile {
+				mismatchReasons = append(mismatchReasons, "origin file mismatch")
 				continue
 			}
-			if moveData.originRank != "" && strconv.Itoa(int((m.S1()/8)+1)) != moveData.originRank {
-				mismatchReasons = append(mismatchReasons, &ParserError{
-					Message:    fmt.Sprintf("origin rank mismatch: %d", m.S1()/8+1),
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				})
+			if originRank >= 0 && int8(m.S1().Rank()) != originRank {
+				mismatchReasons = append(mismatchReasons, fmt.Sprintf("origin rank mismatch: %d", m.S1()/8+1))
 				continue
 			}
 
 			// Check capture
 			if moveData.isCapture != (m.HasTag(Capture) || m.HasTag(EnPassant)) {
-				mismatchReasons = append(mismatchReasons, &ParserError{
-					Message:    "capture mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				})
+				mismatchReasons = append(mismatchReasons, "capture mismatch")
 				continue
 			}
 
 			// Check promotion
 			if moveData.promotion != NoPieceType && m.promo != moveData.promotion {
-				mismatchReasons = append(mismatchReasons, &ParserError{
-					Message:    "promotion mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				})
+				mismatchReasons = append(mismatchReasons, "promotion mismatch")
 				continue
 			}
 
@@ -515,7 +502,7 @@ func (p *Parser) parseMove() (Move, error) {
 	if matchingIdx < 0 {
 		if len(mismatchReasons) > 0 {
 			return Move{}, &ParserError{
-				Message:  fmt.Sprintf("no legal move found for position: %s", errors.Join(mismatchReasons...)),
+				Message:  fmt.Sprintf("no legal move found for position: %s", strings.Join(mismatchReasons, "; ")),
 				Position: p.position,
 			}
 		}

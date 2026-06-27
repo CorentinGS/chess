@@ -49,14 +49,25 @@ type CastleRights string
 //	    // White can castle kingside
 //	}
 func (cr CastleRights) CanCastle(c Color, side Side) bool {
-	char := "k"
-	if side == QueenSide {
-		char = "q"
+	var want byte
+	switch {
+	case c == White && side == KingSide:
+		want = 'K'
+	case c == White && side == QueenSide:
+		want = 'Q'
+	case c == Black && side == KingSide:
+		want = 'k'
+	case c == Black && side == QueenSide:
+		want = 'q'
+	default:
+		return false
 	}
-	if c == White {
-		char = strings.ToUpper(char)
+	for i := range cr {
+		if cr[i] == want {
+			return true
+		}
 	}
-	return strings.Contains(string(cr), char)
+	return false
 }
 
 // String implements the fmt.Stringer interface and returns
@@ -606,24 +617,37 @@ func (pos *Position) computeHash() uint64 {
 }
 
 func (pos *Position) updateCastleRights(m Move) CastleRights {
-	cr := string(pos.castleRights)
+	removeK := false
+	removeQ := false
+	removek := false
+	removeq := false
 	p := pos.board.Piece(m.s1)
 	if p == WhiteKing || m.s1 == H1 || m.s2 == H1 {
-		cr = strings.ReplaceAll(cr, "K", "")
+		removeK = true
 	}
 	if p == WhiteKing || m.s1 == A1 || m.s2 == A1 {
-		cr = strings.ReplaceAll(cr, "Q", "")
+		removeQ = true
 	}
 	if p == BlackKing || m.s1 == H8 || m.s2 == H8 {
-		cr = strings.ReplaceAll(cr, "k", "")
+		removek = true
 	}
 	if p == BlackKing || m.s1 == A8 || m.s2 == A8 {
-		cr = strings.ReplaceAll(cr, "q", "")
+		removeq = true
 	}
-	if cr == "" {
-		cr = "-"
+	var buf [4]byte
+	n := 0
+	for i := range pos.castleRights {
+		c := pos.castleRights[i]
+		if (c == 'K' && removeK) || (c == 'Q' && removeQ) || (c == 'k' && removek) || (c == 'q' && removeq) || c == '-' {
+			continue
+		}
+		buf[n] = c
+		n++
 	}
-	return CastleRights(cr)
+	if n == 0 {
+		return "-"
+	}
+	return CastleRights(string(buf[:n]))
 }
 
 func (pos *Position) updateEnPassantSquare(m Move) Square {
