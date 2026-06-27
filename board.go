@@ -367,32 +367,29 @@ func (b *Board) UnmarshalBinary(data []byte) error {
 //nolint:mnd // magic number is used for bitboard size.
 func (b *Board) update(m Move) {
 	p1 := b.Piece(m.s1)
+	captured := b.Piece(m.s2)
 	s1BB := bbForSquare(m.s1)
 	s2BB := bbForSquare(m.s2)
 
-	// move s1 piece to s2
-	for _, p := range allPieces {
-		bb := b.bbForPiece(p)
-		// remove what was at s2
-		if err := b.setBBForPiece(p, bb & ^s2BB); err != nil {
+	if p1 == NoPiece {
+		return
+	}
+
+	if captured != NoPiece {
+		bb := b.bbForPiece(captured)
+		if err := b.setBBForPiece(captured, bb&^s2BB); err != nil {
 			panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
 		}
-		// move what was at s1 to s2
-		if bb.Occupied(m.s1) {
-			bb = b.bbForPiece(p)
-			if err := b.setBBForPiece(p, (bb & ^s1BB)|s2BB); err != nil {
-				panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
-			}
-		}
 	}
+
+	bb := b.bbForPiece(p1)
+	if err := b.setBBForPiece(p1, bb&^s1BB); err != nil {
+		panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
+	}
+
 	// check promotion
 	if m.promo != NoPieceType && p1 != NoPiece {
 		newPiece := NewPiece(m.promo, p1.Color())
-		// remove pawn
-		bbPawn := b.bbForPiece(p1)
-		if err := b.setBBForPiece(p1, bbPawn & ^s1BB & ^s2BB); err != nil {
-			panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
-		}
 		// add promo piece
 		bbPromo := b.bbForPiece(newPiece)
 		if err := b.setBBForPiece(newPiece, bbPromo|s2BB); err != nil {
@@ -401,6 +398,10 @@ func (b *Board) update(m Move) {
 		b.mailbox[m.s1] = NoPiece
 		b.mailbox[m.s2] = newPiece
 	} else {
+		bb = b.bbForPiece(p1)
+		if err := b.setBBForPiece(p1, bb|s2BB); err != nil {
+			panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
+		}
 		b.mailbox[m.s1] = NoPiece
 		b.mailbox[m.s2] = p1
 	}
