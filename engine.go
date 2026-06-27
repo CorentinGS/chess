@@ -93,6 +93,27 @@ func hasLegalMove(pos *Position) bool {
 }
 
 func hasStandardMove(pos *Position, unsafeOnly bool) bool {
+	return visitStandardMoves(pos, unsafeOnly, func(Move) bool { return true })
+}
+
+func visitLegalMoves(pos *Position, unsafeOnly bool, visit func(Move) bool) bool {
+	if visitStandardMoves(pos, unsafeOnly, visit) {
+		return true
+	}
+	if unsafeOnly {
+		return false
+	}
+	var castles [2]Move
+	count := castleMovesInto(pos, &castles)
+	for i := range count {
+		if visit(castles[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+func visitStandardMoves(pos *Position, unsafeOnly bool, visit func(Move) bool) bool {
 	var m Move
 
 	bbAllowed := ^pos.board.whiteSqs
@@ -125,14 +146,18 @@ func hasStandardMove(pos *Position, unsafeOnly bool) bool {
 						m.promo = pt
 						m.tags = moveTags(m, pos)
 						if m.HasTag(inCheck) == unsafeOnly {
-							return true
+							if visit(m) {
+								return true
+							}
 						}
 					}
 				} else {
 					m.promo = 0
 					m.tags = moveTags(m, pos)
 					if m.HasTag(inCheck) == unsafeOnly {
-						return true
+						if visit(m) {
+							return true
+						}
 					}
 				}
 			}
@@ -180,67 +205,22 @@ func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 	defer movePool.Put(moves)
 	count := 0
 
-	// Reuse a single Move struct for temporary operations
-	var m Move
-
-	bbAllowed := ^pos.board.whiteSqs
-	if pos.Turn() == Black {
-		bbAllowed = ^pos.board.blackSqs
+	if first {
+		var result [1]Move
+		if visitStandardMoves(pos, unsafeOnly, func(m Move) bool {
+			result[0] = m
+			return true
+		}) {
+			return result[:]
+		}
+		return nil
 	}
 
-	for _, p := range allPieces {
-		if pos.Turn() != p.Color() {
-			continue
-		}
-		s1BB := pos.board.bbForPiece(p)
-		if s1BB == 0 {
-			continue
-		}
-		for s1Bits := s1BB; s1Bits != 0; s1Bits &= s1Bits - 1 {
-			s1 := squareFromBit(s1Bits & -s1Bits)
-			s2BB := bbForPossibleMoves(pos, p.Type(), s1) & bbAllowed
-			if s2BB == 0 {
-				continue
-			}
-			for s2Bits := s2BB; s2Bits != 0; s2Bits &= s2Bits - 1 {
-				s2 := squareFromBit(s2Bits & -s2Bits)
-
-				// Reuse move struct by setting fields directly
-				m.s1 = s1
-				m.s2 = s2
-
-				if (p == WhitePawn && s2.Rank() == Rank8) || (p == BlackPawn && s2.Rank() == Rank1) {
-					for _, pt := range promoPieceTypes {
-						m.promo = pt
-						m.tags = moveTags(m, pos)
-						if m.HasTag(inCheck) == unsafeOnly {
-							// Copy the valid move to the array
-							moves[count] = m
-							count++
-							if first {
-								// For single move, return fixed array of size 1
-								var result [1]Move
-								result[0] = moves[0]
-								return result[:]
-							}
-						}
-					}
-				} else {
-					m.promo = 0
-					m.tags = moveTags(m, pos)
-					if m.HasTag(inCheck) == unsafeOnly {
-						moves[count] = m
-						count++
-						if first {
-							var result [1]Move
-							result[0] = moves[0]
-							return result[:]
-						}
-					}
-				}
-			}
-		}
-	}
+	visitStandardMoves(pos, unsafeOnly, func(m Move) bool {
+		moves[count] = m
+		count++
+		return false
+	})
 
 	// Need to copy since we're returning array to pool
 	result := make([]Move, count)

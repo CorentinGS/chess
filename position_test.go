@@ -47,6 +47,29 @@ func TestPositionUpdate(t *testing.T) {
 	}
 }
 
+func TestPositionAnyLegalMove(t *testing.T) {
+	for _, fen := range validFENs {
+		pos, err := decodeFEN(fen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := pos.AnyLegalMove(), len(pos.ValidMoves()) > 0; got != want {
+			t.Fatalf("AnyLegalMove(%s) = %v, want %v", fen, got, want)
+		}
+	}
+
+	terminalFENs := []string{
+		"7k/5K2/6Q1/8/8/8/8/8 b - - 0 1",
+		"7k/5K2/7Q/8/8/8/8/8 b - - 0 1",
+	}
+	for _, fen := range terminalFENs {
+		pos := mustPosition(fen)
+		if pos.AnyLegalMove() {
+			t.Fatalf("AnyLegalMove(%s) = true, want false", fen)
+		}
+	}
+}
+
 func TestPositionPly(t *testing.T) {
 	tests := []struct {
 		moveCount int

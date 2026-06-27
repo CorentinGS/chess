@@ -313,9 +313,10 @@ func (p *Parser) parseMove() (Move, error) {
 	// Handle castling first as it's a special case
 	if p.currentToken().Type == KingsideCastle {
 		move.tags = KingSideCastle
-		validMoves := p.game.pos.ValidMovesUnsafe()
-		for i := range validMoves {
-			m := validMoves[i]
+		var castles [2]Move
+		count := castleMovesInto(p.game.pos, &castles)
+		for i := range count {
+			m := castles[i]
 			if m.HasTag(KingSideCastle) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
@@ -336,9 +337,10 @@ func (p *Parser) parseMove() (Move, error) {
 
 	if p.currentToken().Type == QueensideCastle {
 		move.tags = QueenSideCastle
-		validMoves := p.game.pos.ValidMovesUnsafe()
-		for i := range validMoves {
-			m := validMoves[i]
+		var castles [2]Move
+		count := castleMovesInto(p.game.pos, &castles)
+		for i := range count {
+			m := castles[i]
 			if m.HasTag(QueenSideCastle) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
@@ -445,7 +447,7 @@ func (p *Parser) parseMove() (Move, error) {
 	// Index-loop the slice instead of ranging by value: taking &m in the
 	// body forces the loop variable onto the heap, which previously caused
 	// ~12M extra Move allocations per `big.pgn` run.
-	var matchingIdx int = -1
+	matchedMove := false
 	var mismatchReasons []string
 	movePieceType := Pawn
 	if moveData.piece != "" {
@@ -459,9 +461,8 @@ func (p *Parser) parseMove() (Move, error) {
 	if moveData.originRank != "" {
 		originRank = int8(moveData.originRank[0] - '1')
 	}
-	validMoves := p.game.pos.ValidMovesUnsafe()
-	for i := range validMoves {
-		m := validMoves[i]
+	var matched Move
+	visitLegalMoves(p.game.pos, false, func(m Move) bool {
 		//nolint:nestif // readability
 		if m.S2() == targetSquare {
 			pos := p.game.pos
@@ -470,37 +471,39 @@ func (p *Parser) parseMove() (Move, error) {
 			// Check piece type
 			if piece.Type() != movePieceType {
 				mismatchReasons = append(mismatchReasons, "piece type mismatch")
-				continue
+				return false
 			}
 
 			// Check disambiguation
 			if originFile != 0 && m.S1().File().Byte() != originFile {
 				mismatchReasons = append(mismatchReasons, "origin file mismatch")
-				continue
+				return false
 			}
 			if originRank >= 0 && int8(m.S1().Rank()) != originRank {
 				mismatchReasons = append(mismatchReasons, fmt.Sprintf("origin rank mismatch: %d", m.S1()/8+1))
-				continue
+				return false
 			}
 
 			// Check capture
 			if moveData.isCapture != (m.HasTag(Capture) || m.HasTag(EnPassant)) {
 				mismatchReasons = append(mismatchReasons, "capture mismatch")
-				continue
+				return false
 			}
 
 			// Check promotion
 			if moveData.promotion != NoPieceType && m.promo != moveData.promotion {
 				mismatchReasons = append(mismatchReasons, "promotion mismatch")
-				continue
+				return false
 			}
 
-			matchingIdx = i
-			break
+			matched = m
+			matchedMove = true
+			return true
 		}
-	}
+		return false
+	})
 
-	if matchingIdx < 0 {
+	if !matchedMove {
 		if len(mismatchReasons) > 0 {
 			return Move{}, &ParserError{
 				Message:  fmt.Sprintf("no legal move found for position: %s", strings.Join(mismatchReasons, "; ")),
@@ -513,10 +516,6 @@ func (p *Parser) parseMove() (Move, error) {
 		}
 	}
 
-	// Copy the matched move details directly from the slice element.
-	// validMoves is alive until end of function, so referencing it here is
-	// safe (no aliasing risk because we then return).
-	matched := validMoves[matchingIdx]
 	move.s1 = matched.S1()
 	move.s2 = matched.S2()
 	move.tags = matched.tags

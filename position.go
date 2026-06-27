@@ -102,6 +102,11 @@ func StartingPosition() *Position {
 	return pos
 }
 
+// AnyLegalMove reports whether the position has at least one legal move.
+func (pos *Position) AnyLegalMove() bool {
+	return hasLegalMove(pos)
+}
+
 // Update returns a new position resulting from the given move.
 // The move isn't validated - use Game.Move() for validation.
 // This method is optimized for move generation where validation
