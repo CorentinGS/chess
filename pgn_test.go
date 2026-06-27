@@ -76,6 +76,13 @@ func BenchmarkPGN(b *testing.B) {
 	}
 }
 
+func TestNewParserSharesStartingPosition(t *testing.T) {
+	parser := NewParser(nil)
+	if parser.game.pos != parser.game.rootMove.position {
+		t.Fatal("parser game and root move should share the starting position")
+	}
+}
+
 func mustParsePGN(fname string) string {
 	f, err := os.Open(fname)
 	if err != nil {

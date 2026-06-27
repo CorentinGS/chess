@@ -39,14 +39,15 @@ type Parser struct {
 //	tokens := TokenizeGame(game)
 //	parser := NewParser(tokens)
 func NewParser(tokens []Token) *Parser {
+	pos := StartingPosition()
 	rootMove := &MoveNode{
-		position: StartingPosition(),
+		position: pos,
 	}
 	return &Parser{
 		tokens: tokens,
 		game: &Game{
 			tagPairs:    make(TagPairs),
-			pos:         StartingPosition(),
+			pos:         pos,
 			rootMove:    rootMove, // Empty root move
 			currentMove: rootMove,
 		},
