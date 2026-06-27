@@ -51,7 +51,11 @@ func TokenizeGame(game *GameScanned) ([]Token, error) {
 	}
 
 	lexer := NewLexer(game.Raw)
-	var tokens []Token
+	// Preallocate the token slice. Empirically a PGN byte produces ~3 tokens
+	// (move pairs, NAGs, comments, tags), so size to avoid reallocation
+	// during growth. Slice growth from a nil starting point throws away
+	// every prior backing array, which previously dominated allocations.
+	tokens := make([]Token, 0, len(game.Raw)/3+16)
 
 	for {
 		token := lexer.NextToken()

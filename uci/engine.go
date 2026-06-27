@@ -123,6 +123,16 @@ func (e *Engine) Run(cmds ...Cmd) error {
 	return nil
 }
 
+// Getpid returns the operating system process ID of the engine subprocess.
+// Returns 0 when the engine is not backed by a subprocess (e.g. when created
+// with NewWithAdapter using a non-subprocess Adapter).
+func (e *Engine) Getpid() int {
+	if sa, ok := e.adapter.(*SubprocessAdapter); ok {
+		return sa.Pid()
+	}
+	return 0
+}
+
 // Close sends a quit command to the engine and closes the underlying adapter.
 func (e *Engine) Close() error {
 	quitErr := e.Run(CmdQuit{})

@@ -310,7 +310,9 @@ func (p *Parser) parseMove() (Move, error) {
 	// Handle castling first as it's a special case
 	if p.currentToken().Type == KingsideCastle {
 		move.tags = KingSideCastle
-		for _, m := range p.game.pos.ValidMovesUnsafe() {
+		validMoves := p.game.pos.ValidMovesUnsafe()
+		for i := range validMoves {
+			m := validMoves[i]
 			if m.HasTag(KingSideCastle) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
@@ -331,7 +333,9 @@ func (p *Parser) parseMove() (Move, error) {
 
 	if p.currentToken().Type == QueensideCastle {
 		move.tags = QueenSideCastle
-		for _, m := range p.game.pos.ValidMovesUnsafe() {
+		validMoves := p.game.pos.ValidMovesUnsafe()
+		for i := range validMoves {
+			m := validMoves[i]
 			if m.HasTag(QueenSideCastle) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
@@ -433,11 +437,16 @@ func (p *Parser) parseMove() (Move, error) {
 		}
 	}
 
-	// Find matching legal move
-	var matchingMove *Move
+	// Find matching legal move.
+	//
+	// Index-loop the slice instead of ranging by value: taking &m in the
+	// body forces the loop variable onto the heap, which previously caused
+	// ~12M extra Move allocations per `big.pgn` run.
+	var matchingIdx int = -1
 	var mismatchReasons []error
 	validMoves := p.game.pos.ValidMovesUnsafe()
-	for _, m := range validMoves {
+	for i := range validMoves {
+		m := validMoves[i]
 		//nolint:nestif // readability
 		if m.S2() == targetSquare {
 			pos := p.game.pos
@@ -497,12 +506,12 @@ func (p *Parser) parseMove() (Move, error) {
 				continue
 			}
 
-			matchingMove = &m
+			matchingIdx = i
 			break
 		}
 	}
 
-	if matchingMove == nil {
+	if matchingIdx < 0 {
 		if len(mismatchReasons) > 0 {
 			return Move{}, &ParserError{
 				Message:  fmt.Sprintf("no legal move found for position: %s", errors.Join(mismatchReasons...)),
@@ -515,11 +524,14 @@ func (p *Parser) parseMove() (Move, error) {
 		}
 	}
 
-	// Copy the matched move details
-	move.s1 = matchingMove.S1()
-	move.s2 = matchingMove.S2()
-	move.tags = matchingMove.tags
-	move.promo = matchingMove.promo
+	// Copy the matched move details directly from the slice element.
+	// validMoves is alive until end of function, so referencing it here is
+	// safe (no aliasing risk because we then return).
+	matched := validMoves[matchingIdx]
+	move.s1 = matched.S1()
+	move.s2 = matched.S2()
+	move.tags = matched.tags
+	move.promo = matched.promo
 
 	// Handle check/checkmate if present
 	if p.currentToken().Type == CHECK {

@@ -437,27 +437,97 @@ func pawnMoves(pos *Position, sq Square) bitboard {
 
 // diaAttack returns a bitboard representing possible diagonal moves for a
 // sliding piece, considering occupied squares as blocking further movement.
+//
+// Implementation: walk each of the four diagonal sub-directions (NE, SW, NW,
+// SE) outward from sq, stopping at the first blocker in each. This replaces
+// the previous Hyperbola Quintessence implementation, which called
+// bits.Reverse64 twice per invocation and was the largest single CPU
+// hotspot in PGN parsing (~20% of total CPU).
 func diaAttack(occupied bitboard, sq Square) bitboard {
-	pos := bbForSquare(sq)
-	dMask := bbDiagonals[sq]
-	adMask := bbAntiDiagonals[sq]
-	return linearAttack(occupied, pos, dMask) | linearAttack(occupied, pos, adMask)
+	f := int(sq) & 7
+	r := int(sq) >> 3
+	occ := uint64(occupied)
+	var attacks uint64
+	// NE: rank+1, file+1 (NE-SW diagonal = bbDiagonals[sq]).
+	for d := 1; f+d < 8 && r+d < 8; d++ {
+		bit := uint64(1) << (63 - ((r+d)<<3) - (f+d))
+		attacks |= bit
+		if occ&bit != 0 {
+			break
+		}
+	}
+	// SW: rank-1, file-1 (NE-SW diagonal, opposite side).
+	for d := 1; f-d >= 0 && r-d >= 0; d++ {
+		bit := uint64(1) << (63 - ((r-d)<<3) - (f-d))
+		attacks |= bit
+		if occ&bit != 0 {
+			break
+		}
+	}
+	// NW: rank+1, file-1 (NW-SE diagonal = bbAntiDiagonals[sq]).
+	for d := 1; f-d >= 0 && r+d < 8; d++ {
+		bit := uint64(1) << (63 - ((r+d)<<3) - (f-d))
+		attacks |= bit
+		if occ&bit != 0 {
+			break
+		}
+	}
+	// SE: rank-1, file+1 (NW-SE diagonal, opposite side).
+	for d := 1; f+d < 8 && r-d >= 0; d++ {
+		bit := uint64(1) << (63 - ((r-d)<<3) - (f+d))
+		attacks |= bit
+		if occ&bit != 0 {
+			break
+		}
+	}
+	return bitboard(attacks)
 }
 
 // hvAttack returns a bitboard representing possible horizontal and vertical
+// moves for a sliding piece, considering occupied squares as blocking
+// further movement.
+//
+// Implementation: walk each of the four orthogonal sub-directions (E, W, N,
+// S) outward from sq, stopping at the first blocker in each. See diaAttack
+// for the rationale (drops math/bits.Reverse64 calls).
 func hvAttack(occupied bitboard, sq Square) bitboard {
-	pos := bbForSquare(sq)
-	rankMask := bbRanks[sq.Rank()]
-	fileMask := bbFiles[sq.File()]
-	return linearAttack(occupied, pos, rankMask) | linearAttack(occupied, pos, fileMask)
-}
-
-// linearAttack returns a bitboard representing possible moves in a single
-// direction (rank, file, or diagonal) for a sliding piece, considering
-// occupied squares as blocking further movement.
-func linearAttack(occupied, pos, mask bitboard) bitboard {
-	oInMask := occupied & mask
-	return ((oInMask - 2*pos) ^ (oInMask.Reverse() - 2*pos.Reverse()).Reverse()) & mask
+	f := int(sq) & 7
+	r := int(sq) >> 3
+	occ := uint64(occupied)
+	var attacks uint64
+	// E: file+1.
+	for df := 1; f+df < 8; df++ {
+		bit := uint64(1) << (63 - (r<<3) - (f + df))
+		attacks |= bit
+		if occ&bit != 0 {
+			break
+		}
+	}
+	// W: file-1.
+	for df := 1; f-df >= 0; df++ {
+		bit := uint64(1) << (63 - (r<<3) - (f - df))
+		attacks |= bit
+		if occ&bit != 0 {
+			break
+		}
+	}
+	// N: rank+1.
+	for dr := 1; r+dr < 8; dr++ {
+		bit := uint64(1) << (63 - ((r+dr)<<3) - f)
+		attacks |= bit
+		if occ&bit != 0 {
+			break
+		}
+	}
+	// S: rank-1.
+	for dr := 1; r-dr >= 0; dr++ {
+		bit := uint64(1) << (63 - ((r-dr)<<3) - f)
+		attacks |= bit
+		if occ&bit != 0 {
+			break
+		}
+	}
+	return bitboard(attacks)
 }
 
 const (

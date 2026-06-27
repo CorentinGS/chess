@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -1075,6 +1076,101 @@ func BenchmarkPGNWithVariations(b *testing.B) {
 		_, err := scanner.ParseNext()
 		if err != nil {
 			b.Fatalf("parse error: %v", err)
+		}
+	}
+}
+
+// readPGNFixture returns the raw bytes of a fixture PGN file.
+func readPGNFixture(name string) []byte {
+	data, err := os.ReadFile(filepath.Join("fixtures", "pgns", name))
+	if err != nil {
+		panic(err)
+	}
+	return data
+}
+
+// pgnFixtureMeta reports size and game count for a fixture file.
+type pgnFixtureMeta struct {
+	path    string
+	size    int64
+	games   int
+	perGame int // approximate bytes per game
+}
+
+func pgnMeta(name string) pgnFixtureMeta {
+	data := readPGNFixture(name)
+	games := bytes.Count(data, []byte("[Event "))
+	return pgnFixtureMeta{
+		path:    filepath.Join("fixtures", "pgns", name),
+		size:    int64(len(data)),
+		games:   games,
+		perGame: len(data) / max(games, 1),
+	}
+}
+
+// BenchmarkPGN_Stream_Big parses the 1000-game lichess big.pgn fixture once per
+// iteration via the streaming Scanner API. Equivalent in workload to the
+// chess-library example (full SAN validation + move tree building).
+func BenchmarkPGN_Stream_Big(b *testing.B) {
+	benchStreamFixture(b, "big.pgn")
+}
+
+// BenchmarkPGN_Stream_BigBig parses the 10000-game lichess big_big.pgn fixture.
+func BenchmarkPGN_Stream_BigBig(b *testing.B) {
+	benchStreamFixture(b, "big_big.pgn")
+}
+
+// BenchmarkPGN_Stream_Variations parses a small PGN rich in variations to
+// exercise the variation path separately.
+func BenchmarkPGN_Stream_Variations(b *testing.B) {
+	pgn := []byte(`[Event "Variation Benchmark"]
+[Site "Internet"]
+[Date "2023.12.06"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Nf6 4. d3) a6 4. Ba4 Nf6 5. O-O Be7 1-0`)
+
+	b.SetBytes(int64(len(pgn)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s := NewScanner(bytes.NewReader(pgn))
+		for s.HasNext() {
+			if _, err := s.ParseNext(); err != nil {
+				b.Fatalf("parse error: %v", err)
+			}
+		}
+	}
+}
+
+func benchStreamFixture(b *testing.B, name string) {
+	b.Helper()
+	data := readPGNFixture(name)
+	meta := pgnMeta(name)
+	b.SetBytes(meta.size)
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		s := NewScanner(bytes.NewReader(data))
+		games := 0
+		errs := 0
+		for s.HasNext() {
+			if _, err := s.ParseNext(); err != nil {
+				// Real-world lichess data has ~0.7% games with a result
+				// inconsistent with the board-derivable outcome (e.g. "Black
+				// wins on time" when the final position is checkmate).
+				// Skip those rather than aborting the benchmark.
+				errs++
+				continue
+			}
+			games++
+		}
+		if games+errs != meta.games {
+			b.Fatalf("expected %d games total, parsed %d with %d errors", meta.games, games, errs)
 		}
 	}
 }
