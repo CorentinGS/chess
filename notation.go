@@ -149,7 +149,9 @@ func (UCINotation) Decode(pos *Position, s string) (Move, error) {
 	}
 
 	// Convert directly instead of using map lookups
+	//nolint:gosec // values are bounded 0-7 by the checks above; result fits Square (int8).
 	s1 := Square((s[0] - 'a') + (s[1]-'1')*8)
+	//nolint:gosec // values are bounded 0-7 by the checks above; result fits Square (int8).
 	s2 := Square((s[2] - 'a') + (s[3]-'1')*8)
 
 	if s1 < A1 || s1 > H8 || s2 < A1 || s2 > H8 {
@@ -330,6 +332,7 @@ func algebraicMoveMatches(pos *Position, m Move, components moveComponents) bool
 		return false
 	}
 
+	//nolint:gosec // file is [a-h] (empty-checked above) and rank is [0-9] per the SAN regex; out-of-range ranks fail the m.s2 compare and fit Square (int8).
 	dest := Square((components.file[0] - 'a') + (components.rank[0]-'1')*8)
 	if m.s2 != dest {
 		return false

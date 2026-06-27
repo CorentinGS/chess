@@ -63,9 +63,10 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 	needTrailingSpace := false
 	if g.rootMove != nil {
 		if len(g.rootMove.children) > 0 {
-			needTrailingSpace = !writeMoves(g.rootMove,
+			writeMoves(g.rootMove,
 				g.rootMove.Position().moveCount,
 				g.rootMove.Position().Turn() == White, &sb, false, false, true)
+			needTrailingSpace = true
 		} else if g.rootMove.hasAnnotations() {
 			writeAnnotations(g.rootMove, &sb)
 		}
@@ -155,15 +156,12 @@ func escapeTagValue(v string) string {
 //
 // The function recurses through the move tree, writing the main line first and then processing any additional variations,
 // ensuring that the output adheres to standard PGN conventions. Future enhancements may include support for all NAG values.
-// the function returns whether or not a trailing space was added to the output
 func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
 	subVariation, closedVariation, isRoot bool,
-) bool {
-	trailingSpace := false
-
+) {
 	// If no moves remain, stop.
 	if node == nil {
-		return trailingSpace
+		return
 	}
 
 	// Handle root move comments before processing children
@@ -178,7 +176,7 @@ func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
 		currentMove = node
 	} else {
 		if len(node.children) == 0 {
-			return trailingSpace // nothing to print if no child exists (should not happen for a proper game)
+			return // nothing to print if no child exists (should not happen for a proper game)
 		}
 		currentMove = node.children[0]
 	}
@@ -212,8 +210,6 @@ func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
 		writeMoves(currentMove, nextMoveNum, nextIsWhite, sb, false, closedVar,
 			false)
 	}
-
-	return trailingSpace
 }
 
 func writeMoveNumber(moveNum int, isWhite bool, subVariation, closedVariation,
@@ -223,9 +219,9 @@ func writeMoveNumber(moveNum int, isWhite bool, subVariation, closedVariation,
 		sb.WriteString(" ")
 	}
 	if isWhite {
-		sb.WriteString(fmt.Sprintf("%d. ", moveNum))
+		fmt.Fprintf(sb, "%d. ", moveNum)
 	} else if subVariation || closedVariation || isRoot {
-		sb.WriteString(fmt.Sprintf("%d... ", moveNum))
+		fmt.Fprintf(sb, "%d... ", moveNum)
 	}
 }
 

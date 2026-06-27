@@ -94,9 +94,13 @@ func convertPolyglotCastleToUCI(fromFile, toFile, rank byte) (byte, byte, byte, 
 
 func (pm PolyglotMove) ToMove() Move {
 	var moveBuf [5]byte
+	//nolint:gosec // FromFile/FromRank/ToFile/ToRank are 0-7 per the struct doc and &0x7 mask in NewPolyglotMove.
 	moveBuf[0] = 'a' + byte(pm.FromFile)
+	//nolint:gosec // FromFile/FromRank/ToFile/ToRank are 0-7 per the struct doc and &0x7 mask in NewPolyglotMove.
 	moveBuf[1] = '1' + byte(pm.FromRank)
+	//nolint:gosec // FromFile/FromRank/ToFile/ToRank are 0-7 per the struct doc and &0x7 mask in NewPolyglotMove.
 	moveBuf[2] = 'a' + byte(pm.ToFile)
+	//nolint:gosec // FromFile/FromRank/ToFile/ToRank are 0-7 per the struct doc and &0x7 mask in NewPolyglotMove.
 	moveBuf[3] = '1' + byte(pm.ToRank)
 
 	if pm.CastlingMove {

@@ -770,7 +770,7 @@ func outcomeFromTagString(s string) Outcome {
 	}
 }
 
-func (p *Parser) addMove(move Move, number uint) *MoveNode {
+func (p *Parser) addMove(move Move, number uint) {
 	node := &MoveNode{move: move, parent: p.currentMove, number: number}
 	p.currentMove.children = append(p.currentMove.children, node)
 
@@ -783,7 +783,6 @@ func (p *Parser) addMove(move Move, number uint) *MoveNode {
 	node.position = p.game.pos
 
 	p.currentMove = node
-	return node
 }
 
 // parsePieceType converts a piece character into a PieceType.

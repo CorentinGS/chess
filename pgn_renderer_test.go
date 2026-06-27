@@ -3,6 +3,7 @@ package chess_test
 import (
 	"bytes"
 	"errors"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -76,6 +77,53 @@ func TestPGNRenderer_EndsEmptyGameWithNoOutcome(t *testing.T) {
 	out := chess.DefaultPGNRenderer.Render(g)
 	if !strings.HasSuffix(out, string(chess.NoOutcome)) {
 		t.Errorf("expected output to end with NoOutcome %q, got %q", chess.NoOutcome, out)
+	}
+}
+
+func TestPGNRenderer_MoveNumberUsesDotAndSpace(t *testing.T) {
+	g := chess.NewGame()
+	if err := g.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.PushMove("e5", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.PushMove("Nf3", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	out := chess.DefaultPGNRenderer.Render(g)
+
+	for _, pattern := range []string{`\b1\. e4\b`, ` 2\. Nf3\b`} {
+		re := regexp.MustCompile(pattern)
+		if !re.MatchString(out) {
+			t.Errorf("expected output to match %q, got %q", pattern, out)
+		}
+	}
+	if strings.Contains(out, "1.e4") || strings.Contains(out, "2.Nf3") {
+		t.Errorf("expected a space between move number and move, got %q", out)
+	}
+}
+
+func TestPGNRenderer_TrailingSpaceAfterMoves(t *testing.T) {
+	g := chess.NewGame()
+	if err := g.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.PushMove("e5", nil); err != nil {
+		t.Fatal(err)
+	}
+	out := chess.DefaultPGNRenderer.Render(g)
+	if !strings.HasSuffix(out, " *") {
+		t.Errorf("expected a single trailing space before outcome token in %q", out)
+	}
+}
+
+func TestPGNRenderer_NoTrailingSpaceForEmptyGame(t *testing.T) {
+	g := chess.NewGame()
+	out := chess.DefaultPGNRenderer.Render(g)
+	if strings.HasSuffix(out, " *") {
+		t.Errorf("empty game must not gain a trailing space before outcome: %q", out)
 	}
 }
 
