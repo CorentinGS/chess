@@ -48,6 +48,15 @@ func TestStandardMovesPoolFallback(t *testing.T) {
 	}
 }
 
+func TestSquareFromBit(t *testing.T) {
+	for sq := range numOfSquaresInBoard {
+		want := Square(sq)
+		if got := squareFromBit(bbForSquare(want)); got != want {
+			t.Fatalf("squareFromBit(%s) = %s, want %s", bbForSquare(want), got, want)
+		}
+	}
+}
+
 // TestEngineStatusReceiver asserts engine{}.Status returns the correct
 // Method for each terminal category, exercised through the receiver-style
 // signature.

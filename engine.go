@@ -21,7 +21,10 @@ Example usage:
 */
 package chess
 
-import "sync"
+import (
+	"math/bits"
+	"sync"
+)
 
 // engine implements chess move generation and position analysis.
 type engine struct{}
@@ -105,23 +108,19 @@ func hasStandardMove(pos *Position, unsafeOnly bool) bool {
 		if s1BB == 0 {
 			continue
 		}
-		for s1 := range numOfSquaresInBoard {
-			if s1BB&bbForSquare(Square(s1)) == 0 {
-				continue
-			}
-			s2BB := bbForPossibleMoves(pos, p.Type(), Square(s1)) & bbAllowed
+		for s1Bits := s1BB; s1Bits != 0; s1Bits &= s1Bits - 1 {
+			s1 := squareFromBit(s1Bits & -s1Bits)
+			s2BB := bbForPossibleMoves(pos, p.Type(), s1) & bbAllowed
 			if s2BB == 0 {
 				continue
 			}
-			for s2 := range numOfSquaresInBoard {
-				if s2BB&bbForSquare(Square(s2)) == 0 {
-					continue
-				}
+			for s2Bits := s2BB; s2Bits != 0; s2Bits &= s2Bits - 1 {
+				s2 := squareFromBit(s2Bits & -s2Bits)
 
-				m.s1 = Square(s1)
-				m.s2 = Square(s2)
+				m.s1 = s1
+				m.s2 = s2
 
-				if (p == WhitePawn && Square(s2).Rank() == Rank8) || (p == BlackPawn && Square(s2).Rank() == Rank1) {
+				if (p == WhitePawn && s2.Rank() == Rank8) || (p == BlackPawn && s2.Rank() == Rank1) {
 					for _, pt := range promoPieceTypes {
 						m.promo = pt
 						m.tags = moveTags(m, pos)
@@ -141,6 +140,10 @@ func hasStandardMove(pos *Position, unsafeOnly bool) bool {
 	}
 
 	return false
+}
+
+func squareFromBit(bb bitboard) Square {
+	return Square(63 - bits.TrailingZeros64(uint64(bb)))
 }
 
 // promoPieceTypes is an immutable array of promotion piece types.
@@ -193,24 +196,20 @@ func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 		if s1BB == 0 {
 			continue
 		}
-		for s1 := range numOfSquaresInBoard {
-			if s1BB&bbForSquare(Square(s1)) == 0 {
-				continue
-			}
-			s2BB := bbForPossibleMoves(pos, p.Type(), Square(s1)) & bbAllowed
+		for s1Bits := s1BB; s1Bits != 0; s1Bits &= s1Bits - 1 {
+			s1 := squareFromBit(s1Bits & -s1Bits)
+			s2BB := bbForPossibleMoves(pos, p.Type(), s1) & bbAllowed
 			if s2BB == 0 {
 				continue
 			}
-			for s2 := range numOfSquaresInBoard {
-				if s2BB&bbForSquare(Square(s2)) == 0 {
-					continue
-				}
+			for s2Bits := s2BB; s2Bits != 0; s2Bits &= s2Bits - 1 {
+				s2 := squareFromBit(s2Bits & -s2Bits)
 
 				// Reuse move struct by setting fields directly
-				m.s1 = Square(s1)
-				m.s2 = Square(s2)
+				m.s1 = s1
+				m.s2 = s2
 
-				if (p == WhitePawn && Square(s2).Rank() == Rank8) || (p == BlackPawn && Square(s2).Rank() == Rank1) {
+				if (p == WhitePawn && s2.Rank() == Rank8) || (p == BlackPawn && s2.Rank() == Rank1) {
 					for _, pt := range promoPieceTypes {
 						m.promo = pt
 						m.tags = moveTags(m, pos)
