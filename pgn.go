@@ -101,6 +101,7 @@ func (p *Parser) Parse() (*Game, error) {
 	if err := p.parseMoveText(); err != nil {
 		return nil, err
 	}
+	p.game.evaluateTerminalPositionStatus()
 
 	if err := p.resolveOutcome(); err != nil {
 		return nil, err
@@ -789,7 +790,6 @@ func (p *Parser) addMove(move Move, number uint) *MoveNode {
 	// Update position
 	if newPos := p.game.pos.Update(move); newPos != nil {
 		p.game.pos = newPos
-		p.game.evaluatePositionStatus()
 	}
 
 	// Cache position after the move

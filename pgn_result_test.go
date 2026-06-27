@@ -62,6 +62,23 @@ func TestPGNDrawMovetextTokenNotRecognized(t *testing.T) {
 	}
 	g := chess.NewGame(opt)
 	if got := g.Outcome(); got != chess.NoOutcome {
-		t.Errorf("draw movetext token currently yields %v; lexer does not recognize 1/2-1/2 as a RESULT (only the Result tag produces draws). If this changed, update this test", got)
+			t.Errorf("draw movetext token currently yields %v; lexer does not recognize 1/2-1/2 as a RESULT (only the Result tag produces draws). If this changed, update this test", got)
+		}
+}
+
+func TestPGNTerminalVariationDoesNotSetMainLineOutcome(t *testing.T) {
+	opt, err := chess.PGN(strings.NewReader(`
+[Result "*"]
+
+(1. f3 e5 2. g4 Qh4#) 1. e4 e5 *`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := chess.NewGame(opt)
+	if got := g.Outcome(); got != chess.NoOutcome {
+		t.Fatalf("Outcome() = %v, want %v", got, chess.NoOutcome)
+	}
+	if got := g.Method(); got != chess.NoMethod {
+		t.Fatalf("Method() = %v, want %v", got, chess.NoMethod)
 	}
 }

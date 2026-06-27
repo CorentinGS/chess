@@ -633,6 +633,25 @@ func (g *Game) evaluatePositionStatus() {
 	}
 }
 
+// evaluateTerminalPositionStatus updates only board-derived terminal outcomes.
+// PGN parsing calls this once on the final main-line position so result-token
+// conflict checks still catch mate/stalemate without paying full draw-rule
+// evaluation after every parsed move.
+func (g *Game) evaluateTerminalPositionStatus() {
+	method := g.pos.Status()
+	switch method {
+	case Stalemate:
+		g.method = Stalemate
+		g.outcome = Draw
+	case Checkmate:
+		g.method = Checkmate
+		g.outcome = WhiteWon
+		if g.pos.Turn() == White {
+			g.outcome = BlackWon
+		}
+	}
+}
+
 // copy copies the game state from the given game.
 func (g *Game) copy(game *Game) {
 	g.tagPairs = make(map[string]string)
