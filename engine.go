@@ -36,10 +36,19 @@ type engine struct{}
 //
 // Each move is validated to ensure it doesn't leave the king in check
 func (engine) CalcMoves(pos *Position, first bool) []Move {
+	if first {
+		if hasLegalMove(pos) {
+			return []Move{{}}
+		}
+		return nil
+	}
+
 	// generate possible moves
-	moves := standardMoves(pos, first, false)
+	moves := standardMoves(pos, false, false)
 	// return moves including castles
-	return append(moves, castleMoves(pos)...)
+	var castles [2]Move
+	count := castleMovesInto(pos, &castles)
+	return append(moves, castles[:count]...)
 }
 
 // UnsafeMoves returns all pseudo-legal moves that are illegal because they
@@ -62,7 +71,7 @@ func (e engine) Status(pos *Position) Method {
 	if pos.validMoves != nil {
 		hasMove = len(pos.validMoves) > 0
 	} else {
-		hasMove = len(e.CalcMoves(pos, true)) > 0
+		hasMove = hasLegalMove(pos)
 	}
 	if !pos.inCheck && !hasMove {
 		return Stalemate
@@ -70,6 +79,68 @@ func (e engine) Status(pos *Position) Method {
 		return Checkmate
 	}
 	return NoMethod
+}
+
+func hasLegalMove(pos *Position) bool {
+	if hasStandardMove(pos, false) {
+		return true
+	}
+	var castles [2]Move
+	return castleMovesInto(pos, &castles) > 0
+}
+
+func hasStandardMove(pos *Position, unsafeOnly bool) bool {
+	var m Move
+
+	bbAllowed := ^pos.board.whiteSqs
+	if pos.Turn() == Black {
+		bbAllowed = ^pos.board.blackSqs
+	}
+
+	for _, p := range allPieces {
+		if pos.Turn() != p.Color() {
+			continue
+		}
+		s1BB := pos.board.bbForPiece(p)
+		if s1BB == 0 {
+			continue
+		}
+		for s1 := range numOfSquaresInBoard {
+			if s1BB&bbForSquare(Square(s1)) == 0 {
+				continue
+			}
+			s2BB := bbForPossibleMoves(pos, p.Type(), Square(s1)) & bbAllowed
+			if s2BB == 0 {
+				continue
+			}
+			for s2 := range numOfSquaresInBoard {
+				if s2BB&bbForSquare(Square(s2)) == 0 {
+					continue
+				}
+
+				m.s1 = Square(s1)
+				m.s2 = Square(s2)
+
+				if (p == WhitePawn && Square(s2).Rank() == Rank8) || (p == BlackPawn && Square(s2).Rank() == Rank1) {
+					for _, pt := range promoPieceTypes {
+						m.promo = pt
+						m.tags = moveTags(m, pos)
+						if m.HasTag(inCheck) == unsafeOnly {
+							return true
+						}
+					}
+				} else {
+					m.promo = 0
+					m.tags = moveTags(m, pos)
+					if m.HasTag(inCheck) == unsafeOnly {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // promoPieceTypes is an immutable array of promotion piece types.
@@ -352,8 +423,7 @@ func bbForPossibleMoves(pos *Position, pt PieceType, sq Square) bitboard {
 //   - The squares between king and rook are empty
 //   - The king is not in check
 //   - The king does not pass through check
-func castleMoves(pos *Position) []Move {
-	var moves [2]Move // Maximum of 2 possible castle moves (king side and queen side)
+func castleMovesInto(pos *Position, moves *[2]Move) int {
 	count := 0
 
 	kingSide := pos.castleRights.CanCastle(pos.Turn(), KingSide)
@@ -403,7 +473,7 @@ func castleMoves(pos *Position) []Move {
 		count++
 	}
 
-	return moves[:count]
+	return count
 }
 
 // pawnMoves returns a bitboard with 1s in positions where the pawn at the
@@ -450,7 +520,7 @@ func diaAttack(occupied bitboard, sq Square) bitboard {
 	var attacks uint64
 	// NE: rank+1, file+1 (NE-SW diagonal = bbDiagonals[sq]).
 	for d := 1; f+d < 8 && r+d < 8; d++ {
-		bit := uint64(1) << (63 - ((r+d)<<3) - (f+d))
+		bit := uint64(1) << (63 - ((r + d) << 3) - (f + d))
 		attacks |= bit
 		if occ&bit != 0 {
 			break
@@ -458,7 +528,7 @@ func diaAttack(occupied bitboard, sq Square) bitboard {
 	}
 	// SW: rank-1, file-1 (NE-SW diagonal, opposite side).
 	for d := 1; f-d >= 0 && r-d >= 0; d++ {
-		bit := uint64(1) << (63 - ((r-d)<<3) - (f-d))
+		bit := uint64(1) << (63 - ((r - d) << 3) - (f - d))
 		attacks |= bit
 		if occ&bit != 0 {
 			break
@@ -466,7 +536,7 @@ func diaAttack(occupied bitboard, sq Square) bitboard {
 	}
 	// NW: rank+1, file-1 (NW-SE diagonal = bbAntiDiagonals[sq]).
 	for d := 1; f-d >= 0 && r+d < 8; d++ {
-		bit := uint64(1) << (63 - ((r+d)<<3) - (f-d))
+		bit := uint64(1) << (63 - ((r + d) << 3) - (f - d))
 		attacks |= bit
 		if occ&bit != 0 {
 			break
@@ -474,7 +544,7 @@ func diaAttack(occupied bitboard, sq Square) bitboard {
 	}
 	// SE: rank-1, file+1 (NW-SE diagonal, opposite side).
 	for d := 1; f+d < 8 && r-d >= 0; d++ {
-		bit := uint64(1) << (63 - ((r-d)<<3) - (f+d))
+		bit := uint64(1) << (63 - ((r - d) << 3) - (f + d))
 		attacks |= bit
 		if occ&bit != 0 {
 			break
@@ -497,7 +567,7 @@ func hvAttack(occupied bitboard, sq Square) bitboard {
 	var attacks uint64
 	// E: file+1.
 	for df := 1; f+df < 8; df++ {
-		bit := uint64(1) << (63 - (r<<3) - (f + df))
+		bit := uint64(1) << (63 - (r << 3) - (f + df))
 		attacks |= bit
 		if occ&bit != 0 {
 			break
@@ -505,7 +575,7 @@ func hvAttack(occupied bitboard, sq Square) bitboard {
 	}
 	// W: file-1.
 	for df := 1; f-df >= 0; df++ {
-		bit := uint64(1) << (63 - (r<<3) - (f - df))
+		bit := uint64(1) << (63 - (r << 3) - (f - df))
 		attacks |= bit
 		if occ&bit != 0 {
 			break
@@ -513,7 +583,7 @@ func hvAttack(occupied bitboard, sq Square) bitboard {
 	}
 	// N: rank+1.
 	for dr := 1; r+dr < 8; dr++ {
-		bit := uint64(1) << (63 - ((r+dr)<<3) - f)
+		bit := uint64(1) << (63 - ((r + dr) << 3) - f)
 		attacks |= bit
 		if occ&bit != 0 {
 			break
@@ -521,7 +591,7 @@ func hvAttack(occupied bitboard, sq Square) bitboard {
 	}
 	// S: rank-1.
 	for dr := 1; r-dr >= 0; dr++ {
-		bit := uint64(1) << (63 - ((r-dr)<<3) - f)
+		bit := uint64(1) << (63 - ((r - dr) << 3) - f)
 		attacks |= bit
 		if occ&bit != 0 {
 			break
