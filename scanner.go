@@ -25,6 +25,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"sync"
 )
 
 // GameScanned represents a complete chess game in PGN format.
@@ -49,14 +50,20 @@ func TokenizeGame(game *GameScanned) ([]Token, error) {
 	if game == nil {
 		return nil, nil
 	}
-
-	lexer := NewLexer(game.Raw)
 	// Preallocate the token slice. Empirically a PGN byte produces ~3 tokens
 	// (move pairs, NAGs, comments, tags), so size to avoid reallocation
 	// during growth. Slice growth from a nil starting point throws away
 	// every prior backing array, which previously dominated allocations.
-	tokens := make([]Token, 0, len(game.Raw)/3+16)
+	return tokenizeInto(game, make([]Token, 0, len(game.Raw)/3+16))
+}
 
+func tokenizeInto(game *GameScanned, tokens []Token) ([]Token, error) {
+	if game == nil {
+		return nil, nil
+	}
+
+	lexer := NewLexer(game.Raw)
+	tokens = tokens[:0]
 	for {
 		token := lexer.NextToken()
 		if token.Type == EOF {
@@ -66,6 +73,14 @@ func TokenizeGame(game *GameScanned) ([]Token, error) {
 	}
 
 	return tokens, nil
+}
+
+//nolint:gochecknoglobals // Pool amortizes token backing arrays across streamed games.
+var tokenSlicePool = sync.Pool{
+	New: func() any {
+		tokens := make([]Token, 0, 256)
+		return &tokens
+	},
 }
 
 // Scanner provides functionality to read chess games from a PGN source.
@@ -195,10 +210,24 @@ func (s *Scanner) ParseNext() (*Game, error) {
 	if err != nil {
 		return nil, err
 	}
-	tokens, err := TokenizeGame(scannedGame)
+	pooledTokens, ok := tokenSlicePool.Get().(*[]Token)
+	if !ok {
+		tokens := make([]Token, 0, len(scannedGame.Raw)/3+16)
+		pooledTokens = &tokens
+	}
+	tokens, err := tokenizeInto(scannedGame, *pooledTokens)
 	if err != nil {
+		*pooledTokens = tokens[:0]
+		tokenSlicePool.Put(pooledTokens)
 		return nil, err
 	}
+	defer func() {
+		for i := range tokens {
+			tokens[i] = Token{}
+		}
+		*pooledTokens = tokens[:0]
+		tokenSlicePool.Put(pooledTokens)
+	}()
 	parser := NewParser(tokens)
 	game, err := parser.Parse()
 	if err != nil {
