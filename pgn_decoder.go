@@ -227,7 +227,7 @@ func (f *pgnFramer) next() (PGNRecord, error) {
 				start = f.baseOffset + int64(rel)
 			}
 		}
-		f.buffer = f.buffer[advance:]
+		f.advance(advance)
 		f.baseOffset += int64(advance)
 		if len(token) == 0 {
 			continue
@@ -264,7 +264,7 @@ func (f *pgnFramer) nextText() (pgnTextRecord, error) {
 				start = f.baseOffset + int64(rel)
 			}
 		}
-		f.buffer = f.buffer[advance:]
+		f.advance(advance)
 		f.baseOffset += int64(advance)
 		if len(token) == 0 {
 			continue
@@ -289,16 +289,28 @@ func (f *pgnFramer) readMore() error {
 	return err
 }
 
+func (f *pgnFramer) advance(n int) {
+	if n >= len(f.buffer) {
+		f.buffer = f.buffer[:0]
+		return
+	}
+	f.buffer = f.buffer[n:]
+}
+
 func parsePGNRecord(raw []byte) (*Game, error) {
 	return parsePGNText(string(raw))
 }
 
 func parsePGNText(raw string) (*Game, error) {
-	tokens, err := TokenizeGame(&GameScanned{Raw: raw})
-	if err != nil {
-		return nil, err
-	}
-	return newParser(tokens).Parse()
+	return newParserFromSource(&lexerTokenSource{lexer: NewLexer(raw)}).Parse()
+}
+
+type lexerTokenSource struct {
+	lexer *Lexer
+}
+
+func (s *lexerTokenSource) NextToken() (Token, error) {
+	return s.lexer.NextToken(), nil
 }
 
 func applyPGNOptions(opts []PGNOption) pgnOptions {
