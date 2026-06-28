@@ -610,6 +610,30 @@ func (g *Game) UnsafePushNotationMove(moveStr string, notation Notation, options
 	return g.UnsafeMove(move, options)
 }
 
+// UnsafePushMoveText adds fully specified move text without legal move
+// verification. It supports only codecs that can raw-decode a move without SAN
+// resolution.
+func (g *Game) UnsafePushMoveText(moveText string, codec MoveTextCodec, options *MoveInsertOptions) (*MoveNode, error) {
+	raw, err := codec.DecodeRaw(moveText)
+	if err != nil {
+		if errors.Is(err, ErrMoveTextUnsupportedRawDecode) {
+			return nil, fmt.Errorf("%w: %s", ErrUnsafeMoveTextUnsupported, codec)
+		}
+		return nil, fmt.Errorf("chess: decode raw %s move text %q: %w", codec, moveText, err)
+	}
+
+	move := raw.Move()
+	if !move.HasTag(Null) {
+		pos := g.currentPosition()
+		if pos == nil {
+			return nil, ErrMoveTextMissingPosition
+		}
+		move.tags = moveTags(move, pos)
+	}
+
+	return g.UnsafeMove(move, options)
+}
+
 // Move method adds a move to the game using a Move struct.
 // It returns an error if the move is invalid.
 // This method validates the move before adding it to ensure game correctness.

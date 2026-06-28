@@ -16,6 +16,9 @@ var (
 	ErrMoveTextUnsupportedRawDecode = errors.New("chess: move text raw decode unsupported")
 	// ErrInvalidMoveTextCodec indicates an impossible codec format/policy pair.
 	ErrInvalidMoveTextCodec = errors.New("chess: invalid move text codec")
+	// ErrUnsafeMoveTextUnsupported indicates that a codec cannot be used with
+	// unsafe move-text insertion.
+	ErrUnsafeMoveTextUnsupported = errors.New("chess: unsafe move text unsupported")
 )
 
 // MoveTextFormat identifies the concrete move text grammar handled by a codec.
