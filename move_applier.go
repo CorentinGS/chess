@@ -13,9 +13,9 @@ package chess
 // otherwise avoid. They share only the moveCount rule via nextMoveCount.
 //
 // The Zobrist hash is deliberately NOT part of the core: Update computes it
-// incrementally, while makeMove skips it entirely (perft never inspects
-// intermediate hashes and restores the original from the positionUndo record).
-// See docs/adr/0001-single-move-application-core.md.
+// incrementally, while makeMove skips it entirely. Perft never inspects
+// intermediate hashes; unmakeMove restores the original from the positionUndo
+// record. See docs/adr/0001-single-move-application-core.md.
 
 // nullUpdate returns a new position that is identical to the receiver except
 // for the side to move, the half-move clock, the full-move clock, and the

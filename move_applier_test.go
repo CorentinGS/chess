@@ -4,15 +4,20 @@ import "testing"
 
 // TestApplyMoveDifferential runs the copy-on-write applier (Position.Update) and
 // the in-place applier (Position.makeMove) in lockstep over the canonical perft
-// positions and asserts they reach byte-identical positions after every move.
+// positions and asserts they reach byte-identical FENs after every move.
 //
-// Perft node counts are blind to the half-move clock and full-move number, so a
-// drift in those fields would not change node counts (the existing perft suite
-// would stay green) yet would corrupt the 50/75-move draw rules. Position.String
-// emits the full FEN, which includes both counters, so this comparison is the
-// guard against that drift class. The hash is intentionally excluded: Update
-// computes it incrementally while makeMove leaves it stale, and FEN does not
-// encode it.
+// FEN excludes two fields that the bookkeeping rule also owns: the Zobrist hash
+// (Update computes it incrementally, makeMove leaves it stale — by design) and
+// the in-check flag (not part of FEN; verified transitively because both
+// wrappers go through applyMove, which sets it identically). The hash
+// exclusion is the one sanctioned difference between the paths; inCheck is
+// covered by code structure rather than by this test.
+//
+// What the test does cover: perft node counts are blind to the half-move clock
+// and full-move number, so a drift in those fields would not change node counts
+// (the existing perft suite would stay green) yet would corrupt the 50/75-move
+// draw rules. Position.String emits the full FEN, which includes both counters,
+// so this comparison is the guard against that drift class.
 func TestApplyMoveDifferential(t *testing.T) {
 	const depth = 3
 	fens := []struct{ name, fen string }{
@@ -30,11 +35,10 @@ func TestApplyMoveDifferential(t *testing.T) {
 			if err != nil {
 				t.Fatalf("FEN decode: %v", err)
 			}
-			root := NewGame(opt).Position()
-			// Two independent positions with their own *Board: cow advances via
-			// Update (COW, never mutates its receiver), while inplace mutates and
-			// restores via make/unmakeMove. They must not share a board pointer.
-			cow := root
+			// Two independent positions with their own *Board: cow advances
+			// immutably via Update (which copies the board each call), while
+			// inplace mutates and restores via make/unmakeMove.
+			cow := NewGame(opt).Position()
 			opt2, err := FEN(c.fen)
 			if err != nil {
 				t.Fatalf("FEN decode (inplace): %v", err)

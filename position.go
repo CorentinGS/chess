@@ -123,8 +123,10 @@ func (pos *Position) Update(m Move) *Position {
 		return pos.nullUpdate()
 	}
 
-	// Seed a fresh position with the pre-move scalars so applyMove can run
-	// in place on the copy. applyMove overwrites the fields it owns.
+	// Seed a fresh position with the pre-move scalars so applyMove can mutate
+	// it in one place. applyMove overwrites every field it owns, so the seed
+	// is read by applyMove (via updateCastleRights/updateEnPassantSquare)
+	// before being overwritten.
 	b := pos.board.copy()
 	newPos := &Position{
 		board:           b,
@@ -133,7 +135,6 @@ func (pos *Position) Update(m Move) *Position {
 		enPassantSquare: pos.enPassantSquare,
 		halfMoveClock:   pos.halfMoveClock,
 		moveCount:       pos.moveCount,
-		inCheck:         pos.inCheck,
 	}
 	newPos.applyMove(m)
 	// updateHash reads the pre-move board and hash on the original position.
