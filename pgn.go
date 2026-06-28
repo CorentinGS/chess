@@ -87,7 +87,7 @@ func (p *Parser) Parse() (*Game, error) {
 		return nil, errors.New("parsing header")
 	}
 
-	p.tagOutcome = outcomeFromTagString(p.game.tagPairs["Result"])
+	p.tagOutcome = outcomeFromResultString(p.game.tagPairs["Result"])
 
 	// check if the game has a starting position
 	if value, ok := p.game.tagPairs["FEN"]; ok {
@@ -756,19 +756,6 @@ func (p *Parser) parseResult() {
 }
 
 func outcomeFromResultString(s string) Outcome {
-	switch s {
-	case "1-0":
-		return WhiteWon
-	case "0-1":
-		return BlackWon
-	case "1/2-1/2":
-		return Draw
-	default:
-		return NoOutcome
-	}
-}
-
-func outcomeFromTagString(s string) Outcome {
 	switch s {
 	case "1-0":
 		return WhiteWon

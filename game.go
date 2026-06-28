@@ -1075,16 +1075,11 @@ func (g *Game) recomputeOutcomeFromLeaf() {
 }
 
 func (g *Game) syncResultTag() {
-	switch g.outcome {
-	case NoOutcome:
+	if g.outcome == NoOutcome {
 		delete(g.tagPairs, "Result")
-	case WhiteWon:
-		g.tagPairs["Result"] = "1-0"
-	case BlackWon:
-		g.tagPairs["Result"] = "0-1"
-	case Draw:
-		g.tagPairs["Result"] = "1/2-1/2"
+		return
 	}
+	g.tagPairs["Result"] = string(g.outcome)
 }
 
 // ValidateSAN checks if a string is valid Standard Algebraic Notation (SAN) syntax.
