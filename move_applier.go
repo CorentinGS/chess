@@ -7,10 +7,38 @@ package chess
 // in-place applier (Position.makeMove) both delegate here to applyMove, so the
 // rule cannot drift between them.
 //
+// Null moves are a separate concern (nullUpdate) and intentionally do not share
+// the applyMove body: a null move never touches the board, castling rights, or
+// pieces, so folding it in would force applyMove to skip a board copy it can
+// otherwise avoid. They share only the moveCount rule via nextMoveCount.
+//
 // The Zobrist hash is deliberately NOT part of the core: Update computes it
 // incrementally, while makeMove skips it entirely (perft never inspects
 // intermediate hashes and restores the original from the positionUndo record).
 // See docs/adr/0001-single-move-application-core.md.
+
+// nullUpdate returns a new position that is identical to the receiver except
+// for the side to move, the half-move clock, the full-move clock, and the
+// en-passant square. The half-move clock is incremented as for a quiet move,
+// the full-move clock advances when Black passed, and the en-passant capture
+// right is cleared. The board, castling rights, and pieces are unchanged.
+// The Zobrist hash is recomputed incrementally.
+func (pos *Position) nullUpdate() *Position {
+	newPos := &Position{
+		board:           pos.board,
+		turn:            pos.turn.Other(),
+		castleRights:    pos.castleRights,
+		enPassantSquare: NoSquare,
+		halfMoveClock:   pos.halfMoveClock + 1,
+		moveCount:       pos.nextMoveCount(),
+	}
+
+	// Recompute inCheck for the new side to move. The board is unchanged,
+	// so the new side may now be in check if a piece attacks their king.
+	newPos.inCheck = isInCheck(newPos)
+	newPos.hash = pos.nullUpdateHash(newPos.enPassantSquare)
+	return newPos
+}
 
 // nextMoveCount returns the full-move number after the side to move has moved.
 // The number advances when Black is to move. This is the single source for the
