@@ -309,8 +309,8 @@ func (f *pgnFramer) advance(n int) {
 	f.buffer = f.buffer[n:]
 }
 
-func parsePGNText(raw string) (*Game, error) {
-	return newParserFromSource(&lexerTokenSource{lexer: NewLexer(raw)}).Parse()
+func parsePGNText(raw string, options pgnOptions) (*Game, error) {
+	return newParserFromSource(&lexerTokenSource{lexer: NewLexer(raw)}, options).Parse()
 }
 
 type lexerTokenSource struct {
@@ -322,9 +322,13 @@ func (s *lexerTokenSource) NextToken() (Token, error) {
 }
 
 func applyPGNOptions(opts []PGNOption) pgnOptions {
-	options := pgnOptions{}
+	options := defaultPGNOptions()
 	for _, opt := range opts {
 		opt(&options)
 	}
 	return options
+}
+
+func defaultPGNOptions() pgnOptions {
+	return pgnOptions{moveTextCodec: PGNImportSAN()}
 }

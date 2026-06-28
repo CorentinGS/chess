@@ -24,6 +24,7 @@ type Parser struct {
 	game         *Game
 	currentMove  *MoveNode
 	tokens       pgnTokenSource
+	moveText     MoveTextCodec
 	token        Token
 	initErr      error
 	errors       []ParserError
@@ -58,10 +59,14 @@ func (s *sliceTokenSource) NextToken() (Token, error) {
 //	tokens := TokenizeGame(game)
 //	parser := newParser(tokens)
 func newParser(tokens []Token) *Parser {
-	return newParserFromSource(&sliceTokenSource{tokens: tokens})
+	return newParserFromSource(&sliceTokenSource{tokens: tokens}, defaultPGNOptions())
 }
 
-func newParserFromSource(tokens pgnTokenSource) *Parser {
+func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *Parser {
+	options := defaultPGNOptions()
+	if len(opts) > 0 {
+		options = opts[0]
+	}
 	pos := StartingPosition()
 	tree := newMoveTree(pos)
 	rootMove := tree.Root()
@@ -74,6 +79,7 @@ func newParserFromSource(tokens pgnTokenSource) *Parser {
 			method:   NoMethod,
 		},
 		currentMove: rootMove,
+		moveText:    options.moveTextCodec,
 	}
 	token, err := tokens.NextToken()
 	if err != nil {
@@ -495,7 +501,8 @@ func (p *Parser) parseMove() (Move, error) {
 		moveData.promotion = parsePieceType(p.currentToken().Value)
 		p.advance()
 	}
-	if moveData.promotion == NoPieceType &&
+	if p.moveText.Policy() == MoveTextPolicyPGNImport &&
+		moveData.promotion == NoPieceType &&
 		moveData.piece == "" &&
 		p.currentToken().Type == PIECE &&
 		isPromotionDestination(targetSquare) {
@@ -519,6 +526,7 @@ func (p *Parser) parseMove() (Move, error) {
 		dest:       targetSquare,
 		capture:    moveData.isCapture,
 		promotion:  moveData.promotion,
+		canonical:  p.moveText.Policy() == MoveTextPolicyStrict,
 	})
 	if err != nil {
 		return Move{}, &ParserError{

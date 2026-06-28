@@ -233,11 +233,17 @@ func writeMoveNumber(moveNum int, isWhite bool, subVariation, closedVariation,
 }
 
 func writeMoveEncoding(node *MoveNode, currentMove *MoveNode, subVariation bool, sb *strings.Builder) {
+	var (
+		moveStr string
+		err     error
+	)
 	if subVariation && node.parent != nil {
-		moveStr := AlgebraicNotation{}.Encode(node.parent.position, currentMove.move)
-		sb.WriteString(moveStr)
+		moveStr, err = SAN().Encode(node.parent.position, currentMove.move)
 	} else {
-		sb.WriteString(AlgebraicNotation{}.Encode(node.position, currentMove.move))
+		moveStr, err = SAN().Encode(node.position, currentMove.move)
+	}
+	if err == nil {
+		sb.WriteString(moveStr)
 	}
 }
 

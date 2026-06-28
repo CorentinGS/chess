@@ -53,6 +53,26 @@ func TestPGNImportAcceptsPromotionWithoutEquals(t *testing.T) {
 	}
 }
 
+func TestPGNSANPolicyOptionsLastOneWins(t *testing.T) {
+	const pgn = `[Event "Promotion import"]
+[SetUp "1"]
+[FEN "6k1/4P3/8/8/8/8/8/4K3 w - - 0 1"]
+[Result "*"]
+
+1. e8Q *
+`
+
+	if _, err := chess.ParsePGN(strings.NewReader(pgn), chess.WithStrictSAN()); err == nil {
+		t.Fatalf("ParsePGN WithStrictSAN accepted import-only promotion spelling")
+	}
+	if _, err := chess.ParsePGN(strings.NewReader(pgn), chess.WithStrictSAN(), chess.WithImportSAN()); err != nil {
+		t.Fatalf("ParsePGN last import option error = %v", err)
+	}
+	if _, err := chess.ParsePGN(strings.NewReader(pgn), chess.WithImportSAN(), chess.WithStrictSAN()); err == nil {
+		t.Fatalf("ParsePGN last strict option accepted import-only promotion spelling")
+	}
+}
+
 func TestPGNDecoderGameBoundaries(t *testing.T) {
 	tests := []struct {
 		name        string

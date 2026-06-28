@@ -145,13 +145,17 @@ func (c MoveTextCodec) Encode(pos *Position, m Move) (string, error) {
 		if pos == nil {
 			return "", ErrMoveTextMissingPosition
 		}
-		m.tags = moveTags(m, pos)
+		if !m.HasTag(Null) {
+			m.tags = moveTags(m, pos)
+		}
 		return AlgebraicNotation{}.Encode(pos, m), nil
 	case MoveTextFormatLongAlgebraic:
 		if pos == nil {
 			return "", ErrMoveTextMissingPosition
 		}
-		m.tags = moveTags(m, pos)
+		if !m.HasTag(Null) {
+			m.tags = moveTags(m, pos)
+		}
 		return LongAlgebraicNotation{}.Encode(pos, m), nil
 	case MoveTextFormatUCI:
 		return UCINotation{}.Encode(pos, m), nil

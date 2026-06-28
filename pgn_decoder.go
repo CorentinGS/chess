@@ -15,6 +15,7 @@ type PGNOption func(*pgnOptions)
 type pgnOptions struct {
 	bufferSize       int
 	expandVariations bool
+	moveTextCodec    MoveTextCodec
 }
 
 // WithPGNExpandVariations expands each Game's Variations into separate Games.
@@ -30,6 +31,20 @@ func WithPGNBufferSize(n int) PGNOption {
 		if n > 0 {
 			o.bufferSize = n
 		}
+	}
+}
+
+// WithStrictSAN requires PGN movetext to use strict canonical SAN.
+func WithStrictSAN() PGNOption {
+	return func(o *pgnOptions) {
+		o.moveTextCodec = SAN()
+	}
+}
+
+// WithImportSAN accepts documented PGN import SAN spellings.
+func WithImportSAN() PGNOption {
+	return func(o *pgnOptions) {
+		o.moveTextCodec = PGNImportSAN()
 	}
 }
 
@@ -63,12 +78,13 @@ func (d *PGNDecoder) Decode() (*Game, error) {
 	d.index++
 	d.offset = record.Offset
 
-	game, err := parsePGNText(record.Raw)
+	options := applyPGNOptions(d.options)
+
+	game, err := parsePGNText(record.Raw, options)
 	if err != nil {
 		return nil, err
 	}
 
-	options := applyPGNOptions(d.options)
 	if options.expandVariations {
 		games := game.Split()
 		if len(games) == 0 {
@@ -121,7 +137,7 @@ type PGNRecord struct {
 
 // Decode parses this record into a Game.
 func (r PGNRecord) Decode(opts ...PGNOption) (*Game, error) {
-	return parsePGNText(r.Raw)
+	return parsePGNText(r.Raw, applyPGNOptions(opts))
 }
 
 // Tags returns the PGN tag pairs in this record without building a Game.
