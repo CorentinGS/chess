@@ -565,17 +565,3 @@ func charFromPieceType(p PieceType) string {
 	}
 	return ""
 }
-
-func pieceTypeFromChar(c string) PieceType {
-	switch c {
-	case "q":
-		return Queen
-	case "r":
-		return Rook
-	case "b":
-		return Bishop
-	case "n":
-		return Knight
-	}
-	return NoPieceType
-}
