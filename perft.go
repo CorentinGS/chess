@@ -121,36 +121,10 @@ func (pos *Position) makeMove(m Move) positionUndo {
 		return undo
 	}
 
-	moveCount := pos.moveCount
-	if pos.turn == Black {
-		moveCount++
-	}
-
-	ncr := pos.updateCastleRights(m)
-	p := pos.board.Piece(m.S1())
-	halfMove := pos.halfMoveClock
-	if p.Type() == Pawn || m.HasTag(Capture) {
-		halfMove = 0
-	} else {
-		halfMove++
-	}
-	enPassantSquare := pos.updateEnPassantSquare(m)
-
-	pos.board.update(m)
-	pos.turn = pos.turn.Other()
-	pos.castleRights = ncr
-	pos.enPassantSquare = enPassantSquare
-	pos.halfMoveClock = halfMove
-	pos.moveCount = moveCount
-	pos.validMoves = nil
-	pos.statusCached = false
-	// Perft and Divide never inspect intermediate hashes. The undo record still
-	// restores the caller-visible hash exactly after traversal.
-	if m.HasTag(Check) {
-		pos.inCheck = true
-	} else {
-		pos.inCheck = isInCheck(pos)
-	}
+	pos.applyMove(m)
+	// Perft and Divide never inspect intermediate hashes. The undo record
+	// restores the caller-visible hash exactly after traversal, so applyMove
+	// leaving the hash untouched is safe here.
 	return undo
 }
 
