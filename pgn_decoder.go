@@ -6,6 +6,7 @@ import (
 	"io"
 	"iter"
 	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -116,6 +117,30 @@ func (r PGNRecord) Decode(opts ...PGNOption) (*Game, error) {
 		return nil, err
 	}
 	return game, nil
+}
+
+// Tags returns the PGN tag pairs in this record without building a Game.
+func (r PGNRecord) Tags() (map[string]string, error) {
+	tokens, err := TokenizeGame(&GameScanned{Raw: string(r.Raw)})
+	if err != nil {
+		return nil, err
+	}
+
+	tags := make(map[string]string)
+	for i := 0; i < len(tokens); i++ {
+		if tokens[i].Type == EOF {
+			break
+		}
+		if tokens[i].Type != TagStart {
+			continue
+		}
+		if i+3 >= len(tokens) || tokens[i+1].Type != TagKey || tokens[i+2].Type != TagValue {
+			continue
+		}
+		tags[tokens[i+1].Value] = tokens[i+2].Value
+		i += 3
+	}
+	return tags, nil
 }
 
 // PGNRecords returns an iterator over raw PGN records.
@@ -230,16 +255,13 @@ func DecodePGNGamesParallel(ctx context.Context, r io.Reader, opts PGNParallelOp
 		defer close(jobs)
 		for record, err := range PGNRecords(ctx, r) {
 			if err != nil {
-				select {
-				case results <- PGNResult{Err: err}:
-				case <-ctx.Done():
-				}
+				results <- PGNResult{Err: err}
 				return
 			}
 			select {
 			case jobs <- record:
 			case <-ctx.Done():
-				sendPGNResult(ctx, out, PGNResult{Err: ctx.Err()})
+				results <- PGNResult{Err: ctx.Err()}
 				return
 			}
 		}
@@ -312,5 +334,146 @@ func yieldOrderedPGNResults(ctx context.Context, out chan<- PGNResult, results <
 			}
 			next++
 		}
+	}
+}
+
+// PGNEventKind identifies a semantic PGN event.
+type PGNEventKind uint8
+
+const (
+	PGNEventUnknown PGNEventKind = iota
+	PGNTag
+	PGNMove
+	PGNComment
+	PGNNAG
+	PGNVariationStart
+	PGNVariationEnd
+	PGNGameEnd
+)
+
+// PGNEvent is one semantic event from a PGN stream.
+type PGNEvent struct {
+	Kind   PGNEventKind
+	Index  int64
+	Offset int64
+	Name   string
+	Value  string
+	Move   string
+	NAG    string
+}
+
+// PGNEvents returns an iterator over semantic PGN events without building Games.
+func PGNEvents(r io.Reader, opts ...PGNOption) iter.Seq2[PGNEvent, error] {
+	return func(yield func(PGNEvent, error) bool) {
+		for record, err := range PGNRecords(context.Background(), r, opts...) {
+			if err != nil {
+				yield(PGNEvent{}, err)
+				return
+			}
+			if !yieldPGNRecordEvents(record, yield) {
+				return
+			}
+		}
+	}
+}
+
+func yieldPGNRecordEvents(record PGNRecord, yield func(PGNEvent, error) bool) bool {
+	tokens, err := TokenizeGame(&GameScanned{Raw: string(record.Raw)})
+	if err != nil {
+		return yield(PGNEvent{}, err)
+	}
+
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+		event := PGNEvent{Index: record.Index, Offset: record.Offset}
+		switch token.Type {
+		case EOF:
+			return yield(PGNEvent{Kind: PGNGameEnd, Index: record.Index, Offset: record.Offset}, nil)
+		case TagStart:
+			if i+2 < len(tokens) && tokens[i+1].Type == TagKey && tokens[i+2].Type == TagValue {
+				event.Kind = PGNTag
+				event.Name = tokens[i+1].Value
+				event.Value = tokens[i+2].Value
+				i += 2
+				if !yield(event, nil) {
+					return false
+				}
+			}
+		case CommentStart:
+			comment, next := collectPGNComment(tokens, i+1)
+			i = next
+			if comment != "" {
+				event.Kind = PGNComment
+				event.Value = comment
+				if !yield(event, nil) {
+					return false
+				}
+			}
+		case NAG:
+			event.Kind = PGNNAG
+			event.NAG = token.Value
+			if !yield(event, nil) {
+				return false
+			}
+		case VariationStart:
+			event.Kind = PGNVariationStart
+			if !yield(event, nil) {
+				return false
+			}
+		case VariationEnd:
+			event.Kind = PGNVariationEnd
+			if !yield(event, nil) {
+				return false
+			}
+		default:
+			if isPGNMoveToken(token.Type) {
+				move, next := collectPGNMove(tokens, i)
+				i = next - 1
+				event.Kind = PGNMove
+				event.Move = move
+				if !yield(event, nil) {
+					return false
+				}
+			}
+		}
+	}
+
+	return yield(PGNEvent{Kind: PGNGameEnd, Index: record.Index, Offset: record.Offset}, nil)
+}
+
+func collectPGNComment(tokens []Token, start int) (string, int) {
+	var b strings.Builder
+	for i := start; i < len(tokens); i++ {
+		switch tokens[i].Type {
+		case COMMENT:
+			b.WriteString(tokens[i].Value)
+			if i+1 < len(tokens) && tokens[i+1].Type == CommandStart && b.Len() > 0 {
+				b.WriteByte(' ')
+			}
+		case CommentEnd:
+			return b.String(), i
+		}
+	}
+	return b.String(), len(tokens)
+}
+
+func collectPGNMove(tokens []Token, start int) (string, int) {
+	var b strings.Builder
+	for i := start; i < len(tokens); i++ {
+		if !isPGNMoveToken(tokens[i].Type) {
+			return b.String(), i
+		}
+		b.WriteString(tokens[i].Value)
+	}
+	return b.String(), len(tokens)
+}
+
+func isPGNMoveToken(tokenType TokenType) bool {
+	switch tokenType {
+	case PIECE, SQUARE, CAPTURE, FILE, RANK, KingsideCastle, QueensideCastle,
+		PROMOTION, PromotionPiece, CHECK, CHECKMATE, DeambiguationSquare, NullMove:
+		return true
+	default:
+		return false
 	}
 }
