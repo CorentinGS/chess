@@ -561,14 +561,14 @@ fmt.Println(game)
 #### PGN comment annotations
 
 Parsed PGN comments preserve comment block boundaries, command annotation order, and duplicate command annotations. Use
-`Move.CommentBlocks()` when an importer needs structured access to each `{...}` block and the ordered text or command
+`MoveNode.CommentBlocks()` when an importer needs structured access to each `{...}` block and the ordered text or command
 items inside it. The returned blocks are defensive copies.
 
 ```go
 game := chess.NewGame(pgn)
-move := game.Moves()[0]
+node := game.MoveNodes()[0]
 
-for _, block := range move.CommentBlocks() {
+for _, block := range node.CommentBlocks() {
 	for _, item := range block.Items {
 		switch item.Kind {
 		case chess.CommentText:
@@ -580,8 +580,8 @@ for _, block := range move.CommentBlocks() {
 }
 ```
 
-The legacy helpers `Move.Comments()`, `Move.GetCommand()`, `Move.SetCommand()`, `Move.SetComment()`, and
-`Move.AddComment()` remain available for callers that only need a flattened text comment or single command value.
+The helpers `MoveNode.Comments()`, `MoveNode.GetCommand()`, `MoveNode.SetCommand()`, `MoveNode.SetComment()`, and
+`MoveNode.AddComment()` remain available for callers that only need a flattened text comment or single command value.
 
 #### Scan PGN
 
@@ -723,7 +723,7 @@ fmt.Println(game.Position().Board().Draw())
 
 ### Moves
 
-Moves is a convenient API for accessing aligned positions, moves, and comments. Moves is useful when trying to understand detailed information about a game. Below is an
+MoveHistory is a convenient API for accessing aligned positions, moves, and comments. MoveHistory is useful when trying to understand detailed information about a game. Below is an
 example showing how to see which side castled first.
 
 ```go
@@ -748,9 +748,9 @@ func main() {
 	}
 	game := chess.NewGame(pgn)
 	color := chess.NoColor
-	for _, mh := range game.Moves() {
-		if mh.HasTag(chess.KingSideCastle) || mh.HasTag(chess.QueenSideCastle) {
-			color = mh.Position().Turn()
+	for _, mh := range game.MoveHistory() {
+		if mh.Move.HasTag(chess.KingSideCastle) || mh.Move.HasTag(chess.QueenSideCastle) {
+			color = mh.PrePosition.Turn()
 			break
 		}
 	}
