@@ -5,6 +5,8 @@ import (
 	"context"
 	"io"
 	"iter"
+	"runtime"
+	"sync"
 )
 
 // PGNOption configures PGN import.
@@ -193,4 +195,122 @@ func applyPGNOptions(opts []PGNOption) pgnOptions {
 		opt(&options)
 	}
 	return options
+}
+
+// PGNParallelOptions configures parallel PGN Game decoding.
+type PGNParallelOptions struct {
+	Workers int
+	Buffer  int
+	Ordered bool
+	Options []PGNOption
+}
+
+// PGNResult is the result of decoding one PGN record.
+type PGNResult struct {
+	Game   *Game
+	Err    error
+	Index  int64
+	Offset int64
+}
+
+// DecodePGNGamesParallel decodes PGN records across worker goroutines.
+func DecodePGNGamesParallel(ctx context.Context, r io.Reader, opts PGNParallelOptions) <-chan PGNResult {
+	if opts.Workers <= 0 {
+		opts.Workers = runtime.GOMAXPROCS(0)
+	}
+	if opts.Buffer <= 0 {
+		opts.Buffer = opts.Workers
+	}
+
+	out := make(chan PGNResult, opts.Buffer)
+	jobs := make(chan PGNRecord, opts.Buffer)
+	results := make(chan PGNResult, opts.Buffer)
+
+	go func() {
+		defer close(jobs)
+		for record, err := range PGNRecords(ctx, r) {
+			if err != nil {
+				select {
+				case results <- PGNResult{Err: err}:
+				case <-ctx.Done():
+				}
+				return
+			}
+			select {
+			case jobs <- record:
+			case <-ctx.Done():
+				sendPGNResult(ctx, out, PGNResult{Err: ctx.Err()})
+				return
+			}
+		}
+	}()
+
+	var wg sync.WaitGroup
+	wg.Add(opts.Workers)
+	for range opts.Workers {
+		go func() {
+			defer wg.Done()
+			for record := range jobs {
+				game, err := record.Decode(opts.Options...)
+				result := PGNResult{Game: game, Err: err, Index: record.Index, Offset: record.Offset}
+				select {
+				case results <- result:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	go func() {
+		defer close(out)
+		if opts.Ordered {
+			yieldOrderedPGNResults(ctx, out, results)
+			return
+		}
+		for result := range results {
+			if !sendPGNResult(ctx, out, result) {
+				return
+			}
+		}
+	}()
+
+	return out
+}
+
+func sendPGNResult(ctx context.Context, out chan<- PGNResult, result PGNResult) bool {
+	select {
+	case out <- result:
+		return true
+	case <-ctx.Done():
+		select {
+		case out <- PGNResult{Err: ctx.Err()}:
+		default:
+		}
+		return false
+	}
+}
+
+func yieldOrderedPGNResults(ctx context.Context, out chan<- PGNResult, results <-chan PGNResult) {
+	next := int64(1)
+	pending := make(map[int64]PGNResult)
+	for result := range results {
+		pending[result.Index] = result
+		for {
+			ready, ok := pending[next]
+			if !ok {
+				break
+			}
+			delete(pending, next)
+			if !sendPGNResult(ctx, out, ready) {
+				return
+			}
+			next++
+		}
+	}
 }
