@@ -820,6 +820,27 @@ func TestPGNAnnotationFidelityLegacyAPIsAndDefensiveCopies(t *testing.T) {
 	}
 }
 
+// TestPGNCommentCommandMergingIssue104 is a regression test for issue #104:
+// a parsed text comment followed by SetCommand must merge into a single
+// comment block rather than emitting two separate {} blocks. v3's
+// SetCommand appends to the last block when no matching key exists, so
+// this pins the single-block contract. See the reporter's v2 scenario.
+func TestPGNCommentCommandMergingIssue104(t *testing.T) {
+	game := mustParseSingleGame(t, withMinimalTags(`1. e4 {Ruy Lopez} *`))
+	move := game.MoveNodes()[0]
+	move.SetCommand("eval", "0.25")
+
+	roundTrip := game.String()
+	want := "{Ruy Lopez [%eval 0.25]}"
+	if !strings.Contains(roundTrip, want) {
+		t.Fatalf("expected merged single block %q in:\n%s", want, roundTrip)
+	}
+	// The two-block failure mode would look like "{Ruy Lopez} {[%eval 0.25]}".
+	if strings.Contains(roundTrip, "{Ruy Lopez} {") {
+		t.Fatalf("expected single merged block, got two separate blocks:\n%s", roundTrip)
+	}
+}
+
 func mustParseSingleGame(t *testing.T, pgn string) *Game {
 	t.Helper()
 	scanner := NewScanner(strings.NewReader(pgn))

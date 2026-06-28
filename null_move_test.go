@@ -357,6 +357,26 @@ func TestNullMove_PGNRead_AtStart(t *testing.T) {
 	}
 }
 
+// TestNullMove_PGNRead_AliasedSpellings covers the PGN-layer spellings not
+// covered by TestNullMove_PGNRead_Z0 / DoubleDash: "Z1", "@@", "0000". The
+// lexer's readNullMove accepts all five spellings; Z0 and "--" are tested
+// individually above, this pins the remaining three at the PGN layer.
+func TestNullMove_PGNRead_AliasedSpellings(t *testing.T) {
+	for _, spelling := range []string{"Z1", "@@", "0000"} {
+		t.Run(spelling, func(t *testing.T) {
+			pgn := withMinimalTags("1. e4 " + spelling + " 2. Nf3 *")
+			g := mustParseSingleGame(t, pgn)
+			moves := g.Moves()
+			if len(moves) != 3 {
+				t.Fatalf("len(Moves)=%d, want 3 (e4, %s, Nf3)", len(moves), spelling)
+			}
+			if !moves[1].HasTag(chess.Null) {
+				t.Fatalf("%q must be parsed as a null move", spelling)
+			}
+		})
+	}
+}
+
 func TestNullMove_PGNRead_TwoConsecutiveNulls(t *testing.T) {
 	// White passes, Black passes: side to move is back to White at move 2.
 	pgn := withMinimalTags("1. Z0 Z0 *")
