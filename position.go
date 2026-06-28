@@ -119,42 +119,25 @@ func (pos *Position) AnyLegalMove() bool {
 //	newPos := pos.Update(move)
 func (pos *Position) Update(m Move) *Position {
 	// Null moves flip the side to move without touching the board.
-	// They are handled separately so the bookkeeping below (piece
-	// capture, castling rights, en passant, hash XOR for the moved
-	// piece) can be skipped entirely.
 	if m.HasTag(Null) {
 		return pos.nullUpdate()
 	}
 
-	moveCount := pos.moveCount
-	if pos.turn == Black {
-		moveCount++
-	}
-
-	ncr := pos.updateCastleRights(m)
-	p := pos.board.Piece(m.s1)
-	halfMove := pos.halfMoveClock
-	if p.Type() == Pawn || m.HasTag(Capture) {
-		halfMove = 0
-	} else {
-		halfMove++
-	}
+	// Seed a fresh position with the pre-move scalars so applyMove can run
+	// in place on the copy. applyMove overwrites the fields it owns.
 	b := pos.board.copy()
-	b.update(m)
 	newPos := &Position{
 		board:           b,
-		turn:            pos.turn.Other(),
-		castleRights:    ncr,
-		enPassantSquare: pos.updateEnPassantSquare(m),
-		halfMoveClock:   halfMove,
-		moveCount:       moveCount,
+		turn:            pos.turn,
+		castleRights:    pos.castleRights,
+		enPassantSquare: pos.enPassantSquare,
+		halfMoveClock:   pos.halfMoveClock,
+		moveCount:       pos.moveCount,
+		inCheck:         pos.inCheck,
 	}
-	if m.HasTag(Check) {
-		newPos.inCheck = true
-	} else {
-		newPos.inCheck = isInCheck(newPos)
-	}
-	newPos.hash = pos.updateHash(m, ncr, newPos.enPassantSquare)
+	newPos.applyMove(m)
+	// updateHash reads the pre-move board and hash on the original position.
+	newPos.hash = pos.updateHash(m, newPos.castleRights, newPos.enPassantSquare)
 	return newPos
 }
 
@@ -680,58 +663,6 @@ func (pos *Position) computeHash() uint64 {
 		hash ^= polyglotHashesUint64[780]
 	}
 	return hash
-}
-
-func (pos *Position) updateCastleRights(m Move) CastleRights {
-	removeK := false
-	removeQ := false
-	removek := false
-	removeq := false
-	p := pos.board.Piece(m.s1)
-	if p == WhiteKing || m.s1 == H1 || m.s2 == H1 {
-		removeK = true
-	}
-	if p == WhiteKing || m.s1 == A1 || m.s2 == A1 {
-		removeQ = true
-	}
-	if p == BlackKing || m.s1 == H8 || m.s2 == H8 {
-		removek = true
-	}
-	if p == BlackKing || m.s1 == A8 || m.s2 == A8 {
-		removeq = true
-	}
-	var buf [4]byte
-	n := 0
-	for i := range pos.castleRights {
-		c := pos.castleRights[i]
-		if (c == 'K' && removeK) || (c == 'Q' && removeQ) || (c == 'k' && removek) || (c == 'q' && removeq) || c == '-' {
-			continue
-		}
-		buf[n] = c
-		n++
-	}
-	if n == 0 {
-		return "-"
-	}
-	return CastleRights(string(buf[:n]))
-}
-
-func (pos *Position) updateEnPassantSquare(m Move) Square {
-	const squaresPerRank = 8
-	p := pos.board.Piece(m.s1)
-	if p.Type() != Pawn {
-		return NoSquare
-	}
-	if pos.turn == White &&
-		(bbForSquare(m.s1)&bbRank2) != 0 &&
-		(bbForSquare(m.s2)&bbRank4) != 0 {
-		return m.s2 - squaresPerRank
-	} else if pos.turn == Black &&
-		(bbForSquare(m.s1)&bbRank7) != 0 &&
-		(bbForSquare(m.s2)&bbRank5) != 0 {
-		return m.s2 + squaresPerRank
-	}
-	return NoSquare
 }
 
 // SamePosition returns true if the two positions are the same
