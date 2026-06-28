@@ -65,14 +65,15 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 	}
 
 	needTrailingSpace := false
-	if g.rootMove != nil {
-		if len(g.rootMove.children) > 0 {
-			writeMoves(g.rootMove,
-				g.rootMove.position.moveCount,
-				g.rootMove.position.turn == White, &sb, false, false, true)
+	if g.tree != nil && g.tree.Root() != nil {
+		root := g.tree.Root()
+		if len(root.children) > 0 {
+			writeMoves(root,
+				root.position.moveCount,
+				root.position.turn == White, &sb, false, false, true)
 			needTrailingSpace = true
-		} else if g.rootMove.hasAnnotations() {
-			writeAnnotations(g.rootMove, &sb)
+		} else if root.hasAnnotations() {
+			writeAnnotations(root, &sb)
 		}
 	}
 

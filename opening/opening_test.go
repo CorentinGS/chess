@@ -13,8 +13,8 @@ import (
 
 func ExampleDefaultBook_find() {
 	g := chess.NewGame()
-	_ = g.PushMove("e4", nil)
-	_ = g.PushMove("e6", nil)
+	_, _ = g.PushMove("e4", nil)
+	_, _ = g.PushMove("e6", nil)
 
 	// print French Defense
 	book, err := opening.DefaultBook()
@@ -30,8 +30,8 @@ func ExampleDefaultBook_find() {
 
 func ExampleDefaultBook_possible() {
 	g := chess.NewGame()
-	_ = g.PushMove("e4", nil)
-	_ = g.PushMove("d5", nil)
+	_, _ = g.PushMove("e4", nil)
+	_, _ = g.PushMove("d5", nil)
 
 	// print all variantions of the Scandinavian Defense
 	book, err := opening.DefaultBook()
@@ -70,10 +70,10 @@ func TestDefaultBook(t *testing.T) {
 
 func TestFind(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("d5", nil); err != nil {
+	if _, err := g.PushMove("d5", nil); err != nil {
 		t.Fatal(err)
 	}
 	book, err := opening.DefaultBook()
@@ -92,7 +92,7 @@ func TestFind(t *testing.T) {
 
 func TestPossible(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("g3", nil); err != nil {
+	if _, err := g.PushMove("g3", nil); err != nil {
 		t.Fatal(err)
 	}
 	book, err := opening.DefaultBook()
@@ -112,10 +112,10 @@ func TestOpeningGameRace(t *testing.T) {
 		t.Fatalf("DefaultBook() failed: %v", err)
 	}
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.PushMove("e5", nil); err != nil {
 		t.Fatal(err)
 	}
 	o := book.Find(g.Moves())
@@ -176,10 +176,10 @@ func TestOpeningGameReturnsCallerOwnedGame(t *testing.T) {
 	}
 
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.PushMove("e5", nil); err != nil {
 		t.Fatal(err)
 	}
 	o := book.Find(g.Moves())
@@ -191,7 +191,7 @@ func TestOpeningGameReturnsCallerOwnedGame(t *testing.T) {
 	if game1 == nil {
 		t.Fatal("Game() returned nil")
 	}
-	if err := game1.PushMove("Nf3", nil); err != nil {
+	if _, err := game1.PushMove("Nf3", nil); err != nil {
 		t.Fatal(err)
 	}
 

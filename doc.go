@@ -13,12 +13,12 @@ Using Moves
 
 	game := chess.NewGame()
 	moves := game.ValidMoves()
-	game.Move(moves[0])
+	game.Move(moves[0], nil)
 
 Using Algebraic Notation
 
 	game := chess.NewGame()
-	game.MoveStr("e4")
+	game.PushMove("e4", nil)
 
 Using PGN
 
@@ -47,7 +47,7 @@ Random Game
 	        // select a random move
 	        moves := game.ValidMoves()
 	        move := moves[rand.Intn(len(moves))]
-	        game.Move(move)
+	        game.Move(move, nil)
 	    }
 	    // print outcome and game PGN
 	    fmt.Println(game.Position().Board().Draw())

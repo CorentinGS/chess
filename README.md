@@ -566,7 +566,7 @@ items inside it. The returned blocks are defensive copies.
 
 ```go
 game := chess.NewGame(pgn)
-node := game.MoveNodes()[0]
+node := game.MoveTree().MainLine()[0]
 
 for _, block := range node.CommentBlocks() {
 	for _, item := range block.Items {
@@ -839,13 +839,20 @@ The package's Perft tests verify six canonical positions from
 through depth 4–6. For a side-by-side performance comparison against another
 Go chess library, see [`benchcmp/perft/`](./benchcmp/perft/).
 
-## Variation Tree
+## Move Tree
 
-A `Game` keeps the moves that have been played as a tree of `MoveNode`s. Each
-node holds the `Move` it represents, its `Position` after the move, its parent
-and an ordered slice of children, plus any comments, NAGs, or
-`[%clk ...]`-style command annotations. `children[0]` is always the main line;
-`children[1:]` are the variations (sidelines) at that position.
+A `Game` owns a `MoveTree` containing the moves that have been played. The root
+is a synthetic position node before any move has been played. Each non-root
+`MoveNode` holds the `Move` it represents, its `Position` after the move, its
+parent and ordered continuations, plus comments, NAGs, and `[%clk ...]`-style
+command annotations. The first continuation is the main line; later
+continuations are variations.
+
+Use `Game.Move`, `Game.UnsafeMove`, `Game.PushMove`, or
+`Game.PushNotationMove` to play moves on the active cursor. Those methods keep
+game legality, terminal outcome guards, and result evaluation in sync with the
+tree. `MoveTree` exposes traversal, cursor navigation, and variation editing;
+it does not expose a public API for advancing the active game state directly.
 
 ```go
 package main
@@ -858,19 +865,14 @@ import (
 
 func main() {
 	g := chess.NewGame()
-	g.PushMove(chess.Move{S1: chess.E2, S2: chess.E4})
-	g.PushMove(chess.Move{S1: chess.E7, S2: chess.E5})
+	g.PushMove("e4", nil)
+	g.PushMove("e5", nil)
 
-	// Walk the main line from the root.
-	root := g.GetRootMove()
-	for n := root; n != nil; n = n.children[0] {
-		fmt.Printf("%s ", n.move)
+	// Walk the main line.
+	for _, n := range g.MoveTree().MainLine() {
+		fmt.Printf("%s ", n.Move())
 	}
 	fmt.Println()
-
-	// Add a variation off the root.
-	varOpt, _ := chess.PGN(strings.NewReader("1. e4 e5 (1... c5 {Sicilian} ) 1. e4"))
-	_ = varOpt
 }
 ```
 
@@ -889,46 +891,44 @@ func main() {
 		`[Result "*"] 1. e4 e5 (1... c5 {Sicilian}) 2. Nf3 *`,
 	))
 
-	root := g.GetRootMove()
-	e4 := root.Children()[0] // first move of the main line
+	tree := g.MoveTree()
+	e4 := tree.MainChild(tree.Root()) // first move of the main line
 
-	// Walk the main line by following children[0] at each node.
+	// Walk the main line by following the main continuation at each node.
 	fmt.Print("main: ")
-	for n := e4; n != nil; n = mainChild(n) {
+	for n := e4; n != nil; n = tree.MainChild(n) {
 		fmt.Printf("%s ", n.Move())
 	}
 	fmt.Println()
 
-	// Enumerate sideline variations at e4 (children[1:]).
+	// Enumerate sideline variations at e4.
 	fmt.Print("variations at e4: ")
-	for _, v := range g.Variations(e4) {
+	for _, v := range tree.Variations(e4) {
 		fmt.Printf("%s ", v.Move())
 	}
 	fmt.Println()
-}
-
-func mainChild(n *chess.MoveNode) *chess.MoveNode {
-	if n == nil || len(n.Children()) == 0 {
-		return nil
-	}
-	return n.Children()[0]
 }
 ```
 
 Useful APIs over the tree:
 
-- `Game.GetRootMove() *MoveNode` — root of the tree (the position before any
-  move has been played).
-- `Game.MoveNodes() []*MoveNode` — all nodes in the tree, in pre-order.
-- `Game.Variations(node *MoveNode) []*MoveNode` — the sideline children of a
-  node (`children[1:]`); returns nil if the node has no variations.
-- `Game.AddVariation(parent *MoveNode, move Move)` — append a sideline to
-  `parent`'s children.
-- `node.Move()`, `node.Position()`, `node.parent`, `node.children`,
-  `node.Comments()`, `node.nag` — per-node data.
+- `Game.MoveTree() *MoveTree` — returns the game tree and active cursor.
+- `MoveTree.Root() *MoveNode` — root position node.
+- `MoveTree.Current() *MoveNode` — active cursor node.
+- `MoveTree.MainLine() []*MoveNode` — main-line nodes, excluding the root.
+- `MoveTree.MainChild(node *MoveNode) *MoveNode` — main continuation.
+- `MoveTree.Continuations(node *MoveNode) []*MoveNode` — all continuations.
+- `MoveTree.Variations(node *MoveNode) []*MoveNode` — sideline continuations.
+- `MoveTree.AddVariation(parent *MoveNode, move Move) (*MoveNode, error)` —
+  validate and append a sideline.
+- `MoveTree.GoBack()`, `MoveTree.GoForward()`, and
+  `MoveTree.NavigateToMainLine()` — move the active cursor without changing
+  game outcome metadata.
+- `node.Move()`, `node.Position()`, `node.Comments()`, `node.NAG()`,
+  `node.Children()`, and `node.Parent()` — per-node data.
 
 Perft does not store its results in the game tree; it walks a temporary move
-tree internally, so it does not affect the `MoveNodes` you see from `Game`.
+tree internally, so it does not affect the `MoveTree` you see from `Game`.
 
 ## Performance
 

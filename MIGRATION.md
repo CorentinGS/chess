@@ -32,10 +32,21 @@ if err := game.Move(&moves[0], nil); err != nil { /* ... */ }
 
 // v3
 moves := game.ValidMoves()
-if err := game.Move(moves[0], nil); err != nil { /* ... */ }
+node, err := game.Move(moves[0], nil)
+if err != nil { /* ... */ }
+_ = node
 ```
 
-The same change applies to `UnsafeMove(move Move, opts *PushMoveOptions) error`.
+The same change applies to `UnsafeMove`, `PushMove`, `PushNotationMove`, and
+`UnsafePushNotationMove`: they now return `(*MoveNode, error)`. The old
+`PushMoveOptions` type is replaced by `MoveInsertOptions` with
+`PromoteToMainLine`.
+
+Active move insertion remains a `Game` responsibility. Use the `Game` move
+methods above to advance the current position so legality checks, terminal game
+guards, and outcome evaluation stay in sync. `MoveTree` is exposed for
+topology, cursor navigation, and variation traversal/editing; it does not have
+a public active-move insertion method.
 `Move.Clone()` has been removed — copy by assignment (`m2 := m1`) if you need a
 value copy.
 
@@ -51,15 +62,17 @@ for _, m := range game.Moves() {
 }
 
 // v3
-for _, node := range game.MoveNodes() {
+for _, node := range game.MoveTree().MainLine() {
     fmt.Println(node.Position().Turn()) // position is on MoveNode
 }
 ```
 
 `game.Moves()` still returns `[]Move` (bare values, main line only). Use
-`game.MoveNodes()` for tree access: `node.Comments()`,
-`node.SetCommand(key, val)`, `node.SetComment(text)`, `node.AddComment(text)`,
-`node.NAG()`, and `node.Children()` / `node.Parent()` for variation traversal.
+`game.MoveTree()` for tree access: `tree.Root()`, `tree.Current()`,
+`tree.MainLine()`, `tree.Continuations(node)`, `tree.Variations(node)`,
+`node.Comments()`, `node.SetCommand(key, val)`, `node.SetComment(text)`,
+`node.AddComment(text)`, `node.NAG()`, and `node.Children()` / `node.Parent()`
+for variation traversal.
 
 ## Notation uses value signatures
 

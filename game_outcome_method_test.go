@@ -109,14 +109,16 @@ func TestTerminalOutcomeGuards(t *testing.T) {
 		name string
 		call func(g *chess.Game) error
 	}{
-		{"Move", func(g *chess.Game) error { return g.Move(g.ValidMoves()[0], nil) }},
-		{"UnsafeMove", func(g *chess.Game) error { return g.UnsafeMove(g.ValidMoves()[0], nil) }},
-		{"PushMove", func(g *chess.Game) error { return g.PushMove("e4", nil) }},
+		{"Move", func(g *chess.Game) error { _, err := g.Move(g.ValidMoves()[0], nil); return err }},
+		{"UnsafeMove", func(g *chess.Game) error { _, err := g.UnsafeMove(g.ValidMoves()[0], nil); return err }},
+		{"PushMove", func(g *chess.Game) error { _, err := g.PushMove("e4", nil); return err }},
 		{"PushNotationMove", func(g *chess.Game) error {
-			return g.PushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+			_, err := g.PushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+			return err
 		}},
 		{"UnsafePushNotationMove", func(g *chess.Game) error {
-			return g.UnsafePushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+			_, err := g.UnsafePushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+			return err
 		}},
 		{"Resign", func(g *chess.Game) error { return g.Resign(chess.Black) }},
 		{"Draw", func(g *chess.Game) error { return g.Draw(chess.DrawOffer) }},
@@ -163,20 +165,20 @@ func TestResignSetsOpponentWinner(t *testing.T) {
 
 func TestMoveAfterGoBackFromTerminalStillRejected(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}); err != nil {
 		t.Fatal(err)
 	}
-	if !g.GoBack() {
+	if !g.MoveTree().GoBack() {
 		t.Fatal("GoBack failed")
 	}
 	if g.Outcome() != chess.WhiteWon {
 		t.Fatalf("outcome lost after GoBack: %s", g.Outcome())
 	}
 	move := g.ValidMoves()[0]
-	err := g.Move(move, nil)
+	_, err := g.Move(move, nil)
 	if !errors.Is(err, chess.ErrGameAlreadyEnded) {
 		t.Errorf("error = %v, want ErrGameAlreadyEnded", err)
 	}
@@ -184,18 +186,18 @@ func TestMoveAfterGoBackFromTerminalStillRejected(t *testing.T) {
 
 func TestAddVariationAllowedAfterTerminalOutcome(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}); err != nil {
 		t.Fatal(err)
 	}
-	if !g.GoBack() {
+	if !g.MoveTree().GoBack() {
 		t.Fatal("GoBack failed")
 	}
 	variation := g.ValidMoves()[0]
-	g.AddVariation(g.GetRootMove(), variation)
-	if len(g.GetRootMove().Children()) == 0 {
+	g.MoveTree().AddVariation(g.MoveTree().Root(), variation)
+	if len(g.MoveTree().Root().Children()) == 0 {
 		t.Error("AddVariation did not append child after terminal outcome")
 	}
 }
@@ -269,7 +271,7 @@ func TestEligibleDraws_FreshGameReturnsOnlyDrawOffer(t *testing.T) {
 func TestEligibleDraws_IncludesThreefoldRepetitionWhenConditionsMet(t *testing.T) {
 	g := chess.NewGame()
 	for _, mv := range []string{"Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8"} {
-		if err := g.PushMove(mv, nil); err != nil {
+		if _, err := g.PushMove(mv, nil); err != nil {
 			t.Fatal(err)
 		}
 	}

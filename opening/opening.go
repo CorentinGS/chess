@@ -31,7 +31,7 @@ func buildGame(moveList []string) *chess.Game {
 		if err != nil {
 			return nil
 		}
-		if err := game.Move(m, nil); err != nil {
+		if _, err := game.Move(m, nil); err != nil {
 			return nil
 		}
 	}

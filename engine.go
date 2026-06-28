@@ -1,33 +1,9 @@
-/*
-Package chess implements a chess game engine that manages move generation,
-position analysis, and game state validation.
-The engine uses bitboard operations and lookup tables for efficient move
-generation and position analysis. Move generation includes standard piece
-moves, captures, castling, en passant, and pawn promotions.
-Example usage:
-
-	// Create a position
-	pos := NewPosition()
-
-	// Calculate legal moves for current position
-	eng := engine{}
-	moves := eng.CalcMoves(pos, false)
-
-	// Check game status
-	status := eng.Status(pos)
-	if status == Checkmate {
-		fmt.Println("Game Over - Checkmate")
-	}
-*/
 package chess
 
 import (
 	"math/bits"
 	"sync"
 )
-
-// engine implements chess move generation and position analysis.
-type engine struct{}
 
 type moveGenerationMode uint8
 
@@ -37,7 +13,7 @@ const (
 	generateUnsafeOnly
 )
 
-// CalcMoves returns all legal moves for the given position. If first is true,
+// calcMoves returns all legal moves for the given position. If first is true,
 // returns after finding the first legal move. This is useful for quick position
 // validation.
 //
@@ -46,7 +22,7 @@ const (
 //  2. Castling moves (if available)
 //
 // Each move is validated to ensure it doesn't leave the king in check
-func (engine) CalcMoves(pos *Position, first bool) []Move {
+func calcMoves(pos *Position, first bool) []Move {
 	if first {
 		if hasLegalMove(pos) {
 			return []Move{{}}
@@ -68,13 +44,13 @@ func legalMovesForMode(pos *Position, mode moveGenerationMode) []Move {
 	return moves
 }
 
-// UnsafeMoves returns all pseudo-legal moves that are illegal because they
+// unsafeMoves returns all pseudo-legal moves that are illegal because they
 // leave the moving side's king in check.
-func (engine) UnsafeMoves(pos *Position) []Move {
+func unsafeMoves(pos *Position) []Move {
 	return standardMoves(pos, false, generateUnsafeOnly)
 }
 
-// Status returns the current position's Method (Checkmate, Stalemate, or
+// status returns the current position's Method (Checkmate, Stalemate, or
 // NoMethod).
 //
 // The Method is determined by:
@@ -83,7 +59,7 @@ func (engine) UnsafeMoves(pos *Position) []Move {
 //
 // If the position has cached valid moves in pos.validMoves, those will be
 // used. Otherwise, moves will be calculated to determine the Method.
-func (e engine) Status(pos *Position) Method {
+func status(pos *Position) Method {
 	var hasMove bool
 	if pos.validMoves != nil {
 		hasMove = len(pos.validMoves) > 0

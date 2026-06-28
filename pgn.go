@@ -64,16 +64,15 @@ func newParser(tokens []Token) *Parser {
 
 func newParserFromSource(tokens pgnTokenSource) *Parser {
 	pos := StartingPosition()
-	rootMove := &MoveNode{
-		position: pos,
-	}
+	tree := newMoveTree(pos)
+	rootMove := tree.Root()
 	parser := &Parser{
 		tokens: tokens,
 		game: &Game{
-			tagPairs:    make(TagPairs),
-			pos:         pos,
-			rootMove:    rootMove, // Empty root move
-			currentMove: rootMove,
+			tagPairs: make(TagPairs),
+			tree:     tree,
+			outcome:  NoOutcome,
+			method:   NoMethod,
 		},
 		currentMove: rootMove,
 	}
@@ -138,8 +137,7 @@ func (p *Parser) Parse() (*Game, error) {
 		if err != nil {
 			return nil, errors.New("chess: invalid FEN")
 		}
-		p.game.rootMove.position = pos
-		p.game.pos = pos
+		p.game.tree.setRootPosition(pos)
 	}
 
 	// Parse moves section
@@ -151,7 +149,7 @@ func (p *Parser) Parse() (*Game, error) {
 	if err := p.resolveOutcome(); err != nil {
 		return nil, err
 	}
-	p.game.currentMove = p.currentMove
+	p.game.tree.setCurrent(p.currentMove)
 
 	return p.game, nil
 }
@@ -362,7 +360,7 @@ func (p *Parser) parseMove() (Move, error) {
 	if p.currentToken().Type == KingsideCastle {
 		move.tags = KingSideCastle
 		var castles [2]Move
-		count := castleMovesInto(p.game.pos, &castles, generateLegalAnnotated)
+		count := castleMovesInto(p.game.currentPosition(), &castles, generateLegalAnnotated)
 		for i := range count {
 			m := castles[i]
 			if m.HasTag(KingSideCastle) {
@@ -386,7 +384,7 @@ func (p *Parser) parseMove() (Move, error) {
 	if p.currentToken().Type == QueensideCastle {
 		move.tags = QueenSideCastle
 		var castles [2]Move
-		count := castleMovesInto(p.game.pos, &castles, generateLegalAnnotated)
+		count := castleMovesInto(p.game.currentPosition(), &castles, generateLegalAnnotated)
 		for i := range count {
 			m := castles[i]
 			if m.HasTag(QueenSideCastle) {
@@ -510,10 +508,10 @@ func (p *Parser) parseMove() (Move, error) {
 		originRank = int8(moveData.originRank[0] - '1')
 	}
 	var matched Move
-	visitLegalMoves(p.game.pos, generateLegalAnnotated, func(m Move) bool {
+	visitLegalMoves(p.game.currentPosition(), generateLegalAnnotated, func(m Move) bool {
 		//nolint:nestif // readability
 		if m.S2() == targetSquare {
-			pos := p.game.pos
+			pos := p.game.currentPosition()
 			piece := pos.Board().Piece(m.S1())
 
 			// Check piece type
@@ -668,24 +666,18 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 
 	// Save current state to restore later
 	parentMove := p.currentMove
-	oldPos := p.game.pos
+	oldCurrent := p.game.tree.Current()
 
 	// For variations at game start, we attach to root
-	variationParent := p.game.rootMove
+	variationParent := p.game.tree.Root()
 
 	// Find the move this variation should diverge from
-	if parentMove != p.game.rootMove && parentMove.parent != nil {
+	if parentMove != p.game.tree.Root() && parentMove.parent != nil {
 		variationParent = parentMove.parent
-		if variationParent.parent != nil && variationParent.parent.position != nil {
-			p.game.pos = variationParent.parent.position.Update(variationParent.move)
-		} else {
-			p.game.pos = p.game.rootMove.position.copy()
-		}
-	} else {
-		p.game.pos = p.game.rootMove.position.copy()
 	}
 
 	p.currentMove = variationParent
+	p.game.tree.setCurrent(variationParent)
 
 	moveNumber := parentMoveNumber
 	ply := parentPly
@@ -735,7 +727,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 			p.advance()
 
 		case PIECE, SQUARE, FILE, KingsideCastle, QueensideCastle:
-			if isBlackMove != (p.game.pos.Turn() == Black) {
+			if isBlackMove != (p.game.currentPosition().Turn() == Black) {
 				return &ParserError{
 					Message:  "move color mismatch",
 					Position: p.position,
@@ -786,9 +778,8 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 
 	p.advance() // consume )
 
-	p.game.pos = oldPos
 	p.currentMove = parentMove
-	p.game.currentMove = p.currentMove
+	p.game.tree.setCurrent(oldCurrent)
 
 	return nil
 }
@@ -816,14 +807,12 @@ func (p *Parser) addMove(move Move, number uint) {
 	p.currentMove.children = append(p.currentMove.children, node)
 
 	// Update position
-	if newPos := p.game.pos.Update(move); newPos != nil {
-		p.game.pos = newPos
+	if newPos := p.game.currentPosition().Update(move); newPos != nil {
+		node.position = newPos
 	}
 
-	// Cache position after the move
-	node.position = p.game.pos
-
 	p.currentMove = node
+	p.game.tree.setCurrent(node)
 }
 
 // parsePieceType converts a piece character into a PieceType.

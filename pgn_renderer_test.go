@@ -20,10 +20,10 @@ func TestPGNRenderer_RenderMatchesGameString(t *testing.T) {
 	g.AddTagPair("Black", "Player B")
 	g.AddTagPair("Result", "*")
 
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.PushMove("e5", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -36,10 +36,10 @@ func TestPGNRenderer_RenderMatchesGameString(t *testing.T) {
 
 func TestGame_WritePGNMatchesString(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("d4", nil); err != nil {
+	if _, err := g.PushMove("d4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("d5", nil); err != nil {
+	if _, err := g.PushMove("d5", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -82,13 +82,13 @@ func TestPGNRenderer_EndsEmptyGameWithNoOutcome(t *testing.T) {
 
 func TestPGNRenderer_MoveNumberUsesDotAndSpace(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.PushMove("e5", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("Nf3", nil); err != nil {
+	if _, err := g.PushMove("Nf3", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,10 +107,10 @@ func TestPGNRenderer_MoveNumberUsesDotAndSpace(t *testing.T) {
 
 func TestPGNRenderer_TrailingSpaceAfterMoves(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.PushMove("e5", nil); err != nil {
 		t.Fatal(err)
 	}
 	out := chess.DefaultPGNRenderer.Render(g)
@@ -129,10 +129,10 @@ func TestPGNRenderer_NoTrailingSpaceForEmptyGame(t *testing.T) {
 
 func TestPGNRenderer_EscapesCommentEndBrace(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	g.GetRootMove().Children()[0].SetComment("keeps } inside")
+	g.MoveTree().Root().Children()[0].SetComment("keeps } inside")
 
 	out := chess.DefaultPGNRenderer.Render(g)
 	if !strings.Contains(out, `keeps \} inside`) {
@@ -140,7 +140,7 @@ func TestPGNRenderer_EscapesCommentEndBrace(t *testing.T) {
 	}
 
 	parsed := chess.NewGame(mustPGNOption(t, out))
-	if got := parsed.GetRootMove().Children()[0].Comments(); got != "keeps } inside" {
+	if got := parsed.MoveTree().Root().Children()[0].Comments(); got != "keeps } inside" {
 		t.Fatalf("round-tripped comment = %q, want %q", got, "keeps } inside")
 	}
 }
@@ -148,7 +148,7 @@ func TestPGNRenderer_EscapesCommentEndBrace(t *testing.T) {
 func TestPGNRenderer_EscapesTagValueQuotes(t *testing.T) {
 	g := chess.NewGame()
 	g.AddTagPair("White", `A "B" C`)
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -160,10 +160,10 @@ func TestPGNRenderer_EscapesTagValueQuotes(t *testing.T) {
 
 func TestPGNRenderer_EmitsCommandAnnotation(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	g.GetRootMove().Children()[0].SetCommand("clk", "0:01:23")
+	g.MoveTree().Root().Children()[0].SetCommand("clk", "0:01:23")
 
 	out := chess.DefaultPGNRenderer.Render(g)
 	if !strings.Contains(out, "[%clk 0:01:23]") {
@@ -182,7 +182,7 @@ func TestPGNRenderer_OrdersTagsBySevenTagRosterThenAlpha(t *testing.T) {
 	g.AddTagPair("White", "A")
 	g.AddTagPair("Event", "E")
 	g.AddTagPair("Site", "S")
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -199,10 +199,10 @@ func TestPGNRenderer_OrdersTagsBySevenTagRosterThenAlpha(t *testing.T) {
 
 func TestPGNRenderer_DoesNotMutateGame(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	g.GetRootMove().Children()[0].SetComment("a comment")
+	g.MoveTree().Root().Children()[0].SetComment("a comment")
 	g.AddTagPair("Custom", "value")
 
 	before := g.String()
@@ -234,12 +234,12 @@ func TestPGNRenderer_RoundTripsVariations(t *testing.T) {
 
 func TestPGNRenderer_IsIdempotentOnAnnotations(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	g.GetRootMove().Children()[0].SetComment("best move")
-	g.GetRootMove().Children()[0].SetNAG("$1")
-	if err := g.PushMove("e5", nil); err != nil {
+	g.MoveTree().Root().Children()[0].SetComment("best move")
+	g.MoveTree().Root().Children()[0].SetNAG("$1")
+	if _, err := g.PushMove("e5", nil); err != nil {
 		t.Fatal(err)
 	}
 

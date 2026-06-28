@@ -21,7 +21,6 @@ package chess
 
 import (
 	"bytes"
-	"crypto/md5"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -245,7 +244,7 @@ func (pos *Position) ValidMoves() []Move {
 	if pos.validMoves != nil {
 		return append([]Move(nil), pos.validMoves...)
 	}
-	pos.validMoves = engine{}.CalcMoves(pos, false)
+	pos.validMoves = calcMoves(pos, false)
 	return append([]Move(nil), pos.validMoves...)
 }
 
@@ -256,7 +255,7 @@ func (pos *Position) ValidMovesUnsafe() []Move {
 	if pos.validMoves != nil {
 		return pos.validMoves
 	}
-	pos.validMoves = engine{}.CalcMoves(pos, false)
+	pos.validMoves = calcMoves(pos, false)
 	return pos.validMoves
 }
 
@@ -282,7 +281,7 @@ func (pos *Position) ValidMovesIter(yield func(Move) bool) {
 // UnsafeMoves returns all pseudo-legal moves that are illegal because they leave
 // the moving side's king in check. These moves should not be played via Move().
 func (pos *Position) UnsafeMoves() []Move {
-	return engine{}.UnsafeMoves(pos)
+	return unsafeMoves(pos)
 }
 
 // Status returns the position's outcome Method (e.g. Checkmate, Stalemate, or
@@ -291,7 +290,7 @@ func (pos *Position) Status() Method {
 	if pos.statusCached {
 		return pos.status
 	}
-	pos.status = engine{}.Status(pos)
+	pos.status = status(pos)
 	pos.statusCached = true
 	return pos.status
 }
@@ -412,13 +411,6 @@ func (pos *Position) XFENString() string {
 		}
 	}
 	return fmt.Sprintf("%s %s %s %s %d %d", b, t, c, sq, pos.halfMoveClock, pos.moveCount)
-}
-
-// Hash returns a unique hash of the position using MD5 of the binary representation.
-// Deprecated: Use ZobristHash() for fast position comparison and transposition tables.
-func (pos *Position) Hash() [16]byte {
-	b, _ := pos.MarshalBinary()
-	return md5.Sum(b)
 }
 
 // ZobristHash returns the Zobrist hash of the position.

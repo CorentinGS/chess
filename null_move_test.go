@@ -264,14 +264,14 @@ func TestNullMove_UpdateIncrementsMoveCountAfterBlack(t *testing.T) {
 
 func TestNullMove_GameMoveRejectsNull(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.Move(chess.NewNullMove(), nil); err == nil {
+	if _, err := g.Move(chess.NewNullMove(), nil); err == nil {
 		t.Fatal("Game.Move must reject a null move")
 	}
 }
 
 func TestNullMove_UnsafeMoveAcceptsNull(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.UnsafeMove(chess.NewNullMove(), nil); err != nil {
+	if _, err := g.UnsafeMove(chess.NewNullMove(), nil); err != nil {
 		t.Fatalf("Game.UnsafeMove(NullMove()) error: %v", err)
 	}
 	if g.Position().Turn() != chess.Black {
@@ -416,7 +416,7 @@ func TestNullMove_PGNWrite(t *testing.T) {
 	if _, err := g.NullMove(); err != nil {
 		t.Fatalf("NullMove: %v", err)
 	}
-	if err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.PushMove("e5", nil); err != nil {
 		t.Fatalf("PushMove e5: %v", err)
 	}
 	rendered := g.String()
@@ -430,10 +430,10 @@ func TestNullMove_PGNWriteReadRoundTrip(t *testing.T) {
 	if _, err := g.NullMove(); err != nil {
 		t.Fatalf("NullMove: %v", err)
 	}
-	if err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.PushMove("e5", nil); err != nil {
 		t.Fatalf("PushMove e5: %v", err)
 	}
-	if err := g.PushMove("Nf3", nil); err != nil {
+	if _, err := g.PushMove("Nf3", nil); err != nil {
 		t.Fatalf("PushMove Nf3: %v", err)
 	}
 	if _, err := g.NullMove(); err != nil {

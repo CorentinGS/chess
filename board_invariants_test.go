@@ -21,7 +21,7 @@ func TestMailboxConsistency(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to parse move %s: %v", moveStr, err)
 			}
-			if err := g.Move(move, nil); err != nil {
+			if _, err := g.Move(move, nil); err != nil {
 				t.Fatalf("failed to play move %s: %v", moveStr, err)
 			}
 			if err := verifyMailboxConsistency(g.Position().Board()); err != nil {
@@ -38,7 +38,7 @@ func TestMailboxConsistency(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to parse move %s: %v", moveStr, err)
 			}
-			if err := g.Move(move, nil); err != nil {
+			if _, err := g.Move(move, nil); err != nil {
 				t.Fatalf("failed to play move %s: %v", moveStr, err)
 			}
 			if err := verifyMailboxConsistency(g.Position().Board()); err != nil {
@@ -55,7 +55,7 @@ func TestMailboxConsistency(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to parse move %s: %v", moveStr, err)
 			}
-			if err := g.Move(move, nil); err != nil {
+			if _, err := g.Move(move, nil); err != nil {
 				t.Fatalf("failed to play move %s: %v", moveStr, err)
 			}
 			if err := verifyMailboxConsistency(g.Position().Board()); err != nil {
@@ -76,7 +76,7 @@ func TestMailboxConsistency(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to parse move %s: %v", moveStr, err)
 			}
-			if err := g.Move(move, nil); err != nil {
+			if _, err := g.Move(move, nil); err != nil {
 				t.Fatalf("failed to play move %s: %v", moveStr, err)
 			}
 			if err := verifyMailboxConsistency(g.Position().Board()); err != nil {

@@ -35,7 +35,7 @@ func BenchmarkFind(b *testing.B) {
 	}
 	g := chess.NewGame()
 	for _, move := range []string{"e4", "e5", "Nf3", "Nc6", "Bb5"} {
-		if err := g.PushMove(move, nil); err != nil {
+		if _, err := g.PushMove(move, nil); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -55,7 +55,7 @@ func BenchmarkPossible(b *testing.B) {
 		b.Fatal(err)
 	}
 	g := chess.NewGame()
-	if err := g.PushMove("g3", nil); err != nil {
+	if _, err := g.PushMove("g3", nil); err != nil {
 		b.Fatal(err)
 	}
 	moves := g.Moves()
@@ -75,7 +75,7 @@ func BenchmarkOpeningGame(b *testing.B) {
 	}
 	g := chess.NewGame()
 	for _, move := range []string{"e4", "e5"} {
-		if err := g.PushMove(move, nil); err != nil {
+		if _, err := g.PushMove(move, nil); err != nil {
 			b.Fatal(err)
 		}
 	}

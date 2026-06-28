@@ -572,7 +572,7 @@ func TestIssue84FullGame(t *testing.T) {
 		t.Fatalf("Failed to parse PGN: %v", err)
 	}
 	game := NewGame(pgnObj)
-	moves := game.MoveNodes()
+	moves := game.MoveTree().MainLine()
 
 	for i, mv := range moves {
 		moveNum := (i / 2) + 1
