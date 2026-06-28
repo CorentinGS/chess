@@ -33,8 +33,7 @@ func mustPGNOption(t *testing.T, pgn string) func(*chess.Game) {
 
 func mustParseSingleGame(t *testing.T, pgn string) *chess.Game {
 	t.Helper()
-	scanner := chess.NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := chess.ParsePGN(strings.NewReader(pgn))
 	if err != nil {
 		t.Fatalf("failed to parse pgn: %v", err)
 	}

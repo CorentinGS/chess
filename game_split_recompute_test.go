@@ -94,11 +94,10 @@ func TestSplit_RecomputesTerminalOutcomesFromLeaf(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opt, err := chess.PGN(strings.NewReader(tt.pgn))
+			g, err := chess.ParsePGN(strings.NewReader(tt.pgn))
 			if err != nil {
 				t.Fatal(err)
 			}
-			g := chess.NewGame(opt)
 
 			splitGames := g.Split()
 			if len(splitGames) == 0 {

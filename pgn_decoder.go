@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"io"
@@ -10,10 +11,11 @@ import (
 	"sync"
 )
 
-// PGNOption configures PGN import.
+// PGNOption configures PGN decoding.
 type PGNOption func(*pgnOptions)
 
 type pgnOptions struct {
+	bufferSize       int
 	expandVariations bool
 }
 
@@ -21,6 +23,15 @@ type pgnOptions struct {
 func WithPGNExpandVariations() PGNOption {
 	return func(o *pgnOptions) {
 		o.expandVariations = true
+	}
+}
+
+// WithPGNBufferSize configures the reader buffer size used for PGN record framing.
+func WithPGNBufferSize(n int) PGNOption {
+	return func(o *pgnOptions) {
+		if n > 0 {
+			o.bufferSize = n
+		}
 	}
 }
 
@@ -35,7 +46,7 @@ type PGNDecoder struct {
 
 // NewPGNDecoder creates a decoder that reads Games from r.
 func NewPGNDecoder(r io.Reader, opts ...PGNOption) *PGNDecoder {
-	return &PGNDecoder{framer: newPGNFramer(r), options: opts}
+	return &PGNDecoder{framer: newPGNFramer(r, opts...), options: opts}
 }
 
 // Decode returns the next Game from the PGN stream.
@@ -47,13 +58,14 @@ func (d *PGNDecoder) Decode() (*Game, error) {
 		return game, nil
 	}
 
-	record, err := d.framer.next()
+	record, err := d.framer.nextText()
 	if err != nil {
 		return nil, err
 	}
+	d.index++
 	d.offset = record.Offset
 
-	game, err := record.Decode(d.options...)
+	game, err := parsePGNText(record.Raw)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +80,6 @@ func (d *PGNDecoder) Decode() (*Game, error) {
 		game = games[0]
 	}
 
-	d.index++
 	return game, nil
 }
 
@@ -110,6 +121,12 @@ type PGNRecord struct {
 	Raw    []byte
 }
 
+type pgnTextRecord struct {
+	Index  int64
+	Offset int64
+	Raw    string
+}
+
 // Decode parses this record into a Game.
 func (r PGNRecord) Decode(opts ...PGNOption) (*Game, error) {
 	game, err := parsePGNRecord(r.Raw)
@@ -144,9 +161,9 @@ func (r PGNRecord) Tags() (map[string]string, error) {
 }
 
 // PGNRecords returns an iterator over raw PGN records.
-func PGNRecords(ctx context.Context, r io.Reader, _ ...PGNOption) iter.Seq2[PGNRecord, error] {
+func PGNRecords(ctx context.Context, r io.Reader, opts ...PGNOption) iter.Seq2[PGNRecord, error] {
 	return func(yield func(PGNRecord, error) bool) {
-		framer := newPGNFramer(r)
+		framer := newPGNFramer(r, opts...)
 		for {
 			if err := ctx.Err(); err != nil {
 				yield(PGNRecord{}, err)
@@ -165,53 +182,123 @@ func PGNRecords(ctx context.Context, r io.Reader, _ ...PGNOption) iter.Seq2[PGNR
 }
 
 type pgnFramer struct {
-	data    []byte
-	pos     int
-	index   int64
-	readErr error
+	reader     *bufio.Reader
+	buffer     []byte
+	chunk      []byte
+	baseOffset int64
+	index      int64
+	readErr    error
+	eof        bool
 }
 
-func newPGNFramer(r io.Reader) *pgnFramer {
-	data, err := io.ReadAll(r)
-	return &pgnFramer{data: data, readErr: err}
+func newPGNFramer(r io.Reader, opts ...PGNOption) *pgnFramer {
+	options := applyPGNOptions(opts)
+	bufferSize := options.bufferSize
+	if bufferSize <= 0 {
+		bufferSize = 32 * 1024
+	}
+	return &pgnFramer{reader: bufio.NewReaderSize(r, bufferSize), chunk: make([]byte, bufferSize)}
 }
 
 func (f *pgnFramer) next() (PGNRecord, error) {
-	if f.readErr != nil {
-		err := f.readErr
-		f.readErr = nil
-		return PGNRecord{}, err
-	}
-	for f.pos < len(f.data) {
-		advance, token, err := splitPGNGames(f.data[f.pos:], true)
+	for {
+		if f.readErr != nil && len(f.buffer) == 0 {
+			err := f.readErr
+			f.readErr = nil
+			return PGNRecord{}, err
+		}
+
+		advance, token, err := splitPGNGames(f.buffer, f.eof)
 		if err != nil {
 			return PGNRecord{}, err
 		}
 		if advance == 0 && token == nil {
-			return PGNRecord{}, io.EOF
+			if f.eof {
+				return PGNRecord{}, io.EOF
+			}
+			if err := f.readMore(); err != nil && len(f.buffer) == 0 {
+				return PGNRecord{}, err
+			}
+			continue
 		}
-		start := f.pos
+		start := f.baseOffset
 		if len(token) > 0 {
-			if rel := bytes.Index(f.data[f.pos:f.pos+advance], token); rel >= 0 {
-				start = f.pos + rel
+			if rel := bytes.Index(f.buffer[:advance], token); rel >= 0 {
+				start = f.baseOffset + int64(rel)
 			}
 		}
-		f.pos += advance
+		f.buffer = f.buffer[advance:]
+		f.baseOffset += int64(advance)
 		if len(token) == 0 {
 			continue
 		}
 		f.index++
-		return PGNRecord{Index: f.index, Offset: int64(start), Raw: append([]byte(nil), token...)}, nil
+		return PGNRecord{Index: f.index, Offset: start, Raw: append([]byte(nil), token...)}, nil
 	}
-	return PGNRecord{}, io.EOF
+}
+
+func (f *pgnFramer) nextText() (pgnTextRecord, error) {
+	for {
+		if f.readErr != nil && len(f.buffer) == 0 {
+			err := f.readErr
+			f.readErr = nil
+			return pgnTextRecord{}, err
+		}
+
+		advance, token, err := splitPGNGames(f.buffer, f.eof)
+		if err != nil {
+			return pgnTextRecord{}, err
+		}
+		if advance == 0 && token == nil {
+			if f.eof {
+				return pgnTextRecord{}, io.EOF
+			}
+			if err := f.readMore(); err != nil && len(f.buffer) == 0 {
+				return pgnTextRecord{}, err
+			}
+			continue
+		}
+		start := f.baseOffset
+		if len(token) > 0 {
+			if rel := bytes.Index(f.buffer[:advance], token); rel >= 0 {
+				start = f.baseOffset + int64(rel)
+			}
+		}
+		f.buffer = f.buffer[advance:]
+		f.baseOffset += int64(advance)
+		if len(token) == 0 {
+			continue
+		}
+		f.index++
+		return pgnTextRecord{Index: f.index, Offset: start, Raw: string(token)}, nil
+	}
+}
+
+func (f *pgnFramer) readMore() error {
+	n, err := f.reader.Read(f.chunk)
+	if n > 0 {
+		f.buffer = append(f.buffer, f.chunk[:n]...)
+	}
+	if err == io.EOF {
+		f.eof = true
+		return nil
+	}
+	if err != nil {
+		f.readErr = err
+	}
+	return err
 }
 
 func parsePGNRecord(raw []byte) (*Game, error) {
-	tokens, err := TokenizeGame(&GameScanned{Raw: string(raw)})
+	return parsePGNText(string(raw))
+}
+
+func parsePGNText(raw string) (*Game, error) {
+	tokens, err := TokenizeGame(&GameScanned{Raw: raw})
 	if err != nil {
 		return nil, err
 	}
-	return NewParser(tokens).Parse()
+	return newParser(tokens).Parse()
 }
 
 func applyPGNOptions(opts []PGNOption) pgnOptions {
@@ -253,7 +340,7 @@ func DecodePGNGamesParallel(ctx context.Context, r io.Reader, opts PGNParallelOp
 
 	go func() {
 		defer close(jobs)
-		for record, err := range PGNRecords(ctx, r) {
+		for record, err := range PGNRecords(ctx, r, opts.Options...) {
 			if err != nil {
 				results <- PGNResult{Err: err}
 				return
@@ -319,9 +406,20 @@ func sendPGNResult(ctx context.Context, out chan<- PGNResult, result PGNResult) 
 }
 
 func yieldOrderedPGNResults(ctx context.Context, out chan<- PGNResult, results <-chan PGNResult) {
+	// Index zero or negative results (typically record-stream errors from
+	// the framer goroutine) are emitted immediately without ordering.
+	// Workers may still be decoding in-flight records when an error arrives;
+	// their results will be dropped because the results channel closes after
+	// this function returns.
 	next := int64(1)
 	pending := make(map[int64]PGNResult)
 	for result := range results {
+		if result.Index <= 0 {
+			if !sendPGNResult(ctx, out, result) {
+				return
+			}
+			continue
+		}
 		pending[result.Index] = result
 		for {
 			ready, ok := pending[next]

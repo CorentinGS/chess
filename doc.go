@@ -22,8 +22,7 @@ Using Algebraic Notation
 
 Using PGN
 
-	pgn, _ := chess.PGN(pgnReader)
-	game := chess.NewGame(pgn)
+	game, _ := chess.ParsePGN(pgnReader)
 
 Using FEN
 

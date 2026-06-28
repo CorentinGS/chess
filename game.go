@@ -96,40 +96,6 @@ type Game struct {
 	ignoreInsufficientMaterialDraw bool       // Flag for automatic InsufficientMaterial draw handling
 }
 
-// PGN takes a reader and returns a function that updates
-// the game to reflect the PGN data.  The PGN can use any
-// move notation supported by this package.  The returned
-// function is designed to be used in the NewGame constructor.
-// An error is returned if there is a problem parsing the PGN data.
-func PGN(r io.Reader) (func(*Game), error) {
-	scanner := NewScanner(r)
-
-	if !scanner.HasNext() {
-		return nil, ErrNoGameFound
-	}
-
-	gameScanned, err := scanner.ScanGame()
-	if err != nil {
-		return nil, err
-	}
-
-	tokens, err := TokenizeGame(gameScanned)
-	if err != nil {
-		return nil, err
-	}
-
-	parser := NewParser(tokens)
-	game, err := parser.Parse()
-	if err != nil {
-		return nil, err
-	}
-
-	// Return a function that updates the game with the parsed game state
-	return func(g *Game) {
-		g.copy(game)
-	}, nil
-}
-
 // FEN takes a string and returns a function that updates
 // the game to reflect the FEN data.  Since FEN doesn't encode
 // prior moves, the move list will be empty.  The returned
@@ -493,11 +459,11 @@ func (g *Game) MarshalText() ([]byte, error) {
 func (g *Game) UnmarshalText(text []byte) error {
 	r := bytes.NewReader(text)
 
-	toGame, err := PGN(r)
+	game, err := ParsePGN(r)
 	if err != nil {
 		return err
 	}
-	toGame(g)
+	g.copy(game)
 
 	return nil
 }

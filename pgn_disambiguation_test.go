@@ -22,8 +22,7 @@ func TestPGN_ParsesDisambiguationGame(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			scanner := chess.NewScanner(strings.NewReader(tc.pgn))
-			game, err := scanner.ParseNext()
+			game, err := chess.ParsePGN(strings.NewReader(tc.pgn))
 			if err != nil {
 				if !tc.shouldFail {
 					t.Errorf("%s: expected PGN parsing to succeed but got error: %v", tc.name, err)
@@ -107,8 +106,7 @@ func TestPGN_ParsesFullSquareCapture(t *testing.T) {
 
 1. c4 Nf6 2. Nc3 Ng8 3. e4 Nf6 4. e5 Ng8 5. d4 e6 6. f4 Ne7 7. Nf3 Ng8 8. d5 Ne7 9. Be3 Nf5 10. Bf2 Ne7 11. Bd3 Ng8 12. O-O Nh6 13. h3 Ng8 14. g4 h5 15. g5 d6 16. Qc2 Qf6 17. exf6 Nc6 18. fxg7 Bd7 19. gxh8=Q O-O-O 20. g6 Bg7 21. gxf7 Kb8 22. fxg8=Q Ka8 23. f5 Rf8 24. f6 Be8 25. f7 Nd8 26. fxe8=Q Kb8 27. Qhxh5 Ka8 28. Qg4 Kb8 29. h4 Ka8 30. h5 Kb8 31. h6 Ka8 32. h7 Kb8 33. h8=Q Ka8 34. dxe6 Kb8 35. e7 Ka8 36. exf8=Q Kb8 37. Qg8xg7 Ka8 38. Qgg8 Kb8 39. Q4g7 Ka8 40. c5 Kb8 41. cxd6 Ka8 42. dxc7 b6 43. cxd8=Q# 1-0`
 
-	scanner := chess.NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := chess.ParsePGN(strings.NewReader(pgn))
 	if err != nil {
 		t.Fatalf("expected PGN with full-square disambiguation capture to parse: %v", err)
 	}

@@ -6,7 +6,7 @@ Example usage:
 
 	// Create parser from tokens
 	tokens := TokenizeGame(game)
-	parser := NewParser(tokens)
+	parser := newParser(tokens)
 
 	// Parse complete game
 	game, err := parser.Parse()
@@ -50,14 +50,14 @@ func (s *sliceTokenSource) NextToken() (Token, error) {
 	return token, nil
 }
 
-// NewParser creates a new parser instance initialized with the given tokens.
+// newParser creates a new parser instance initialized with the given tokens.
 // The parser starts with a root move containing the starting position.
 //
 // Example:
 //
 //	tokens := TokenizeGame(game)
-//	parser := NewParser(tokens)
-func NewParser(tokens []Token) *Parser {
+//	parser := newParser(tokens)
+func newParser(tokens []Token) *Parser {
 	return newParserFromSource(&sliceTokenSource{tokens: tokens})
 }
 

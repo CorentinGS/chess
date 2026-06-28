@@ -7,11 +7,11 @@ and variations. It supports streaming processing of large PGN files and provides
 proper handling of game boundaries and special notation.
 Example usage:
 	// Create scanner for PGN input
-	scanner := NewScanner(reader)
+	scanner := newScanner(reader)
 
 	// Read all games
-	for scanner.HasNext() {
-		game, err := scanner.ParseNext()
+	for scanner.hasNext() {
+		game, err := scanner.parseNext()
 		if err != nil {
 			log.Fatalf("Failed to parse game: %v", err)
 		}
@@ -83,43 +83,43 @@ var tokenSlicePool = sync.Pool{
 	},
 }
 
-// Scanner provides functionality to read chess games from a PGN source.
+// scanner provides functionality to read chess games from a PGN source.
 // It supports streaming processing of multiple games and proper handling
 // of PGN syntax.
-type Scanner struct {
+type scanner struct {
 	lastError       error // Store last error
 	scanner         *bufio.Scanner
 	nextGame        *GameScanned // Buffer for peeked game
 	nextParsedGames []*Game      // only valid when ExpandVariations==true
-	opts            ScannerOpts
+	opts            scannerOpts
 }
 
-type ScannerOption func(*Scanner)
+type scannerOption func(*scanner)
 
-// WithExpandVariations() instructs the scanner to expand all variations in
+// withExpandVariations() instructs the scanner to expand all variations in
 // a single GameScanned into multiple Game instances (1 per variation) rather
 // than a single Game instance.
-func WithExpandVariations() ScannerOption {
-	return func(s *Scanner) {
+func withExpandVariations() scannerOption {
+	return func(s *scanner) {
 		s.opts.ExpandVariations = true
 	}
 }
 
-type ScannerOpts struct {
+type scannerOpts struct {
 	ExpandVariations bool // default false
 }
 
-// NewScanner creates a new PGN scanner that reads from the provided reader.
+// newScanner creates a new PGN scanner that reads from the provided reader.
 // The scanner is configured to properly split PGN games and handle
 // PGN-specific syntax.
 //
 // Example:
 //
-//	scanner := NewScanner(strings.NewReader(pgnText))
-func NewScanner(r io.Reader, opts ...ScannerOption) *Scanner {
+//	scanner := newScanner(strings.NewReader(pgnText))
+func newScanner(r io.Reader, opts ...scannerOption) *scanner {
 	s := bufio.NewScanner(r)
 	s.Split(splitPGNGames)
-	ret := &Scanner{
+	ret := &scanner{
 		scanner:         s,
 		nextParsedGames: make([]*Game, 0),
 	}
@@ -132,18 +132,18 @@ func NewScanner(r io.Reader, opts ...ScannerOption) *Scanner {
 	return ret
 }
 
-// ScanGame reads and returns the next game from the source.
+// scanGame reads and returns the next game from the source.
 // Returns nil and io.EOF when no more games are available.
 // Returns nil and an error if reading fails.
 //
 // Example:
 //
-//	game, err := scanner.ScanGame()
+//	game, err := scanner.scanGame()
 //	if err == io.EOF {
 //	    // No more games
 //	}
-func (s *Scanner) ScanGame() (*GameScanned, error) {
-	// If we have a buffered game from HasNext(), return it
+func (s *scanner) scanGame() (*GameScanned, error) {
+	// If we have a buffered game from hasNext(), return it
 	if s.nextGame != nil {
 		game := s.nextGame
 		s.nextGame = nil
@@ -162,16 +162,16 @@ func (s *Scanner) ScanGame() (*GameScanned, error) {
 	return nil, io.EOF
 }
 
-// HasNext returns true if there are more games available to read.
+// hasNext returns true if there are more games available to read.
 // This method can be used to iterate over all games in the source.
 //
 // Example:
 //
-//	for scanner.HasNext() {
-//	    scangame, err := scanner.ScanGame()
+//	for scanner.hasNext() {
+//	    scangame, err := scanner.scanGame()
 //	    // Process scangame
 //	}
-func (s *Scanner) HasNext() bool {
+func (s *scanner) hasNext() bool {
 	// If we already have a buffered game, return true
 	if s.nextGame != nil || len(s.nextParsedGames) > 0 {
 		return true
@@ -189,24 +189,24 @@ func (s *Scanner) HasNext() bool {
 	return false
 }
 
-// ParseNext is a convenience wrapper combining the functionality of
-// ScanGame(), TokenizeGame(), NewParser(), and Parse() enabling
-// callers to simplify iterating over each Game within a pgn file.
+// parseNext is a convenience wrapper combining the functionality of
+// scanGame(), TokenizeGame(), newParser(), and Parse() enabling
+// callers to simplify iterating over each Game within a PGN file.
 //
 // Example:
 //
-//	for scanner.HasNext() {
-//	    game, err := scanner.ParseNext()
+//	for scanner.hasNext() {
+//	    game, err := scanner.parseNext()
 //	    // Process game
 //	}
-func (s *Scanner) ParseNext() (*Game, error) {
+func (s *scanner) parseNext() (*Game, error) {
 	if len(s.nextParsedGames) > 0 {
 		ret := s.nextParsedGames[0]
 		s.nextParsedGames = s.nextParsedGames[1:]
 		return ret, nil
 	}
 
-	scannedGame, err := s.ScanGame()
+	scannedGame, err := s.scanGame()
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func (s *Scanner) ParseNext() (*Game, error) {
 		*pooledTokens = tokens[:0]
 		tokenSlicePool.Put(pooledTokens)
 	}()
-	parser := NewParser(tokens)
+	parser := newParser(tokens)
 	game, err := parser.Parse()
 	if err != nil {
 		return nil, err

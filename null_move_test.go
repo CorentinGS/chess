@@ -409,11 +409,10 @@ func TestNullMove_PGNWriteReadRoundTrip(t *testing.T) {
 	}
 	rendered := g.String()
 
-	g2, err := chess.PGN(strings.NewReader(rendered))
+	loaded, err := chess.ParsePGN(strings.NewReader(rendered))
 	if err != nil {
 		t.Fatalf("re-parse: %v", err)
 	}
-	loaded := chess.NewGame(g2)
 	moves := loaded.Moves()
 	if len(moves) != 4 {
 		t.Fatalf("len(Moves)=%d, want 4", len(moves))

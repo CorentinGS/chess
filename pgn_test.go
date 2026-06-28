@@ -1116,7 +1116,7 @@ func pgnMeta(name string) pgnFixtureMeta {
 }
 
 // BenchmarkPGN_Stream_Big parses the 1000-game lichess big.pgn fixture once per
-// iteration via the streaming Scanner API. Equivalent in workload to the
+// iteration via the streaming PGNDecoder API. Equivalent in workload to the
 // chess-library example (full SAN validation + move tree building).
 func BenchmarkPGN_Stream_Big(b *testing.B) {
 	benchStreamFixture(b, "big.pgn")
@@ -1144,9 +1144,13 @@ func BenchmarkPGN_Stream_Variations(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s := NewScanner(bytes.NewReader(pgn))
-		for s.HasNext() {
-			if _, err := s.ParseNext(); err != nil {
+		dec := NewPGNDecoder(bytes.NewReader(pgn))
+		for {
+			_, err := dec.Decode()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
 				b.Fatalf("parse error: %v", err)
 			}
 		}
@@ -1162,11 +1166,15 @@ func benchStreamFixture(b *testing.B, name string) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		s := NewScanner(bytes.NewReader(data))
+		dec := NewPGNDecoder(bytes.NewReader(data))
 		games := 0
 		errs := 0
-		for s.HasNext() {
-			if _, err := s.ParseNext(); err != nil {
+		for {
+			_, err := dec.Decode()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
 				// Real-world lichess data has ~0.7% games with a result
 				// inconsistent with the board-derivable outcome (e.g. "Black
 				// wins on time" when the final position is checkmate).

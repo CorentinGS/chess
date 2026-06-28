@@ -33,7 +33,7 @@ func TestPGN_ResolvesOutcomeFromTagTokenAndBoard(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opt, err := chess.PGN(strings.NewReader(tt.pgn))
+			g, err := chess.ParsePGN(strings.NewReader(tt.pgn))
 			if tt.wantErr {
 				var pe *chess.ParserError
 				if !errors.As(err, &pe) {
@@ -44,7 +44,6 @@ func TestPGN_ResolvesOutcomeFromTagTokenAndBoard(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			g := chess.NewGame(opt)
 			if got := g.Outcome(); got != tt.wantOutcome {
 				t.Errorf("Outcome() = %v, want %v", got, tt.wantOutcome)
 			}
@@ -56,25 +55,23 @@ func TestPGN_ResolvesOutcomeFromTagTokenAndBoard(t *testing.T) {
 }
 
 func TestPGNDrawMovetextTokenNotRecognized(t *testing.T) {
-	opt, err := chess.PGN(strings.NewReader("1. e4 e5 1/2-1/2"))
+	g, err := chess.ParsePGN(strings.NewReader("1. e4 e5 1/2-1/2"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := chess.NewGame(opt)
 	if got := g.Outcome(); got != chess.NoOutcome {
 		t.Errorf("draw movetext token currently yields %v; lexer does not recognize 1/2-1/2 as a RESULT (only the Result tag produces draws). If this changed, update this test", got)
 	}
 }
 
 func TestPGNTerminalVariationDoesNotSetMainLineOutcome(t *testing.T) {
-	opt, err := chess.PGN(strings.NewReader(`
+	g, err := chess.ParsePGN(strings.NewReader(`
 [Result "*"]
 
 (1. f3 e5 2. g4 Qh4#) 1. e4 e5 *`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := chess.NewGame(opt)
 	if got := g.Outcome(); got != chess.NoOutcome {
 		t.Fatalf("Outcome() = %v, want %v", got, chess.NoOutcome)
 	}
