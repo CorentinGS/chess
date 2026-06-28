@@ -5,6 +5,15 @@ import (
 	"testing"
 )
 
+func mustPosition(t *testing.T, fen string) *Position {
+	t.Helper()
+	pos, err := decodeFEN(fen)
+	if err != nil {
+		t.Fatalf("FEN decode: %v", err)
+	}
+	return pos
+}
+
 func TestPositionBinary(t *testing.T) {
 	for _, fen := range validFENs {
 		pos, err := decodeFEN(fen)
@@ -63,7 +72,7 @@ func TestPositionAnyLegalMove(t *testing.T) {
 		"7k/5K2/7Q/8/8/8/8/8 b - - 0 1",
 	}
 	for _, fen := range terminalFENs {
-		pos := mustPosition(fen)
+		pos := mustPosition(t, fen)
 		if pos.AnyLegalMove() {
 			t.Fatalf("AnyLegalMove(%s) = true, want false", fen)
 		}

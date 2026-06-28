@@ -42,6 +42,8 @@
   - [FEN](#fen)
   - [Notations](#notations)
   - [Moves](#moves)
+- [Perft](#perft)
+- [Variation Tree](#variation-tree)
 - [Performance](#performance)
   - [Benchmarks](#benchmarks)
 
@@ -762,6 +764,171 @@ func main() {
 	}
 }
 ```
+
+## Perft
+
+[Perft](https://www.chessprogramming.org/Perft) (performance test) is the
+standard correctness and performance benchmark for a chess move generator: it
+counts every legal move sequence of a given length reachable from a starting
+position. This package exposes Perft on `*Position`; the traversal uses the
+same legality rules that govern normal play while applying moves through an
+internal make/unmake path for performance.
+
+### Bulk node count
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/corentings/chess/v3"
+)
+
+func main() {
+	pos := chess.StartingPosition()
+	fmt.Println("startpos d5:", pos.Perft(5)) // 4 865 609
+	fmt.Println("startpos d6:", pos.Perft(6)) // 119 060 324
+}
+```
+
+A depth of 0 returns 1 (the position itself counts as a leaf). A position with
+no legal moves (checkmate or stalemate) returns 0 for any depth greater than 0.
+
+### Per-move breakdown (`Divide`)
+
+`Divide` returns the per-root-move Perft breakdown as a map from each legal
+move to its leaf count. It is the standard way to localize a divergence when
+two move generators disagree at a given depth.
+
+```go
+package main
+
+import (
+	"fmt"
+	"sort"
+
+	"github.com/corentings/chess/v3"
+)
+
+func main() {
+	pos := chess.StartingPosition()
+	results := pos.Divide(1)
+
+	keys := make([]chess.Move, 0, len(results))
+	for m := range results {
+		keys = append(keys, m)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].String() < keys[j].String()
+	})
+	for _, m := range keys {
+		fmt.Printf("%s: %d\n", m, results[m])
+	}
+}
+```
+
+Map iteration order is unspecified; sort by `Move.String()` for a stable
+display. Move strings are long-algebraic (`s1s2` plus a promotion suffix) and
+are intended for debugging, not for chess notation.
+
+### Canonical positions
+
+The package's Perft tests verify six canonical positions from
+[chessprogramming.org/Perft_Results](https://www.chessprogramming.org/Perft_Results)
+through depth 4–6. For a side-by-side performance comparison against another
+Go chess library, see [`benchcmp/perft/`](./benchcmp/perft/).
+
+## Variation Tree
+
+A `Game` keeps the moves that have been played as a tree of `MoveNode`s. Each
+node holds the `Move` it represents, its `Position` after the move, its parent
+and an ordered slice of children, plus any comments, NAGs, or
+`[%clk ...]`-style command annotations. `children[0]` is always the main line;
+`children[1:]` are the variations (sidelines) at that position.
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/corentings/chess/v3"
+)
+
+func main() {
+	g := chess.NewGame()
+	g.PushMove(chess.Move{S1: chess.E2, S2: chess.E4})
+	g.PushMove(chess.Move{S1: chess.E7, S2: chess.E5})
+
+	// Walk the main line from the root.
+	root := g.GetRootMove()
+	for n := root; n != nil; n = n.children[0] {
+		fmt.Printf("%s ", n.move)
+	}
+	fmt.Println()
+
+	// Add a variation off the root.
+	varOpt, _ := chess.PGN(strings.NewReader("1. e4 e5 (1... c5 {Sicilian} ) 1. e4"))
+	_ = varOpt
+}
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/corentings/chess/v3"
+)
+
+func main() {
+	g, _ := chess.ParsePGN(strings.NewReader(
+		`[Result "*"] 1. e4 e5 (1... c5 {Sicilian}) 2. Nf3 *`,
+	))
+
+	root := g.GetRootMove()
+	e4 := root.Children()[0] // first move of the main line
+
+	// Walk the main line by following children[0] at each node.
+	fmt.Print("main: ")
+	for n := e4; n != nil; n = mainChild(n) {
+		fmt.Printf("%s ", n.Move())
+	}
+	fmt.Println()
+
+	// Enumerate sideline variations at e4 (children[1:]).
+	fmt.Print("variations at e4: ")
+	for _, v := range g.Variations(e4) {
+		fmt.Printf("%s ", v.Move())
+	}
+	fmt.Println()
+}
+
+func mainChild(n *chess.MoveNode) *chess.MoveNode {
+	if n == nil || len(n.Children()) == 0 {
+		return nil
+	}
+	return n.Children()[0]
+}
+```
+
+Useful APIs over the tree:
+
+- `Game.GetRootMove() *MoveNode` — root of the tree (the position before any
+  move has been played).
+- `Game.MoveNodes() []*MoveNode` — all nodes in the tree, in pre-order.
+- `Game.Variations(node *MoveNode) []*MoveNode` — the sideline children of a
+  node (`children[1:]`); returns nil if the node has no variations.
+- `Game.AddVariation(parent *MoveNode, move Move)` — append a sideline to
+  `parent`'s children.
+- `node.Move()`, `node.Position()`, `node.parent`, `node.children`,
+  `node.Comments()`, `node.nag` — per-node data.
+
+Perft does not store its results in the game tree; it walks a temporary move
+tree internally, so it does not affect the `MoveNodes` you see from `Game`.
 
 ## Performance
 

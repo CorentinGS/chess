@@ -166,6 +166,9 @@ func TestMailboxConsistency(t *testing.T) {
 }
 
 func verifyMailboxConsistency(b *Board) error {
+	var whiteSqs bitboard
+	var blackSqs bitboard
+	var occupied bitboard
 	for sq := range numOfSquaresInBoard {
 		square := Square(sq)
 		mailboxPiece := b.Piece(square)
@@ -182,6 +185,25 @@ func verifyMailboxConsistency(b *Board) error {
 			return fmt.Errorf("mailbox/bitboard mismatch at %s: mailbox=%s, bitboard=%s",
 				square.String(), mailboxPiece.String(), bitboardPiece.String())
 		}
+		if bitboardPiece == NoPiece {
+			continue
+		}
+		sqBB := bbForSquare(square)
+		occupied |= sqBB
+		if bitboardPiece.Color() == White {
+			whiteSqs |= sqBB
+		} else {
+			blackSqs |= sqBB
+		}
+	}
+	if b.whiteSqs != whiteSqs {
+		return fmt.Errorf("white aggregate occupancy mismatch: got %s, want %s", b.whiteSqs, whiteSqs)
+	}
+	if b.blackSqs != blackSqs {
+		return fmt.Errorf("black aggregate occupancy mismatch: got %s, want %s", b.blackSqs, blackSqs)
+	}
+	if b.emptySqs != ^occupied {
+		return fmt.Errorf("empty aggregate occupancy mismatch: got %s, want %s", b.emptySqs, ^occupied)
 	}
 	return nil
 }

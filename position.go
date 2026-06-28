@@ -89,6 +89,8 @@ type Position struct {
 	enPassantSquare Square       // En passant target square
 	inCheck         bool         // Whether current side is in check
 	hash            uint64       // Zobrist hash for O(1) position comparison
+	status          Method       // Cached Status result
+	statusCached    bool         // Whether status contains a valid cached value
 }
 
 const (
@@ -146,7 +148,11 @@ func (pos *Position) Update(m Move) *Position {
 		enPassantSquare: pos.updateEnPassantSquare(m),
 		halfMoveClock:   halfMove,
 		moveCount:       moveCount,
-		inCheck:         m.HasTag(Check),
+	}
+	if m.HasTag(Check) {
+		newPos.inCheck = true
+	} else {
+		newPos.inCheck = isInCheck(newPos)
 	}
 	newPos.hash = pos.updateHash(m, ncr, newPos.enPassantSquare)
 	return newPos
@@ -223,18 +229,16 @@ func (pos *Position) updateHash(m Move, newCR CastleRights, newEP Square) uint64
 	}
 
 	// Update castling rights: XOR out removed rights
-	oldCR := pos.castleRights.String()
-	newCRStr := newCR.String()
-	if strings.Contains(oldCR, "K") && !strings.Contains(newCRStr, "K") {
+	if pos.castleRights.CanCastle(White, KingSide) && !newCR.CanCastle(White, KingSide) {
 		hash ^= polyglotHashesUint64[768]
 	}
-	if strings.Contains(oldCR, "Q") && !strings.Contains(newCRStr, "Q") {
+	if pos.castleRights.CanCastle(White, QueenSide) && !newCR.CanCastle(White, QueenSide) {
 		hash ^= polyglotHashesUint64[769]
 	}
-	if strings.Contains(oldCR, "k") && !strings.Contains(newCRStr, "k") {
+	if pos.castleRights.CanCastle(Black, KingSide) && !newCR.CanCastle(Black, KingSide) {
 		hash ^= polyglotHashesUint64[770]
 	}
-	if strings.Contains(oldCR, "q") && !strings.Contains(newCRStr, "q") {
+	if pos.castleRights.CanCastle(Black, QueenSide) && !newCR.CanCastle(Black, QueenSide) {
 		hash ^= polyglotHashesUint64[771]
 	}
 
@@ -300,7 +304,12 @@ func (pos *Position) UnsafeMoves() []Move {
 // Status returns the position's outcome Method (e.g. Checkmate, Stalemate, or
 // NoMethod).
 func (pos *Position) Status() Method {
-	return engine{}.Status(pos)
+	if pos.statusCached {
+		return pos.status
+	}
+	pos.status = engine{}.Status(pos)
+	pos.statusCached = true
+	return pos.status
 }
 
 // Board returns the position's board.
@@ -317,6 +326,7 @@ func (pos *Position) Turn() Color {
 func (pos *Position) ChangeTurn() *Position {
 	pos.turn = pos.turn.Other()
 	pos.hash = pos.computeHash()
+	pos.statusCached = false
 	return pos
 }
 

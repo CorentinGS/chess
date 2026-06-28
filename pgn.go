@@ -351,7 +351,7 @@ func (p *Parser) parseMove() (Move, error) {
 	if p.currentToken().Type == KingsideCastle {
 		move.tags = KingSideCastle
 		var castles [2]Move
-		count := castleMovesInto(p.game.pos, &castles)
+		count := castleMovesInto(p.game.pos, &castles, generateLegalAnnotated)
 		for i := range count {
 			m := castles[i]
 			if m.HasTag(KingSideCastle) {
@@ -375,7 +375,7 @@ func (p *Parser) parseMove() (Move, error) {
 	if p.currentToken().Type == QueensideCastle {
 		move.tags = QueenSideCastle
 		var castles [2]Move
-		count := castleMovesInto(p.game.pos, &castles)
+		count := castleMovesInto(p.game.pos, &castles, generateLegalAnnotated)
 		for i := range count {
 			m := castles[i]
 			if m.HasTag(QueenSideCastle) {
@@ -499,7 +499,7 @@ func (p *Parser) parseMove() (Move, error) {
 		originRank = int8(moveData.originRank[0] - '1')
 	}
 	var matched Move
-	visitLegalMoves(p.game.pos, false, func(m Move) bool {
+	visitLegalMoves(p.game.pos, generateLegalAnnotated, func(m Move) bool {
 		//nolint:nestif // readability
 		if m.S2() == targetSquare {
 			pos := p.game.pos

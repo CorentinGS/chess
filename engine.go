@@ -29,6 +29,14 @@ import (
 // engine implements chess move generation and position analysis.
 type engine struct{}
 
+type moveGenerationMode uint8
+
+const (
+	generateLegalAnnotated moveGenerationMode = iota
+	generateLegalOnly
+	generateUnsafeOnly
+)
+
 // CalcMoves returns all legal moves for the given position. If first is true,
 // returns after finding the first legal move. This is useful for quick position
 // validation.
@@ -47,17 +55,23 @@ func (engine) CalcMoves(pos *Position, first bool) []Move {
 	}
 
 	// generate possible moves
-	moves := standardMoves(pos, false, false)
+	moves := legalMovesForMode(pos, generateLegalAnnotated)
+	return moves
+}
+
+func legalMovesForMode(pos *Position, mode moveGenerationMode) []Move {
+	moves := standardMoves(pos, false, mode)
 	// return moves including castles
 	var castles [2]Move
-	count := castleMovesInto(pos, &castles)
-	return append(moves, castles[:count]...)
+	count := castleMovesInto(pos, &castles, mode)
+	moves = append(moves, castles[:count]...)
+	return moves
 }
 
 // UnsafeMoves returns all pseudo-legal moves that are illegal because they
 // leave the moving side's king in check.
 func (engine) UnsafeMoves(pos *Position) []Move {
-	return standardMoves(pos, false, true)
+	return standardMoves(pos, false, generateUnsafeOnly)
 }
 
 // Status returns the current position's Method (Checkmate, Stalemate, or
@@ -85,26 +99,25 @@ func (e engine) Status(pos *Position) Method {
 }
 
 func hasLegalMove(pos *Position) bool {
-	if hasStandardMove(pos, false) {
+	if hasStandardMove(pos) {
 		return true
 	}
-	var castles [2]Move
-	return castleMovesInto(pos, &castles) > 0
+	return hasCastleMove(pos)
 }
 
-func hasStandardMove(pos *Position, unsafeOnly bool) bool {
-	return visitStandardMoves(pos, unsafeOnly, func(Move) bool { return true })
+func hasStandardMove(pos *Position) bool {
+	return visitStandardMoves(pos, generateLegalOnly, func(Move) bool { return true })
 }
 
-func visitLegalMoves(pos *Position, unsafeOnly bool, visit func(Move) bool) bool {
-	if visitStandardMoves(pos, unsafeOnly, visit) {
+func visitLegalMoves(pos *Position, mode moveGenerationMode, visit func(Move) bool) bool {
+	if visitStandardMoves(pos, mode, visit) {
 		return true
 	}
-	if unsafeOnly {
+	if mode == generateUnsafeOnly {
 		return false
 	}
 	var castles [2]Move
-	count := castleMovesInto(pos, &castles)
+	count := castleMovesInto(pos, &castles, mode)
 	for i := range count {
 		if visit(castles[i]) {
 			return true
@@ -113,8 +126,9 @@ func visitLegalMoves(pos *Position, unsafeOnly bool, visit func(Move) bool) bool
 	return false
 }
 
-func visitStandardMoves(pos *Position, unsafeOnly bool, visit func(Move) bool) bool {
+func visitStandardMoves(pos *Position, mode moveGenerationMode, visit func(Move) bool) bool {
 	var m Move
+	ctx := legalMoveContextFor(pos, mode)
 
 	bbAllowed := ^pos.board.whiteSqs
 	if pos.Turn() == Black {
@@ -132,6 +146,9 @@ func visitStandardMoves(pos *Position, unsafeOnly bool, visit func(Move) bool) b
 		for s1Bits := s1BB; s1Bits != 0; s1Bits &= s1Bits - 1 {
 			s1 := squareFromBit(s1Bits & -s1Bits)
 			s2BB := bbForPossibleMoves(pos, p.Type(), s1) & bbAllowed
+			if ctx.enabled {
+				s2BB = ctx.filter(pos, p, s1, s2BB)
+			}
 			if s2BB == 0 {
 				continue
 			}
@@ -144,8 +161,8 @@ func visitStandardMoves(pos *Position, unsafeOnly bool, visit func(Move) bool) b
 				if (p == WhitePawn && s2.Rank() == Rank8) || (p == BlackPawn && s2.Rank() == Rank1) {
 					for _, pt := range promoPieceTypes {
 						m.promo = pt
-						m.tags = moveTags(m, pos)
-						if m.HasTag(inCheck) == unsafeOnly {
+						m.tags = moveTagsForPiece(m, pos, mode, p, mode == generateLegalOnly && ctx.provesOwnKingSafe(p, s2))
+						if moveMatchesMode(m, mode) {
 							if visit(m) {
 								return true
 							}
@@ -153,8 +170,8 @@ func visitStandardMoves(pos *Position, unsafeOnly bool, visit func(Move) bool) b
 					}
 				} else {
 					m.promo = 0
-					m.tags = moveTags(m, pos)
-					if m.HasTag(inCheck) == unsafeOnly {
+					m.tags = moveTagsForPiece(m, pos, mode, p, mode == generateLegalOnly && ctx.provesOwnKingSafe(p, s2))
+					if moveMatchesMode(m, mode) {
 						if visit(m) {
 							return true
 						}
@@ -165,6 +182,223 @@ func visitStandardMoves(pos *Position, unsafeOnly bool, visit func(Move) bool) b
 	}
 
 	return false
+}
+
+func moveMatchesMode(m Move, mode moveGenerationMode) bool {
+	if mode == generateUnsafeOnly {
+		return m.HasTag(inCheck)
+	}
+	return !m.HasTag(inCheck)
+}
+
+type legalMoveContext struct {
+	enabled    bool
+	enPassant  Square
+	checkCount int
+	checkMask  bitboard
+}
+
+func legalMoveContextFor(pos *Position, mode moveGenerationMode) legalMoveContext {
+	if mode == generateUnsafeOnly {
+		return legalMoveContext{}
+	}
+	kingSq := pos.board.kingSquare(pos.turn)
+	if kingSq == NoSquare {
+		return legalMoveContext{}
+	}
+	queenBB, rookBB, bishopBB := sliderBitboards(pos.board, pos.turn.Other())
+	if !pos.inCheck && alignedMasks[kingSq]&(queenBB|rookBB|bishopBB) == 0 {
+		return legalMoveContext{}
+	}
+	ctx := legalMoveContext{
+		enabled:   true,
+		enPassant: pos.enPassantSquare,
+		checkMask: ^bitboard(0),
+	}
+	if pos.inCheck {
+		ctx.setChecks(pos, kingSq)
+	}
+	return ctx
+}
+
+func (ctx legalMoveContext) filter(pos *Position, p Piece, s1 Square, moves bitboard) bitboard {
+	if p.Type() == King {
+		return moves
+	}
+	if ctx.enPassant != NoSquare && p.Type() == Pawn {
+		return moves
+	}
+	if ctx.checkCount > 1 {
+		return 0
+	}
+	if ctx.checkCount == 1 {
+		moves &= ctx.checkMask
+	}
+	if pinRay := pinnedRayForPiece(pos, s1); pinRay != 0 {
+		moves &= pinRay
+	}
+	return moves
+}
+
+func (ctx legalMoveContext) provesOwnKingSafe(p Piece, s2 Square) bool {
+	if p.Type() == King {
+		return false
+	}
+	if !ctx.enabled {
+		return false
+	}
+	if p.Type() == Pawn && ctx.enPassant != NoSquare {
+		return false
+	}
+	return true
+}
+
+func (ctx *legalMoveContext) setChecks(pos *Position, kingSq Square) {
+	board := pos.board
+	attacker := pos.turn.Other()
+	occ := ^board.emptySqs
+	queenBB, rookBB, bishopBB := sliderBitboards(board, attacker)
+
+	checkers := (hvAttack(occ, kingSq) & (queenBB | rookBB)) |
+		(diaAttack(occ, kingSq) & (queenBB | bishopBB)) |
+		(bbKnightMoves[kingSq] & board.bbForPiece(NewPiece(Knight, attacker))) |
+		(bbKingMoves[kingSq] & board.bbForPiece(NewPiece(King, attacker))) |
+		pawnCheckers(board, kingSq, attacker)
+
+	ctx.checkCount = bits.OnesCount64(uint64(checkers))
+	if ctx.checkCount == 1 {
+		checkerSq := squareFromBit(checkers)
+		ctx.checkMask = bbForSquare(checkerSq)
+		if squaresAligned(kingSq, checkerSq) {
+			ctx.checkMask |= squaresBetween(kingSq, checkerSq)
+		}
+	}
+}
+
+func pawnCheckers(board *Board, kingSq Square, attacker Color) bitboard {
+	pawns := board.bbForPiece(NewPiece(Pawn, attacker))
+	var checkers bitboard
+	for pawnBits := pawns; pawnBits != 0; pawnBits &= pawnBits - 1 {
+		pawnSq := squareFromBit(pawnBits & -pawnBits)
+		if pawnAttacks(attacker, pawnSq)&bbForSquare(kingSq) != 0 {
+			checkers |= bbForSquare(pawnSq)
+		}
+	}
+	return checkers
+}
+
+func pawnAttacks(c Color, sq Square) bitboard {
+	bb := bbForSquare(sq)
+	if c == White {
+		return ((bb & ^bbFileH & ^bbRank8) >> 9) | ((bb & ^bbFileA & ^bbRank8) >> 7)
+	}
+	return ((bb & ^bbFileH & ^bbRank1) << 7) | ((bb & ^bbFileA & ^bbRank1) << 9)
+}
+
+func pinnedRayForPiece(pos *Position, s1 Square) bitboard {
+	kingSq := pos.board.kingSquare(pos.turn)
+	if kingSq == NoSquare || alignedMasks[kingSq]&bbForSquare(s1) == 0 {
+		return 0
+	}
+	fileStep := int(rayFileSteps[kingSq][s1])
+	rankStep := int(rayRankSteps[kingSq][s1])
+	if fileStep == 0 && rankStep == 0 {
+		return 0
+	}
+	if betweenMasks[kingSq][s1]&^pos.board.emptySqs != 0 {
+		return 0
+	}
+	diagonal := rayDiagonals[kingSq][s1]
+	file := int(s1.File()) + fileStep
+	rank := int(s1.Rank()) + rankStep
+	for file >= 0 && file < numOfSquaresInRow && rank >= 0 && rank < numOfSquaresInRow {
+		sq := NewSquare(File(file), Rank(rank))
+		p := pos.board.Piece(sq)
+		if p != NoPiece {
+			if p.Color() != pos.turn.Other() || !piecePinsAlong(p.Type(), diagonal) {
+				return 0
+			}
+			return betweenMasks[kingSq][sq] | bbForSquare(sq)
+		}
+		file += fileStep
+		rank += rankStep
+	}
+	return 0
+}
+
+func rayStep(from Square, to Square) (fileStep int, rankStep int, diagonal bool) {
+	fileDelta := int(to.File()) - int(from.File())
+	rankDelta := int(to.Rank()) - int(from.Rank())
+	switch {
+	case fileDelta == 0:
+		return 0, compareStep(rankDelta, 0), false
+	case rankDelta == 0:
+		return compareStep(fileDelta, 0), 0, false
+	case abs(fileDelta) == abs(rankDelta):
+		return compareStep(fileDelta, 0), compareStep(rankDelta, 0), true
+	default:
+		return 0, 0, false
+	}
+}
+
+func piecePinsAlong(pt PieceType, diagonal bool) bool {
+	if pt == Queen {
+		return true
+	}
+	if diagonal {
+		return pt == Bishop
+	}
+	return pt == Rook
+}
+
+func squaresBetween(a Square, b Square) bitboard {
+	fileStep := compareStep(int(b.File()), int(a.File()))
+	rankStep := compareStep(int(b.Rank()), int(a.Rank()))
+	if fileStep == 0 && rankStep == 0 {
+		return 0
+	}
+	if fileStep != 0 && rankStep != 0 && !sameDiagonal(a, b) {
+		return 0
+	}
+	var out bitboard
+	file := int(a.File()) + fileStep
+	rank := int(a.Rank()) + rankStep
+	for file != int(b.File()) || rank != int(b.Rank()) {
+		out |= bbForSquare(NewSquare(File(file), Rank(rank)))
+		file += fileStep
+		rank += rankStep
+	}
+	return out
+}
+
+func compareStep(a, b int) int {
+	switch {
+	case a > b:
+		return 1
+	case a < b:
+		return -1
+	default:
+		return 0
+	}
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+func sameDiagonal(a Square, b Square) bool {
+	fileDelta := int(a.File()) - int(b.File())
+	if fileDelta < 0 {
+		fileDelta = -fileDelta
+	}
+	rankDelta := int(a.Rank()) - int(b.Rank())
+	if rankDelta < 0 {
+		rankDelta = -rankDelta
+	}
+	return fileDelta == rankDelta
 }
 
 func squareFromBit(bb bitboard) Square {
@@ -195,7 +429,7 @@ var movePool = &sync.Pool{
 //
 // The function uses a sync.Pool of move arrays to reduce allocations. Each
 // move is validated to ensure it doesn't leave the king in check.
-func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
+func standardMoves(pos *Position, first bool, mode moveGenerationMode) []Move {
 	moves, ok := movePool.Get().(*[maxPossibleMoves]Move)
 	if !ok {
 		// Pool returned an unexpected type; allocate a fresh array rather
@@ -207,7 +441,7 @@ func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 
 	if first {
 		var result [1]Move
-		if visitStandardMoves(pos, unsafeOnly, func(m Move) bool {
+		if visitStandardMoves(pos, mode, func(m Move) bool {
 			result[0] = m
 			return true
 		}) {
@@ -216,7 +450,7 @@ func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 		return nil
 	}
 
-	visitStandardMoves(pos, unsafeOnly, func(m Move) bool {
+	visitStandardMoves(pos, mode, func(m Move) bool {
 		moves[count] = m
 		count++
 		return false
@@ -237,8 +471,19 @@ func standardMoves(pos *Position, first bool, unsafeOnly bool) []Move {
 //   - KingSideCastle: The move is a king-side castle
 //   - QueenSideCastle: The move is a queen-side castle
 func moveTags(m Move, pos *Position) MoveTag {
+	return moveTagsForMode(m, pos, generateLegalAnnotated)
+}
+
+// moveTagsForMode computes the tags required by the selected generation mode.
+// Full public move generation needs exported annotations such as Check. Fast
+// existence checks only need enough information to reject moves that leave the
+// moving side in check, so they skip the opponent-check test.
+func moveTagsForMode(m Move, pos *Position, mode moveGenerationMode) MoveTag {
+	return moveTagsForPiece(m, pos, mode, pos.board.Piece(m.s1), false)
+}
+
+func moveTagsForPiece(m Move, pos *Position, mode moveGenerationMode, p Piece, ownKingSafe bool) MoveTag {
 	var tags MoveTag
-	p := pos.board.Piece(m.s1)
 	if pos.board.isOccupied(m.s2) {
 		tags |= Capture
 	} else if m.s2 == pos.enPassantSquare && p.Type() == Pawn {
@@ -253,6 +498,23 @@ func moveTags(m Move, pos *Position) MoveTag {
 			tags |= KingSideCastle
 		}
 	}
+	if mode == generateLegalOnly || mode == generateUnsafeOnly {
+		if ownKingSafe {
+			return tags
+		}
+		if !pos.inCheck && p.Type() != King && tags&EnPassant == 0 {
+			if moveFromAlignedWithOwnKing(m, pos) {
+				if exposesOwnKingToSlider(m, pos) {
+					tags |= inCheck
+				}
+				return tags
+			}
+			return tags
+		}
+		if !requiresOwnKingCheckSimulation(m, pos, p, tags) {
+			return tags
+		}
+	}
 	// apply preliminary tags to a local copy so board.update reads them correctly
 	local := m
 	local.tags = tags
@@ -261,10 +523,13 @@ func moveTags(m Move, pos *Position) MoveTag {
 	// check status without mutating the actual position.
 	tempBoard := *pos.board
 	tempBoard.update(local)
-	if tempBoard.kingSquare(pos.turn) != NoSquare {
+	if !ownKingSafe && tempBoard.kingSquare(pos.turn) != NoSquare {
 		if isSquareAttackedBy(&tempBoard, tempBoard.kingSquare(pos.turn), pos.turn.Other()) {
 			tags |= inCheck
 		}
+	}
+	if mode == generateLegalOnly || mode == generateUnsafeOnly {
+		return tags
 	}
 	// determine if opponent in check after move
 	if tempBoard.kingSquare(pos.turn.Other()) != NoSquare {
@@ -273,6 +538,62 @@ func moveTags(m Move, pos *Position) MoveTag {
 		}
 	}
 	return tags
+}
+
+func requiresOwnKingCheckSimulation(m Move, pos *Position, p Piece, tags MoveTag) bool {
+	if pos.inCheck || p.Type() == King || tags&EnPassant != 0 {
+		return true
+	}
+	return moveFromAlignedWithOwnKing(m, pos)
+}
+
+func moveFromAlignedWithOwnKing(m Move, pos *Position) bool {
+	kingSq := pos.board.kingSquare(pos.turn)
+	if kingSq == NoSquare {
+		return false
+	}
+	return alignedMasks[kingSq]&bbForSquare(m.s1) != 0
+}
+
+func exposesOwnKingToSlider(m Move, pos *Position) bool {
+	kingSq := pos.board.kingSquare(pos.turn)
+	if kingSq == NoSquare {
+		return false
+	}
+	occ := (^pos.board.emptySqs &^ bbForSquare(m.s1)) | bbForSquare(m.s2)
+	attacker := pos.turn.Other()
+	captured := bbForSquare(m.s2)
+	queenBB, rookBB, bishopBB := sliderBitboards(pos.board, attacker)
+	queenBB &^= captured
+	orthogonal := kingSq.File() == m.s1.File() || kingSq.Rank() == m.s1.Rank()
+	if orthogonal {
+		rookBB &^= captured
+		if hvAttack(occ, kingSq)&(queenBB|rookBB) != 0 {
+			return true
+		}
+		return false
+	}
+	bishopBB &^= captured
+	return diaAttack(occ, kingSq)&(queenBB|bishopBB) != 0
+}
+
+func sliderBitboards(board *Board, c Color) (queen bitboard, rook bitboard, bishop bitboard) {
+	if c == White {
+		return board.bbWhiteQueen, board.bbWhiteRook, board.bbWhiteBishop
+	}
+	return board.bbBlackQueen, board.bbBlackRook, board.bbBlackBishop
+}
+
+func squaresAligned(a Square, b Square) bool {
+	fileDelta := int(a.File()) - int(b.File())
+	if fileDelta < 0 {
+		fileDelta = -fileDelta
+	}
+	rankDelta := int(a.Rank()) - int(b.Rank())
+	if rankDelta < 0 {
+		rankDelta = -rankDelta
+	}
+	return a.File() == b.File() || a.Rank() == b.Rank() || fileDelta == rankDelta
 }
 
 // isInCheck returns true if the side to move is in check in the given position.
@@ -297,25 +618,27 @@ func isSquareAttackedBy(board *Board, sq Square, attacker Color) bool {
 	if attacker == White {
 		s2BB = board.whiteSqs
 	}
-	if ((diaAttack(occ, sq)|hvAttack(occ, sq))&s2BB)|(bbKnightMoves[sq]&s2BB) == 0 {
+	diagAttacks := diaAttack(occ, sq)
+	orthogonalAttacks := hvAttack(occ, sq)
+	if ((diagAttacks|orthogonalAttacks)&s2BB)|(bbKnightMoves[sq]&s2BB) == 0 {
 		return false
 	}
 
 	// check queen attack vector
 	queenBB := board.bbForPiece(NewPiece(Queen, attacker))
-	bb := (diaAttack(occ, sq) | hvAttack(occ, sq)) & queenBB
+	bb := (diagAttacks | orthogonalAttacks) & queenBB
 	if bb != 0 {
 		return true
 	}
 	// check rook attack vector
 	rookBB := board.bbForPiece(NewPiece(Rook, attacker))
-	bb = hvAttack(occ, sq) & rookBB
+	bb = orthogonalAttacks & rookBB
 	if bb != 0 {
 		return true
 	}
 	// check bishop attack vector
 	bishopBB := board.bbForPiece(NewPiece(Bishop, attacker))
-	bb = diaAttack(occ, sq) & bishopBB
+	bb = diagAttacks & bishopBB
 	if bb != 0 {
 		return true
 	}
@@ -402,7 +725,12 @@ func bbForPossibleMoves(pos *Position, pt PieceType, sq Square) bitboard {
 //   - The squares between king and rook are empty
 //   - The king is not in check
 //   - The king does not pass through check
-func castleMovesInto(pos *Position, moves *[2]Move) int {
+func hasCastleMove(pos *Position) bool {
+	var castles [2]Move
+	return castleMovesInto(pos, &castles, generateLegalOnly) > 0
+}
+
+func castleMovesInto(pos *Position, moves *[2]Move, mode moveGenerationMode) int {
 	count := 0
 
 	kingSide := pos.castleRights.CanCastle(pos.Turn(), KingSide)
@@ -414,7 +742,7 @@ func castleMovesInto(pos *Position, moves *[2]Move) int {
 		!squaresAreAttacked(pos, F1, G1) &&
 		!pos.inCheck {
 		m := Move{s1: E1, s2: G1}
-		m.tags = moveTags(m, pos)
+		m.tags = moveTagsForMode(m, pos, mode)
 		moves[count] = m
 		count++
 	}
@@ -425,7 +753,7 @@ func castleMovesInto(pos *Position, moves *[2]Move) int {
 		!squaresAreAttacked(pos, C1, D1) &&
 		!pos.inCheck {
 		m := Move{s1: E1, s2: C1}
-		m.tags = moveTags(m, pos)
+		m.tags = moveTagsForMode(m, pos, mode)
 		moves[count] = m
 		count++
 	}
@@ -436,7 +764,7 @@ func castleMovesInto(pos *Position, moves *[2]Move) int {
 		!squaresAreAttacked(pos, F8, G8) &&
 		!pos.inCheck {
 		m := Move{s1: E8, s2: G8}
-		m.tags = moveTags(m, pos)
+		m.tags = moveTagsForMode(m, pos, mode)
 		moves[count] = m
 		count++
 	}
@@ -447,7 +775,7 @@ func castleMovesInto(pos *Position, moves *[2]Move) int {
 		!squaresAreAttacked(pos, C8, D8) &&
 		!pos.inCheck {
 		m := Move{s1: E8, s2: C8}
-		m.tags = moveTags(m, pos)
+		m.tags = moveTagsForMode(m, pos, mode)
 		moves[count] = m
 		count++
 	}
@@ -487,14 +815,10 @@ func pawnMoves(pos *Position, sq Square) bitboard {
 // diaAttack returns a bitboard representing possible diagonal moves for a
 // sliding piece, considering occupied squares as blocking further movement.
 //
-// Implementation: walk each of the four diagonal sub-directions (NE, SW, NW,
-// SE) outward from sq, stopping at the first blocker in each. This replaces
-// the previous Hyperbola Quintessence implementation, which called
-// bits.Reverse64 twice per invocation and was the largest single CPU
-// hotspot in PGN parsing (~20% of total CPU).
+// Implementation: index a deterministic magic-bitboard table generated at
+// package init from checked-in magic constants.
 func diaAttack(occupied bitboard, sq Square) bitboard {
-	return slidingAttacks[slideDiag][sq][lineIndex(occupied, slideDiag, sq)] |
-		slidingAttacks[slideAntiDiag][sq][lineIndex(occupied, slideAntiDiag, sq)]
+	return bishopMagicAttacks[sq][((occupied&bishopMagicMasks[sq])*bishopMagics[sq])>>bishopMagicShifts[sq]]
 }
 
 func slowDiaAttack(occupied bitboard, sq Square) bitboard {
@@ -541,12 +865,10 @@ func slowDiaAttack(occupied bitboard, sq Square) bitboard {
 // moves for a sliding piece, considering occupied squares as blocking
 // further movement.
 //
-// Implementation: walk each of the four orthogonal sub-directions (E, W, N,
-// S) outward from sq, stopping at the first blocker in each. See diaAttack
-// for the rationale (drops math/bits.Reverse64 calls).
+// Implementation: index a deterministic magic-bitboard table generated at
+// package init from checked-in magic constants.
 func hvAttack(occupied bitboard, sq Square) bitboard {
-	return slidingAttacks[slideRank][sq][lineIndex(occupied, slideRank, sq)] |
-		slidingAttacks[slideFile][sq][lineIndex(occupied, slideFile, sq)]
+	return rookMagicAttacks[sq][((occupied&rookMagicMasks[sq])*rookMagics[sq])>>rookMagicShifts[sq]]
 }
 
 func slowHVAttack(occupied bitboard, sq Square) bitboard {
@@ -637,12 +959,66 @@ var (
 
 	bbKingMoves = [64]bitboard{4665729213955833856, 11592265440851656704, 5796132720425828352, 2898066360212914176, 1449033180106457088, 724516590053228544, 362258295026614272, 144959613005987840, 13853283560024178688, 16186183351374184448, 8093091675687092224, 4046545837843546112, 2023272918921773056, 1011636459460886528, 505818229730443264, 216739030602088448, 54114388906344448, 63227278716305408, 31613639358152704, 15806819679076352, 7903409839538176, 3951704919769088, 1975852459884544, 846636838289408, 211384331665408, 246981557485568, 123490778742784, 61745389371392, 30872694685696, 15436347342848, 7718173671424, 3307175149568, 825720045568, 964771708928, 482385854464, 241192927232, 120596463616, 60298231808, 30149115904, 12918652928, 3225468928, 3768639488, 1884319744, 942159872, 471079936, 235539968, 117769984, 50463488, 12599488, 14721248, 7360624, 3680312, 1840156, 920078, 460039, 197123, 49216, 57504, 28752, 14376, 7188, 3594, 1797, 770}
 
-	bbSquares      = [64]bitboard{}
-	lineSquares    = [4][64][8]Square{}
-	lineBitboards  = [4][64][8]bitboard{}
-	lineLens       = [4][64]int{}
-	slidingAttacks = [4][64][256]bitboard{}
+	bbSquares          = [64]bitboard{}
+	lineSquares        = [4][64][8]Square{}
+	lineBitboards      = [4][64][8]bitboard{}
+	lineMasks          = [4][64]bitboard{}
+	lineBitIndexes     = [4][64][64]uint8{}
+	lineWordIndexes    = [4][64][4][65536]uint8{}
+	fileWordIndexes    = [8][4][65536]uint8{}
+	lineLens           = [4][64]int{}
+	alignedMasks       = [64]bitboard{}
+	betweenMasks       = [64][64]bitboard{}
+	rayFileSteps       = [64][64]int8{}
+	rayRankSteps       = [64][64]int8{}
+	rayDiagonals       = [64][64]bool{}
+	slidingAttacks     = [4][64][256]bitboard{}
+	rookMagicMasks     = [64]bitboard{}
+	bishopMagicMasks   = [64]bitboard{}
+	rookMagicShifts    = [64]uint{}
+	bishopMagicShifts  = [64]uint{}
+	rookMagicAttacks   = [64][4096]bitboard{}
+	bishopMagicAttacks = [64][512]bitboard{}
 )
+
+// Deterministically generated for this package's A1=MSB square numbering.
+var rookMagics = [64]bitboard{ //nolint:gochecknoglobals // lookup constants
+	0x000009284d008402, 0x0602004108040082, 0x5262005024880102, 0x071200141020086a,
+	0x4003008620500009, 0x0000220010088042, 0x4001004000208015, 0x3620120880410022,
+	0x02804d0280542200, 0x80c0081001020400, 0x2058044010200801, 0x4108004200040040,
+	0x00a0080050008180, 0x0818220080401200, 0x8000220045028600, 0x40800020014000c0,
+	0x4080009408420005, 0x0000080210040001, 0x88c1002400090002, 0x0809001008010004,
+	0x00100a0010420020, 0x102c100020008080, 0x003000200040c008, 0x4080004020014000,
+	0x010010984200011c, 0x1800010204001008, 0x101200540a000830, 0x0020800800800400,
+	0x0100100023000900, 0x0022002042001084, 0x0060200042401008, 0x4000400020800080,
+	0x0028012200004084, 0x3900611400d01802, 0x0202000404001020, 0x0002002200100408,
+	0x3080080080100080, 0x8000200080801000, 0x0000200280400084, 0x0450288080004000,
+	0x000202000c205181, 0x00222c000e100108, 0x8031080110400420, 0x0048008008800400,
+	0x0002020020081041, 0x1020018061801000, 0x0010024000200040, 0x2080004000402000,
+	0x9182000102046484, 0x0000800200010080, 0x0083000300080400, 0x082a002030048a00,
+	0x2181001000090020, 0x0401801000200180, 0x3200404000201000, 0x0000802080004006,
+	0x0200048114002042, 0x0200430406002088, 0x2200211028020024, 0x4100080010020500,
+	0x0a80080004100082, 0x2700200031000840, 0x0040001000200041, 0x0080006015804008,
+}
+
+var bishopMagics = [64]bitboard{ //nolint:gochecknoglobals // lookup constants
+	0x0002100142040242, 0x0000400841140080, 0x2030e04064084220, 0x000120813092020a,
+	0x0510c0040020a800, 0x0000810104010400, 0x0400078084100260, 0x0480808808020200,
+	0x1284040842042000, 0x0221a00400808021, 0x4000068850010010, 0x0a10001020222022,
+	0x6802124842020062, 0x8050002084100106, 0x6222092108020020, 0x4a2c012188600001,
+	0x4408880100400020, 0x10421e0204004212, 0x006210b000804100, 0x1410401011010210,
+	0x0800044200908800, 0x0000104828007000, 0x1004210108041001, 0x60009004200210c0,
+	0x10a408a482082400, 0x0008081120009082, 0x0802208104020040, 0x0084200200082080,
+	0x0100020080080080, 0x4142045101900100, 0x0022022023900100, 0x4002034080200812,
+	0x04a2048008540081, 0x4004088530421004, 0x8268080800808400, 0x0000848014002000,
+	0x800c080100220040, 0x0000208224080080, 0x0008208004091244, 0x0428400420024a81,
+	0x0081020a00420204, 0x5002011080b0880a, 0x10f2001040422080, 0x0044004480a02000,
+	0x0008000420401100, 0x0784026088001240, 0x0202040810210200, 0x2021120420420220,
+	0xe000422508088400, 0x000001008820880a, 0x4006011048040004, 0x0008020210008000,
+	0x8000040408800821, 0x8016048104090400, 0x002e080829042120, 0x1040a00210011104,
+	0x0020240948141002, 0xe025880d48200108, 0x0041010840020620, 0x0002121040400450,
+	0x0148248900004010, 0x2008180460811001, 0x0010308080808600, 0x0804101208011014,
+}
 
 const (
 	slideRank = iota
@@ -653,13 +1029,26 @@ const (
 )
 
 func lineIndex(occupied bitboard, line int, sq Square) uint8 {
-	var idx uint8
-	for i := range lineLens[line][sq] {
-		if occupied&lineBitboards[line][sq][i] != 0 {
-			idx |= 1 << i
-		}
-	}
-	return idx
+	u := uint64(occupied)
+	t := &lineWordIndexes[line][sq]
+	return t[0][uint16(u>>48)] |
+		t[1][uint16(u>>32)] |
+		t[2][uint16(u>>16)] |
+		t[3][uint16(u)]
+}
+
+func rankLineIndex(occupied bitboard, sq Square) uint8 {
+	shift := uint((7 - sq.Rank()) * 8)
+	return bits.Reverse8(byte(uint64(occupied) >> shift))
+}
+
+func fileLineIndex(occupied bitboard, sq Square) uint8 {
+	u := uint64(occupied)
+	t := &fileWordIndexes[sq.File()]
+	return t[0][uint16(u>>48)] |
+		t[1][uint16(u>>32)] |
+		t[2][uint16(u>>16)] |
+		t[3][uint16(u)]
 }
 
 // init populates the bbSquares lookup table. This is done at package
@@ -671,13 +1060,130 @@ func init() {
 	for sq := range numOfSquaresInBoard {
 		bbSquares[sq] = bitboard(uint64(1) << (uint8(63) - uint8(sq)))
 	}
+	initAlignedMasks()
+	initRayMasks()
+	initMagicAttackTables()
 	initSlidingAttackTables()
+}
+
+func initMagicAttackTables() {
+	for sq := range numOfSquaresInBoard {
+		square := Square(sq)
+		rookMagicMasks[sq] = rookMagicMask(square)
+		rookMagicShifts[sq] = uint(numOfSquaresInBoard - bits.OnesCount64(uint64(rookMagicMasks[sq])))
+		initMagicAttack(rookMagicAttacks[sq][:], rookMagicMasks[sq], rookMagics[sq], rookMagicShifts[sq], square, slowHVAttack)
+
+		bishopMagicMasks[sq] = bishopMagicMask(square)
+		bishopMagicShifts[sq] = uint(numOfSquaresInBoard - bits.OnesCount64(uint64(bishopMagicMasks[sq])))
+		initMagicAttack(
+			bishopMagicAttacks[sq][:],
+			bishopMagicMasks[sq],
+			bishopMagics[sq],
+			bishopMagicShifts[sq],
+			square,
+			slowDiaAttack,
+		)
+	}
+}
+
+func initMagicAttack(
+	attacks []bitboard,
+	mask bitboard,
+	magic bitboard,
+	shift uint,
+	sq Square,
+	attack func(bitboard, Square) bitboard,
+) {
+	for _, occupied := range magicOccupancies(mask) {
+		idx := ((occupied & mask) * magic) >> shift
+		attacks[idx] = attack(occupied, sq)
+	}
+}
+
+func magicOccupancies(mask bitboard) []bitboard {
+	bitCount := bits.OnesCount64(uint64(mask))
+	occupancies := make([]bitboard, 1<<bitCount)
+	maskBits := make([]uint, 0, bitCount)
+	for rest := mask; rest != 0; rest &= rest - 1 {
+		maskBits = append(maskBits, uint(bits.TrailingZeros64(uint64(rest))))
+	}
+	for subset := range occupancies {
+		var occupied bitboard
+		for i, bit := range maskBits {
+			if subset&(1<<i) != 0 {
+				occupied |= bitboard(uint64(1) << bit)
+			}
+		}
+		occupancies[subset] = occupied
+	}
+	return occupancies
+}
+
+func rookMagicMask(sq Square) bitboard {
+	file := int(sq.File())
+	rank := int(sq.Rank())
+	var mask bitboard
+	for r := rank + 1; r <= 6; r++ {
+		mask |= bbForSquare(NewSquare(File(file), Rank(r)))
+	}
+	for r := rank - 1; r >= 1; r-- {
+		mask |= bbForSquare(NewSquare(File(file), Rank(r)))
+	}
+	for f := file + 1; f <= 6; f++ {
+		mask |= bbForSquare(NewSquare(File(f), Rank(rank)))
+	}
+	for f := file - 1; f >= 1; f-- {
+		mask |= bbForSquare(NewSquare(File(f), Rank(rank)))
+	}
+	return mask
+}
+
+func bishopMagicMask(sq Square) bitboard {
+	file := int(sq.File())
+	rank := int(sq.Rank())
+	var mask bitboard
+	for f, r := file+1, rank+1; f <= 6 && r <= 6; f, r = f+1, r+1 {
+		mask |= bbForSquare(NewSquare(File(f), Rank(r)))
+	}
+	for f, r := file-1, rank-1; f >= 1 && r >= 1; f, r = f-1, r-1 {
+		mask |= bbForSquare(NewSquare(File(f), Rank(r)))
+	}
+	for f, r := file-1, rank+1; f >= 1 && r <= 6; f, r = f-1, r+1 {
+		mask |= bbForSquare(NewSquare(File(f), Rank(r)))
+	}
+	for f, r := file+1, rank-1; f <= 6 && r >= 1; f, r = f+1, r-1 {
+		mask |= bbForSquare(NewSquare(File(f), Rank(r)))
+	}
+	return mask
+}
+
+func initAlignedMasks() {
+	for a := range numOfSquaresInBoard {
+		for b := range numOfSquaresInBoard {
+			if squaresAligned(Square(a), Square(b)) {
+				alignedMasks[a] |= bbForSquare(Square(b))
+			}
+		}
+	}
+}
+
+func initRayMasks() {
+	for a := range numOfSquaresInBoard {
+		for b := range numOfSquaresInBoard {
+			fileStep, rankStep, diagonal := rayStep(Square(a), Square(b))
+			rayFileSteps[a][b] = int8(fileStep)
+			rayRankSteps[a][b] = int8(rankStep)
+			rayDiagonals[a][b] = diagonal
+			betweenMasks[a][b] = squaresBetween(Square(a), Square(b))
+		}
+	}
 }
 
 func initSlidingAttackTables() {
 	for sq := range numOfSquaresInBoard {
 		initSlidingLines(Square(sq))
 	}
+	initLineWordIndexes()
 	for line := range slideLineCount {
 		for sq := range numOfSquaresInBoard {
 			for idx := range 256 {
@@ -685,6 +1191,44 @@ func initSlidingAttackTables() {
 			}
 		}
 	}
+}
+
+func initLineWordIndexes() {
+	for line := range slideLineCount {
+		if line == slideRank || line == slideFile {
+			continue
+		}
+		for sq := range numOfSquaresInBoard {
+			for wordIndex := range 4 {
+				shift := uint((3 - wordIndex) * 16)
+				for value := range 65536 {
+					chunk := bitboard(uint64(value) << shift)
+					lineWordIndexes[line][sq][wordIndex][value] = lineIndexFromMaskedOccupancy(chunk, line, Square(sq))
+				}
+			}
+		}
+	}
+	for file := range numOfSquaresInRow {
+		sq := NewSquare(File(file), Rank1)
+		for wordIndex := range 4 {
+			shift := uint((3 - wordIndex) * 16)
+			for value := range 65536 {
+				chunk := bitboard(uint64(value) << shift)
+				fileWordIndexes[file][wordIndex][value] = lineIndexFromMaskedOccupancy(chunk, slideFile, sq)
+			}
+		}
+	}
+}
+
+func lineIndexFromMaskedOccupancy(occupied bitboard, line int, sq Square) uint8 {
+	lineOccupied := occupied & lineMasks[line][sq]
+	var idx uint8
+	for lineOccupied != 0 {
+		bit := lineOccupied & -lineOccupied
+		idx |= lineBitIndexes[line][sq][bits.TrailingZeros64(uint64(bit))]
+		lineOccupied &= lineOccupied - 1
+	}
+	return idx
 }
 
 func initSlidingLines(sq Square) {
@@ -724,7 +1268,10 @@ func initSlidingLines(sq Square) {
 func appendLineSquare(line int, src Square, sq Square) {
 	idx := lineLens[line][src]
 	lineSquares[line][src][idx] = sq
-	lineBitboards[line][src][idx] = bbForSquare(sq)
+	bb := bbForSquare(sq)
+	lineBitboards[line][src][idx] = bb
+	lineMasks[line][src] |= bb
+	lineBitIndexes[line][src][bits.TrailingZeros64(uint64(bb))] = 1 << idx
 	lineLens[line][src]++
 }
 

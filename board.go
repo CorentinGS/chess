@@ -375,6 +375,20 @@ func (b *Board) update(m Move) {
 		return
 	}
 
+	whiteSqs := b.whiteSqs
+	blackSqs := b.blackSqs
+	if p1.Color() == White {
+		whiteSqs = (whiteSqs & ^s1BB) | s2BB
+		if captured != NoPiece {
+			blackSqs &^= s2BB
+		}
+	} else {
+		blackSqs = (blackSqs & ^s1BB) | s2BB
+		if captured != NoPiece {
+			whiteSqs &^= s2BB
+		}
+	}
+
 	if captured != NoPiece {
 		bb := b.bbForPiece(captured)
 		if err := b.setBBForPiece(captured, bb&^s2BB); err != nil {
@@ -408,10 +422,14 @@ func (b *Board) update(m Move) {
 	// remove captured en passant piece
 	if m.HasTag(EnPassant) {
 		if p1.Color() == White {
-			b.bbBlackPawn = ^(bbForSquare(m.s2) << 8) & b.bbBlackPawn
+			capturedBB := bbForSquare(m.s2) << 8
+			b.bbBlackPawn = ^capturedBB & b.bbBlackPawn
+			blackSqs &^= capturedBB
 			b.mailbox[m.s2-8] = NoPiece
 		} else {
-			b.bbWhitePawn = ^(bbForSquare(m.s2) >> 8) & b.bbWhitePawn
+			capturedBB := bbForSquare(m.s2) >> 8
+			b.bbWhitePawn = ^capturedBB & b.bbWhitePawn
+			whiteSqs &^= capturedBB
 			b.mailbox[m.s2+8] = NoPiece
 		}
 	}
@@ -419,23 +437,39 @@ func (b *Board) update(m Move) {
 	switch {
 	case p1.Color() == White && m.HasTag(KingSideCastle):
 		b.bbWhiteRook = b.bbWhiteRook & ^bbForSquare(H1) | bbForSquare(F1)
+		whiteSqs = (whiteSqs & ^bbForSquare(H1)) | bbForSquare(F1)
 		b.mailbox[H1] = NoPiece
 		b.mailbox[F1] = WhiteRook
 	case p1.Color() == White && m.HasTag(QueenSideCastle):
 		b.bbWhiteRook = (b.bbWhiteRook & ^bbForSquare(A1)) | bbForSquare(D1)
+		whiteSqs = (whiteSqs & ^bbForSquare(A1)) | bbForSquare(D1)
 		b.mailbox[A1] = NoPiece
 		b.mailbox[D1] = WhiteRook
 	case p1.Color() == Black && m.HasTag(KingSideCastle):
 		b.bbBlackRook = b.bbBlackRook & ^bbForSquare(H8) | bbForSquare(F8)
+		blackSqs = (blackSqs & ^bbForSquare(H8)) | bbForSquare(F8)
 		b.mailbox[H8] = NoPiece
 		b.mailbox[F8] = BlackRook
 	case p1.Color() == Black && m.HasTag(QueenSideCastle):
 		b.bbBlackRook = (b.bbBlackRook & ^bbForSquare(A8)) | bbForSquare(D8)
+		blackSqs = (blackSqs & ^bbForSquare(A8)) | bbForSquare(D8)
 		b.mailbox[A8] = NoPiece
 		b.mailbox[D8] = BlackRook
 	}
 
-	b.calcConvienceBBs(&m)
+	b.whiteSqs = whiteSqs
+	b.blackSqs = blackSqs
+	b.emptySqs = ^(whiteSqs | blackSqs)
+	switch {
+	case p1 == WhiteKing:
+		b.whiteKingSq = m.s2
+	case p1 == BlackKing:
+		b.blackKingSq = m.s2
+	case captured == WhiteKing:
+		b.whiteKingSq = NoSquare
+	case captured == BlackKing:
+		b.blackKingSq = NoSquare
+	}
 }
 
 func (b *Board) calcConvienceBBs(m *Move) {
