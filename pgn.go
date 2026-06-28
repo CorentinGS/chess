@@ -252,6 +252,11 @@ func (p *Parser) parseMoveText() error {
 			p.advance()
 			ply++
 
+		case NullMove:
+			p.addMove(NewNullMove(), uint(moveNumber))
+			p.advance()
+			ply++
+
 		case PIECE, SQUARE, FILE, KingsideCastle, QueensideCastle:
 			move, err := p.parseMove()
 			if err != nil {
@@ -661,6 +666,12 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 			p.advance()
 			isBlackMove = true
 			ply++
+
+		case NullMove:
+			p.addMove(NewNullMove(), uint(moveNumber))
+			p.advance()
+			ply++
+			isBlackMove = !isBlackMove
 
 		case VariationStart:
 			if err := p.parseVariation(moveNumber, ply); err != nil {

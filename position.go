@@ -116,6 +116,14 @@ func (pos *Position) AnyLegalMove() bool {
 //
 //	newPos := pos.Update(move)
 func (pos *Position) Update(m Move) *Position {
+	// Null moves flip the side to move without touching the board.
+	// They are handled separately so the bookkeeping below (piece
+	// capture, castling rights, en passant, hash XOR for the moved
+	// piece) can be skipped entirely.
+	if m.HasTag(Null) {
+		return pos.nullUpdate()
+	}
+
 	moveCount := pos.moveCount
 	if pos.turn == Black {
 		moveCount++
@@ -310,6 +318,46 @@ func (pos *Position) ChangeTurn() *Position {
 	pos.turn = pos.turn.Other()
 	pos.hash = pos.computeHash()
 	return pos
+}
+
+// nullUpdate returns a new position that is identical to the receiver except
+// for the side to move, the half-move clock, the full-move clock, and the
+// en-passant square. The half-move clock is incremented as for a quiet move,
+// the full-move clock advances when Black passed, and the en-passant capture
+// right is cleared. The board, castling rights, and pieces are unchanged.
+// The Zobrist hash is recomputed incrementally.
+func (pos *Position) nullUpdate() *Position {
+	moveCount := pos.moveCount
+	if pos.turn == Black {
+		moveCount++
+	}
+
+	newPos := &Position{
+		board:           pos.board,
+		turn:            pos.turn.Other(),
+		castleRights:    pos.castleRights,
+		enPassantSquare: NoSquare,
+		halfMoveClock:   pos.halfMoveClock + 1,
+		moveCount:       moveCount,
+	}
+
+	// Recompute inCheck for the new side to move. The board is unchanged,
+	// so the new side may now be in check if a piece attacks their king.
+	newPos.inCheck = isInCheck(newPos)
+	newPos.hash = pos.nullUpdateHash(newPos.enPassantSquare)
+	return newPos
+}
+
+// nullUpdateHash computes the Zobrist hash delta for a null move: the only
+// state that changed is the side to move (always flipped) and the en-passant
+// square (always cleared), so the only XOR is the side-to-move key plus any
+// previously-active en-passant file key.
+func (pos *Position) nullUpdateHash(_ Square) uint64 {
+	hash := pos.hash ^ polyglotHashesUint64[780]
+	if oldEPFile := enPassantFileForHash(pos.board, pos.enPassantSquare); oldEPFile >= 0 {
+		hash ^= polyglotHashesUint64[772+oldEPFile]
+	}
+	return hash
 }
 
 // HalfMoveClock returns the half-move clock (50-rule).

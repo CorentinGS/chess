@@ -869,11 +869,44 @@ func (g *Game) moveUnchecked(move Move, options *PushMoveOptions) error {
 	return nil
 }
 
+// NullMove appends a null move (a side-to-move flip with no piece movement)
+// to the current position's main line. Null moves are never part of the
+// legal moves returned by ValidMoves, so they cannot be inserted via Game.Move.
+// Use this method or Game.UnsafeMove(NullMove()) to add one explicitly.
+//
+// Pass nil (or no argument) to use default options.
+func (g *Game) NullMove(options ...*PushMoveOptions) (*MoveNode, error) {
+	var opts *PushMoveOptions
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	return g.insertByMove(NewNullMove(), opts)
+}
+
+// insertByMove is shared by UnsafeMove and NullMove. It validates only the
+// structural preconditions (game in progress) and lets moveUnchecked handle
+// tree wiring and position updates.
+func (g *Game) insertByMove(move Move, options *PushMoveOptions) (*MoveNode, error) {
+	if options == nil {
+		options = &PushMoveOptions{}
+	}
+	if err := g.moveUnchecked(move, options); err != nil {
+		return nil, err
+	}
+	return g.currentMove, nil
+}
+
 // validateMove checks if the given move is valid for the current position.
 // It returns an error if the move is invalid.
 func (g *Game) validateMove(move Move) error {
 	if g.pos == nil {
 		return errors.New("no current position")
+	}
+
+	// Null moves are never part of a position's legal moves; they must
+	// be inserted via UnsafeMove or NullMove.
+	if move.HasTag(Null) {
+		return fmt.Errorf("null move %s is not valid for the current position", move.String())
 	}
 
 	// Check if the move exists in the list of valid moves for the current position

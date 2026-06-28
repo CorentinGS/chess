@@ -110,6 +110,10 @@ func (UCINotation) String() string {
 // Encode implements the Encoder interface.
 func (UCINotation) Encode(_ *Position, m Move) string {
 	const maxLen = 5
+	// Null move: encode as "0000" (UCI convention).
+	if m.HasTag(Null) {
+		return "0000"
+	}
 	// Get a string builder from the pool
 	sb, _ := stringPool.Get().(*strings.Builder)
 	sb.Reset()
@@ -129,6 +133,11 @@ func (UCINotation) Encode(_ *Position, m Move) string {
 
 // Decode implements the Decoder interface.
 func (UCINotation) Decode(pos *Position, s string) (Move, error) {
+	// Null move: "0000" is the UCI convention.
+	if s == "0000" {
+		return NewNullMove(), nil
+	}
+
 	const promoLen = 5
 
 	l := len(s)
@@ -194,6 +203,10 @@ func (AlgebraicNotation) String() string {
 
 // Encode implements the Encoder interface.
 func (AlgebraicNotation) Encode(pos *Position, m Move) string {
+	// Null move: emit "Z0" (ChessBase / Scid convention).
+	if m.HasTag(Null) {
+		return "Z0"
+	}
 	// Handle castling without builder
 	checkChar := getCheckChar(pos, m)
 	if m.HasTag(KingSideCastle) {
@@ -309,6 +322,15 @@ func (mc moveComponents) generateOptions() []string {
 
 // Decode implements the Decoder interface.
 func (AlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
+	// Null move: accept several common spellings used across tools:
+	//   "Z0", "Z1"  - ChessBase / Scid convention
+	//   "--"        - pgn-extract, Scid and various editors
+	//   "@@"        - some exporters
+	switch s {
+	case "Z0", "Z1", "--", "@@":
+		return NewNullMove(), nil
+	}
+
 	components, err := algebraicNotationParts(s)
 	if err != nil {
 		return Move{}, err
@@ -422,6 +444,10 @@ func (LongAlgebraicNotation) String() string {
 
 // Encode implements the Encoder interface.
 func (LongAlgebraicNotation) Encode(pos *Position, m Move) string {
+	// Null move: emit "0000" (UCI / long-algebraic convention).
+	if m.HasTag(Null) {
+		return "0000"
+	}
 	checkChar := getCheckChar(pos, m)
 	if m.HasTag(KingSideCastle) {
 		return "O-O" + checkChar
@@ -444,6 +470,11 @@ func (LongAlgebraicNotation) Encode(pos *Position, m Move) string {
 
 // Decode implements the Decoder interface.
 func (LongAlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
+	// "0000" is the UCI / long-algebraic spelling for a null move; the
+	// algebraic decoder doesn't recognise it.
+	if s == "0000" {
+		return NewNullMove(), nil
+	}
 	return AlgebraicNotation{}.Decode(pos, s)
 }
 

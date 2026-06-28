@@ -61,6 +61,7 @@ const (
 	CommandParam        // Command parameter
 	CommandEnd          // ]
 	DeambiguationSquare // Full square disambiguation (e.g., e8 in Qe8f7)
+	NullMove            // A null move: Z0, Z1, --, or @@
 )
 
 func (t TokenType) String() string {
@@ -96,6 +97,8 @@ func (t TokenType) String() string {
 		"CommandName",
 		"CommandParam",
 		"CommandEnd",
+		"DeambiguationSquare",
+		"NullMove",
 	}
 
 	if t < 0 || int(t) >= len(types) {
@@ -484,6 +487,64 @@ func (l *Lexer) readCastling() (Token, bool) {
 	return Token{Type: KingsideCastle, Value: "O-O"}, true
 }
 
+// readNullMove consumes a null-move token at the current position and returns
+// it. Recognised spellings: "Z0", "Z1", "--", "@@", "0000". Returns (Token{}, false)
+// if the current character does not start a null-move token. Safe to call from
+// NextToken before the main dispatch because it never clashes with valid move
+// squares, piece letters, or result tokens.
+func (l *Lexer) readNullMove() (Token, bool) {
+	switch l.ch {
+	case 'Z':
+		next := l.peekChar()
+		if next != '0' && next != '1' {
+			return Token{}, false
+		}
+		value := string([]byte{l.ch, next})
+		l.readChar()
+		l.readChar()
+		return Token{Type: NullMove, Value: value}, true
+
+	case '-':
+		if l.peekChar() != '-' {
+			return Token{}, false
+		}
+		// Standalone "--" — readResult already consumed any result token
+		// beginning with a digit ("1-0", "0-1", "1/2-1/2"), and readCastling
+		// requires an uppercase O, so we cannot be inside those.
+		l.readChar()
+		l.readChar()
+		return Token{Type: NullMove, Value: "--"}, true
+
+	case '@':
+		if l.peekChar() != '@' {
+			return Token{}, false
+		}
+		l.readChar()
+		l.readChar()
+		return Token{Type: NullMove, Value: "@@"}, true
+
+	case '0':
+		// "0000" — must be four zeros with nothing digit/dash-adjacent to
+		// avoid clashing with result/castle tokens. readCastling consumes
+		// "O-O" / "O-O-O" and readResult consumes "1-0" / "0-1" before we
+		// reach here, so standalone "0000" can safely be claimed.
+		if l.position+3 >= len(l.input) {
+			return Token{}, false
+		}
+		if l.input[l.position+1] != '0' ||
+			l.input[l.position+2] != '0' ||
+			l.input[l.position+3] != '0' {
+			return Token{}, false
+		}
+		l.readChar()
+		l.readChar()
+		l.readChar()
+		l.readChar()
+		return Token{Type: NullMove, Value: "0000"}, true
+	}
+	return Token{}, false
+}
+
 // NextToken reads the next token from the input stream.
 // Returns an EOF token when the input is exhausted.
 // Returns an ILLEGAL token for invalid input.
@@ -535,6 +596,12 @@ func (l *Lexer) NextToken() Token {
 
 	if l.inTag && isLetter(l.ch) {
 		return l.readTagKey()
+	}
+
+	// Null move tokens: "Z0", "Z1" (ChessBase / Scid), "--" (pgn-extract,
+	// Scid), "@@" (some exporters), and "0000" (UCI convention).
+	if tok, ok := l.readNullMove(); ok {
+		return tok
 	}
 
 	switch l.ch {
