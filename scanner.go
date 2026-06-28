@@ -384,6 +384,12 @@ func checkForResult(data []byte, i int) (bool, int) {
 	const minLength = 3        // Minimum length for results like "1-0"
 	const fullResultLength = 7 // Length for "1/2-1/2"
 
+	switch data[i] {
+	case '1', '0', '*':
+	default:
+		return false, -1
+	}
+
 	if len(data)-i >= minLength {
 		switch {
 		case bytes.HasPrefix(data[i:], []byte("1-0")):

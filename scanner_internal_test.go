@@ -2,6 +2,17 @@ package chess
 
 import "testing"
 
+func BenchmarkCheckForResult(b *testing.B) {
+	data := []byte("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0\n[Event ")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < len(data); j++ {
+			checkForResult(data, j)
+		}
+	}
+}
+
 func TestTokenizeIntoReusesProvidedSlice(t *testing.T) {
 	game := &GameScanned{Raw: "1. e4 e5 1-0"}
 	dst := make([]Token, 0, 32)

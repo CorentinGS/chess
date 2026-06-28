@@ -389,6 +389,8 @@ func TestScanner_GameBoundaries(t *testing.T) {
 		{"bom_prefix", "\xEF\xBB\xBF1. e4 e5 1-0\n", 0, chess.NoOutcome},
 		{"no_blank_line_separator", "1. e4 e5 1-0\n[Event \"z\"]\n\n1. d4 d5 0-1\n", 1, chess.BlackWon},
 		{"trailing_garbage", "1. e4 e5 1-0\nGARBAGE\n", 1, chess.WhiteWon},
+		{"result_prefix_no_false_positive", "10-0\n", 1, chess.NoOutcome},
+		{"result_embedded_in_movetext", "1-0e5\n", 1, chess.NoOutcome},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
