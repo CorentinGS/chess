@@ -163,7 +163,7 @@ func TestNewBookFailsFastOnInvalidOpeningMove(t *testing.T) {
 	if !strings.Contains(err.Error(), "ECO row 2 (A00 Broken Opening)") {
 		t.Fatalf("expected row and opening context, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "apply move e2e5") {
+	if !strings.Contains(err.Error(), "decode move e2e5") {
 		t.Fatalf("expected invalid move context, got %v", err)
 	}
 }

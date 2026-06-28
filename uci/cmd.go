@@ -176,7 +176,7 @@ func (cmd CmdPosition) String() string {
 	}
 	moveStrs := []string{}
 	for _, m := range cmd.Moves {
-		mStr := chess.UCINotation{}.Encode(nil, m)
+		mStr, _ := chess.UCI().Encode(nil, m)
 		moveStrs = append(moveStrs, mStr)
 	}
 	return fmt.Sprintf("position fen %s moves %s", cmd.Position, strings.Join(moveStrs, " "))
@@ -243,7 +243,7 @@ func (cmd CmdGo) String() string {
 	if len(cmd.SearchMoves) > 0 {
 		a = append(a, "searchmoves")
 		for _, m := range cmd.SearchMoves {
-			mStr := chess.UCINotation{}.Encode(nil, m)
+			mStr, _ := chess.UCI().Encode(nil, m)
 			a = append(a, mStr)
 		}
 	}
@@ -270,13 +270,13 @@ func (CmdGo) Handle(lines []string, e *Engine) error {
 			if e.hasPos {
 				position = e.position.Position
 			}
-			bestMove, err := chess.UCINotation{}.Decode(position, parts[1])
+			bestMove, err := decodeUCIMove(position, parts[1])
 			if err != nil {
 				return err
 			}
 			results.BestMove = bestMove
 			if len(parts) >= maxParts {
-				ponderMove, decodeErr := chess.UCINotation{}.Decode(position, parts[3])
+				ponderMove, decodeErr := decodeUCIMove(position, parts[3])
 				if decodeErr != nil {
 					return decodeErr
 				}
@@ -308,6 +308,17 @@ func (CmdGo) Handle(lines []string, e *Engine) error {
 	results.MultiPVInfo[0] = results.Info
 	e.results = results
 	return nil
+}
+
+func decodeUCIMove(pos *chess.Position, text string) (chess.Move, error) {
+	if pos != nil {
+		return chess.UCI().Decode(pos, text)
+	}
+	raw, err := chess.UCI().DecodeRaw(text)
+	if err != nil {
+		return chess.Move{}, err
+	}
+	return raw.Move(), nil
 }
 
 func parseIDLine(s string) (string, string, error) {

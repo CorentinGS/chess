@@ -16,7 +16,7 @@ import (
 // emits "Z0" (the convention used by ChessBase and Scid) and accepts several
 // common spellings when reading.
 //
-// Notation contract:
+// notation contract:
 //   - SAN encode       : "Z0"
 //   - Long/UCI encode  : "0000"
 //   - SAN decode       : "Z0", "Z1", "--", "@@"
@@ -60,12 +60,15 @@ func TestNullMove_ConstructorHasNullTag(t *testing.T) {
 }
 
 // ------------------------------------------------------------------
-// Notation encoding
+// notation encoding
 // ------------------------------------------------------------------
 
 func TestNullMove_SANEncode(t *testing.T) {
 	pos := chess.StartingPosition()
-	got := chess.AlgebraicNotation{}.Encode(pos, chess.NewNullMove())
+	got, err := chess.SAN().Encode(pos, chess.NewNullMove())
+	if err != nil {
+		t.Fatalf("SAN Encode error: %v", err)
+	}
 	if got != "Z0" {
 		t.Fatalf("SAN Encode = %q, want %q", got, "Z0")
 	}
@@ -73,7 +76,10 @@ func TestNullMove_SANEncode(t *testing.T) {
 
 func TestNullMove_LongAlgebraicEncode(t *testing.T) {
 	pos := chess.StartingPosition()
-	got := chess.LongAlgebraicNotation{}.Encode(pos, chess.NewNullMove())
+	got, err := chess.LongAlgebraic().Encode(pos, chess.NewNullMove())
+	if err != nil {
+		t.Fatalf("LongAlgebraic Encode error: %v", err)
+	}
 	if got != "0000" {
 		t.Fatalf("LongAlgebraic Encode = %q, want %q", got, "0000")
 	}
@@ -81,14 +87,17 @@ func TestNullMove_LongAlgebraicEncode(t *testing.T) {
 
 func TestNullMove_UCIEncode(t *testing.T) {
 	pos := chess.StartingPosition()
-	got := chess.UCINotation{}.Encode(pos, chess.NewNullMove())
+	got, err := chess.UCI().Encode(pos, chess.NewNullMove())
+	if err != nil {
+		t.Fatalf("UCI Encode error: %v", err)
+	}
 	if got != "0000" {
 		t.Fatalf("UCI Encode = %q, want %q", got, "0000")
 	}
 }
 
 // ------------------------------------------------------------------
-// Notation decoding
+// notation decoding
 // ------------------------------------------------------------------
 
 func TestNullMove_SANDecode(t *testing.T) {
@@ -96,7 +105,7 @@ func TestNullMove_SANDecode(t *testing.T) {
 	cases := []string{"Z0", "Z1", "--", "@@"}
 	for _, s := range cases {
 		t.Run(s, func(t *testing.T) {
-			m, err := chess.AlgebraicNotation{}.Decode(pos, s)
+			m, err := chess.SAN().Decode(pos, s)
 			if err != nil {
 				t.Fatalf("SAN Decode(%q) error: %v", s, err)
 			}
@@ -109,7 +118,7 @@ func TestNullMove_SANDecode(t *testing.T) {
 
 func TestNullMove_UCIDecode(t *testing.T) {
 	pos := chess.StartingPosition()
-	m, err := chess.UCINotation{}.Decode(pos, "0000")
+	m, err := chess.UCI().Decode(pos, "0000")
 	if err != nil {
 		t.Fatalf("UCI Decode error: %v", err)
 	}
@@ -120,7 +129,7 @@ func TestNullMove_UCIDecode(t *testing.T) {
 
 func TestNullMove_LongAlgebraicDecode(t *testing.T) {
 	pos := chess.StartingPosition()
-	m, err := chess.LongAlgebraicNotation{}.Decode(pos, "0000")
+	m, err := chess.LongAlgebraic().Decode(pos, "0000")
 	if err != nil {
 		t.Fatalf("LongAlgebraic Decode error: %v", err)
 	}

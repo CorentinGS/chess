@@ -1360,29 +1360,29 @@ func TestGameString(t *testing.T) {
 	}
 }
 
-func FuzzTestPushNotationMove(f *testing.F) {
+func FuzzTestPushMoveText(f *testing.F) {
 	f.Add("e2e4", 0)
 	f.Add("e4", 1)
 	f.Add("Nb1c3", 2)
 
-	f.Fuzz(func(t *testing.T, move string, notationType int) {
+	f.Fuzz(func(t *testing.T, move string, codecType int) {
 		game := NewGame()
 
-		var notation Notation
-		switch notationType % 3 {
+		var codec MoveTextCodec
+		switch codecType % 3 {
 		case 0:
-			notation = UCINotation{}
+			codec = UCI()
 		case 1:
-			notation = AlgebraicNotation{}
+			codec = SAN()
 		case 2:
-			notation = LongAlgebraicNotation{}
+			codec = LongAlgebraic()
 		}
 
-		_, _ = game.PushNotationMove(move, notation, nil)
+		_, _ = game.PushMoveText(move, codec, nil)
 	})
 }
 
-func TestInvalidPushNotationMove(t *testing.T) {
+func TestInvalidPushMoveText(t *testing.T) {
 	fen := "r1bqk1nr/pp1pppbp/6p1/1Bp1P3/P2n1P2/2N2N2/1PPP2PP/R1BQK2R w KQkq - 0 1"
 	bogusMv := "Kxh1"
 	opt, err := FEN(fen)
@@ -1391,17 +1391,17 @@ func TestInvalidPushNotationMove(t *testing.T) {
 	}
 	game := NewGame(opt)
 
-	_, err = game.PushNotationMove(bogusMv, UCINotation{}, nil)
+	_, err = game.PushMoveText(bogusMv, UCI(), nil)
 	if err == nil {
-		t.Errorf("PushNotationMove() (uci) succeeded in pushing bogus mv when it should have failed")
+		t.Errorf("PushMoveText() (uci) succeeded in pushing bogus mv when it should have failed")
 	}
-	_, err = game.PushNotationMove(bogusMv, AlgebraicNotation{}, nil)
+	_, err = game.PushMoveText(bogusMv, SAN(), nil)
 	if err == nil {
-		t.Errorf("PushNotationMove() (alg) succeeded in pushing bogus mv when it should have failed")
+		t.Errorf("PushMoveText() (SAN) succeeded in pushing bogus mv when it should have failed")
 	}
 }
 
-func TestValidPushNotationMove(t *testing.T) {
+func TestValidPushMoveText(t *testing.T) {
 	pgn := strings.NewReader("1. e4 (1. g4) 1... c5 2. Nc3 Nc6 3. f4 g6 4. Nf3 Bg7 5. a4 Nf6 6. e5 *")
 	mv := "Ng4"
 	opt, err := PGN(pgn)
@@ -1413,18 +1413,18 @@ func TestValidPushNotationMove(t *testing.T) {
 	startMlen := len(game.Moves())
 	startPlen := len(game.Positions())
 
-	_, err = game.PushNotationMove(mv, AlgebraicNotation{}, &MoveInsertOptions{
+	_, err = game.PushMoveText(mv, SAN(), &MoveInsertOptions{
 		PromoteToMainLine: true,
 	})
 	if err != nil {
-		t.Errorf("PushNotationMove() failed but should have succeeded")
+		t.Errorf("PushMoveText() failed but should have succeeded")
 	}
 
 	if len(game.Moves()) != startMlen+1 {
-		t.Errorf("PushNotationMove() failed to update game.Moves()")
+		t.Errorf("PushMoveText() failed to update game.Moves()")
 	}
 	if len(game.Positions()) != startPlen+1 {
-		t.Errorf("PushNotationMove() failed to update game.Positions()")
+		t.Errorf("PushMoveText() failed to update game.Positions()")
 	}
 }
 
@@ -2192,50 +2192,37 @@ func TestMoveVsUnsafeMovePerformance(t *testing.T) {
 	}
 }
 
-func TestUnsafePushNotationMove(t *testing.T) {
+func TestUnsafePushMoveText(t *testing.T) {
 	tests := []struct {
 		name       string
 		setupMoves []string // Moves to set up the position
 		moveStr    string   // Move to test
-		notation   Notation // Notation to use
-		wantErr    bool     // Whether we expect an error
+		codec      MoveTextCodec
+		wantErr    bool // Whether we expect an error
 	}{
 		{
-			name:     "valid algebraic move should succeed without validation",
-			moveStr:  "e4",
-			notation: AlgebraicNotation{},
-			wantErr:  false,
+			name:    "valid UCI move should succeed without validation",
+			moveStr: "e2e4",
+			codec:   UCI(),
+			wantErr: false,
 		},
 		{
-			name:     "valid UCI move should succeed without validation",
-			moveStr:  "e2e4",
-			notation: UCINotation{},
-			wantErr:  false,
+			name:    "valid long algebraic move should succeed without validation",
+			moveStr: "e2e4",
+			codec:   LongAlgebraic(),
+			wantErr: false,
 		},
 		{
-			name:     "valid long algebraic move should succeed without validation",
-			moveStr:  "e2e4",
-			notation: LongAlgebraicNotation{},
-			wantErr:  false,
-		},
-		{
-			name:     "invalid notation should fail during parsing",
-			moveStr:  "xyz",
-			notation: AlgebraicNotation{},
-			wantErr:  true, // This should fail at notation parsing, not validation
-		},
-		{
-			name:       "complex valid move should succeed",
-			setupMoves: []string{"e4", "e5"},
-			moveStr:    "Nf3",
-			notation:   AlgebraicNotation{},
-			wantErr:    false,
+			name:    "invalid notation should fail during parsing",
+			moveStr: "xyz",
+			codec:   UCI(),
+			wantErr: true, // This should fail at notation parsing, not validation
 		},
 		{
 			name:       "invalid move should still succeed (no validation)",
 			setupMoves: []string{"e4", "e5"},
-			moveStr:    "e2e3", // This move is illegal but UnsafePushNotationMove doesn't validate
-			notation:   UCINotation{},
+			moveStr:    "e2e3", // This move is illegal but UnsafePushMoveText doesn't validate
+			codec:      UCI(),
 			wantErr:    false, // No validation, so no error expected
 		},
 	}
@@ -2247,18 +2234,18 @@ func TestUnsafePushNotationMove(t *testing.T) {
 
 			// Setup moves
 			for _, move := range tt.setupMoves {
-				_, err := game.PushNotationMove(move, AlgebraicNotation{}, nil)
+				_, err := game.PushMoveText(move, SAN(), nil)
 				if err != nil {
 					t.Fatalf("setup failed: %v", err)
 				}
 			}
 
 			// Test the move
-			_, err := game.UnsafePushNotationMove(tt.moveStr, tt.notation, nil)
+			_, err := game.UnsafePushMoveText(tt.moveStr, tt.codec, nil)
 
 			// Check error expectation
 			if (err != nil) != tt.wantErr {
-				t.Errorf("UnsafePushNotationMove() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("UnsafePushMoveText() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -2268,21 +2255,21 @@ func TestUnsafePushNotationMove(t *testing.T) {
 
 			// If the move was successful, verify it was added to the game
 			if game.MoveTree().Current() == nil {
-				t.Errorf("UnsafePushNotationMove() succeeded but currentMove is nil")
+				t.Errorf("UnsafePushMoveText() succeeded but currentMove is nil")
 				return
 			}
 
 			// For successful cases, just verify that some move was made
 			moves := game.Moves()
 			if len(moves) == 0 {
-				t.Errorf("UnsafePushNotationMove() succeeded but no moves in game")
+				t.Errorf("UnsafePushMoveText() succeeded but no moves in game")
 			}
 		})
 	}
 }
 
-// TestPushNotationMoveVsUnsafePushNotationMovePerformance demonstrates the performance difference
-func TestPushNotationMoveVsUnsafePushNotationMovePerformance(t *testing.T) {
+// TestPushMoveTextVsUnsafePushMoveTextPerformance demonstrates the performance difference.
+func TestPushMoveTextVsUnsafePushMoveTextPerformance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -2291,37 +2278,37 @@ func TestPushNotationMoveVsUnsafePushNotationMovePerformance(t *testing.T) {
 
 	// Test with a common opening move
 	moveStr := "e4"
-	notation := AlgebraicNotation{}
+	unsafeMoveStr := "e2e4"
 
-	// Test PushNotationMove (with validation)
+	// Test PushMoveText (with validation)
 	start := time.Now()
 	for i := 0; i < 1000; i++ {
 		gameClone := game.Clone()
-		_, err := gameClone.PushNotationMove(moveStr, notation, nil)
+		_, err := gameClone.PushMoveText(moveStr, SAN(), nil)
 		if err != nil {
-			t.Fatalf("PushNotationMove failed: %v", err)
+			t.Fatalf("PushMoveText failed: %v", err)
 		}
 	}
 	pushNotationMoveTime := time.Since(start)
 
-	// Test UnsafePushNotationMove (without validation)
+	// Test UnsafePushMoveText (without validation)
 	start = time.Now()
 	for i := 0; i < 1000; i++ {
 		gameClone := game.Clone()
-		_, err := gameClone.UnsafePushNotationMove(moveStr, notation, nil)
+		_, err := gameClone.UnsafePushMoveText(unsafeMoveStr, UCI(), nil)
 		if err != nil {
-			t.Fatalf("UnsafePushNotationMove failed: %v", err)
+			t.Fatalf("UnsafePushMoveText failed: %v", err)
 		}
 	}
 	unsafePushNotationMoveTime := time.Since(start)
 
-	t.Logf("PushNotationMove() (with validation): %v", pushNotationMoveTime)
-	t.Logf("UnsafePushNotationMove() (no validation): %v", unsafePushNotationMoveTime)
+	t.Logf("PushMoveText() (with validation): %v", pushNotationMoveTime)
+	t.Logf("UnsafePushMoveText() (no validation): %v", unsafePushNotationMoveTime)
 	t.Logf("Performance improvement: %.2fx", float64(pushNotationMoveTime)/float64(unsafePushNotationMoveTime))
 
-	// UnsafePushNotationMove should be faster
+	// UnsafePushMoveText should be faster
 	if unsafePushNotationMoveTime >= pushNotationMoveTime {
-		t.Logf("Warning: UnsafePushNotationMove wasn't faster than PushNotationMove - this might be expected for simple positions")
+		t.Logf("Warning: UnsafePushMoveText wasn't faster than PushMoveText - this might be expected for simple positions")
 	}
 }
 
@@ -2424,7 +2411,7 @@ func TestCastlingInteractions(t *testing.T) {
 
 			// Make first move
 			pos := g.Position()
-			m1, err := AlgebraicNotation{}.Decode(pos, tt.firstMove)
+			m1, err := algebraicNotation{}.Decode(pos, tt.firstMove)
 			if err != nil {
 				t.Fatalf("Failed to decode first move %s: %v", tt.firstMove, err)
 			}

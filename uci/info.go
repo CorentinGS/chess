@@ -315,11 +315,11 @@ func (info *Info) UnmarshalText(text []byte) error {
 			}
 			info.CurrentMoveNumber = v
 		case "currmove":
-			m, err := chess.UCINotation{}.Decode(nil, s)
+			raw, err := chess.UCI().DecodeRaw(s)
 			if err != nil {
 				return fmt.Errorf("uci: invalid info currmove %q: %w", s, err)
 			}
-			info.CurrentMove = m
+			info.CurrentMove = raw.Move()
 		case "hashfull":
 			v, err := parseInfoInt("hashfull", s)
 			if err != nil {
@@ -351,11 +351,11 @@ func (info *Info) UnmarshalText(text []byte) error {
 			}
 			info.CPULoad = v
 		case "pv":
-			m, err := chess.UCINotation{}.Decode(nil, s)
+			raw, err := chess.UCI().DecodeRaw(s)
 			if err != nil {
 				return fmt.Errorf("uci: invalid info pv move %q: %w", s, err)
 			}
-			info.PV = append(info.PV, m)
+			info.PV = append(info.PV, raw.Move())
 		}
 		if ref != "pv" {
 			ref = ""

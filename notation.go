@@ -100,41 +100,41 @@ func pieceTypeChar(p PieceType) string {
 	return pieceTypeToChar[p]
 }
 
-// Encoder is the interface implemented by objects that can
+// encoder is the interface implemented by objects that can
 // encode a move into a string given the position.  It is not
 // the encoders responsibility to validate the move.
-type Encoder interface {
+type encoder interface {
 	Encode(pos *Position, m Move) string
 }
 
-// Decoder is the interface implemented by objects that can
+// decoder is the interface implemented by objects that can
 // decode a string into a move given the position. It is not
 // the decoders responsibility to validate the move.  An error
 // is returned if the string could not be decoded.
-type Decoder interface {
+type decoder interface {
 	Decode(pos *Position, s string) (Move, error)
 }
 
-// Notation is the interface implemented by objects that can
+// notation is the interface implemented by objects that can
 // encode and decode moves.
-type Notation interface {
-	Encoder
-	Decoder
+type notation interface {
+	encoder
+	decoder
 }
 
-// UCINotation is a more computer friendly alternative to algebraic
+// uciNotation is a more computer friendly alternative to algebraic
 // notation.  This notation uses the same format as the UCI (Universal Chess
 // Interface).  Examples: e2e4, e7e5, e1g1 (white short castling), e7e8q (for promotion).
-type UCINotation struct{}
+type uciNotation struct{}
 
 // String implements the fmt.Stringer interface and returns
 // the notation's name.
-func (UCINotation) String() string {
-	return "UCI Notation"
+func (uciNotation) String() string {
+	return "UCI notation"
 }
 
-// Encode implements the Encoder interface.
-func (UCINotation) Encode(_ *Position, m Move) string {
+// Encode implements the encoder interface.
+func (uciNotation) Encode(_ *Position, m Move) string {
 	const maxLen = 5
 	// Null move: encode as "0000" (UCI convention).
 	if m.HasTag(Null) {
@@ -161,8 +161,8 @@ func (UCINotation) Encode(_ *Position, m Move) string {
 	return sb.String()
 }
 
-// Decode implements the Decoder interface.
-func (UCINotation) Decode(pos *Position, s string) (Move, error) {
+// Decode implements the decoder interface.
+func (uciNotation) Decode(pos *Position, s string) (Move, error) {
 	// Null move: "0000" is the UCI convention.
 	if s == "0000" {
 		return NewNullMove(), nil
@@ -217,19 +217,19 @@ func (UCINotation) Decode(pos *Position, s string) (Move, error) {
 	return m, nil
 }
 
-// AlgebraicNotation (or Standard Algebraic Notation) is the
+// algebraicNotation (or Standard Algebraic notation) is the
 // official chess notation used by FIDE. Examples: e4, e5,
 // O-O (short castling), e8=Q (promotion).
-type AlgebraicNotation struct{}
+type algebraicNotation struct{}
 
 // String implements the fmt.Stringer interface and returns
 // the notation's name.
-func (AlgebraicNotation) String() string {
-	return "Algebraic Notation"
+func (algebraicNotation) String() string {
+	return "Algebraic notation"
 }
 
-// Encode implements the Encoder interface.
-func (AlgebraicNotation) Encode(pos *Position, m Move) string {
+// Encode implements the encoder interface.
+func (algebraicNotation) Encode(pos *Position, m Move) string {
 	// Null move: emit "Z0" (ChessBase / Scid convention).
 	if m.HasTag(Null) {
 		return "Z0"
@@ -347,8 +347,8 @@ func (mc moveComponents) generateOptions() []string {
 	return *options
 }
 
-// Decode implements the Decoder interface.
-func (AlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
+// Decode implements the decoder interface.
+func (algebraicNotation) Decode(pos *Position, s string) (Move, error) {
 	// Null move: accept several common spellings used across tools:
 	//   "Z0", "Z1"  - ChessBase / Scid convention
 	//   "--"        - pgn-extract, Scid and various editors
@@ -465,20 +465,20 @@ func algebraicPromotion(promotes string) PieceType {
 	return algebraicPieceType(promotes[1:])
 }
 
-// LongAlgebraicNotation is a fully expanded version of
+// longAlgebraicNotation is a fully expanded version of
 // algebraic notation in which the starting and ending
 // squares are specified.
 // Examples: e2e4, Rd3xd7, O-O (short castling), e7e8=Q (promotion).
-type LongAlgebraicNotation struct{}
+type longAlgebraicNotation struct{}
 
 // String implements the fmt.Stringer interface and returns
 // the notation's name.
-func (LongAlgebraicNotation) String() string {
-	return "Long Algebraic Notation"
+func (longAlgebraicNotation) String() string {
+	return "Long Algebraic notation"
 }
 
-// Encode implements the Encoder interface.
-func (LongAlgebraicNotation) Encode(pos *Position, m Move) string {
+// Encode implements the encoder interface.
+func (longAlgebraicNotation) Encode(pos *Position, m Move) string {
 	// Null move: emit "0000" (UCI / long-algebraic convention).
 	if m.HasTag(Null) {
 		return "0000"
@@ -503,14 +503,14 @@ func (LongAlgebraicNotation) Encode(pos *Position, m Move) string {
 	return pChar + s1Str + capChar + m.s2.String() + promoText + checkChar
 }
 
-// Decode implements the Decoder interface.
-func (LongAlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
+// Decode implements the decoder interface.
+func (longAlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
 	// "0000" is the UCI / long-algebraic spelling for a null move; the
 	// algebraic decoder doesn't recognise it.
 	if s == "0000" {
 		return NewNullMove(), nil
 	}
-	return AlgebraicNotation{}.Decode(pos, s)
+	return algebraicNotation{}.Decode(pos, s)
 }
 
 func getCheckChar(pos *Position, move Move) string {

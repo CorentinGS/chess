@@ -431,7 +431,10 @@ func Test_FakeAdapter_FullGame(t *testing.T) {
 	if bestMove == (chess.Move{}) {
 		t.Fatal("expected best move")
 	}
-	san := chess.AlgebraicNotation{}.Encode(pos, bestMove)
+	san, err := chess.SAN().Encode(pos, bestMove)
+	if err != nil {
+		t.Fatalf("SAN encode failed: %v", err)
+	}
 	if san != "e4" {
 		t.Errorf("expected e4, got %s", san)
 	}

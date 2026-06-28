@@ -60,13 +60,16 @@ func TestRegressionIssue29_EngineBestMoveHasCastleTag(t *testing.T) {
 		t.Fatalf("expected KingSideCastle tag on engine best move e8g8, got move=%s",
 			results.BestMove)
 	}
-	alg := chess.AlgebraicNotation{}
-	if san := alg.Encode(g.Position(), results.BestMove); san != "O-O" {
+	san, err := chess.SAN().Encode(g.Position(), results.BestMove)
+	if err != nil {
+		t.Fatalf("SAN encode failed: %v", err)
+	}
+	if san != "O-O" {
 		t.Fatalf("SAN = %q, want %q", san, "O-O")
 	}
 }
 
-// #34: UCINotation.Decode did not tag king/queen-side castles, so downstream
+// #34: UCI decode did not tag king/queen-side castles, so downstream
 // SAN encoding was wrong.
 // https://github.com/CorentinGS/chess/issues/34
 func TestRegressionIssue34_UCINotationDecodeTagsCastle(t *testing.T) {
@@ -98,16 +101,18 @@ func TestRegressionIssue34_UCINotationDecodeTagsCastle(t *testing.T) {
 				t.Fatal(err)
 			}
 			g := chess.NewGame(f)
-			uciDec := chess.UCINotation{}
-			m, err := uciDec.Decode(g.Position(), tt.uci)
+			m, err := chess.UCI().Decode(g.Position(), tt.uci)
 			if err != nil {
 				t.Fatalf("decode %q: %v", tt.uci, err)
 			}
 			if !m.HasTag(tt.want) {
 				t.Fatalf("%s: missing tag %v (got move=%s)", tt.uci, tt.want, m)
 			}
-			alg := chess.AlgebraicNotation{}
-			if san := alg.Encode(g.Position(), m); san != tt.sanOut {
+			san, err := chess.SAN().Encode(g.Position(), m)
+			if err != nil {
+				t.Fatalf("%s: SAN encode error: %v", tt.uci, err)
+			}
+			if san != tt.sanOut {
 				t.Fatalf("%s: SAN = %q, want %q", tt.uci, san, tt.sanOut)
 			}
 		})

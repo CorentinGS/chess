@@ -88,7 +88,10 @@ func Test_EngineInfo(t *testing.T) {
 			}
 
 			move := eng.SearchResults().Info.PV[0]
-			moveStr := chess.AlgebraicNotation{}.Encode(pos, move)
+			moveStr, err := chess.SAN().Encode(pos, move)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if moveStr != "Ne5" {
 				t.Errorf("expected Ne5, got %s", moveStr)
@@ -135,13 +138,19 @@ func Test_EngineMultiPVInfo(t *testing.T) {
 			}
 
 			move := multiPVInfo[0].PV[0]
-			moveStr := chess.AlgebraicNotation{}.Encode(pos, move)
+			moveStr, err := chess.SAN().Encode(pos, move)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if moveStr != "Ne5" {
 				t.Errorf("expected Ne5, got %s", moveStr)
 			}
 
 			move = multiPVInfo[1].PV[0]
-			moveStr = chess.AlgebraicNotation{}.Encode(pos, move)
+			moveStr, err = chess.SAN().Encode(pos, move)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if moveStr != "e5" {
 				t.Errorf("expected e5, got %s", moveStr)
 			}
@@ -169,7 +178,6 @@ func Test_UCIMovesTags(t *testing.T) {
 			}
 
 			game := chess.NewGame()
-			notation := chess.AlgebraicNotation{}
 
 			for game.Outcome() == chess.NoOutcome {
 				cmdPos := uci.CmdPosition{Position: game.Position()}
@@ -180,7 +188,10 @@ func Test_UCIMovesTags(t *testing.T) {
 
 				move := eng.SearchResults().BestMove
 				pos := game.Position()
-				san := notation.Encode(pos, move)
+				san, encodeErr := chess.SAN().Encode(pos, move)
+				if encodeErr != nil {
+					t.Fatal(encodeErr)
+				}
 
 				err = game.PushMove(san, nil)
 				if err != nil {

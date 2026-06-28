@@ -188,7 +188,7 @@ func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
 
 	writeMoveNumber(moveNum, isWhite, subVariation, closedVariation, isRoot, sb)
 
-	// Encode the move using your AlgebraicNotation.
+	// Encode the move using your algebraicNotation.
 	writeMoveEncoding(node, currentMove, subVariation, sb)
 
 	writeAnnotations(currentMove, sb)

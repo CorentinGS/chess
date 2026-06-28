@@ -159,7 +159,10 @@ func TestAlgebraicNotation_EncodeDisambiguation(t *testing.T) {
 			if !found {
 				t.Skipf("%s: move %s%s unavailable in position", tc.name, tc.from, tc.to)
 			}
-			got := chess.AlgebraicNotation{}.Encode(pos, target)
+			got, err := chess.SAN().Encode(pos, target)
+			if err != nil {
+				t.Fatalf("%s: Encode error: %v", tc.name, err)
+			}
 			if got != tc.wantSAN {
 				t.Errorf("%s: Encode = %q, want %q", tc.name, got, tc.wantSAN)
 			}

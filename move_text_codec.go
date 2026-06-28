@@ -25,7 +25,7 @@ var (
 type MoveTextFormat uint8
 
 const (
-	// MoveTextFormatSAN is strict Standard Algebraic Notation.
+	// MoveTextFormatSAN is strict Standard Algebraic notation.
 	MoveTextFormatSAN MoveTextFormat = iota
 	// MoveTextFormatLongAlgebraic is coordinate-expanded algebraic notation.
 	MoveTextFormatLongAlgebraic
@@ -88,7 +88,7 @@ func (m RawMoveText) Null() bool {
 	return m.null
 }
 
-// SAN returns the strict Standard Algebraic Notation codec.
+// SAN returns the strict Standard Algebraic notation codec.
 func SAN() MoveTextCodec {
 	return MoveTextCodec{}
 }
@@ -151,7 +151,7 @@ func (c MoveTextCodec) Encode(pos *Position, m Move) (string, error) {
 		if !m.HasTag(Null) {
 			m.tags = moveTags(m, pos)
 		}
-		return AlgebraicNotation{}.Encode(pos, m), nil
+		return algebraicNotation{}.Encode(pos, m), nil
 	case MoveTextFormatLongAlgebraic:
 		if pos == nil {
 			return "", ErrMoveTextMissingPosition
@@ -159,9 +159,9 @@ func (c MoveTextCodec) Encode(pos *Position, m Move) (string, error) {
 		if !m.HasTag(Null) {
 			m.tags = moveTags(m, pos)
 		}
-		return LongAlgebraicNotation{}.Encode(pos, m), nil
+		return longAlgebraicNotation{}.Encode(pos, m), nil
 	case MoveTextFormatUCI:
-		return UCINotation{}.Encode(pos, m), nil
+		return uciNotation{}.Encode(pos, m), nil
 	default:
 		return "", ErrInvalidMoveTextCodec
 	}
@@ -185,19 +185,21 @@ func (c MoveTextCodec) Decode(pos *Position, s string) (Move, error) {
 		if c.policy == MoveTextPolicyPGNImport {
 			s = normaliseImportSAN(s)
 		}
-		move, err = AlgebraicNotation{}.Decode(pos, s)
+		move, err = algebraicNotation{}.Decode(pos, s)
 	case MoveTextFormatLongAlgebraic:
-		move, err = LongAlgebraicNotation{}.Decode(pos, s)
+		move, err = longAlgebraicNotation{}.Decode(pos, s)
 	case MoveTextFormatUCI:
-		move, err = UCINotation{}.Decode(pos, s)
+		move, err = uciNotation{}.Decode(pos, s)
 	default:
 		return Move{}, ErrInvalidMoveTextCodec
 	}
 	if err != nil {
 		return Move{}, fmt.Errorf("%w: %w", ErrInvalidMoveText, err)
 	}
-	if err := validatePositionMove(pos, move); err != nil {
-		return Move{}, fmt.Errorf("%w: %w", ErrInvalidMoveText, err)
+	if !move.HasTag(Null) {
+		if err := validatePositionMove(pos, move); err != nil {
+			return Move{}, fmt.Errorf("%w: %w", ErrInvalidMoveText, err)
+		}
 	}
 	return move, nil
 }
@@ -257,7 +259,7 @@ func (c MoveTextCodec) validate() error {
 }
 
 func decodeRawUCI(s string) (RawMoveText, error) {
-	move, err := UCINotation{}.Decode(nil, s)
+	move, err := uciNotation{}.Decode(nil, s)
 	if err != nil {
 		return RawMoveText{}, fmt.Errorf("%w: %w", ErrInvalidMoveText, err)
 	}

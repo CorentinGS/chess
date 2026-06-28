@@ -15,7 +15,7 @@ Using Moves
 	moves := game.ValidMoves()
 	game.Move(moves[0], nil)
 
-Using Algebraic Notation
+Using Strict SAN Move Text
 
 	game := chess.NewGame()
 	game.PushMove("e4", nil)

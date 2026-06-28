@@ -96,7 +96,7 @@ func TestPositionReturnsDefensiveCopyAfterGoForward(t *testing.T) {
 
 func TestAddVariationStoresPosition(t *testing.T) {
 	g := NewGame()
-	move, err := AlgebraicNotation{}.Decode(g.Position(), "e4")
+	move, err := algebraicNotation{}.Decode(g.Position(), "e4")
 	if err != nil {
 		t.Fatal(err)
 	}

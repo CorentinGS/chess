@@ -37,8 +37,8 @@ if err != nil { /* ... */ }
 _ = node
 ```
 
-The same change applies to `UnsafeMove`, `PushMove`, `PushNotationMove`, and
-`UnsafePushNotationMove`: they now return `(*MoveNode, error)`. The old
+The same change applies to `UnsafeMove`, `PushMove`, `PushMoveText`, and
+`UnsafePushMoveText`: they now return `(*MoveNode, error)`. The old
 `PushMoveOptions` type is replaced by `MoveInsertOptions` with
 `PromoteToMainLine`.
 
@@ -74,19 +74,28 @@ for _, node := range game.MoveTree().MainLine() {
 `node.AddComment(text)`, `node.NAG()`, and `node.Children()` / `node.Parent()`
 for variation traversal.
 
-## Notation uses value signatures
+## Notation APIs moved to move text codecs
 
-`Encode` and `Decode` now take and return `Move` values instead of pointers:
+v3 removes the old notation structs and game notation methods. Use
+`MoveTextCodec` values instead:
+
+- `AlgebraicNotation{}` -> `chess.SAN()`
+- PGN import leniency -> `chess.PGNImportSAN()`
+- `LongAlgebraicNotation{}` -> `chess.LongAlgebraic()`
+- `UCINotation{}` -> `chess.UCI()`
+- `Game.PushNotationMove(text, notation, opts)` -> `Game.PushMoveText(text, codec, opts)`
+- `Game.UnsafePushNotationMove(text, notation, opts)` -> `Game.UnsafePushMoveText(text, codec, opts)`
 
 ```go
-// v2
-m, err := alg.Decode(pos, "e4") // m *Move
-
-// v3
-m, err := alg.Decode(pos, "e4") // m Move
+game := chess.NewGame()
+_, err := game.PushMoveText("e4", chess.SAN(), nil)
+_, err = game.PushMoveText("e2e4", chess.UCI(), nil)
+_, err = game.UnsafePushMoveText("e2e4", chess.UCI(), nil)
 ```
 
-`Encode(pos, m Move) string` / `Decode(pos, s string) (Move, error)`.
+`PushMove` remains a strict SAN shorthand. Unsafe move text supports only fully
+specified formats such as UCI and long algebraic notation; SAN and PGN import
+SAN require legal resolution and are rejected by `UnsafePushMoveText`.
 
 ## UCI commands are struct literals
 
@@ -160,7 +169,7 @@ if err := game.Resign(chess.Black); err != nil {
 
 ## Terminal outcome guards
 
-`Move`, `UnsafeMove`, and `PushNotationMove` reject moves once the game has
+`Move`, `UnsafeMove`, and `PushMoveText` reject moves once the game has
 reached a terminal outcome and return `chess.ErrGameAlreadyEnded`. Call
 `Game.ClearOutcome()` to resume, or `Game.SetOutcomeMethod(method, outcome)` to
 set an outcome explicitly with validation. `Split()` now recomputes each line's

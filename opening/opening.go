@@ -27,7 +27,7 @@ func newOpening(code, title, pgn string, moveList []string) *Opening {
 func buildGame(moveList []string) *chess.Game {
 	game := chess.NewGame()
 	for _, moveStr := range moveList {
-		m, err := chess.UCINotation{}.Decode(game.Position(), moveStr)
+		m, err := chess.UCI().Decode(game.Position(), moveStr)
 		if err != nil {
 			return nil
 		}

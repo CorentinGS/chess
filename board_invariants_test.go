@@ -17,7 +17,7 @@ func TestMailboxConsistency(t *testing.T) {
 		g := NewGame()
 		moves := []string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "d2d3", "d7d5"}
 		for _, moveStr := range moves {
-			move, err := UCINotation{}.Decode(g.Position(), moveStr)
+			move, err := uciNotation{}.Decode(g.Position(), moveStr)
 			if err != nil {
 				t.Fatalf("failed to parse move %s: %v", moveStr, err)
 			}
@@ -34,7 +34,7 @@ func TestMailboxConsistency(t *testing.T) {
 		g := NewGame()
 		moves := []string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "e1g1", "f8c5", "d2d3", "e8g8"}
 		for _, moveStr := range moves {
-			move, err := UCINotation{}.Decode(g.Position(), moveStr)
+			move, err := uciNotation{}.Decode(g.Position(), moveStr)
 			if err != nil {
 				t.Fatalf("failed to parse move %s: %v", moveStr, err)
 			}
@@ -51,7 +51,7 @@ func TestMailboxConsistency(t *testing.T) {
 		g := NewGame()
 		moves := []string{"e2e4", "a7a6", "e4e5", "d7d5", "e5d6"}
 		for _, moveStr := range moves {
-			move, err := UCINotation{}.Decode(g.Position(), moveStr)
+			move, err := uciNotation{}.Decode(g.Position(), moveStr)
 			if err != nil {
 				t.Fatalf("failed to parse move %s: %v", moveStr, err)
 			}
@@ -72,7 +72,7 @@ func TestMailboxConsistency(t *testing.T) {
 		g := NewGame(opt)
 		moves := []string{"a7a8q"}
 		for _, moveStr := range moves {
-			move, err := UCINotation{}.Decode(g.Position(), moveStr)
+			move, err := uciNotation{}.Decode(g.Position(), moveStr)
 			if err != nil {
 				t.Fatalf("failed to parse move %s: %v", moveStr, err)
 			}

@@ -121,7 +121,7 @@ func (b *BookECO) insertOpening(o *Opening) error {
 
 	n := b.root
 	for _, moveStr := range o.moveList {
-		m, err := chess.UCINotation{}.Decode(n.pos, moveStr)
+		m, err := chess.UCI().Decode(n.pos, moveStr)
 		if err != nil {
 			return fmt.Errorf("decode move %s: %w", moveStr, err)
 		}

@@ -117,7 +117,7 @@ func (pm PolyglotMove) ToMove() Move {
 		moveStr = string(moveBuf[:4])
 	}
 
-	decode, err := UCINotation{}.Decode(nil, moveStr)
+	decode, err := uciNotation{}.Decode(nil, moveStr)
 	if err != nil {
 		return Move{}
 	}

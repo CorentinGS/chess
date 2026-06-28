@@ -567,49 +567,6 @@ func (g *Game) PushMoveText(moveText string, codec MoveTextCodec, options *MoveI
 	return g.Move(move, options)
 }
 
-// PushNotationMove adds a move to the game using any supported notation.
-// It validates the move before adding it to ensure game correctness.
-// For high-performance scenarios where moves are pre-validated, use UnsafePushNotationMove.
-//
-// Example:
-//
-//	node, err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, &MoveInsertOptions{PromoteToMainLine: true})
-//	if err != nil {
-//	  panic(err)
-//	}
-//
-//	game.PushNotationMove("c7c5", chess.UCINotation{}, nil)
-//	game.PushNotationMove("Nc1f3", chess.LongAlgebraicNotation{}, nil)
-func (g *Game) PushNotationMove(moveStr string, notation Notation, options *MoveInsertOptions) (*MoveNode, error) {
-	move, err := notation.Decode(g.currentPosition(), moveStr)
-	if err != nil {
-		return nil, err
-	}
-
-	return g.Move(move, options)
-}
-
-// UnsafePushNotationMove adds a move to the game using any supported notation without validation.
-// This method is intended for high-performance scenarios where moves are known to be valid.
-// Use this method only when you have already validated the move or are certain it's legal.
-// For general use, prefer PushNotationMove which includes validation.
-//
-// Example:
-//
-//	// Only use when you're certain the move is valid
-//	err := game.UnsafePushNotationMove("e4", chess.AlgebraicNotation{}, nil)
-//	if err != nil {
-//	    panic(err) // Should not happen with valid notation/moves
-//	}
-func (g *Game) UnsafePushNotationMove(moveStr string, notation Notation, options *MoveInsertOptions) (*MoveNode, error) {
-	move, err := notation.Decode(g.currentPosition(), moveStr)
-	if err != nil {
-		return nil, err
-	}
-
-	return g.UnsafeMove(move, options)
-}
-
 // UnsafePushMoveText adds fully specified move text without legal move
 // verification. It supports only codecs that can raw-decode a move without SAN
 // resolution.
@@ -820,7 +777,7 @@ func (g *Game) syncResultTag() {
 	g.tagPairs["Result"] = string(g.outcome)
 }
 
-// ValidateSAN checks if a string is valid Standard Algebraic Notation (SAN) syntax.
+// ValidateSAN checks if a string is valid Standard Algebraic notation (SAN) syntax.
 // This function only validates the syntax, not whether the move is legal in any position.
 // Examples of valid SAN: "e4", "Nf3", "O-O", "Qxd2+", "e8=Q#"
 func ValidateSAN(s string) error {
