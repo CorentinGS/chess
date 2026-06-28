@@ -2,11 +2,13 @@ package chess
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -123,8 +125,7 @@ func isKnownInconsistentPgn(err error) bool {
 func TestGamesFromPGN(t *testing.T) {
 	for idx, test := range validPGNs {
 		reader := strings.NewReader(test.PGN)
-		scanner := NewScanner(reader)
-		game, err := scanner.ParseNext()
+		game, err := NewPGNDecoder(reader).Decode()
 		if err != nil {
 			t.Fatalf("fail to parse game from valid pgn %d: %s", idx, err.Error())
 		}
@@ -138,8 +139,7 @@ func TestGameWithVariations(t *testing.T) {
 	pgn := mustParsePGN("fixtures/pgns/variations.pgn")
 	reader := strings.NewReader(pgn)
 
-	scanner := NewScanner(reader)
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(reader).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game from pgn: %s", err.Error())
 	}
@@ -168,9 +168,7 @@ func TestSingleGameFromPGN(t *testing.T) {
 	pgn := mustParsePGN("fixtures/pgns/single_game.pgn")
 	reader := strings.NewReader(pgn)
 
-	scanner := NewScanner(reader)
-
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(reader).Decode()
 	if err != nil {
 		t.Fatalf("fail to read games from valid pgn: %s", err.Error())
 	}
@@ -235,25 +233,24 @@ func TestSingleGameFromPGN(t *testing.T) {
 
 func TestBigPgn(t *testing.T) {
 	pgn := mustParsePGN("fixtures/pgns/big.pgn")
-	reader := strings.NewReader(pgn)
 
-	scanner := NewScanner(reader)
 	count := 0
-
-	for scanner.HasNext() {
+	for record, err := range PGNRecords(context.Background(), strings.NewReader(pgn)) {
 		count++
 		t.Run(fmt.Sprintf("big pgn : %d", count), func(t *testing.T) {
-			scannedGame, err := scanner.ScanGame()
 			if err != nil {
-				t.Fatalf("fail to scan game from valid pgn: %s", err.Error())
+				if isKnownInconsistentPgn(err) {
+					t.Skipf("skipping inconsistent real-world PGN: %s", err.Error())
+					return
+				}
+				t.Fatalf("fail to read record: %s", err.Error())
 			}
 
-			tokens, err := TokenizeGame(scannedGame)
+			raw := record.Raw
+			tokens, err := TokenizeGame(&GameScanned{Raw: raw})
 			if err != nil {
 				t.Fatalf("fail to tokenize game from valid pgn: %s", err.Error())
 			}
-
-			raw := scannedGame.Raw
 
 			parser := NewParser(tokens)
 			game, err := parser.Parse()
@@ -297,28 +294,18 @@ func TestBigBigPgn(t *testing.T) {
 	pgn := mustParsePGN("fixtures/pgns/big_big.pgn")
 	reader := strings.NewReader(pgn)
 
-	scanner := NewScanner(reader)
+	dec := NewPGNDecoder(reader)
 	count := 0
 
-	for scanner.HasNext() {
+	for {
 		count++
+		game, err := dec.Decode()
+		if err == io.EOF {
+			break
+		}
 		t.Run(fmt.Sprintf("bigbig pgn : %d", count), func(t *testing.T) {
-			scannedGame, err := scanner.ScanGame()
 			if err != nil {
-				t.Fatalf("fail to scan game from valid pgn: %s", err.Error())
-			}
-
-			tokens, err := TokenizeGame(scannedGame)
-			if err != nil {
-				t.Fatalf("fail to tokenize game from valid pgn: %s", err.Error())
-			}
-
-			raw := scannedGame.Raw
-
-			parser := NewParser(tokens)
-			game, err := parser.Parse()
-			if err != nil {
-				t.Fatalf("fail to read games from valid pgn: %s | %s", err.Error(), raw[:min(200, len(raw))])
+				t.Fatalf("fail to read games from valid pgn: %s", err.Error())
 			}
 
 			if game == nil {
@@ -332,8 +319,7 @@ func TestCompleteGame(t *testing.T) {
 	pgn := mustParsePGN("fixtures/pgns/complete_game.pgn")
 	reader := strings.NewReader(pgn)
 
-	scanner := NewScanner(reader)
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(reader).Decode()
 	if err != nil {
 		t.Fatalf("fail to read games from valid pgn: %s", err.Error())
 	}
@@ -390,8 +376,8 @@ func TestCompleteGame(t *testing.T) {
 		t.Fatalf("game move 4 is not correct, expected comment, got %s", moves[6].Comments())
 	}
 
-	if moves[44].NAG() != "?!" {
-		t.Fatalf("game move 44 is not correct, expected nag '!?', got %s", moves[44].NAG())
+	if got := moves[44].NAGs(); !reflect.DeepEqual(got, []string{"$6"}) {
+		t.Fatalf("game move 44 is not correct, expected NAG '$6', got %v", got)
 	}
 }
 
@@ -401,10 +387,10 @@ func TestLichessMultipleCommand(t *testing.T) {
 		t.Fatalf("Failed to open fixture file: %v", err)
 	}
 
-	scanner := NewScanner(file)
+	dec := NewPGNDecoder(file)
 
 	// Test first game
-	game, err := scanner.ParseNext()
+	game, err := dec.Decode()
 	if err != nil {
 		t.Fatalf("fail to read games from valid pgn: %s", err.Error())
 	}
@@ -453,8 +439,7 @@ func TestParseMoveWithNAGAndComment(t *testing.T) {
 
 1. e4 $1 {Good move} e5 {Solid} $2 2. Nf3 $3 {Another comment} Nc6 $4 {Yet another}`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
@@ -464,17 +449,17 @@ func TestParseMoveWithNAGAndComment(t *testing.T) {
 		t.Fatalf("expected at least 4 moves, got %d", len(moves))
 	}
 
-	if moves[0].NAG() == "" || moves[0].Comments() == "" {
-		t.Errorf("move 1 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[0].NAG(), moves[0].Comments())
+	if len(moves[0].NAGs()) == 0 || moves[0].Comments() == "" {
+		t.Errorf("move 1 should have both NAG and comment, got nags: '%v', comment: '%s'", moves[0].NAGs(), moves[0].Comments())
 	}
-	if moves[1].NAG() == "" || moves[1].Comments() == "" {
-		t.Errorf("move 2 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[1].NAG(), moves[1].Comments())
+	if len(moves[1].NAGs()) == 0 || moves[1].Comments() == "" {
+		t.Errorf("move 2 should have both NAG and comment, got nags: '%v', comment: '%s'", moves[1].NAGs(), moves[1].Comments())
 	}
-	if moves[2].NAG() == "" || moves[2].Comments() == "" {
-		t.Errorf("move 3 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[2].NAG(), moves[2].Comments())
+	if len(moves[2].NAGs()) == 0 || moves[2].Comments() == "" {
+		t.Errorf("move 3 should have both NAG and comment, got nags: '%v', comment: '%s'", moves[2].NAGs(), moves[2].Comments())
 	}
-	if moves[3].NAG() == "" || moves[3].Comments() == "" {
-		t.Errorf("move 4 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[3].NAG(), moves[3].Comments())
+	if len(moves[3].NAGs()) == 0 || moves[3].Comments() == "" {
+		t.Errorf("move 4 should have both NAG and comment, got nags: '%v', comment: '%s'", moves[3].NAGs(), moves[3].Comments())
 	}
 }
 
@@ -489,8 +474,7 @@ func TestVariationComments(t *testing.T) {
 
 1. e4 {main line comment} e5 (1... d5 {variation comment on d5} 2. exd5 {variation comment on exd5} Qxd5) 2. Nf3 Nc6 *`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
@@ -536,8 +520,7 @@ func TestVariationNAGs(t *testing.T) {
 
 1. e4 e5 (1... d5 $1 {great move} 2. exd5 $6 Qxd5 $2) 2. Nf3 *`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
@@ -549,8 +532,8 @@ func TestVariationNAGs(t *testing.T) {
 	}
 
 	d5Move := e4Move.children[1]
-	if d5Move.NAG() != "$1" {
-		t.Errorf("expected NAG '$1' on 1...d5, got %q", d5Move.NAG())
+	if got := d5Move.NAGs(); !reflect.DeepEqual(got, []string{"$1"}) {
+		t.Errorf("expected NAG '$1' on 1...d5, got %v", got)
 	}
 	if d5Move.Comments() != "great move" {
 		t.Errorf("expected comment 'great move' on 1...d5, got %q", d5Move.Comments())
@@ -560,16 +543,16 @@ func TestVariationNAGs(t *testing.T) {
 		t.Fatalf("expected children on d5")
 	}
 	exd5Move := d5Move.children[0]
-	if exd5Move.NAG() != "$6" {
-		t.Errorf("expected NAG '$6' on 2.exd5, got %q", exd5Move.NAG())
+	if got := exd5Move.NAGs(); !reflect.DeepEqual(got, []string{"$6"}) {
+		t.Errorf("expected NAG '$6' on 2.exd5, got %v", got)
 	}
 
 	if len(exd5Move.children) == 0 {
 		t.Fatalf("expected children on exd5")
 	}
 	qxd5Move := exd5Move.children[0]
-	if qxd5Move.NAG() != "$2" {
-		t.Errorf("expected NAG '$2' on 2...Qxd5, got %q", qxd5Move.NAG())
+	if got := qxd5Move.NAGs(); !reflect.DeepEqual(got, []string{"$2"}) {
+		t.Errorf("expected NAG '$2' on 2...Qxd5, got %v", got)
 	}
 }
 
@@ -584,8 +567,7 @@ func TestVariationCommands(t *testing.T) {
 
 1. e4 e5 (1... d5 {good move [%eval -0.5] [%clk 0:05:00]} 2. exd5) 2. Nf3 *`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
@@ -618,8 +600,7 @@ func TestNestedVariationComments(t *testing.T) {
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 {Ruy Lopez} (3. Bc4 {Italian Game} Nf6 (3... Bc5 {Giuoco Piano}) 4. d3) 3... a6 *`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
@@ -666,11 +647,7 @@ func TestRoundTripWithVariationsAndCommandAnnotations(t *testing.T) {
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 {Ruy Lopez} (3. Bc4 {Italian Game} Nf6 (3... Bc5 {Giuoco Piano}) 4. d3) 3... a6 *`
 
-	base := NewScanner(strings.NewReader(pgn))
-	if !base.HasNext() {
-		t.Fatal("expected one game in input pgn")
-	}
-	game, err := base.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("failed to parse input pgn: %v", err)
 	}
@@ -795,9 +772,12 @@ func TestPGNAnnotationFidelityVariationsAndExpansion(t *testing.T) {
 	assertCommentItem(t, blocks[0].Items[0], CommentText, "Sicilian", "", "")
 	assertCommentItem(t, blocks[0].Items[1], CommentCommand, "", "eval", "0.12")
 
-	scanner := NewScanner(strings.NewReader(roundTrip), WithExpandVariations())
-	for scanner.HasNext() {
-		if _, err := scanner.ParseNext(); err != nil {
+	dec := NewPGNDecoder(strings.NewReader(roundTrip), WithPGNExpandVariations())
+	for {
+		if _, err := dec.Decode(); err != nil {
+			if err == io.EOF {
+				break
+			}
 			t.Fatalf("expanded annotated variation should parse: %v", err)
 		}
 	}
@@ -860,8 +840,7 @@ func TestPGNCommentCommandMergingIssue104(t *testing.T) {
 
 func mustParseSingleGame(t *testing.T, pgn string) *Game {
 	t.Helper()
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("failed to parse pgn: %v", err)
 	}
@@ -1052,8 +1031,7 @@ func TestVariationMoveNumbers(t *testing.T) {
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Nf6 4. d3) a6 4. Ba4 Nf6 5. O-O Be7 1-0`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
@@ -1111,14 +1089,10 @@ func BenchmarkPGNWithVariations(b *testing.B) {
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Nf6 4. d3) a6 4. Ba4 Nf6 5. O-O Be7 1-0`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// Reset scanner for each iteration
-		scanner = NewScanner(strings.NewReader(pgn))
-		_, err := scanner.ParseNext()
+		_, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 		if err != nil {
 			b.Fatalf("parse error: %v", err)
 		}

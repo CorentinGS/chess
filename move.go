@@ -105,7 +105,7 @@ type MoveNode struct {
 	position      *Position
 	children      []*MoveNode
 	number        uint
-	nag           string
+	nags          []string
 	commentBlocks []CommentBlock
 }
 
@@ -202,17 +202,46 @@ func (n *MoveNode) CommentBlocks() []CommentBlock {
 	return copyCommentBlocks(n.commentBlocks)
 }
 
-func (n *MoveNode) NAG() string {
+// NAGs returns a defensive copy of the move node's numeric annotation glyphs in
+// their canonical "$N" form, in the order they were added.
+func (n *MoveNode) NAGs() []string {
 	if n == nil {
-		return ""
+		return nil
 	}
-	return n.nag
+	return append([]string(nil), n.nags...)
 }
 
-func (n *MoveNode) SetNAG(nag string) {
-	if n != nil {
-		n.nag = nag
+// SetNAGs replaces all of the move node's NAGs. Each value is normalised via
+// ParseNAG. The replacement is all-or-nothing: if any value is malformed the
+// node is left unchanged and the error is returned.
+func (n *MoveNode) SetNAGs(nags []string) error {
+	if n == nil {
+		return nil
 	}
+	normalised := make([]string, 0, len(nags))
+	for _, nag := range nags {
+		parsed, err := ParseNAG(nag)
+		if err != nil {
+			return err
+		}
+		normalised = append(normalised, parsed)
+	}
+	n.nags = normalised
+	return nil
+}
+
+// AddNAG normalises and appends a single NAG to the move node. Order is
+// preserved. A malformed value leaves the node unchanged.
+func (n *MoveNode) AddNAG(nag string) error {
+	if n == nil {
+		return nil
+	}
+	parsed, err := ParseNAG(nag)
+	if err != nil {
+		return err
+	}
+	n.nags = append(n.nags, parsed)
+	return nil
 }
 
 func (n *MoveNode) Parent() *MoveNode {
@@ -272,7 +301,7 @@ func (n *MoveNode) addCommentBlock(block CommentBlock) {
 }
 
 func (n *MoveNode) hasAnnotations() bool {
-	return n != nil && len(n.commentBlocks) > 0
+	return n != nil && (len(n.commentBlocks) > 0 || len(n.nags) > 0)
 }
 
 func (n *MoveNode) clone() *MoveNode {
@@ -283,7 +312,7 @@ func (n *MoveNode) clone() *MoveNode {
 		move:          n.move,
 		position:      n.position.copy(),
 		number:        n.number,
-		nag:           n.nag,
+		nags:          append([]string(nil), n.nags...),
 		commentBlocks: copyCommentBlocks(n.commentBlocks),
 	}
 	for _, child := range n.children {

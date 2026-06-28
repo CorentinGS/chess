@@ -2,6 +2,7 @@ package chess
 
 import (
 	"log"
+	"reflect"
 	"testing"
 )
 
@@ -333,25 +334,44 @@ func TestAddCommentToStructuredComments(t *testing.T) {
 	})
 }
 
-func TestNAGReturnsCorrectValue(t *testing.T) {
-	t.Run("NAGReturnsCorrectValue", func(t *testing.T) {
-		move := &MoveNode{nag: "!!"}
-		expected := "!!"
-		if move.NAG() != expected {
-			t.Fatalf("expected %v but got %v", expected, move.NAG())
+func TestNAGsReturnCanonicalForm(t *testing.T) {
+	t.Run("NAGsReturnCanonicalForm", func(t *testing.T) {
+		move := &MoveNode{}
+		if err := move.AddNAG("!!"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expected := []string{"$3"}
+		if got := move.NAGs(); !reflect.DeepEqual(got, expected) {
+			t.Fatalf("expected %v but got %v", expected, got)
 		}
 	})
 }
 
-func TestSetNAGUpdatesNAG(t *testing.T) {
-	t.Run("SetNAGUpdatesNAG", func(t *testing.T) {
+func TestSetNAGsNormalisesValues(t *testing.T) {
+	t.Run("SetNAGsNormalisesValues", func(t *testing.T) {
 		move := &MoveNode{}
-		move.SetNAG("??")
-		expected := "??"
-		if move.NAG() != expected {
-			t.Fatalf("expected %v but got %v", expected, move.NAG())
+		if err := move.SetNAGs([]string{"??", "$1406"}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expected := []string{"$4", "$1406"}
+		if got := move.NAGs(); !reflect.DeepEqual(got, expected) {
+			t.Fatalf("expected %v but got %v", expected, got)
 		}
 	})
+}
+
+func TestSetNAGsRejectsMalformed(t *testing.T) {
+	move := &MoveNode{}
+	if err := move.AddNAG("$1"); err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	// All-or-nothing: a malformed element must leave the node unchanged.
+	if err := move.SetNAGs([]string{"$1", "$", "$x"}); err == nil {
+		t.Fatalf("expected error for malformed NAGs, got nil")
+	}
+	if got := move.NAGs(); !reflect.DeepEqual(got, []string{"$1"}) {
+		t.Fatalf("expected unchanged [$1] after failed set, got %v", got)
+	}
 }
 
 func TestGetCommand(t *testing.T) {
@@ -446,8 +466,8 @@ func assertMoveNodesAreEqual(t *testing.T, m1, m2 *MoveNode) {
 	if m1.position.String() != m2.position.String() {
 		t.Fatalf("cloned mv %v position is not the same", m1)
 	}
-	if m1.nag != m2.nag {
-		t.Fatalf("cloned mv %v nag is not the same", m1)
+	if !reflect.DeepEqual(m1.NAGs(), m2.NAGs()) {
+		t.Fatalf("cloned mv %v nags is not the same", m1)
 	}
 	if m1.Comments() != m2.Comments() {
 		t.Fatalf("cloned mv %v comments is not the same", m1)
@@ -483,7 +503,7 @@ func assertMoveNodesAreEqual(t *testing.T, m1, m2 *MoveNode) {
 
 func TestMoveNodeClone(t *testing.T) {
 	for _, mt := range validMoves {
-		node := &MoveNode{move: *mt.m, position: mt.pos, number: 1, nag: "!"}
+		node := &MoveNode{move: *mt.m, position: mt.pos, number: 1, nags: []string{"$1"}}
 		clonedM1 := node.clone()
 		assertMoveNodesAreEqual(t, node, clonedM1)
 		clonedM1.SetCommand("foo", "bar")

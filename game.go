@@ -754,7 +754,7 @@ func (g *Game) buildOneGameFromPath(path []*MoveNode) *Game {
 			move:          m.move,
 			position:      m.position.copy(),
 			number:        m.number,
-			nag:           m.nag,
+			nags:          append([]string(nil), m.nags...),
 			commentBlocks: copyCommentBlocks(m.commentBlocks),
 		}
 		child.parent = cur

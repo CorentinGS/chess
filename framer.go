@@ -1,23 +1,9 @@
-/*
-Package chess provides functionality for reading and parsing chess games in PGN
-(Portable Game Notation) format. It includes a scanner for reading multiple games
-from a single source and a tokenizer for converting PGN text into processable tokens.
-The scanner handles PGN-specific syntax including game metadata, moves, comments,
-and variations. It supports streaming processing of large PGN files and provides
-proper handling of game boundaries and special notation.
-Example usage:
-	// Create scanner for PGN input
-	scanner := newScanner(reader)
-
-	// Read all games
-	for scanner.hasNext() {
-		game, err := scanner.parseNext()
-		if err != nil {
-			log.Fatalf("Failed to parse game: %v", err)
-		}
-		// Process game
-	}
-*/
+// PGN game framing: splits a byte stream into individual PGN game records.
+//
+// The pgnFramer type reads from an io.Reader, buffers data, and uses
+// splitPGNGames to emit complete PGN records as strings. The splitPGNGames
+// function and its helpers handle PGN-specific syntax including game metadata,
+// moves, comments, and variations.
 
 package chess
 
@@ -25,7 +11,6 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"sync"
 )
 
 // GameScanned represents a complete chess game in PGN format.
@@ -73,173 +58,6 @@ func tokenizeInto(game *GameScanned, tokens []Token) ([]Token, error) {
 	}
 
 	return tokens, nil
-}
-
-//nolint:gochecknoglobals // Pool amortizes token backing arrays across streamed games.
-var tokenSlicePool = sync.Pool{
-	New: func() any {
-		tokens := make([]Token, 0, 256)
-		return &tokens
-	},
-}
-
-// scanner provides functionality to read chess games from a PGN source.
-// It supports streaming processing of multiple games and proper handling
-// of PGN syntax.
-type scanner struct {
-	lastError       error // Store last error
-	scanner         *bufio.Scanner
-	nextGame        *GameScanned // Buffer for peeked game
-	nextParsedGames []*Game      // only valid when ExpandVariations==true
-	opts            scannerOpts
-}
-
-type scannerOption func(*scanner)
-
-// withExpandVariations() instructs the scanner to expand all variations in
-// a single GameScanned into multiple Game instances (1 per variation) rather
-// than a single Game instance.
-func withExpandVariations() scannerOption {
-	return func(s *scanner) {
-		s.opts.ExpandVariations = true
-	}
-}
-
-type scannerOpts struct {
-	ExpandVariations bool // default false
-}
-
-// newScanner creates a new PGN scanner that reads from the provided reader.
-// The scanner is configured to properly split PGN games and handle
-// PGN-specific syntax.
-//
-// Example:
-//
-//	scanner := newScanner(strings.NewReader(pgnText))
-func newScanner(r io.Reader, opts ...scannerOption) *scanner {
-	s := bufio.NewScanner(r)
-	s.Split(splitPGNGames)
-	ret := &scanner{
-		scanner:         s,
-		nextParsedGames: make([]*Game, 0),
-	}
-
-	// apply all the options
-	for _, opt := range opts {
-		opt(ret)
-	}
-
-	return ret
-}
-
-// scanGame reads and returns the next game from the source.
-// Returns nil and io.EOF when no more games are available.
-// Returns nil and an error if reading fails.
-//
-// Example:
-//
-//	game, err := scanner.scanGame()
-//	if err == io.EOF {
-//	    // No more games
-//	}
-func (s *scanner) scanGame() (*GameScanned, error) {
-	// If we have a buffered game from hasNext(), return it
-	if s.nextGame != nil {
-		game := s.nextGame
-		s.nextGame = nil
-		return game, nil
-	}
-
-	// Otherwise scan the next game
-	if s.scanner.Scan() {
-		return &GameScanned{Raw: s.scanner.Text()}, nil
-	}
-
-	// Check for errors
-	if err := s.scanner.Err(); err != nil {
-		return nil, err
-	}
-	return nil, io.EOF
-}
-
-// hasNext returns true if there are more games available to read.
-// This method can be used to iterate over all games in the source.
-//
-// Example:
-//
-//	for scanner.hasNext() {
-//	    scangame, err := scanner.scanGame()
-//	    // Process scangame
-//	}
-func (s *scanner) hasNext() bool {
-	// If we already have a buffered game, return true
-	if s.nextGame != nil || len(s.nextParsedGames) > 0 {
-		return true
-	}
-
-	// Try to scan the next game
-	if s.scanner.Scan() {
-		// Store the game in the buffer
-		s.nextGame = &GameScanned{Raw: s.scanner.Text()}
-		return true
-	}
-
-	// Store any error that occurred
-	s.lastError = s.scanner.Err()
-	return false
-}
-
-// parseNext is a convenience wrapper combining the functionality of
-// scanGame(), TokenizeGame(), newParser(), and Parse() enabling
-// callers to simplify iterating over each Game within a PGN file.
-//
-// Example:
-//
-//	for scanner.hasNext() {
-//	    game, err := scanner.parseNext()
-//	    // Process game
-//	}
-func (s *scanner) parseNext() (*Game, error) {
-	if len(s.nextParsedGames) > 0 {
-		ret := s.nextParsedGames[0]
-		s.nextParsedGames = s.nextParsedGames[1:]
-		return ret, nil
-	}
-
-	scannedGame, err := s.scanGame()
-	if err != nil {
-		return nil, err
-	}
-	pooledTokens, ok := tokenSlicePool.Get().(*[]Token)
-	if !ok {
-		tokens := make([]Token, 0, len(scannedGame.Raw)/3+16)
-		pooledTokens = &tokens
-	}
-	tokens, err := tokenizeInto(scannedGame, *pooledTokens)
-	if err != nil {
-		*pooledTokens = tokens[:0]
-		tokenSlicePool.Put(pooledTokens)
-		return nil, err
-	}
-	defer func() {
-		for i := range tokens {
-			tokens[i] = Token{}
-		}
-		*pooledTokens = tokens[:0]
-		tokenSlicePool.Put(pooledTokens)
-	}()
-	parser := newParser(tokens)
-	game, err := parser.Parse()
-	if err != nil {
-		return nil, err
-	}
-	if !s.opts.ExpandVariations {
-		return game, nil
-	} // else
-
-	parsedGames := game.Split()
-	s.nextParsedGames = parsedGames[1:]
-	return parsedGames[0], nil
 }
 
 // Split function for bufio.Scanner to split PGN games.
@@ -405,4 +223,108 @@ func checkForResult(data []byte, i int) (bool, int) {
 		}
 	}
 	return false, -1
+}
+
+type pgnFramer struct {
+	reader     *bufio.Reader
+	buffer     []byte
+	chunk      []byte
+	baseOffset int64
+	index      int64
+	readErr    error
+	eof        bool
+}
+
+func newPGNFramer(r io.Reader, opts ...PGNOption) *pgnFramer {
+	options := applyPGNOptions(opts)
+	bufferSize := options.bufferSize
+	if bufferSize <= 0 {
+		bufferSize = 32 * 1024
+	}
+	return &pgnFramer{reader: bufio.NewReaderSize(r, bufferSize), chunk: make([]byte, bufferSize)}
+}
+
+func (f *pgnFramer) next() (PGNRecord, error) {
+	for {
+		if f.readErr != nil && len(f.buffer) == 0 {
+			err := f.readErr
+			f.readErr = nil
+			return PGNRecord{}, err
+		}
+
+		advance, token, err := splitPGNGames(f.buffer, f.eof)
+		if err != nil {
+			return PGNRecord{}, err
+		}
+		if advance == 0 && token == nil {
+			if f.eof {
+				return PGNRecord{}, io.EOF
+			}
+			if err := f.readMore(); err != nil && len(f.buffer) == 0 {
+				return PGNRecord{}, err
+			}
+			continue
+		}
+		start := f.baseOffset
+		if len(token) > 0 {
+			if rel := bytes.Index(f.buffer[:advance], token); rel >= 0 {
+				start = f.baseOffset + int64(rel)
+			}
+		}
+		f.advance(advance)
+		f.baseOffset += int64(advance)
+		if len(token) == 0 {
+			continue
+		}
+		f.index++
+		return PGNRecord{Index: f.index, Offset: start, Raw: string(token)}, nil
+	}
+}
+
+func (f *pgnFramer) readMore() error {
+	n, err := f.reader.Read(f.chunk)
+	if n > 0 {
+		f.buffer = append(f.buffer, f.chunk[:n]...)
+	}
+	if err == io.EOF {
+		f.eof = true
+		return nil
+	}
+	if err != nil {
+		f.readErr = err
+	}
+	return err
+}
+
+func (f *pgnFramer) advance(n int) {
+	if n >= len(f.buffer) {
+		f.buffer = f.buffer[:0]
+		return
+	}
+	retained := len(f.buffer) - n
+	if retained*4 < cap(f.buffer) {
+		f.buffer = append([]byte(nil), f.buffer[n:]...)
+		return
+	}
+	f.buffer = f.buffer[n:]
+}
+
+func parsePGNText(raw string) (*Game, error) {
+	return newParserFromSource(&lexerTokenSource{lexer: NewLexer(raw)}).Parse()
+}
+
+type lexerTokenSource struct {
+	lexer *Lexer
+}
+
+func (s *lexerTokenSource) NextToken() (Token, error) {
+	return s.lexer.NextToken(), nil
+}
+
+func applyPGNOptions(opts []PGNOption) pgnOptions {
+	options := pgnOptions{}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return options
 }

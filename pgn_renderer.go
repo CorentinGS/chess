@@ -255,9 +255,13 @@ func writeAnnotations(move *MoveNode, sb *strings.Builder) {
 		return
 	}
 
+	for _, nag := range move.nags {
+		sb.WriteByte(' ')
+		sb.WriteString(nag)
+	}
+
 	if len(move.commentBlocks) > 0 {
 		writeCommentBlocks(move.commentBlocks, sb)
-		return
 	}
 }
 

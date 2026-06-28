@@ -1127,6 +1127,16 @@ func TestLexer_NAGSymbols(t *testing.T) {
 	}
 }
 
+func TestLexer_NAGMaximalRun(t *testing.T) {
+	// A run of more than two '!'/'?' characters must be a single NAG token,
+	// not split into a valid token plus a trailing symbol (regression for the
+	// "!!!" bug that produced two NAG tokens).
+	assertTokenSequence(t, chess.NewLexer("e4!!!"), []chess.Token{
+		{Type: chess.SQUARE, Value: "e4"},
+		{Type: chess.NAG, Value: "!!!"},
+	})
+}
+
 func TestLexer_ErrorPaths(t *testing.T) {
 	tests := []struct {
 		name    string

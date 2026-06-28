@@ -1430,8 +1430,7 @@ func TestValidPushNotationMove(t *testing.T) {
 
 func validateSplit(t *testing.T, origPgn string, expectedLastLines []string) {
 	reader := strings.NewReader(origPgn)
-	scanner := NewScanner(reader)
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(reader).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %s", err.Error())
 	}

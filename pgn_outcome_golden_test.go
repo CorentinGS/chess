@@ -35,7 +35,7 @@ func TestPGNOutcomeGolden(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			game, err := chess.NewScanner(strings.NewReader(string(data))).ParseNext()
+			game, err := chess.NewPGNDecoder(strings.NewReader(string(data))).Decode()
 			if err != nil {
 				t.Fatalf("parse %s: %v", pgnPath, err)
 			}

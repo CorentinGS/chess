@@ -13,7 +13,7 @@
 ## Features
 
 - Legal **move generation** via [bitboards](https://chessprogramming.org/Bitboards)
-- **PGN** encode/decode, plus a streaming **Scanner** for large game databases
+- **PGN** encode/decode, plus a streaming **PGNDecoder** for large game databases
 - **FEN** encode/decode for board positions
 - **UCI** client to drive engines like [Stockfish](https://stockfishchess.org/)
 - **Opening book** exploration (ECO — Encyclopaedia of Chess Openings)
@@ -585,24 +585,43 @@ The helpers `MoveNode.Comments()`, `MoveNode.GetCommand()`, `MoveNode.SetCommand
 
 #### Scan PGN
 
-For parsing large PGN database files use Scanner:
+For parsing large PGN database files, use `PGNGames` (Go 1.23+ iterator):
 
 ```go
 f, err := os.Open("lichess_db_standard_rated_2013-01.pgn")
 if err != nil {
-panic(err)
+    panic(err)
 }
 defer f.Close()
 
-scanner := chess.NewScanner(f)
-// Read all games
-for scanner.HasNext() {
-game, err := scanner.ParseNext()
-if err != nil {
-log.Fatal("Failed to parse game: %v", err)
+for game, err := range chess.PGNGames(f) {
+    if err != nil {
+        log.Fatal("Failed to parse game: %v", err)
+    }
+    fmt.Println(game.GetTagPair("Site"))
+    // Output &{Site https://lichess.org/8jb5kiqw}
 }
-fmt.Println(game.GetTagPair("Site"))
-// Output &{Site https://lichess.org/8jb5kiqw}
+```
+
+Or use `PGNDecoder` directly for index/offset access:
+
+```go
+f, err := os.Open("lichess_db_standard_rated_2013-01.pgn")
+if err != nil {
+    panic(err)
+}
+defer f.Close()
+
+dec := chess.NewPGNDecoder(f)
+for {
+    game, err := dec.Decode()
+    if err == io.EOF {
+        break
+    }
+    if err != nil {
+        log.Fatal("Failed to parse game: %v", err)
+    }
+    fmt.Println(game.GetTagPair("Site"))
 }
 ```
 
@@ -613,19 +632,16 @@ To expand every variation into a distinct Game:
 ```go
 f, err := os.Open("lichess_db_standard_rated_2013-01.pgn")
 if err != nil {
-panic(err)
+    panic(err)
 }
 defer f.Close()
 
-scanner := chess.NewScanner(f, chess.WithExpandVariations())
-// Read all games
-for scanner.HasNext() {
-game, err := scanner.ParseNext()
-if err != nil {
-log.Fatal("Failed to parse game: %v", err)
-}
-fmt.Println(game.GetTagPair("Site"))
-// Output &{Site https://lichess.org/8jb5kiqw}
+for game, err := range chess.PGNGames(f, chess.WithPGNExpandVariations()) {
+    if err != nil {
+        log.Fatal("Failed to parse game: %v", err)
+    }
+    fmt.Println(game.GetTagPair("Site"))
+    // Output &{Site https://lichess.org/8jb5kiqw}
 }
 ```
 

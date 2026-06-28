@@ -238,7 +238,9 @@ func TestPGNRenderer_IsIdempotentOnAnnotations(t *testing.T) {
 		t.Fatal(err)
 	}
 	g.MoveTree().Root().Children()[0].SetComment("best move")
-	g.MoveTree().Root().Children()[0].SetNAG("$1")
+	if err := g.MoveTree().Root().Children()[0].SetNAGs([]string{"$1"}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := g.PushMove("e5", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -249,5 +251,24 @@ func TestPGNRenderer_IsIdempotentOnAnnotations(t *testing.T) {
 
 	if first != second {
 		t.Fatalf("render not idempotent:\nfirst:\n%s\nsecond:\n%s", first, second)
+	}
+}
+
+func TestPGNRenderer_WritesNAGsBeforeComments(t *testing.T) {
+	g := chess.NewGame()
+	if _, err := g.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	move := g.MoveTree().Root().Children()[0]
+	move.SetComment("best move")
+	// Multiple NAGs are kept in order and rendered as canonical "$N" before
+	// the comment, even when imported via symbolic spellings.
+	if err := move.SetNAGs([]string{"!", "$1406"}); err != nil {
+		t.Fatal(err)
+	}
+
+	out := chess.DefaultPGNRenderer.Render(g)
+	if !strings.Contains(out, "e4 $1 $1406 {best move}") {
+		t.Fatalf("expected NAGs before comment, got:\n%s", out)
 	}
 }

@@ -312,7 +312,14 @@ func (p *Parser) parseMoveText() error {
 				tok := p.currentToken()
 				switch tok.Type {
 				case NAG:
-					p.currentMove.nag = tok.Value
+					if nagErr := p.currentMove.AddNAG(tok.Value); nagErr != nil {
+						return &ParserError{
+							Message:    nagErr.Error(),
+							TokenValue: tok.Value,
+							TokenType:  NAG,
+							Position:   p.position,
+						}
+					}
 					p.advance()
 				case CommentStart:
 					block, err := p.parseComment()
@@ -723,7 +730,14 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 			}
 
 		case NAG:
-			p.currentMove.nag = p.currentToken().Value
+			if nagErr := p.currentMove.AddNAG(p.currentToken().Value); nagErr != nil {
+				return &ParserError{
+					Message:    nagErr.Error(),
+					TokenValue: p.currentToken().Value,
+					TokenType:  NAG,
+					Position:   p.position,
+				}
+			}
 			p.advance()
 
 		case PIECE, SQUARE, FILE, KingsideCastle, QueensideCastle:
@@ -749,7 +763,14 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 				tok := p.currentToken()
 				switch tok.Type {
 				case NAG:
-					p.currentMove.nag = tok.Value
+					if nagErr := p.currentMove.AddNAG(tok.Value); nagErr != nil {
+						return &ParserError{
+							Message:    nagErr.Error(),
+							TokenValue: tok.Value,
+							TokenType:  NAG,
+							Position:   p.position,
+						}
+					}
 					p.advance()
 				case CommentStart:
 					block, err := p.parseComment()

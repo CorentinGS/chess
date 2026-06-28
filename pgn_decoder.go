@@ -1,8 +1,6 @@
 package chess
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"io"
 	"iter"
@@ -58,7 +56,7 @@ func (d *PGNDecoder) Decode() (*Game, error) {
 		return game, nil
 	}
 
-	record, err := d.framer.nextText()
+	record, err := d.framer.next()
 	if err != nil {
 		return nil, err
 	}
@@ -118,27 +116,17 @@ func PGNGames(r io.Reader, opts ...PGNOption) iter.Seq2[*Game, error] {
 type PGNRecord struct {
 	Index  int64
 	Offset int64
-	Raw    []byte
-}
-
-type pgnTextRecord struct {
-	Index  int64
-	Offset int64
 	Raw    string
 }
 
 // Decode parses this record into a Game.
 func (r PGNRecord) Decode(opts ...PGNOption) (*Game, error) {
-	game, err := parsePGNRecord(r.Raw)
-	if err != nil {
-		return nil, err
-	}
-	return game, nil
+	return parsePGNText(r.Raw)
 }
 
 // Tags returns the PGN tag pairs in this record without building a Game.
 func (r PGNRecord) Tags() (map[string]string, error) {
-	tokens, err := TokenizeGame(&GameScanned{Raw: string(r.Raw)})
+	tokens, err := TokenizeGame(&GameScanned{Raw: r.Raw})
 	if err != nil {
 		return nil, err
 	}
@@ -179,151 +167,6 @@ func PGNRecords(ctx context.Context, r io.Reader, opts ...PGNOption) iter.Seq2[P
 			}
 		}
 	}
-}
-
-type pgnFramer struct {
-	reader     *bufio.Reader
-	buffer     []byte
-	chunk      []byte
-	baseOffset int64
-	index      int64
-	readErr    error
-	eof        bool
-}
-
-func newPGNFramer(r io.Reader, opts ...PGNOption) *pgnFramer {
-	options := applyPGNOptions(opts)
-	bufferSize := options.bufferSize
-	if bufferSize <= 0 {
-		bufferSize = 32 * 1024
-	}
-	return &pgnFramer{reader: bufio.NewReaderSize(r, bufferSize), chunk: make([]byte, bufferSize)}
-}
-
-func (f *pgnFramer) next() (PGNRecord, error) {
-	for {
-		if f.readErr != nil && len(f.buffer) == 0 {
-			err := f.readErr
-			f.readErr = nil
-			return PGNRecord{}, err
-		}
-
-		advance, token, err := splitPGNGames(f.buffer, f.eof)
-		if err != nil {
-			return PGNRecord{}, err
-		}
-		if advance == 0 && token == nil {
-			if f.eof {
-				return PGNRecord{}, io.EOF
-			}
-			if err := f.readMore(); err != nil && len(f.buffer) == 0 {
-				return PGNRecord{}, err
-			}
-			continue
-		}
-		start := f.baseOffset
-		if len(token) > 0 {
-			if rel := bytes.Index(f.buffer[:advance], token); rel >= 0 {
-				start = f.baseOffset + int64(rel)
-			}
-		}
-		f.advance(advance)
-		f.baseOffset += int64(advance)
-		if len(token) == 0 {
-			continue
-		}
-		f.index++
-		return PGNRecord{Index: f.index, Offset: start, Raw: append([]byte(nil), token...)}, nil
-	}
-}
-
-func (f *pgnFramer) nextText() (pgnTextRecord, error) {
-	for {
-		if f.readErr != nil && len(f.buffer) == 0 {
-			err := f.readErr
-			f.readErr = nil
-			return pgnTextRecord{}, err
-		}
-
-		advance, token, err := splitPGNGames(f.buffer, f.eof)
-		if err != nil {
-			return pgnTextRecord{}, err
-		}
-		if advance == 0 && token == nil {
-			if f.eof {
-				return pgnTextRecord{}, io.EOF
-			}
-			if err := f.readMore(); err != nil && len(f.buffer) == 0 {
-				return pgnTextRecord{}, err
-			}
-			continue
-		}
-		start := f.baseOffset
-		if len(token) > 0 {
-			if rel := bytes.Index(f.buffer[:advance], token); rel >= 0 {
-				start = f.baseOffset + int64(rel)
-			}
-		}
-		f.advance(advance)
-		f.baseOffset += int64(advance)
-		if len(token) == 0 {
-			continue
-		}
-		f.index++
-		return pgnTextRecord{Index: f.index, Offset: start, Raw: string(token)}, nil
-	}
-}
-
-func (f *pgnFramer) readMore() error {
-	n, err := f.reader.Read(f.chunk)
-	if n > 0 {
-		f.buffer = append(f.buffer, f.chunk[:n]...)
-	}
-	if err == io.EOF {
-		f.eof = true
-		return nil
-	}
-	if err != nil {
-		f.readErr = err
-	}
-	return err
-}
-
-func (f *pgnFramer) advance(n int) {
-	if n >= len(f.buffer) {
-		f.buffer = f.buffer[:0]
-		return
-	}
-	retained := len(f.buffer) - n
-	if retained*4 < cap(f.buffer) {
-		f.buffer = append([]byte(nil), f.buffer[n:]...)
-		return
-	}
-	f.buffer = f.buffer[n:]
-}
-
-func parsePGNRecord(raw []byte) (*Game, error) {
-	return parsePGNText(string(raw))
-}
-
-func parsePGNText(raw string) (*Game, error) {
-	return newParserFromSource(&lexerTokenSource{lexer: NewLexer(raw)}).Parse()
-}
-
-type lexerTokenSource struct {
-	lexer *Lexer
-}
-
-func (s *lexerTokenSource) NextToken() (Token, error) {
-	return s.lexer.NextToken(), nil
-}
-
-func applyPGNOptions(opts []PGNOption) pgnOptions {
-	options := pgnOptions{}
-	for _, opt := range opts {
-		opt(&options)
-	}
-	return options
 }
 
 // PGNParallelOptions configures parallel PGN Game decoding.
@@ -493,7 +336,7 @@ func PGNEvents(r io.Reader, opts ...PGNOption) iter.Seq2[PGNEvent, error] {
 }
 
 func yieldPGNRecordEvents(record PGNRecord, yield func(PGNEvent, error) bool) bool {
-	tokens, err := TokenizeGame(&GameScanned{Raw: string(record.Raw)})
+	tokens, err := TokenizeGame(&GameScanned{Raw: record.Raw})
 	if err != nil {
 		return yield(PGNEvent{}, err)
 	}

@@ -210,19 +210,18 @@ func (l *Lexer) readCommandParam() Token {
 }
 
 func (l *Lexer) readNAG() Token {
-	// Handle cases where NAG starts with '!' or '?'
-	// This shouldn't happen from my understanding of the PGN spec but lichess pgn files have it.
-	// TODO: Better NAG handling of different formats
+	// Handle cases where NAG starts with '!' or '?' (symbolic move-quality
+	// spellings such as ! ? !! ?? !? ?!). This isn't part of the strict PGN
+	// spec, but Lichess and other sources emit them, so they are accepted on
+	// import. The lexer reads the maximal run of '!' and '?' characters as a
+	// single token; normalisation to the canonical "$N" form happens at the
+	// storage boundary (see ParseNAG).
 	if l.ch == '!' || l.ch == '?' {
-		value := string(l.ch)
-		l.readChar() // Read the next character
-
-		// Check if the next character is also '!' or '?'
-		if l.ch == '!' || l.ch == '?' {
-			value += string(l.ch) // Append the second character
-			l.readChar()          // Move to the next character
+		position := l.position
+		for l.ch == '!' || l.ch == '?' {
+			l.readChar()
 		}
-
+		value := l.input[position:l.position]
 		return Token{Type: NAG, Value: value}
 	}
 	l.readChar() // skip the $ symbol
