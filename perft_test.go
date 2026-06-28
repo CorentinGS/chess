@@ -1,11 +1,18 @@
 package chess_test
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
 	"github.com/corentings/chess/v3"
 )
+
+func ExamplePosition_Perft() {
+	pos := chess.StartingPosition()
+	fmt.Println(pos.Perft(3)) // 8,902 leaf positions at depth 3
+	// Output: 8902
+}
 
 // perftCase pairs a position with the expected node counts for each depth,
 // from depth 1 up to the last entry. Values are from

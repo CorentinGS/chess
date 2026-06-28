@@ -2,11 +2,25 @@ package chess_test
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/corentings/chess/v3"
 )
+
+func ExampleGame_SetOutcomeMethod() {
+	g := chess.NewGame()
+	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{
+		Outcome: chess.WhiteWon,
+		Method:  chess.Resignation,
+	}); err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	fmt.Println(g.Outcome(), g.Method())
+	// Output: 1-0 Resignation
+}
 
 func TestSetOutcomeMethod(t *testing.T) {
 	tests := []struct {

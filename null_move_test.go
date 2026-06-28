@@ -1,6 +1,7 @@
 package chess_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -35,6 +36,17 @@ import (
 //   - pieces are unchanged.
 //   - inCheck is recomputed for the new side to move.
 //   - Zobrist hash reflects the new turn and cleared en-passant.
+
+func ExampleGame_NullMove() {
+	g := chess.NewGame()
+	if _, err := g.NullMove(); err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	// A null move flips the side to move without moving any piece.
+	fmt.Println(g.Position().Turn())
+	// Output: b
+}
 
 // ------------------------------------------------------------------
 // Constructor
