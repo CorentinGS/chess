@@ -544,8 +544,6 @@ func (g *Game) numOfRepetitions() int {
 	return count
 }
 
-// Deprecated: use PushNotationMove instead.
-//
 // PushMove adds a move in algebraic notation to the game.
 // Returns an error if the move is invalid.
 // This method now validates moves for consistency with other move methods.
@@ -554,7 +552,19 @@ func (g *Game) numOfRepetitions() int {
 //
 //	node, err := game.PushMove("e4", &MoveInsertOptions{PromoteToMainLine: true})
 func (g *Game) PushMove(algebraicMove string, options *MoveInsertOptions) (*MoveNode, error) {
-	return g.PushNotationMove(algebraicMove, AlgebraicNotation{}, options)
+	return g.PushMoveText(algebraicMove, SAN(), options)
+}
+
+// PushMoveText adds a move to the game using an explicit move text codec.
+// It decodes against the current position so the inserted move carries
+// position-derived tags.
+func (g *Game) PushMoveText(moveText string, codec MoveTextCodec, options *MoveInsertOptions) (*MoveNode, error) {
+	move, err := codec.Decode(g.currentPosition(), moveText)
+	if err != nil {
+		return nil, fmt.Errorf("chess: decode %s move text %q: %w", codec, moveText, err)
+	}
+
+	return g.Move(move, options)
 }
 
 // PushNotationMove adds a move to the game using any supported notation.
