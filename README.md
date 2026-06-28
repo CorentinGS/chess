@@ -944,13 +944,12 @@ The benchmarks can be run with the following command:
 go test -bench=.
 ```
 
-Results from the baseline 2015 MBP:
+Results vary by hardware. For comparative benchmarking use
+[`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat):
 
 ```
-BenchmarkBitboardReverse-4              2000000000               1.01 ns/op
-BenchmarkStalemateStatus-4                500000              3116 ns/op
-BenchmarkInvalidStalemateStatus-4         500000              2290 ns/op
-BenchmarkPositionHash-4                  1000000              1864 ns/op
-BenchmarkValidMoves-4                     100000             13445 ns/op
-BenchmarkPGN-4                               300           5549192 ns/op
+go test -bench=. -count=10 > new.txt
+benchstat base.txt new.txt
 ```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full benchmark workflow.

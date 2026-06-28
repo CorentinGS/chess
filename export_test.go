@@ -1,6 +1,15 @@
 package chess
 
-import "io"
+import (
+	"io"
+	"testing"
+
+	"go.uber.org/goleak"
+)
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func PGN(r io.Reader) (func(*Game), error) {
 	game, err := ParsePGN(r)
