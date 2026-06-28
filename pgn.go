@@ -15,7 +15,6 @@ package chess
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -469,6 +468,19 @@ func (p *Parser) parseMove() (Move, error) {
 	moveData.destSquare = p.currentToken().Value
 	p.advance()
 
+	// Get target square before promotion handling so import-only promotion
+	// spellings such as e8Q can be recognised without consuming ordinary
+	// piece tokens after non-promotion moves.
+	targetSquare := parseSquare(moveData.destSquare)
+	if targetSquare == NoSquare {
+		return Move{}, &ParserError{
+			Message:    "invalid destination square",
+			TokenType:  p.currentToken().Type,
+			TokenValue: p.currentToken().Value,
+			Position:   p.position,
+		}
+	}
+
 	// Handle promotion
 	if p.currentToken().Type == PROMOTION {
 		p.advance()
@@ -483,88 +495,34 @@ func (p *Parser) parseMove() (Move, error) {
 		moveData.promotion = parsePieceType(p.currentToken().Value)
 		p.advance()
 	}
-
-	// Get target square
-	targetSquare := parseSquare(moveData.destSquare)
-	if targetSquare == NoSquare {
-		return Move{}, &ParserError{
-			Message:    "invalid destination square",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
+	if moveData.promotion == NoPieceType &&
+		moveData.piece == "" &&
+		p.currentToken().Type == PIECE &&
+		isPromotionDestination(targetSquare) {
+		promo := parsePieceType(p.currentToken().Value)
+		switch promo {
+		case Queen, Rook, Bishop, Knight:
+			moveData.promotion = promo
+			p.advance()
 		}
 	}
 
-	// Find matching legal move.
-	//
-	// Index-loop the slice instead of ranging by value: taking &m in the
-	// body forces the loop variable onto the heap, which previously caused
-	// ~12M extra Move allocations per `big.pgn` run.
-	matchedMove := false
-	var mismatchReasons []string
 	movePieceType := Pawn
 	if moveData.piece != "" {
 		movePieceType = PieceTypeFromString(moveData.piece)
 	}
-	originFile := byte(0)
-	if moveData.originFile != "" {
-		originFile = moveData.originFile[0]
-	}
-	originRank := int8(-1)
-	if moveData.originRank != "" {
-		originRank = int8(moveData.originRank[0] - '1')
-	}
-	var matched Move
-	visitLegalMoves(p.game.currentPosition(), generateLegalAnnotated, func(m Move) bool {
-		//nolint:nestif // readability
-		if m.S2() == targetSquare {
-			pos := p.game.currentPosition()
-			piece := pos.Board().Piece(m.S1())
 
-			// Check piece type
-			if piece.Type() != movePieceType {
-				mismatchReasons = append(mismatchReasons, "piece type mismatch")
-				return false
-			}
-
-			// Check disambiguation
-			if originFile != 0 && m.S1().File().Byte() != originFile {
-				mismatchReasons = append(mismatchReasons, "origin file mismatch")
-				return false
-			}
-			if originRank >= 0 && int8(m.S1().Rank()) != originRank {
-				mismatchReasons = append(mismatchReasons, fmt.Sprintf("origin rank mismatch: %d", m.S1()/8+1))
-				return false
-			}
-
-			// Check capture
-			if moveData.isCapture != (m.HasTag(Capture) || m.HasTag(EnPassant)) {
-				mismatchReasons = append(mismatchReasons, "capture mismatch")
-				return false
-			}
-
-			// Check promotion
-			if moveData.promotion != NoPieceType && m.promo != moveData.promotion {
-				mismatchReasons = append(mismatchReasons, "promotion mismatch")
-				return false
-			}
-
-			matched = m
-			matchedMove = true
-			return true
-		}
-		return false
+	matched, err := resolveSANMove(p.game.currentPosition(), sanMoveData{
+		piece:      movePieceType,
+		originFile: moveData.originFile,
+		originRank: moveData.originRank,
+		dest:       targetSquare,
+		capture:    moveData.isCapture,
+		promotion:  moveData.promotion,
 	})
-
-	if !matchedMove {
-		if len(mismatchReasons) > 0 {
-			return Move{}, &ParserError{
-				Message:  fmt.Sprintf("no legal move found for position: %s", strings.Join(mismatchReasons, "; ")),
-				Position: p.position,
-			}
-		}
+	if err != nil {
 		return Move{}, &ParserError{
-			Message:  "no legal move found for position",
+			Message:  strings.TrimPrefix(err.Error(), "chess: "),
 			Position: p.position,
 		}
 	}
@@ -581,6 +539,10 @@ func (p *Parser) parseMove() (Move, error) {
 	}
 
 	return move, nil
+}
+
+func isPromotionDestination(s Square) bool {
+	return s.Rank() == Rank1 || s.Rank() == Rank8
 }
 
 func (p *Parser) parseComment() (CommentBlock, error) {

@@ -35,6 +35,24 @@ func TestPGNDecoderPreservesEscapedQuoteInTagValue(t *testing.T) {
 	}
 }
 
+func TestPGNImportAcceptsPromotionWithoutEquals(t *testing.T) {
+	const pgn = `[Event "Promotion import"]
+[SetUp "1"]
+[FEN "6k1/4P3/8/8/8/8/8/4K3 w - - 0 1"]
+[Result "*"]
+
+1. e8Q *
+`
+
+	game, err := chess.ParsePGN(strings.NewReader(pgn))
+	if err != nil {
+		t.Fatalf("ParsePGN rejected import promotion without equals: %v", err)
+	}
+	if got := game.String(); !strings.Contains(got, "1. e8=Q") {
+		t.Fatalf("generated PGN should canonicalise promotion with equals, got:\n%s", got)
+	}
+}
+
 func TestPGNDecoderGameBoundaries(t *testing.T) {
 	tests := []struct {
 		name        string

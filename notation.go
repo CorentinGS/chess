@@ -363,13 +363,21 @@ func (AlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
 		return Move{}, err
 	}
 
-	for _, m := range pos.ValidMovesUnsafe() {
-		if algebraicMoveMatches(pos, m, components) {
-			return m, nil
-		}
+	dest := NoSquare
+	if components.file != "" && components.rank != "" {
+		dest = squareFromFileRank(components.file[0], components.rank[0])
 	}
 
-	return Move{}, fmt.Errorf("chess: move %s is not valid", s)
+	return resolveSANMove(pos, sanMoveData{
+		castle:     components.castles,
+		piece:      algebraicPieceType(components.piece),
+		originFile: components.originFile,
+		originRank: components.originRank,
+		dest:       dest,
+		capture:    components.capture != "",
+		promotion:  algebraicPromotion(components.promotes),
+		canonical:  true,
+	})
 }
 
 func algebraicMoveMatches(pos *Position, m Move, components moveComponents) bool {
