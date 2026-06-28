@@ -24,11 +24,30 @@ import (
 type Parser struct {
 	game         *Game
 	currentMove  *MoveNode
-	tokens       []Token
+	tokens       pgnTokenSource
+	token        Token
 	errors       []ParserError
 	position     int
 	tagOutcome   Outcome
 	tokenOutcome Outcome
+}
+
+type pgnTokenSource interface {
+	NextToken() (Token, error)
+}
+
+type sliceTokenSource struct {
+	tokens []Token
+	pos    int
+}
+
+func (s *sliceTokenSource) NextToken() (Token, error) {
+	if s.pos >= len(s.tokens) {
+		return Token{Type: EOF}, nil
+	}
+	token := s.tokens[s.pos]
+	s.pos++
+	return token, nil
 }
 
 // NewParser creates a new parser instance initialized with the given tokens.
@@ -39,11 +58,15 @@ type Parser struct {
 //	tokens := TokenizeGame(game)
 //	parser := NewParser(tokens)
 func NewParser(tokens []Token) *Parser {
+	return newParserFromSource(&sliceTokenSource{tokens: tokens})
+}
+
+func newParserFromSource(tokens pgnTokenSource) *Parser {
 	pos := StartingPosition()
 	rootMove := &MoveNode{
 		position: pos,
 	}
-	return &Parser{
+	parser := &Parser{
 		tokens: tokens,
 		game: &Game{
 			tagPairs:    make(TagPairs),
@@ -53,19 +76,28 @@ func NewParser(tokens []Token) *Parser {
 		},
 		currentMove: rootMove,
 	}
+	parser.token, _ = tokens.NextToken()
+	return parser
 }
 
 // currentToken returns the current token being processed.
 func (p *Parser) currentToken() Token {
-	if p.position >= len(p.tokens) {
-		return Token{Type: EOF}
-	}
-	return p.tokens[p.position]
+	return p.token
 }
 
 // advance moves to the next token.
 func (p *Parser) advance() {
 	p.position++
+	token, err := p.tokens.NextToken()
+	if err != nil {
+		p.token = Token{Type: Undefined, Value: err.Error()}
+		return
+	}
+	p.token = token
+}
+
+func (p *Parser) atEnd() bool {
+	return p.currentToken().Type == EOF
 }
 
 // Parse processes all tokens and returns the complete game.
@@ -233,7 +265,7 @@ func (p *Parser) parseTagPair() error {
 func (p *Parser) parseMoveText() error {
 	var moveNumber uint64
 	ply := 1
-	for p.position < len(p.tokens) {
+	for !p.atEnd() {
 		token := p.currentToken()
 
 		switch token.Type {
@@ -540,7 +572,7 @@ func (p *Parser) parseComment() (CommentBlock, error) {
 
 	block := CommentBlock{}
 
-	for p.currentToken().Type != CommentEnd && p.position < len(p.tokens) {
+	for p.currentToken().Type != CommentEnd && !p.atEnd() {
 		switch p.currentToken().Type {
 		case CommandStart:
 			command, err := p.parseCommand()
@@ -562,7 +594,7 @@ func (p *Parser) parseComment() (CommentBlock, error) {
 		p.advance()
 	}
 
-	if p.position >= len(p.tokens) {
+	if p.atEnd() {
 		return CommentBlock{}, &ParserError{
 			Message:  "unterminated comment",
 			Position: p.position,
@@ -580,7 +612,7 @@ func (p *Parser) parseCommand() (CommentItem, error) {
 	// Consume the opening "["
 	p.advance()
 
-	for p.currentToken().Type != CommandEnd && p.position < len(p.tokens) {
+	for p.currentToken().Type != CommandEnd && !p.atEnd() {
 		switch p.currentToken().Type {
 
 		case CommandName:
@@ -610,7 +642,7 @@ func (p *Parser) parseCommand() (CommentItem, error) {
 		p.advance()
 	}
 
-	if p.position >= len(p.tokens) {
+	if p.atEnd() {
 		return CommentItem{}, &ParserError{
 			Message:  "unterminated command",
 			Position: p.position,
@@ -648,7 +680,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	ply := parentPly
 	isBlackMove := false
 
-	for p.currentToken().Type != VariationEnd && p.position < len(p.tokens) {
+	for p.currentToken().Type != VariationEnd && !p.atEnd() {
 		switch p.currentToken().Type {
 		case MoveNumber:
 			num, err := strconv.ParseUint(p.currentToken().Value, 10, 32)
@@ -734,7 +766,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 		}
 	}
 
-	if p.position >= len(p.tokens) {
+	if p.atEnd() {
 		return &ParserError{
 			Message:  "unterminated variation",
 			Position: p.position,
