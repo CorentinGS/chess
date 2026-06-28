@@ -23,6 +23,7 @@ func TestPieceType_FENString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.pt.String(); got != tt.want {
 				t.Errorf("String() = %q, want %q", got, tt.want)
 			}
@@ -46,6 +47,7 @@ func TestPieceType_Bytes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if !bytes.Equal(tt.pt.Bytes(), tt.want) {
 				t.Errorf("Bytes() = %v, want %v", tt.pt.Bytes(), tt.want)
 			}
@@ -69,6 +71,7 @@ func TestPieceType_ToPolyglotPromotionValue(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.pt.ToPolyglotPromotionValue(); got != tt.want {
 				t.Errorf("ToPolyglotPromotionValue() = %d, want %d", got, tt.want)
 			}
@@ -79,6 +82,7 @@ func TestPieceType_ToPolyglotPromotionValue(t *testing.T) {
 func TestPieceType_StringRoundTrip(t *testing.T) {
 	for _, pt := range chess.PieceTypes() {
 		t.Run(pt.String(), func(t *testing.T) {
+			t.Parallel()
 			if got := chess.PieceTypeFromString(pt.String()); got != pt {
 				t.Errorf("PieceTypeFromString(%q) = %v, want %v", pt.String(), got, pt)
 			}
@@ -107,6 +111,7 @@ func TestPieceTypeFromByte(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := chess.PieceTypeFromByte(tt.in); got != tt.want {
 				t.Errorf("PieceTypeFromByte(%q) = %v, want %v", tt.in, got, tt.want)
 			}
@@ -130,6 +135,7 @@ func TestPieceTypeFromString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := chess.PieceTypeFromString(tt.in); got != tt.want {
 				t.Errorf("PieceTypeFromString(%q) = %v, want %v", tt.in, got, tt.want)
 			}

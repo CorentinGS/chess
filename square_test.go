@@ -24,6 +24,7 @@ func TestNewSquare_FromFileAndRank(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := chess.NewSquare(tt.f, tt.r); got != tt.want {
 				t.Errorf("NewSquare(%v,%v) = %s, want %s", tt.f, tt.r, got.String(), tt.want.String())
 			}
@@ -34,6 +35,7 @@ func TestNewSquare_FromFileAndRank(t *testing.T) {
 func TestNewSquare_RoundTripsThroughFileAndRank(t *testing.T) {
 	for _, sq := range allSquares() {
 		t.Run(sq.String(), func(t *testing.T) {
+			t.Parallel()
 			if got := chess.NewSquare(sq.File(), sq.Rank()); got != sq {
 				t.Errorf("NewSquare(%s.File(), %s.Rank()) = %s, want %s", sq, sq, got, sq)
 			}
@@ -44,6 +46,7 @@ func TestNewSquare_RoundTripsThroughFileAndRank(t *testing.T) {
 func TestSquare_StringRoundTrip(t *testing.T) {
 	for _, sq := range allSquares() {
 		t.Run(sq.String(), func(t *testing.T) {
+			t.Parallel()
 			if got := chess.SquareFromString(sq.String()); got != sq {
 				t.Errorf("SquareFromString(%q) = %v, want %v", sq.String(), got, sq)
 			}
@@ -54,6 +57,7 @@ func TestSquare_StringRoundTrip(t *testing.T) {
 func TestSquare_Bytes(t *testing.T) {
 	for _, sq := range allSquares() {
 		t.Run(sq.String(), func(t *testing.T) {
+			t.Parallel()
 			b := sq.Bytes()
 			if len(b) != 2 {
 				t.Fatalf("%s.Bytes() len = %d, want 2", sq, len(b))
@@ -80,6 +84,7 @@ func TestSquareFromString(t *testing.T) {
 	}
 	for _, tt := range valid {
 		t.Run("valid/"+tt.in, func(t *testing.T) {
+			t.Parallel()
 			if got := chess.SquareFromString(tt.in); got != tt.want {
 				t.Errorf("SquareFromString(%q) = %v, want %v", tt.in, got, tt.want)
 			}
@@ -88,6 +93,7 @@ func TestSquareFromString(t *testing.T) {
 	invalid := []string{"", "a", "a9", "a0", "i1", "z9", "A1", "e44", " e4", "e4 ", "##", "e"}
 	for _, in := range invalid {
 		t.Run("invalid/"+in, func(t *testing.T) {
+			t.Parallel()
 			if got := chess.SquareFromString(in); got != chess.NoSquare {
 				t.Errorf("SquareFromString(%q) = %v, want NoSquare", in, got)
 			}
@@ -113,6 +119,7 @@ func TestFile_StringAndByte(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.f.String(); got != tt.str {
 				t.Errorf("String() = %q, want %q", got, tt.str)
 			}
@@ -141,6 +148,7 @@ func TestRank_StringAndByte(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.r.String(); got != tt.str {
 				t.Errorf("String() = %q, want %q", got, tt.str)
 			}

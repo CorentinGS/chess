@@ -37,7 +37,29 @@ if err := game.Move(moves[0], nil); err != nil { /* ... */ }
 
 The same change applies to `UnsafeMove(move Move, opts *PushMoveOptions) error`.
 `Move.Clone()` has been removed — copy by assignment (`m2 := m1`) if you need a
-value copy. For tree nodes use `game.MoveNodes()` and `game.Moves()`.
+value copy.
+
+In v2, `*Move` carried both the move data and its position/context. In v3 these
+are split: `Move` is the bare value; `MoveNode` holds the tree position,
+children, comments, and NAGs. Code that iterated moves and accessed position
+data must now navigate via `MoveNode`:
+
+```go
+// v2
+for _, m := range game.Moves() {
+    fmt.Println(m.Position().Turn()) // Move carried the resulting position
+}
+
+// v3
+for _, node := range game.MoveNodes() {
+    fmt.Println(node.Position().Turn()) // position is on MoveNode
+}
+```
+
+`game.Moves()` still returns `[]Move` (bare values, main line only). Use
+`game.MoveNodes()` for tree access: `node.Comments()`,
+`node.SetCommand(key, val)`, `node.SetComment(text)`, `node.AddComment(text)`,
+`node.NAG()`, and `node.Children()` / `node.Parent()` for variation traversal.
 
 ## Notation uses value signatures
 
@@ -130,6 +152,23 @@ reached a terminal outcome and return `chess.ErrGameAlreadyEnded`. Call
 `Game.ClearOutcome()` to resume, or `Game.SetOutcomeMethod(method, outcome)` to
 set an outcome explicitly with validation. `Split()` now recomputes each line's
 outcome from its leaf position instead of copying the parent outcome.
+
+## Null moves
+
+v3 adds explicit null move support. A null move flips the side to move without
+moving any piece — used by engines for null-move pruning and by PGN
+annotations to indicate a side passed.
+
+```go
+g := chess.NewGame()
+node, err := g.NullMove() // flips turn, serializes as "Z0" in PGN
+```
+
+`NewNullMove()` returns a `Move` carrying the `Null` tag. Null moves are never
+returned by `ValidMoves()` and are rejected by `Game.Move`. Insert them via
+`Game.NullMove()` or `Game.UnsafeMove(NewNullMove(), nil)`. When reading PGN,
+the parser accepts five spellings: `Z0`, `Z1`, `--`, `@@`, and `0000`. The
+renderer always writes `Z0` (ChessBase/Scid convention).
 
 ## PGN rendering
 
