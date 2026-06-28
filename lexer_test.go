@@ -1086,10 +1086,8 @@ func TestLexer_ResultSpellings(t *testing.T) {
 		{"white_wins", "1-0", []chess.Token{{Type: chess.RESULT, Value: "1-0"}}},
 		{"black_wins", "0-1", []chess.Token{{Type: chess.RESULT, Value: "0-1"}}},
 		{"ongoing", "*", []chess.Token{{Type: chess.RESULT, Value: "*"}}},
-		{"draw_token_not_recognized", "1/2-1/2", []chess.Token{
-			{Type: chess.MoveNumber, Value: "1"},
-			{Type: chess.Undefined, Value: "/"},
-			{Type: chess.MoveNumber, Value: "2-1/2"},
+		{"draw", "1/2-1/2", []chess.Token{
+			{Type: chess.RESULT, Value: "1/2-1/2"},
 		}},
 	}
 	for _, tt := range tests {

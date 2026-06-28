@@ -688,6 +688,15 @@ func (l *Lexer) NextToken() Token {
 			l.ch = l.input[position]
 			return l.readResult()
 		default:
+			// "1/2-1/2" draw result token, e.g. "1. e4 e5 1/2-1/2". The digit
+			// run stopped at '/'; if the literal pattern starts at the run
+			// start, reset and let readResult consume and validate it.
+			if position+7 <= len(l.input) && l.input[position:position+7] == "1/2-1/2" {
+				l.position = position
+				l.readPosition = position + 1
+				l.ch = l.input[position]
+				return l.readResult()
+			}
 			// Reset position and try again as a regular number
 			l.position = position
 			l.readPosition = position + 1

@@ -25,6 +25,7 @@ func TestPGN_ResolvesOutcomeFromTagTokenAndBoard(t *testing.T) {
 		{"token_white_won", moves + " 1-0", false, chess.WhiteWon, chess.NoMethod},
 		{"token_black_won", moves + " 0-1", false, chess.BlackWon, chess.NoMethod},
 		{"token_no_outcome", moves + " *", false, chess.NoOutcome, chess.NoMethod},
+		{"token_draw", moves + " 1/2-1/2", false, chess.Draw, chess.NoMethod},
 		{"tag_token_agree", "[Result \"1-0\"]\n\n" + moves + " 1-0", false, chess.WhiteWon, chess.NoMethod},
 		{"tag_token_conflict", "[Result \"0-1\"]\n\n" + moves + " 1-0", true, chess.NoOutcome, chess.NoMethod},
 		{"board_checkmate_conflicts_with_tag", "[Result \"0-1\"]\n\n" + scholarMate + " 1-0", true, chess.NoOutcome, chess.NoMethod},
@@ -54,13 +55,16 @@ func TestPGN_ResolvesOutcomeFromTagTokenAndBoard(t *testing.T) {
 	}
 }
 
-func TestPGNDrawMovetextTokenNotRecognized(t *testing.T) {
+func TestPGNDrawMovetextTokenRecognized(t *testing.T) {
 	g, err := chess.ParsePGN(strings.NewReader("1. e4 e5 1/2-1/2"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := g.Outcome(); got != chess.NoOutcome {
-		t.Errorf("draw movetext token currently yields %v; lexer does not recognize 1/2-1/2 as a RESULT (only the Result tag produces draws). If this changed, update this test", got)
+	if got := g.Outcome(); got != chess.Draw {
+		t.Errorf("Outcome() = %v, want %v", got, chess.Draw)
+	}
+	if got := g.Method(); got != chess.NoMethod {
+		t.Errorf("Method() = %v, want %v", got, chess.NoMethod)
 	}
 }
 
