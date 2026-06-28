@@ -36,10 +36,10 @@ Usage:
 package chess
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Board represents a chess board and its relationship between squares and pieces.
@@ -111,7 +111,7 @@ func NewBoard(m map[Square]Piece) (*Board, error) {
 // SquareMap returns a mapping of squares to pieces.
 // A square is only added to the map if it is occupied.
 func (b *Board) SquareMap() map[Square]Piece {
-	m := map[Square]Piece{}
+	m := make(map[Square]Piece, numOfSquaresInBoard)
 	for sq := range numOfSquaresInBoard {
 		p := b.Piece(Square(sq))
 		if p != NoPiece {
@@ -144,7 +144,7 @@ const (
 // For UpDown, pieces are mirrored across the horizontal center line.
 // For LeftRight, pieces are mirrored across the vertical center line.
 func (b *Board) Flip(fd FlipDirection) (*Board, error) {
-	m := map[Square]Piece{}
+	m := make(map[Square]Piece, numOfSquaresInBoard)
 	for sq := range numOfSquaresInBoard {
 		var mv Square
 		switch fd {
@@ -164,7 +164,7 @@ func (b *Board) Flip(fd FlipDirection) (*Board, error) {
 
 // Transpose flips the board over the A8 to H1 diagonal.
 func (b *Board) Transpose() (*Board, error) {
-	m := map[Square]Piece{}
+	m := make(map[Square]Piece, numOfSquaresInBoard)
 	for sq := range numOfSquaresInBoard {
 		file := File(7 - Square(sq).Rank())
 		rank := Rank(7 - Square(sq).File())
@@ -206,48 +206,48 @@ func (b *Board) Draw2(perspective Color, darkMode bool) string {
 
 // drawForWhite returns visual representation of the board from white's perspective
 func (b *Board) drawForWhite(darkMode bool) string {
-	s := "\n A B C D E F G H\n"
+	var sb strings.Builder
+	sb.Grow(154)
+	sb.WriteString("\n A B C D E F G H\n")
 	for r := 7; r >= 0; r-- {
-		s += Rank(r).String()
+		sb.WriteString(Rank(r).String())
 		for f := range numOfSquaresInRow {
 			p := b.Piece(NewSquare(File(f), Rank(r)))
 			if p == NoPiece {
-				s += "-"
+				sb.WriteByte('-')
+			} else if darkMode {
+				sb.WriteString(p.DarkString())
 			} else {
-				if darkMode {
-					s += p.DarkString()
-				} else {
-					s += p.String()
-				}
+				sb.WriteString(p.String())
 			}
-			s += " "
+			sb.WriteByte(' ')
 		}
-		s += "\n"
+		sb.WriteByte('\n')
 	}
-	return s
+	return sb.String()
 }
 
 // drawForBlack returns visual representation of the board from black's perspective
 func (b *Board) drawForBlack(darkMode bool) string {
-	s := "\n H G F E D C B A\n"
+	var sb strings.Builder
+	sb.Grow(154)
+	sb.WriteString("\n H G F E D C B A\n")
 	for r := 0; r <= 7; r++ {
-		s += Rank(r).String()
+		sb.WriteString(Rank(r).String())
 		for f := numOfSquaresInRow - 1; f >= 0; f-- {
 			p := b.Piece(NewSquare(File(f), Rank(r)))
 			if p == NoPiece {
-				s += "-"
+				sb.WriteByte('-')
+			} else if darkMode {
+				sb.WriteString(p.DarkString())
 			} else {
-				if darkMode {
-					s += p.DarkString()
-				} else {
-					s += p.String()
-				}
+				sb.WriteString(p.String())
 			}
-			s += " "
+			sb.WriteByte(' ')
 		}
-		s += "\n"
+		sb.WriteByte('\n')
 	}
-	return s
+	return sb.String()
 }
 
 // String implements the fmt.Stringer interface and returns
@@ -317,7 +317,7 @@ func (b *Board) MarshalText() ([]byte, error) {
 func (b *Board) UnmarshalText(text []byte) error {
 	cp, err := fenBoard(string(text))
 	if err != nil {
-		return err
+		return fmt.Errorf("chess: unmarshal board FEN: %w", err)
 	}
 	*b = *cp
 	return nil
@@ -328,13 +328,15 @@ func (b *Board) UnmarshalText(text []byte) error {
 // in the following order: WhiteKing, WhiteQueen, WhiteRook, WhiteBishop, WhiteKnight
 // WhitePawn, BlackKing, BlackQueen, BlackRook, BlackBishop, BlackKnight, BlackPawn.
 func (b *Board) MarshalBinary() ([]byte, error) {
-	bbs := []bitboard{
+	bbs := [...]bitboard{
 		b.bbWhiteKing, b.bbWhiteQueen, b.bbWhiteRook, b.bbWhiteBishop, b.bbWhiteKnight, b.bbWhitePawn,
 		b.bbBlackKing, b.bbBlackQueen, b.bbBlackRook, b.bbBlackBishop, b.bbBlackKnight, b.bbBlackPawn,
 	}
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, bbs)
-	return buf.Bytes(), err
+	buf := make([]byte, 8*len(bbs))
+	for i, bb := range bbs {
+		binary.BigEndian.PutUint64(buf[i*8:], uint64(bb))
+	}
+	return buf, nil
 }
 
 // UnmarshalBinary implements the encoding.BinaryUnmarshaler interface and parses
@@ -649,7 +651,7 @@ func (b *Board) setBBForPiece(p Piece, bb bitboard) error {
 	case BlackPawn:
 		b.bbBlackPawn = bb
 	default:
-		return fmt.Errorf("invalid piece %s", p)
+		return fmt.Errorf("chess: invalid piece %s", p)
 	}
 	return nil
 }

@@ -267,6 +267,23 @@ func TestGetRandomMove(t *testing.T) {
 	}
 }
 
+func TestGetRandomMoveWithZeroTotalWeight(t *testing.T) {
+	book := &PolyglotBook{
+		entries: []PolyglotEntry{
+			{Key: 1, Move: 100, Weight: 0, Learn: 0},
+			{Key: 1, Move: 101, Weight: 0, Learn: 0},
+		},
+	}
+
+	move, err := book.GetRandomMove(1)
+	if err != nil {
+		t.Fatalf("GetRandomMove() error = %v", err)
+	}
+	if move != nil {
+		t.Fatalf("GetRandomMove() = %v, want nil", move)
+	}
+}
+
 func TestInvalidBookData(t *testing.T) {
 	// Test invalid file size
 	invalidData := []byte{0x00, 0x01, 0x02} // Not multiple of 16

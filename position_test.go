@@ -14,6 +14,17 @@ func mustPosition(t *testing.T, fen string) *Position {
 	return pos
 }
 
+func TestPositionBoardReturnsDefensiveCopy(t *testing.T) {
+	pos := StartingPosition()
+
+	board := pos.Board()
+	board.mailbox[E2] = NoPiece
+
+	if got := pos.Board().Piece(E2); got != WhitePawn {
+		t.Fatalf("Board returned mutable position board, E2 = %v, want %v", got, WhitePawn)
+	}
+}
+
 func TestPositionBinary(t *testing.T) {
 	for _, fen := range validFENs {
 		pos, err := decodeFEN(fen)

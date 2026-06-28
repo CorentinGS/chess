@@ -26,6 +26,7 @@ type Parser struct {
 	currentMove  *MoveNode
 	tokens       pgnTokenSource
 	token        Token
+	initErr      error
 	errors       []ParserError
 	position     int
 	tagOutcome   Outcome
@@ -76,7 +77,13 @@ func newParserFromSource(tokens pgnTokenSource) *Parser {
 		},
 		currentMove: rootMove,
 	}
-	parser.token, _ = tokens.NextToken()
+	token, err := tokens.NextToken()
+	if err != nil {
+		parser.initErr = err
+		parser.token = Token{Type: Undefined, Value: err.Error()}
+		return parser
+	}
+	parser.token = token
 	return parser
 }
 
@@ -114,9 +121,13 @@ func (p *Parser) atEnd() bool {
 //	}
 //	fmt.Printf("Event: %s\n", game.GetTagPair("Event"))
 func (p *Parser) Parse() (*Game, error) {
+	if p.initErr != nil {
+		return nil, p.initErr
+	}
+
 	// Parse header section (tag pairs)
 	if err := p.parseHeader(); err != nil {
-		return nil, errors.New("parsing header")
+		return nil, errors.New("chess: parsing header")
 	}
 
 	p.tagOutcome = outcomeFromResultString(p.game.tagPairs["Result"])
@@ -125,7 +136,7 @@ func (p *Parser) Parse() (*Game, error) {
 	if value, ok := p.game.tagPairs["FEN"]; ok {
 		pos, err := decodeFEN(value)
 		if err != nil {
-			return nil, errors.New("invalid FEN")
+			return nil, errors.New("chess: invalid FEN")
 		}
 		p.game.rootMove.position = pos
 		p.game.pos = pos

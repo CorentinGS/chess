@@ -223,17 +223,17 @@ func (n *MoveNode) Parent() *MoveNode {
 }
 
 func (n *MoveNode) Position() *Position {
-	if n == nil {
+	if n == nil || n.position == nil {
 		return nil
 	}
-	return n.position
+	return n.position.copy()
 }
 
 func (n *MoveNode) Children() []*MoveNode {
 	if n == nil {
 		return nil
 	}
-	return n.children
+	return append([]*MoveNode{}, n.children...)
 }
 
 func (n *MoveNode) Number() int {

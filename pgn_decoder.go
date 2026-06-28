@@ -294,6 +294,11 @@ func (f *pgnFramer) advance(n int) {
 		f.buffer = f.buffer[:0]
 		return
 	}
+	retained := len(f.buffer) - n
+	if retained*4 < cap(f.buffer) {
+		f.buffer = append([]byte(nil), f.buffer[n:]...)
+		return
+	}
 	f.buffer = f.buffer[n:]
 }
 

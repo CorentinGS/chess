@@ -62,8 +62,8 @@ func TestSquare_Bytes(t *testing.T) {
 			if len(b) != 2 {
 				t.Fatalf("%s.Bytes() len = %d, want 2", sq, len(b))
 			}
-			if string(b) != sq.String() {
-				t.Errorf("%s.Bytes() = %q, want %q", sq, string(b), sq.String())
+			if string(b[:]) != sq.String() {
+				t.Errorf("%s.Bytes() = %q, want %q", sq, string(b[:]), sq.String())
 			}
 		})
 	}

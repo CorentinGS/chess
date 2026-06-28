@@ -2,6 +2,7 @@ package uci
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -36,6 +37,10 @@ func NewSubprocessAdapter(path string) (*SubprocessAdapter, error) {
 	cmd.Stdin = rIn
 	cmd.Stdout = wOut
 	if err := cmd.Start(); err != nil {
+		_ = rIn.Close()
+		_ = wIn.Close()
+		_ = rOut.Close()
+		_ = wOut.Close()
 		return nil, fmt.Errorf("uci: failed to start executable %s: %w", path, err)
 	}
 	go func() {
@@ -74,13 +79,17 @@ func (s *SubprocessAdapter) Exchange(cmd Cmd) ([]string, error) {
 
 // Close closes the communication pipes and kills the subprocess.
 func (s *SubprocessAdapter) Close() error {
-	if err := s.writer.Close(); err != nil {
-		return err
+	var errs []error
+	if s.writer != nil {
+		errs = append(errs, s.writer.Close())
 	}
-	if err := s.reader.Close(); err != nil {
-		return err
+	if s.reader != nil {
+		errs = append(errs, s.reader.Close())
 	}
-	return s.cmd.Process.Kill()
+	if s.cmd != nil && s.cmd.Process != nil {
+		errs = append(errs, s.cmd.Process.Kill())
+	}
+	return errors.Join(errs...)
 }
 
 // Pid returns the operating system process ID of the engine subprocess.

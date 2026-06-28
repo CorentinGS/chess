@@ -23,6 +23,15 @@ type SearchResults struct {
 	Info        Info
 }
 
+func (r SearchResults) copy() SearchResults {
+	return SearchResults{
+		BestMove:    r.BestMove,
+		Ponder:      r.Ponder,
+		MultiPVInfo: copyInfoSlice(r.MultiPVInfo),
+		Info:        r.Info.copy(),
+	}
+}
+
 // Info corresponds to the "info" engine output:
 // the engine wants to send infos to the GUI. This should be done whenever one of the info has changed.
 // The engine can send only selected infos and multiple infos can be send with one info command,
@@ -105,6 +114,42 @@ type Info struct {
 	CPULoad           int
 }
 
+func (i Info) copy() Info {
+	i.PV = append([]chess.Move{}, i.PV...)
+	return i
+}
+
+func copyInfoSlice(src []Info) []Info {
+	if src == nil {
+		return []Info{}
+	}
+	out := make([]Info, len(src))
+	for idx, info := range src {
+		out[idx] = info.copy()
+	}
+	return out
+}
+
+func parseInfoInt(field, value string) (int, error) {
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("uci: invalid info %s %q: %w", field, value, err)
+	}
+	return v, nil
+}
+
+func nextInfoToken(s string) (string, string, bool) {
+	s = strings.TrimLeft(s, " ")
+	if s == "" {
+		return "", "", false
+	}
+	token, rest, found := strings.Cut(s, " ")
+	if !found {
+		return s, "", true
+	}
+	return token, rest, true
+}
+
 // Score corresponds to the "info"'s score engine output:
 //   - score
 //   - cp
@@ -175,16 +220,19 @@ func (score Score) LossPct() (float32, error) {
 //
 //nolint:funlen // This function is long because it has to parse a lot of different fields.
 func (info *Info) UnmarshalText(text []byte) error {
-	parts := strings.Split(string(text), " ")
-	if len(parts) == 0 {
-		return errors.New("uci: invalid info line " + string(text))
-	}
-	if parts[0] != "info" {
-		return errors.New("uci: invalid info line " + string(text))
+	line := string(text)
+	token, rest, ok := nextInfoToken(line)
+	if !ok || token != "info" {
+		return fmt.Errorf("uci: invalid info line %s", line)
 	}
 	ref := ""
-	for i := 1; i < len(parts); i++ {
-		s := parts[i]
+	for {
+		s, nextRest, ok := nextInfoToken(rest)
+		if !ok {
+			break
+		}
+		rest = nextRest
+
 		switch s {
 		case "score":
 			continue
@@ -201,61 +249,67 @@ func (info *Info) UnmarshalText(text []byte) error {
 		}
 		switch ref {
 		case "depth":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("depth", s)
 			if err != nil {
 				return err
 			}
 			info.Depth = v
 		case "seldepth":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("seldepth", s)
 			if err != nil {
 				return err
 			}
 			info.Seldepth = v
 		case "multipv":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("multipv", s)
 			if err != nil {
 				return err
 			}
 			info.Multipv = v
 		case "cp":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("cp", s)
 			if err != nil {
 				return err
 			}
 			info.Score.CP = v
 		case "wdl":
-			if i+2 >= len(parts) {
-				return fmt.Errorf("uci: truncated wdl score: %s", string(text))
+			draw, nextRest, ok := nextInfoToken(rest)
+			if !ok {
+				return fmt.Errorf("uci: truncated wdl score: %s", line)
 			}
+			loss, afterLoss, ok := nextInfoToken(nextRest)
+			if !ok {
+				return fmt.Errorf("uci: truncated wdl score: %s", line)
+			}
+			rest = afterLoss
+
 			var err error
-			info.Score.Win, err = strconv.Atoi(parts[i])
+			info.Score.Win, err = parseInfoInt("wdl win", s)
 			if err != nil {
 				return err
 			}
-			info.Score.Draw, err = strconv.Atoi(parts[i+1])
+			info.Score.Draw, err = parseInfoInt("wdl draw", draw)
 			if err != nil {
 				return err
 			}
-			info.Score.Loss, err = strconv.Atoi(parts[i+2])
+			info.Score.Loss, err = parseInfoInt("wdl loss", loss)
 			if err != nil {
 				return err
 			}
-			i += 2
 		case "nodes":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("nodes", s)
 			if err != nil {
 				return err
 			}
 			info.Nodes = v
 		case "mate":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("mate", s)
 			if err != nil {
 				return err
 			}
 			info.Score.Mate = v
 		case "currmovenumber":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("currmovenumber", s)
 			if err != nil {
 				return err
 			}
@@ -263,35 +317,35 @@ func (info *Info) UnmarshalText(text []byte) error {
 		case "currmove":
 			m, err := chess.UCINotation{}.Decode(nil, s)
 			if err != nil {
-				return err
+				return fmt.Errorf("uci: invalid info currmove %q: %w", s, err)
 			}
 			info.CurrentMove = m
 		case "hashfull":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("hashfull", s)
 			if err != nil {
 				return err
 			}
 			info.Hashfull = v
 		case "tbhits":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("tbhits", s)
 			if err != nil {
 				return err
 			}
 			info.TBHits = v
 		case "time":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("time", s)
 			if err != nil {
 				return err
 			}
 			info.Time = time.Millisecond * time.Duration(v)
 		case "nps":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("nps", s)
 			if err != nil {
 				return err
 			}
 			info.NPS = v
 		case "cpuload":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("cpuload", s)
 			if err != nil {
 				return err
 			}
@@ -299,7 +353,7 @@ func (info *Info) UnmarshalText(text []byte) error {
 		case "pv":
 			m, err := chess.UCINotation{}.Decode(nil, s)
 			if err != nil {
-				return err
+				return fmt.Errorf("uci: invalid info pv move %q: %w", s, err)
 			}
 			info.PV = append(info.PV, m)
 		}

@@ -1,9 +1,9 @@
 package chess
 
 import (
-	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -53,7 +53,11 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 	slices.SortFunc(tagPairList, cmpTags)
 
 	for _, tagPair := range tagPairList {
-		sb.WriteString(fmt.Sprintf("[%s \"%s\"]\n", tagPair.Key, escapeTagValue(tagPair.Value)))
+		sb.WriteByte('[')
+		sb.WriteString(tagPair.Key)
+		sb.WriteString(" \"")
+		sb.WriteString(escapeTagValue(tagPair.Value))
+		sb.WriteString("\"]\n")
 	}
 
 	if len(g.tagPairs) > 0 {
@@ -64,8 +68,8 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 	if g.rootMove != nil {
 		if len(g.rootMove.children) > 0 {
 			writeMoves(g.rootMove,
-				g.rootMove.Position().moveCount,
-				g.rootMove.Position().Turn() == White, &sb, false, false, true)
+				g.rootMove.position.moveCount,
+				g.rootMove.position.turn == White, &sb, false, false, true)
 			needTrailingSpace = true
 		} else if g.rootMove.hasAnnotations() {
 			writeAnnotations(g.rootMove, &sb)
@@ -219,18 +223,20 @@ func writeMoveNumber(moveNum int, isWhite bool, subVariation, closedVariation,
 		sb.WriteString(" ")
 	}
 	if isWhite {
-		fmt.Fprintf(sb, "%d. ", moveNum)
+		sb.WriteString(strconv.Itoa(moveNum))
+		sb.WriteString(". ")
 	} else if subVariation || closedVariation || isRoot {
-		fmt.Fprintf(sb, "%d... ", moveNum)
+		sb.WriteString(strconv.Itoa(moveNum))
+		sb.WriteString("... ")
 	}
 }
 
 func writeMoveEncoding(node *MoveNode, currentMove *MoveNode, subVariation bool, sb *strings.Builder) {
-	if subVariation && node.Parent() != nil {
-		moveStr := AlgebraicNotation{}.Encode(node.Parent().Position(), currentMove.move)
+	if subVariation && node.parent != nil {
+		moveStr := AlgebraicNotation{}.Encode(node.parent.position, currentMove.move)
 		sb.WriteString(moveStr)
 	} else {
-		sb.WriteString(AlgebraicNotation{}.Encode(node.Position(), currentMove.move))
+		sb.WriteString(AlgebraicNotation{}.Encode(node.position, currentMove.move))
 	}
 }
 

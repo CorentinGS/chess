@@ -153,6 +153,59 @@ func TestEncodeUCINotationWithInvalidMove(t *testing.T) {
 	}
 }
 
+func TestNotationHandlesInvalidPooledStringBuilder(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func() string
+		want string
+	}{
+		{
+			name: "uci encode",
+			run: func() string {
+				return UCINotation{}.Encode(nil, Move{s1: E2, s2: E4})
+			},
+			want: "e2e4",
+		},
+		{
+			name: "algebraic encode",
+			run: func() string {
+				pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+				return AlgebraicNotation{}.Encode(pos, Move{s1: E2, s2: E4})
+			},
+			want: "e4",
+		},
+		{
+			name: "move components clean",
+			run: func() string {
+				return moveComponents{
+					piece:      "N",
+					originFile: "g",
+					file:       "f",
+					rank:       "3",
+				}.clean()
+			},
+			want: "Ngf3",
+		},
+		{
+			name: "form source square",
+			run: func() string {
+				pos := unsafeFEN("1k6/8/8/3R4/8/8/R7/K7 w - - 0 1")
+				return formS1(pos, Move{s1: A2, s2: A5})
+			},
+			want: "a",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stringPool.Put("not a string builder")
+			if got := tt.run(); got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestUCINotationDecode(t *testing.T) {
 	moveWithCheckCapture := Move{s1: D1, s2: D8, tags: Check}.WithTag(Capture)
 

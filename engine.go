@@ -418,7 +418,7 @@ const maxPossibleMoves = 218 // Maximum possible moves in any chess position
 //
 //nolint:gochecknoglobals // this is a sync pool
 var movePool = &sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &[maxPossibleMoves]Move{}
 	},
 }

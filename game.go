@@ -23,9 +23,11 @@ package chess
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 )
 
 // A Outcome is the result of a game.
@@ -104,7 +106,7 @@ type Game struct {
 func FEN(fen string) (func(*Game), error) {
 	pos, err := decodeFEN(fen)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("chess: game FEN option: %w", err)
 	}
 	if pos == nil {
 		return nil, errors.New("chess: invalid FEN")
@@ -314,6 +316,7 @@ func (g *Game) MoveHistory() []*MoveHistory {
 }
 
 // GetRootMove returns the root move of the game.
+// The returned node is live game state so callers can attach root comments.
 func (g *Game) GetRootMove() *MoveNode {
 	return g.rootMove
 }
@@ -324,7 +327,7 @@ func (g *Game) Variations(move *MoveNode) []*MoveNode {
 		return nil
 	}
 	// Return all moves except the main line (first child)
-	return move.children[1:]
+	return append([]*MoveNode{}, move.children[1:]...)
 }
 
 // Comments returns the comments for the game indexed by moves.
@@ -356,7 +359,10 @@ func copyComments(src [][]string) [][]string {
 
 // Position returns the game's current position.
 func (g *Game) Position() *Position {
-	return g.pos
+	if g.pos == nil {
+		return nil
+	}
+	return g.pos.copy()
 }
 
 // CurrentPosition returns the game's current move position.
@@ -461,7 +467,7 @@ func (g *Game) UnmarshalText(text []byte) error {
 
 	game, err := ParsePGN(r)
 	if err != nil {
-		return err
+		return fmt.Errorf("chess: unmarshal game PGN: %w", err)
 	}
 	g.copy(game)
 
@@ -620,10 +626,7 @@ func (g *Game) evaluateTerminalPositionStatus() {
 
 // copy copies the game state from the given game.
 func (g *Game) copy(game *Game) {
-	g.tagPairs = make(map[string]string)
-	for k, v := range game.tagPairs {
-		g.tagPairs[k] = v
-	}
+	g.tagPairs = maps.Clone(game.tagPairs)
 	g.rootMove = game.rootMove
 	g.currentMove = game.currentMove
 	g.pos = game.pos
@@ -783,9 +786,7 @@ func (g *Game) UnsafePushNotationMove(moveStr string, notation Notation, options
 //	    panic(err)
 //	}
 func (g *Game) Move(move Move, options *PushMoveOptions) error {
-	if options == nil {
-		options = &PushMoveOptions{}
-	}
+	options = cmp.Or(options, &PushMoveOptions{})
 
 	// Validate the move before adding it
 	if err := g.validateMove(move); err != nil {
@@ -810,9 +811,7 @@ func (g *Game) Move(move Move, options *PushMoveOptions) error {
 //	    panic(err) // Should not happen with valid moves
 //	}
 func (g *Game) UnsafeMove(move Move, options *PushMoveOptions) error {
-	if options == nil {
-		options = &PushMoveOptions{}
-	}
+	options = cmp.Or(options, &PushMoveOptions{})
 
 	return g.moveUnchecked(move, options)
 }
@@ -853,9 +852,7 @@ func (g *Game) NullMove(options ...*PushMoveOptions) (*MoveNode, error) {
 // structural preconditions (game in progress) and lets moveUnchecked handle
 // tree wiring and position updates.
 func (g *Game) insertByMove(move Move, options *PushMoveOptions) (*MoveNode, error) {
-	if options == nil {
-		options = &PushMoveOptions{}
-	}
+	options = cmp.Or(options, &PushMoveOptions{})
 	if err := g.moveUnchecked(move, options); err != nil {
 		return nil, err
 	}
@@ -912,7 +909,9 @@ func (g *Game) reorderMoveToFront(move *MoveNode) {
 	children := g.currentMove.children
 	for i, child := range children {
 		if child == move {
-			copy(children[1:i+1], children[:i])
+			for ; i > 0; i-- {
+				children[i] = children[i-1]
+			}
 			children[0] = move
 			break
 		}
@@ -922,7 +921,9 @@ func (g *Game) reorderMoveToFront(move *MoveNode) {
 func (g *Game) addNewMove(move Move, forceMainline bool) *MoveNode {
 	node := &MoveNode{move: move, parent: g.currentMove}
 	if forceMainline {
-		g.currentMove.children = append([]*MoveNode{node}, g.currentMove.children...)
+		g.currentMove.children = append(g.currentMove.children, nil)
+		copy(g.currentMove.children[1:], g.currentMove.children[:len(g.currentMove.children)-1])
+		g.currentMove.children[0] = node
 	} else {
 		g.currentMove.children = append(g.currentMove.children, node)
 	}

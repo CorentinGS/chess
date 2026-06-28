@@ -65,10 +65,7 @@ func createHexString(h Hash) string {
 }
 
 func xorArrays(a, b Hash) {
-	length := len(a)
-	if len(b) < length {
-		length = len(b)
-	}
+	length := min(len(a), len(b))
 	for i := 0; i < length; i++ {
 		a[i] ^= b[i] // XOR in place, avoiding new slice allocation
 	}

@@ -2,6 +2,7 @@ package uci
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -197,5 +198,5 @@ func optionTypeFromString(s string) (OptionType, error) {
 			return ot, nil
 		}
 	}
-	return OptionNoType, errors.New("uci: invalid option type " + s)
+	return OptionNoType, fmt.Errorf("uci: invalid option type %s", s)
 }

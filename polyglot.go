@@ -2,10 +2,12 @@ package chess
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/binary"
 	"errors"
 	"io"
 	"math/rand/v2"
+	"slices"
 	"sort"
 )
 
@@ -256,8 +258,8 @@ func LoadFromSource(source BookSource) (*PolyglotBook, error) {
 		entries = append(entries, entry)
 	}
 
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Key < entries[j].Key
+	slices.SortFunc(entries, func(a, b PolyglotEntry) int {
+		return cmp.Compare(a.Key, b.Key)
 	})
 
 	return &PolyglotBook{entries: entries}, nil
@@ -329,8 +331,8 @@ func (book *PolyglotBook) FindMoves(positionHash uint64) []PolyglotEntry {
 		moves = append(moves, book.entries[i])
 	}
 
-	sort.Slice(moves, func(i, j int) bool {
-		return moves[i].Weight > moves[j].Weight
+	slices.SortFunc(moves, func(a, b PolyglotEntry) int {
+		return cmp.Compare(b.Weight, a.Weight)
 	})
 
 	return moves
@@ -400,6 +402,9 @@ func (book *PolyglotBook) GetRandomMove(positionHash uint64) (*PolyglotEntry, er
 	for _, move := range moves {
 		totalWeight += int(move.Weight)
 	}
+	if totalWeight == 0 {
+		return nil, nil
+	}
 
 	rn := int(rand.Uint32()) % totalWeight
 	currentWeight := 0
@@ -436,8 +441,8 @@ func NewPolyglotBookFromMap(m map[uint64][]MoveWithWeight) *PolyglotBook {
 			entries = append(entries, entry)
 		}
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Key < entries[j].Key
+	slices.SortFunc(entries, func(a, b PolyglotEntry) int {
+		return cmp.Compare(a.Key, b.Key)
 	})
 	return &PolyglotBook{entries: entries}
 }
@@ -452,8 +457,8 @@ func (book *PolyglotBook) AddMove(positionHash uint64, move Move, weight uint16)
 	}
 	book.entries = append(book.entries, entry)
 	// Re-sort after adding
-	sort.Slice(book.entries, func(i, j int) bool {
-		return book.entries[i].Key < book.entries[j].Key
+	slices.SortFunc(book.entries, func(a, b PolyglotEntry) int {
+		return cmp.Compare(a.Key, b.Key)
 	})
 }
 

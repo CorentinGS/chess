@@ -2,6 +2,7 @@ package uci
 
 import (
 	"log"
+	"maps"
 	"os"
 	"sync"
 )
@@ -70,9 +71,9 @@ func (e *Engine) ID() map[string]string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	cp := map[string]string{}
-	for k, v := range e.id {
-		cp[k] = v
+	cp := maps.Clone(e.id)
+	if cp == nil {
+		return map[string]string{}
 	}
 	return cp
 }
@@ -83,9 +84,9 @@ func (e *Engine) Options() map[string]Option {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	cp := map[string]Option{}
-	for k, v := range e.options {
-		cp[k] = v
+	cp := maps.Clone(e.options)
+	if cp == nil {
+		return map[string]Option{}
 	}
 	return cp
 }
@@ -94,7 +95,7 @@ func (e *Engine) Options() map[string]Option {
 func (e *Engine) SearchResults() SearchResults {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.results
+	return e.results.copy()
 }
 
 // Eval returns the static evaluation from the most recent CmdEval command, in

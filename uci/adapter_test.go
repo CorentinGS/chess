@@ -1,6 +1,7 @@
 package uci_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/corentings/chess/v3"
@@ -45,9 +46,10 @@ func (fakeEmptyCmd) Handle(_ []string, _ *uci.Engine) error { return nil }
 
 func Test_InfoUnmarshalText_WDLBounds(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
+		name       string
+		input      string
+		wantErr    bool
+		wantErrMsg string
 	}{
 		{
 			name:    "valid wdl with three values",
@@ -65,9 +67,10 @@ func Test_InfoUnmarshalText_WDLBounds(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "wdl non-integer value",
-			input:   "info depth 24 score cp 29 wdl 791 x 0",
-			wantErr: true,
+			name:       "wdl non-integer value",
+			input:      "info depth 24 score cp 29 wdl 791 x 0",
+			wantErr:    true,
+			wantErrMsg: "uci: invalid info wdl draw",
 		},
 	}
 	for _, tt := range tests {
@@ -76,6 +79,9 @@ func Test_InfoUnmarshalText_WDLBounds(t *testing.T) {
 			err := info.UnmarshalText([]byte(tt.input))
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("UnmarshalText(%q) err = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+			if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
+				t.Fatalf("UnmarshalText(%q) err = %v, want substring %q", tt.input, err, tt.wantErrMsg)
 			}
 		})
 	}
@@ -187,6 +193,41 @@ func Test_FakeAdapter_MultiPV(t *testing.T) {
 	}
 	if results.MultiPVInfo[1].Score.CP != 30 {
 		t.Errorf("expected cp 30 for pv 2, got %d", results.MultiPVInfo[1].Score.CP)
+	}
+}
+
+func Test_EngineSearchResultsReturnsDefensiveCopy(t *testing.T) {
+	fake := &uci.FakeAdapter{
+		Responses: map[string][]string{
+			"go": {
+				"info depth 10 multipv 1 score cp 50 nodes 1000 pv e2e4 e7e5",
+				"info depth 10 multipv 2 score cp 30 nodes 1000 pv d2d4 d7d5",
+				"bestmove e2e4",
+			},
+		},
+	}
+	eng := uci.NewWithAdapter(fake)
+	defer eng.Close()
+
+	pos := chess.StartingPosition()
+	if err := eng.Run(uci.CmdPosition{Position: pos}, uci.CmdGo{MoveTime: 100}); err != nil {
+		t.Fatal(err)
+	}
+
+	results := eng.SearchResults()
+	results.Info.PV[0] = chess.Move{}
+	results.MultiPVInfo[0] = uci.Info{}
+	results.MultiPVInfo[1].PV[0] = chess.Move{}
+
+	fresh := eng.SearchResults()
+	if fresh.Info.PV[0] == (chess.Move{}) {
+		t.Fatal("SearchResults returned mutable Info.PV backing array")
+	}
+	if fresh.MultiPVInfo[0].Score.CP != 50 {
+		t.Fatalf("SearchResults returned mutable MultiPVInfo backing array, cp = %d", fresh.MultiPVInfo[0].Score.CP)
+	}
+	if fresh.MultiPVInfo[1].PV[0] == (chess.Move{}) {
+		t.Fatal("SearchResults returned mutable MultiPVInfo PV backing array")
 	}
 }
 

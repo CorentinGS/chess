@@ -8,6 +8,32 @@ import (
 	"time"
 )
 
+func TestGameAccessorsReturnDefensiveCopies(t *testing.T) {
+	game := NewGame()
+	if err := game.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	game.AddVariation(nil, Move{s1: D2, s2: D4})
+
+	children := game.rootMove.Children()
+	children[0] = nil
+	if game.rootMove.children[0] == nil {
+		t.Fatal("Children returned mutable backing slice")
+	}
+
+	variations := game.Variations(game.rootMove)
+	variations[0] = nil
+	if game.rootMove.children[1] == nil {
+		t.Fatal("Variations returned mutable backing slice")
+	}
+
+	pos := game.Position()
+	pos.board.mailbox[E4] = NoPiece
+	if got := game.Position().Board().Piece(E4); got != WhitePawn {
+		t.Fatalf("Position returned mutable game position, E4 = %v, want %v", got, WhitePawn)
+	}
+}
+
 func TestCheckmate(t *testing.T) {
 	fenStr := "rn1qkbnr/pbpp1ppp/1p6/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 0 1"
 	fen, err := FEN(fenStr)

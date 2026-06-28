@@ -22,8 +22,8 @@ func (sq Square) String() string {
 	return sq.File().String() + sq.Rank().String()
 }
 
-func (sq Square) Bytes() []byte {
-	return []byte{sq.File().Byte(), sq.Rank().Byte()}
+func (sq Square) Bytes() [2]byte {
+	return [2]byte{sq.File().Byte(), sq.Rank().Byte()}
 }
 
 // NewSquare creates a new Square from a File and a Rank.

@@ -35,7 +35,7 @@ const piecesPoolCapacity = 4
 var (
 	//nolint:gochecknoglobals // false positive
 	stringPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return new(strings.Builder)
 		},
 	}
@@ -43,12 +43,20 @@ var (
 	// Pre-allocate slices for options to avoid allocations in hot path
 	//nolint:gochecknoglobals // false positive
 	pieceOptionsPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			s := make([]string, 0, piecesPoolCapacity)
 			return &s // Return pointer to slice
 		},
 	}
 )
+
+func getStringBuilder() *strings.Builder {
+	sb, ok := stringPool.Get().(*strings.Builder)
+	if !ok || sb == nil {
+		return new(strings.Builder)
+	}
+	return sb
+}
 
 // Constants for common strings to avoid allocations.
 const (
@@ -65,13 +73,31 @@ const (
 	captureStr = "x"
 )
 
-// Pre-allocate piece type maps for faster lookups.
-var pieceTypeToChar = map[PieceType]string{
-	King:   kingStr,
-	Queen:  queenStr,
-	Rook:   rookStr,
-	Bishop: bishopStr,
-	Knight: knightStr,
+// Pre-allocate piece type lookup tables for faster hot-path encoding.
+var (
+	pieceTypeToChar = [7]string{
+		King:        kingStr,
+		Queen:       queenStr,
+		Rook:        rookStr,
+		Bishop:      bishopStr,
+		Knight:      knightStr,
+		Pawn:        "",
+		NoPieceType: "",
+	}
+
+	uciPromoToPieceType = [256]PieceType{
+		'n': Knight,
+		'b': Bishop,
+		'r': Rook,
+		'q': Queen,
+	}
+)
+
+func pieceTypeChar(p PieceType) string {
+	if p < NoPieceType || int(p) >= len(pieceTypeToChar) {
+		return ""
+	}
+	return pieceTypeToChar[p]
 }
 
 // Encoder is the interface implemented by objects that can
@@ -115,15 +141,19 @@ func (UCINotation) Encode(_ *Position, m Move) string {
 		return "0000"
 	}
 	// Get a string builder from the pool
-	sb, _ := stringPool.Get().(*strings.Builder)
+	sb := getStringBuilder()
 	sb.Reset()
 	defer stringPool.Put(sb)
 
 	// Exact size needed: 4 chars for squares + up to 1 for promotion
 	sb.Grow(maxLen)
 
-	sb.Write(m.S1().Bytes())
-	sb.Write(m.S2().Bytes())
+	s1Bytes := m.S1().Bytes()
+	s2Bytes := m.S2().Bytes()
+	sb.WriteByte(s1Bytes[0])
+	sb.WriteByte(s1Bytes[1])
+	sb.WriteByte(s2Bytes[0])
+	sb.WriteByte(s2Bytes[1])
 	if m.Promo() != NoPieceType {
 		sb.Write(m.Promo().Bytes())
 	}
@@ -171,10 +201,7 @@ func (UCINotation) Decode(pos *Position, s string) (Move, error) {
 
 	// Promotion (Use a precomputed lookup)
 	if l == promoLen {
-		promoMap := [256]PieceType{
-			'n': Knight, 'b': Bishop, 'r': Rook, 'q': Queen,
-		}
-		promo := promoMap[s[4]]
+		promo := uciPromoToPieceType[s[4]]
 		if promo == NoPieceType {
 			return Move{}, fmt.Errorf("chess: invalid promotion piece in UCI notation %q", s)
 		}
@@ -217,12 +244,12 @@ func (AlgebraicNotation) Encode(pos *Position, m Move) string {
 	}
 
 	// Get a string builder from the pool
-	sb, _ := stringPool.Get().(*strings.Builder)
+	sb := getStringBuilder()
 	sb.Reset()
 	defer stringPool.Put(sb)
 
 	p := pos.Board().Piece(m.S1())
-	if pChar := pieceTypeToChar[p.Type()]; pChar != "" {
+	if pChar := pieceTypeChar(p.Type()); pChar != "" {
 		sb.WriteString(pChar)
 	}
 
@@ -241,7 +268,7 @@ func (AlgebraicNotation) Encode(pos *Position, m Move) string {
 
 	if m.promo != NoPieceType {
 		sb.WriteString(equalStr)
-		sb.WriteString(pieceTypeToChar[m.promo])
+		sb.WriteString(pieceTypeChar(m.promo))
 	}
 
 	sb.WriteString(getCheckChar(pos, m))
@@ -271,7 +298,7 @@ func algebraicNotationParts(s string) (moveComponents, error) {
 // cleanMove creates a standardized string from move components.
 func (mc moveComponents) clean() string {
 	// Get a string builder from pool
-	sb, _ := stringPool.Get().(*strings.Builder)
+	sb := getStringBuilder()
 	sb.Reset()
 	defer stringPool.Put(sb)
 
@@ -502,7 +529,7 @@ func formS1(pos *Position, m Move) string {
 	)
 
 	// Use a string builder from the pool
-	sb, _ := stringPool.Get().(*strings.Builder)
+	sb := getStringBuilder()
 	sb.Reset()
 	defer stringPool.Put(sb)
 

@@ -83,6 +83,23 @@ func TestNewParserSharesStartingPosition(t *testing.T) {
 	}
 }
 
+type errorTokenSource struct {
+	err error
+}
+
+func (s errorTokenSource) NextToken() (Token, error) {
+	return Token{}, s.err
+}
+
+func TestParserReportsInitialTokenSourceError(t *testing.T) {
+	wantErr := errors.New("token source failed")
+
+	_, err := newParserFromSource(errorTokenSource{err: wantErr}).Parse()
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Parse() error = %v, want %v", err, wantErr)
+	}
+}
+
 func mustParsePGN(fname string) string {
 	f, err := os.Open(fname)
 	if err != nil {

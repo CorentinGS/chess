@@ -314,7 +314,10 @@ func (pos *Position) Status() Method {
 
 // Board returns the position's board.
 func (pos *Position) Board() *Board {
-	return pos.board
+	if pos == nil || pos.board == nil {
+		return nil
+	}
+	return pos.board.copy()
 }
 
 // Turn returns the color to move next.
@@ -481,7 +484,7 @@ func (pos *Position) MarshalText() ([]byte, error) {
 func (pos *Position) UnmarshalText(text []byte) error {
 	cp, err := decodeFEN(string(text))
 	if err != nil {
-		return err
+		return fmt.Errorf("chess: unmarshal position FEN: %w", err)
 	}
 	pos.board = cp.board
 	pos.castleRights = cp.castleRights

@@ -264,7 +264,7 @@ func (CmdGo) Handle(lines []string, e *Engine) error {
 		if strings.HasPrefix(text, "bestmove") {
 			parts := strings.Split(text, " ")
 			if len(parts) <= 1 {
-				return errors.New("best move not found " + text)
+				return fmt.Errorf("best move not found %s", text)
 			}
 			var position *chess.Position
 			if e.hasPos {
