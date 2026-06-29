@@ -182,7 +182,7 @@ func legalMoveContextFor(pos *Position, mode moveGenerationMode) legalMoveContex
 	if kingSq == NoSquare {
 		return legalMoveContext{}
 	}
-	queenBB, rookBB, bishopBB := sliderBitboards(pos.board, pos.turn.Other())
+	queenBB, rookBB, bishopBB := sliderBitboards(&pos.board, pos.turn.Other())
 	if !pos.inCheck && alignedMasks[kingSq]&(queenBB|rookBB|bishopBB) == 0 {
 		return legalMoveContext{}
 	}
@@ -233,13 +233,13 @@ func (ctx *legalMoveContext) setChecks(pos *Position, kingSq Square) {
 	board := pos.board
 	attacker := pos.turn.Other()
 	occ := ^board.emptySqs
-	queenBB, rookBB, bishopBB := sliderBitboards(board, attacker)
+	queenBB, rookBB, bishopBB := sliderBitboards(&board, attacker)
 
 	checkers := (hvAttack(occ, kingSq) & (queenBB | rookBB)) |
 		(diaAttack(occ, kingSq) & (queenBB | bishopBB)) |
 		(bbKnightMoves[kingSq] & board.bbForPiece(NewPiece(Knight, attacker))) |
 		(bbKingMoves[kingSq] & board.bbForPiece(NewPiece(King, attacker))) |
-		pawnCheckers(board, kingSq, attacker)
+		pawnCheckers(&board, kingSq, attacker)
 
 	ctx.checkCount = bits.OnesCount64(uint64(checkers))
 	if ctx.checkCount == 1 {

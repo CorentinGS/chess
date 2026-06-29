@@ -102,7 +102,7 @@ type positionUndo struct {
 
 func (pos *Position) makeMove(m Move) positionUndo {
 	undo := positionUndo{
-		board:           *pos.board,
+		board:           pos.board,
 		castleRights:    pos.castleRights,
 		validMoves:      pos.validMoves,
 		halfMoveClock:   pos.halfMoveClock,
@@ -129,7 +129,7 @@ func (pos *Position) makeMove(m Move) positionUndo {
 }
 
 func (pos *Position) unmakeMove(undo positionUndo) {
-	*pos.board = undo.board
+	pos.board = undo.board
 	pos.castleRights = undo.castleRights
 	pos.validMoves = undo.validMoves
 	pos.halfMoveClock = undo.halfMoveClock

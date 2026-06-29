@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file. See [conven
 
 - - -
 
+## v3.0.0-beta.2 - 2026-06-29
+
+#### Performance
+- speed up full PGN-to-`Game` decoding by resolving SAN moves from direct candidate origins instead of scanning every legal move.
+- reduce parsed position snapshot allocation count by storing board state directly inside internal `Position` values while keeping public defensive-copy APIs unchanged.
+- keep full PGN decode behavior compatible for move tags, checks, castling, promotions, en passant, variations, and parser errors.
+
+#### Documentation
+- document the v3 beta PGN decode performance profile and benchmark workflow.
+
+- - -
+
 ## v3.0.0-beta.1 - 2026-06-19
 
 v3 is a major redesign implementing [RFC-001](docs/adr/RFC-001-v3-redesign.md).

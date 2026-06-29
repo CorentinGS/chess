@@ -59,7 +59,7 @@ func moveTagsForPiece(m Move, pos *Position, mode moveGenerationMode, p Piece, o
 	// determine if in check after move (makes move invalid)
 	// Simulate the move on a temporary board copy so we can test
 	// check status without mutating the actual position.
-	tempBoard := *pos.board
+	tempBoard := pos.board
 	tempBoard.update(local)
 	if !ownKingSafe && tempBoard.kingSquare(pos.turn) != NoSquare {
 		if isSquareAttackedBy(&tempBoard, tempBoard.kingSquare(pos.turn), pos.turn.Other()) {
@@ -101,7 +101,7 @@ func exposesOwnKingToSlider(m Move, pos *Position) bool {
 	occ := (^pos.board.emptySqs &^ bbForSquare(m.s1)) | bbForSquare(m.s2)
 	attacker := pos.turn.Other()
 	captured := bbForSquare(m.s2)
-	queenBB, rookBB, bishopBB := sliderBitboards(pos.board, attacker)
+	queenBB, rookBB, bishopBB := sliderBitboards(&pos.board, attacker)
 	queenBB &^= captured
 	orthogonal := kingSq.File() == m.s1.File() || kingSq.Rank() == m.s1.Rank()
 	if orthogonal {

@@ -625,6 +625,13 @@ for {
 }
 ```
 
+`PGNDecoder` fully decodes each record into a `Game`, including move tree
+positions, SAN resolution, checks, castling, promotions, en passant, comments,
+NAGs, and tag pairs. In v3.0.0-beta.2 this path was tuned for large PGN
+imports: SAN moves are resolved from direct candidate origins, and internal
+position snapshots avoid a separate heap-allocated board copy while public
+defensive-copy APIs remain unchanged.
+
 #### Scan PGN expanding all variations
 
 To expand every variation into a distinct Game:
@@ -969,3 +976,13 @@ benchstat base.txt new.txt
 ```
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full benchmark workflow.
+
+The v3.0.0-beta.2 PGN decode work was measured with:
+
+```
+go test -run '^$' -bench '^BenchmarkPGN_FullGameDecode_(BigBig|Big|CompleteGameDetails|ExpandVariations)$' -benchmem -count=6 ./
+```
+
+On the project `big_big.pgn` fixture, `BenchmarkPGN_FullGameDecode_BigBig`
+improved from roughly `1.48s/op` and `6.62M allocs/op` to roughly `0.91s/op`
+and `5.55M allocs/op` on the maintainer benchmark machine.

@@ -44,7 +44,7 @@ func decodeFEN(fen string) (*Position, error) {
 		return nil, errors.New("chess: fen invalid move count")
 	}
 	pos := &Position{
-		board:           b,
+		board:           *b,
 		turn:            turn,
 		castleRights:    rights,
 		enPassantSquare: sq,

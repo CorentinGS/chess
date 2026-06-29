@@ -156,7 +156,7 @@ func isSquareAttackedBy(board *Board, sq Square, attacker Color) bool {
 func squaresAreAttacked(pos *Position, sqs ...Square) bool {
 	otherColor := pos.Turn().Other()
 	for _, sq := range sqs {
-		if isSquareAttackedBy(pos.board, sq, otherColor) {
+		if isSquareAttackedBy(&pos.board, sq, otherColor) {
 			return true
 		}
 	}
