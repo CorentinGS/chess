@@ -21,7 +21,6 @@ package chess
 
 import (
 	"bytes"
-	"crypto/md5"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -49,14 +48,25 @@ type CastleRights string
 //	    // White can castle kingside
 //	}
 func (cr CastleRights) CanCastle(c Color, side Side) bool {
-	char := "k"
-	if side == QueenSide {
-		char = "q"
+	var want byte
+	switch {
+	case c == White && side == KingSide:
+		want = 'K'
+	case c == White && side == QueenSide:
+		want = 'Q'
+	case c == Black && side == KingSide:
+		want = 'k'
+	case c == Black && side == QueenSide:
+		want = 'q'
+	default:
+		return false
 	}
-	if c == White {
-		char = strings.ToUpper(char)
+	for i := range cr {
+		if cr[i] == want {
+			return true
+		}
 	}
-	return strings.Contains(string(cr), char)
+	return false
 }
 
 // String implements the fmt.Stringer interface and returns
@@ -69,7 +79,7 @@ func (cr CastleRights) String() string {
 // It includes piece placement, castling rights, en passant squares,
 // move counts, and side to move.
 type Position struct {
-	board           *Board       // Current board state
+	board           Board        // Current board state
 	castleRights    CastleRights // Available castling options
 	validMoves      []Move       // Cache of legal moves
 	halfMoveClock   int          // Half-move counter
@@ -78,6 +88,8 @@ type Position struct {
 	enPassantSquare Square       // En passant target square
 	inCheck         bool         // Whether current side is in check
 	hash            uint64       // Zobrist hash for O(1) position comparison
+	status          Method       // Cached Status result
+	statusCached    bool         // Whether status contains a valid cached value
 }
 
 const (
@@ -91,6 +103,11 @@ func StartingPosition() *Position {
 	return pos
 }
 
+// AnyLegalMove reports whether the position has at least one legal move.
+func (pos *Position) AnyLegalMove() bool {
+	return hasLegalMove(pos)
+}
+
 // Update returns a new position resulting from the given move.
 // The move isn't validated - use Game.Move() for validation.
 // This method is optimized for move generation where validation
@@ -99,51 +116,32 @@ func StartingPosition() *Position {
 // Example:
 //
 //	newPos := pos.Update(move)
-func (pos *Position) Update(m *Move) *Position {
-	moveCount := pos.moveCount
-	if pos.turn == Black {
-		moveCount++
+func (pos *Position) Update(m Move) *Position {
+	// Null moves flip the side to move without touching the board.
+	if m.HasTag(Null) {
+		return pos.nullUpdate()
 	}
 
-	if m == nil {
-		newPos := &Position{
-			board:           pos.board.copy(),
-			turn:            pos.turn.Other(),
-			castleRights:    pos.castleRights,
-			enPassantSquare: NoSquare,
-			halfMoveClock:   pos.halfMoveClock + 1,
-			moveCount:       moveCount,
-			inCheck:         false,
-		}
-		newPos.hash = newPos.computeHash()
-		return newPos
-	}
-
-	ncr := pos.updateCastleRights(m)
-	p := pos.board.Piece(m.s1)
-	halfMove := pos.halfMoveClock
-	if p.Type() == Pawn || m.HasTag(Capture) {
-		halfMove = 0
-	} else {
-		halfMove++
-	}
-	b := pos.board.copy()
-	b.update(m)
+	// Seed a fresh position with the pre-move scalars so applyMove can mutate
+	// it in one place. applyMove overwrites every field it owns, so the seed
+	// is read by applyMove (via updateCastleRights/updateEnPassantSquare)
+	// before being overwritten.
 	newPos := &Position{
-		board:           b,
-		turn:            pos.turn.Other(),
-		castleRights:    ncr,
-		enPassantSquare: pos.updateEnPassantSquare(m),
-		halfMoveClock:   halfMove,
-		moveCount:       moveCount,
-		inCheck:         m.HasTag(Check),
+		board:           pos.board,
+		turn:            pos.turn,
+		castleRights:    pos.castleRights,
+		enPassantSquare: pos.enPassantSquare,
+		halfMoveClock:   pos.halfMoveClock,
+		moveCount:       pos.moveCount,
 	}
-	newPos.hash = pos.updateHash(m, ncr, newPos.enPassantSquare)
+	newPos.applyMove(m)
+	// updateHash reads the pre-move board and hash on the original position.
+	newPos.hash = pos.updateHash(m, newPos.castleRights, newPos.enPassantSquare)
 	return newPos
 }
 
 // updateHash computes the new Zobrist hash incrementally from a move.
-func (pos *Position) updateHash(m *Move, newCR CastleRights, newEP Square) uint64 {
+func (pos *Position) updateHash(m Move, newCR CastleRights, newEP Square) uint64 {
 	hash := pos.hash
 
 	// Toggle side to move
@@ -213,27 +211,25 @@ func (pos *Position) updateHash(m *Move, newCR CastleRights, newEP Square) uint6
 	}
 
 	// Update castling rights: XOR out removed rights
-	oldCR := pos.castleRights.String()
-	newCRStr := newCR.String()
-	if strings.Contains(oldCR, "K") && !strings.Contains(newCRStr, "K") {
+	if pos.castleRights.CanCastle(White, KingSide) && !newCR.CanCastle(White, KingSide) {
 		hash ^= polyglotHashesUint64[768]
 	}
-	if strings.Contains(oldCR, "Q") && !strings.Contains(newCRStr, "Q") {
+	if pos.castleRights.CanCastle(White, QueenSide) && !newCR.CanCastle(White, QueenSide) {
 		hash ^= polyglotHashesUint64[769]
 	}
-	if strings.Contains(oldCR, "k") && !strings.Contains(newCRStr, "k") {
+	if pos.castleRights.CanCastle(Black, KingSide) && !newCR.CanCastle(Black, KingSide) {
 		hash ^= polyglotHashesUint64[770]
 	}
-	if strings.Contains(oldCR, "q") && !strings.Contains(newCRStr, "q") {
+	if pos.castleRights.CanCastle(Black, QueenSide) && !newCR.CanCastle(Black, QueenSide) {
 		hash ^= polyglotHashesUint64[771]
 	}
 
 	// Update en passant: XOR out old if present
-	if oldEPFile := enPassantFileForHash(pos.board, pos.enPassantSquare); oldEPFile >= 0 {
+	if oldEPFile := enPassantFileForHash(&pos.board, pos.enPassantSquare); oldEPFile >= 0 {
 		hash ^= polyglotHashesUint64[772+oldEPFile]
 	}
 	// XOR in new if present
-	if newEPFile := enPassantFileForHash(pos.board, newEP); newEPFile >= 0 {
+	if newEPFile := enPassantFileForHash(&pos.board, newEP); newEPFile >= 0 {
 		hash ^= polyglotHashesUint64[772+newEPFile]
 	}
 
@@ -247,7 +243,7 @@ func (pos *Position) ValidMoves() []Move {
 	if pos.validMoves != nil {
 		return append([]Move(nil), pos.validMoves...)
 	}
-	pos.validMoves = engine{}.CalcMoves(pos, false)
+	pos.validMoves = calcMoves(pos, false)
 	return append([]Move(nil), pos.validMoves...)
 }
 
@@ -258,7 +254,7 @@ func (pos *Position) ValidMovesUnsafe() []Move {
 	if pos.validMoves != nil {
 		return pos.validMoves
 	}
-	pos.validMoves = engine{}.CalcMoves(pos, false)
+	pos.validMoves = calcMoves(pos, false)
 	return pos.validMoves
 }
 
@@ -284,18 +280,26 @@ func (pos *Position) ValidMovesIter(yield func(Move) bool) {
 // UnsafeMoves returns all pseudo-legal moves that are illegal because they leave
 // the moving side's king in check. These moves should not be played via Move().
 func (pos *Position) UnsafeMoves() []Move {
-	return engine{}.UnsafeMoves(pos)
+	return unsafeMoves(pos)
 }
 
-// Status returns the position's status as one of the outcome methods.
-// Possible returns values include Checkmate, Stalemate, and NoMethod.
+// Status returns the position's outcome Method (e.g. Checkmate, Stalemate, or
+// NoMethod).
 func (pos *Position) Status() Method {
-	return engine{}.Status(pos)
+	if pos.statusCached {
+		return pos.status
+	}
+	pos.status = status(pos)
+	pos.statusCached = true
+	return pos.status
 }
 
 // Board returns the position's board.
 func (pos *Position) Board() *Board {
-	return pos.board
+	if pos == nil {
+		return nil
+	}
+	return pos.board.copy()
 }
 
 // Turn returns the color to move next.
@@ -307,7 +311,20 @@ func (pos *Position) Turn() Color {
 func (pos *Position) ChangeTurn() *Position {
 	pos.turn = pos.turn.Other()
 	pos.hash = pos.computeHash()
+	pos.statusCached = false
 	return pos
+}
+
+// nullUpdateHash computes the Zobrist hash delta for a null move: the only
+// state that changed is the side to move (always flipped) and the en-passant
+// square (always cleared), so the only XOR is the side-to-move key plus any
+// previously-active en-passant file key.
+func (pos *Position) nullUpdateHash(_ Square) uint64 {
+	hash := pos.hash ^ polyglotHashesUint64[780]
+	if oldEPFile := enPassantFileForHash(&pos.board, pos.enPassantSquare); oldEPFile >= 0 {
+		hash ^= polyglotHashesUint64[772+oldEPFile]
+	}
+	return hash
 }
 
 // HalfMoveClock returns the half-move clock (50-rule).
@@ -336,9 +353,8 @@ func (pos *Position) Ply() int {
 
 	if pos.turn == White {
 		return (pos.moveCount-1)*2 + 1
-	} else {
-		return (pos.moveCount) * 2
 	}
+	return (pos.moveCount) * 2
 }
 
 // String implements the fmt.Stringer interface and returns a
@@ -355,7 +371,7 @@ func (pos *Position) String() string {
 }
 
 // XFENString() is similar to String() except that it returns a string with
-// the X-FEN format
+// the X-FEN format.
 func (pos *Position) XFENString() string {
 	b := pos.board.String()
 	t := pos.turn.String()
@@ -395,13 +411,6 @@ func (pos *Position) XFENString() string {
 	return fmt.Sprintf("%s %s %s %s %d %d", b, t, c, sq, pos.halfMoveClock, pos.moveCount)
 }
 
-// Hash returns a unique hash of the position using MD5 of the binary representation.
-// Deprecated: Use ZobristHash() for fast position comparison and transposition tables.
-func (pos *Position) Hash() [16]byte {
-	b, _ := pos.MarshalBinary()
-	return md5.Sum(b)
-}
-
 // ZobristHash returns the Zobrist hash of the position.
 // This is a fast, collision-resistant hash suitable for transposition tables
 // and position comparison. Two positions that are identical by FIDE rules
@@ -421,7 +430,7 @@ func (pos *Position) MarshalText() ([]byte, error) {
 func (pos *Position) UnmarshalText(text []byte) error {
 	cp, err := decodeFEN(string(text))
 	if err != nil {
-		return err
+		return fmt.Errorf("chess: unmarshal position FEN: %w", err)
 	}
 	pos.board = cp.board
 	pos.castleRights = cp.castleRights
@@ -490,11 +499,9 @@ func (pos *Position) UnmarshalBinary(data []byte) error {
 	if len(data) != size {
 		return errors.New("chess: position binary data should consist of 101 bytes")
 	}
-	board := &Board{}
-	if err := board.UnmarshalBinary(data[:96]); err != nil {
+	if err := pos.board.UnmarshalBinary(data[:96]); err != nil {
 		return err
 	}
-	pos.board = board
 	buf := bytes.NewBuffer(data[96:])
 	halfMove := uint8(pos.halfMoveClock)
 	if err := binary.Read(buf, binary.BigEndian, &halfMove); err != nil {
@@ -543,7 +550,7 @@ func (pos *Position) UnmarshalBinary(data []byte) error {
 
 func (pos *Position) copy() *Position {
 	return &Position{
-		board:           pos.board.copy(),
+		board:           pos.board,
 		turn:            pos.turn,
 		castleRights:    pos.castleRights,
 		enPassantSquare: pos.enPassantSquare,
@@ -585,7 +592,7 @@ func pieceZobristIndex(p Piece, sq Square) int {
 func (pos *Position) computeHash() uint64 {
 	var hash uint64
 	// XOR in all pieces
-	for sq := 0; sq < 64; sq++ {
+	for sq := range 64 {
 		p := pos.board.Piece(Square(sq))
 		if p != NoPiece {
 			idx := pieceZobristIndex(p, Square(sq))
@@ -609,7 +616,7 @@ func (pos *Position) computeHash() uint64 {
 		hash ^= polyglotHashesUint64[771]
 	}
 	// XOR in en passant if a pawn can capture
-	if epFile := enPassantFileForHash(pos.board, pos.enPassantSquare); epFile >= 0 {
+	if epFile := enPassantFileForHash(&pos.board, pos.enPassantSquare); epFile >= 0 {
 		hash ^= polyglotHashesUint64[772+epFile]
 	}
 	// XOR in side to move (white)
@@ -619,55 +626,16 @@ func (pos *Position) computeHash() uint64 {
 	return hash
 }
 
-func (pos *Position) updateCastleRights(m *Move) CastleRights {
-	cr := string(pos.castleRights)
-	p := pos.board.Piece(m.s1)
-	if p == WhiteKing || m.s1 == H1 || m.s2 == H1 {
-		cr = strings.ReplaceAll(cr, "K", "")
-	}
-	if p == WhiteKing || m.s1 == A1 || m.s2 == A1 {
-		cr = strings.ReplaceAll(cr, "Q", "")
-	}
-	if p == BlackKing || m.s1 == H8 || m.s2 == H8 {
-		cr = strings.ReplaceAll(cr, "k", "")
-	}
-	if p == BlackKing || m.s1 == A8 || m.s2 == A8 {
-		cr = strings.ReplaceAll(cr, "q", "")
-	}
-	if cr == "" {
-		cr = "-"
-	}
-	return CastleRights(cr)
-}
-
-func (pos *Position) updateEnPassantSquare(m *Move) Square {
-	const squaresPerRank = 8
-	p := pos.board.Piece(m.s1)
-	if p.Type() != Pawn {
-		return NoSquare
-	}
-	if pos.turn == White &&
-		(bbForSquare(m.s1)&bbRank2) != 0 &&
-		(bbForSquare(m.s2)&bbRank4) != 0 {
-		return m.s2 - squaresPerRank
-	} else if pos.turn == Black &&
-		(bbForSquare(m.s1)&bbRank7) != 0 &&
-		(bbForSquare(m.s2)&bbRank5) != 0 {
-		return m.s2 + squaresPerRank
-	}
-	return NoSquare
-}
-
-// samePosition returns true if the two positions are the same
+// SamePosition returns true if the two positions are the same
 // according to FIDE Article 9.2.3. Uses Zobrist hash as a fast-path,
 // falling back to full field comparison on hash collision.
-func (pos *Position) samePosition(pos2 *Position) bool {
+func (pos *Position) SamePosition(pos2 *Position) bool {
 	if pos.hash != pos2.hash {
 		return false
 	}
-	return pos.board.String() == pos2.board.String() &&
+	return pos.board == pos2.board &&
 		pos.turn == pos2.turn &&
-		pos.castleRights.String() == pos2.castleRights.String() &&
+		pos.castleRights == pos2.castleRights &&
 		pos.relevantEnPassantSquare() == pos2.relevantEnPassantSquare()
 }
 
@@ -711,7 +679,7 @@ func enPassantFileForHash(board *Board, epSquare Square) int {
 // the en passant square is only relevant if there is an opponent
 // pawn that can make the capture.
 func (pos *Position) relevantEnPassantSquare() Square {
-	if enPassantFileForHash(pos.board, pos.enPassantSquare) >= 0 {
+	if enPassantFileForHash(&pos.board, pos.enPassantSquare) >= 0 {
 		return pos.enPassantSquare
 	}
 	return NoSquare

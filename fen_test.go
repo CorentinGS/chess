@@ -86,6 +86,22 @@ func TestInvalidFENs(t *testing.T) {
 	}
 }
 
+func TestFenBoardHandlesInvalidPooledMaps(t *testing.T) {
+	pieceMapPool.Put("not a piece map")
+	fileMapPool.Put("not a file map")
+
+	board, err := fenBoard("8/8/8/8/8/8/8/R6K")
+	if err != nil {
+		t.Fatalf("fenBoard returned error: %v", err)
+	}
+	if got := board.Piece(A1); got != WhiteRook {
+		t.Fatalf("A1 = %v, want %v", got, WhiteRook)
+	}
+	if got := board.Piece(H1); got != WhiteKing {
+		t.Fatalf("H1 = %v, want %v", got, WhiteKing)
+	}
+}
+
 func BenchmarkFenBoard(b *testing.B) {
 	// Test cases representing different scenarios
 	benchmarks := []struct {
@@ -120,7 +136,7 @@ func BenchmarkFenBoard(b *testing.B) {
 			b.ResetTimer()
 			b.ReportAllocs()
 			// Run the benchmark
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				board, err := fenBoard(bm.fen)
 				if err != nil {
 					b.Fatal(err)

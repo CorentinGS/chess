@@ -1,149 +1,117 @@
 package uci
 
 import (
-	"bufio"
-	"fmt"
-	"io"
 	"log"
+	"maps"
 	"os"
-	"os/exec"
 	"sync"
 )
 
-// Engine represents a UCI compliant chess engine (e.g. Stockfish, Shredder, etc.).
-// Engine is safe for concurrent use.
+// Engine manages communication with a UCI-compatible chess engine such as
+// Stockfish. It sends commands, parses responses, and exposes the engine's
+// reported state (ID, options, search results).
 type Engine struct {
-	cmd      *exec.Cmd
-	in       *io.PipeWriter
-	out      *io.PipeReader
+	adapter  Adapter
 	logger   *log.Logger
 	id       map[string]string
 	options  map[string]Option
 	mu       *sync.RWMutex
-	position *CmdPosition
+	position CmdPosition
+	hasPos   bool
 	results  SearchResults
 	eval     int
 	debug    bool
 }
 
-// Debug is an option for the New function to add logging for debugging.  This will
-// log all output to and from the chess engine.
+// Debug enables debug logging of commands sent to and responses received from
+// the engine. It is intended to be passed as an option to New.
 func Debug(e *Engine) {
 	e.debug = true
 }
 
-// Logger is an option for the New function to customize the logger.  The logger is
-// only used if the Debug option is also used.
+// Logger sets the logger the engine uses for debug output. It is intended to be
+// passed as an option to New.
 func Logger(logger *log.Logger) func(e *Engine) {
 	return func(e *Engine) {
 		e.logger = logger
 	}
 }
 
-// New constructs an engine from the executable path (found using exec.LookPath).
-// New also starts running the executable process in the background.  Once created
-// the Engine can be controlled via the Run method.
+// New creates an Engine backed by a subprocess started from the executable at
+// the given path. Optional configuration functions (e.g. Debug, Logger) may be
+// passed to customize the engine.
 func New(path string, opts ...func(e *Engine)) (*Engine, error) {
-	path, err := exec.LookPath(path)
+	adapter, err := NewSubprocessAdapter(path)
 	if err != nil {
-		return nil, fmt.Errorf("uci: executable not found at path %s %w", path, err)
+		return nil, err
 	}
-	rIn, wIn := io.Pipe()
-	rOut, wOut := io.Pipe()
-	cmd := exec.Command(path)
-	cmd.Stdin = rIn
-	cmd.Stdout = wOut
-	e := &Engine{cmd: cmd, in: wIn, out: rOut, mu: &sync.RWMutex{}, logger: log.New(os.Stdout, "uci", log.LstdFlags), position: &CmdPosition{}, results: SearchResults{MultiPVInfo: []Info{}}}
+	return NewWithAdapter(adapter, opts...), nil
+}
+
+// NewWithAdapter creates an Engine that communicates through the provided
+// Adapter instead of spawning a subprocess. This is primarily useful for
+// testing with a FakeAdapter.
+func NewWithAdapter(adapter Adapter, opts ...func(e *Engine)) *Engine {
+	e := &Engine{
+		adapter:  adapter,
+		logger:   log.New(os.Stdout, "uci", log.LstdFlags),
+		mu:       &sync.RWMutex{},
+		position: CmdPosition{},
+		results:  SearchResults{MultiPVInfo: []Info{}},
+	}
 	for _, opt := range opts {
 		opt(e)
 	}
-	err = e.cmd.Start()
-	if err != nil {
-		return nil, fmt.Errorf("uci: failed to start executable %s: %w", path, err)
-	}
-	go e.cmd.Wait()
-
-	return e, nil
+	return e
 }
 
-func (e *Engine) Getpid() int {
-	return e.cmd.Process.Pid
-}
-
-// ID returns the id values returned from the most recent CmdUCI invocation.  It includes
-// key value data such as the following:
-// id name Stockfish 12
-// id author the Stockfish developers (see AUTHORS file).
+// ID returns a copy of the engine's identification key-value pairs as reported
+// in response to the CmdUCI command (e.g. name and author).
 func (e *Engine) ID() map[string]string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	cp := map[string]string{}
-	for k, v := range e.id {
-		cp[k] = v
+	cp := maps.Clone(e.id)
+	if cp == nil {
+		return map[string]string{}
 	}
 	return cp
 }
 
-// Options returns exposed options from the most recent CmdUCI invocation.  It includes
-// data such as the following:
-// option name Debug Log File type string default
-// option name Contempt type spin default 24 min -100 max 100
-// option name Analysis Contempt type combo default Both var Off var White var Black var Both
-// option name Threads type spin default 1 min 1 max 512
-// option name Hash type spin default 16 min 1 max 33554432
-// option name Clear Hash type button
-// option name Ponder type check default false
-// option name MultiPV type spin default 1 min 1 max 500
-// option name Skill Level type spin default 20 min 0 max 20
-// option name Move Overhead type spin default 10 min 0 max 5000
-// option name Slow Mover type spin default 100 min 10 max 1000
-// option name nodestime type spin default 0 min 0 max 10000
-// option name UCI_Chess960 type check default false
-// option name UCI_AnalyseMode type check default false
-// option name UCI_LimitStrength type check default false
-// option name UCI_Elo type spin default 1350 min 1350 max 2850
-// option name UCI_ShowWDL type check default false
-// option name SyzygyPath type string default <empty>
-// option name SyzygyProbeDepth type spin default 1 min 1 max 100
-// option name Syzygy50MoveRule type check default true
-// option name SyzygyProbeLimit type spin default 7 min 0 max 7
-// option name Use NNUE type check default true
-// option name EvalFile type string default nn-82215d0fd0df.nnue
-// The key is the option name and the value is the Option struct.
+// Options returns a copy of the engine's available options as reported in
+// response to the CmdUCI command.
 func (e *Engine) Options() map[string]Option {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	cp := map[string]Option{}
-	for k, v := range e.options {
-		cp[k] = v
+	cp := maps.Clone(e.options)
+	if cp == nil {
+		return map[string]Option{}
 	}
 	return cp
 }
 
-// SearchResults returns results from the most recent CmdGo invocation.  It includes
-// data such as the following:
-// info depth 21 seldepth 31 multipv 1 score cp 39 nodes 862438 nps 860716 hashfull 409 tbhits 0 time 1002 pv e2e4
-// bestmove e2e4 ponder c7c5.
+// SearchResults returns the results from the most recent CmdGo command.
 func (e *Engine) SearchResults() SearchResults {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.results
+	return e.results.copy()
 }
 
+// Eval returns the static evaluation from the most recent CmdEval command, in
+// centipawns. Not all engines support the eval command.
 func (e *Engine) Eval() int {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.eval
 }
 
-// Run runs the set of Cmds in the order given and returns an error if
-// any of the commands fails.  Except for CmdStop (usually paired with
-// CmdGo's infinite option) all commands block via mutux until completed.
+// Run executes the given commands in order, returning the first error
+// encountered. Commands that require exclusive access (LockRequired) are
+// serialized via the engine's mutex.
 func (e *Engine) Run(cmds ...Cmd) error {
 	for _, cmd := range cmds {
-		if cmd.String() == CmdStop.Name {
+		if !cmd.LockRequired() {
 			if err := e.processCommand(cmd); err != nil {
 				return err
 			}
@@ -156,19 +124,24 @@ func (e *Engine) Run(cmds ...Cmd) error {
 	return nil
 }
 
-// Close releases readers, writers, and processes associated with the
-// Engine.  It also invokes the CmdQuit to signal the engine to terminate.
+// Getpid returns the operating system process ID of the engine subprocess.
+// Returns 0 when the engine is not backed by a subprocess (e.g. when created
+// with NewWithAdapter using a non-subprocess Adapter).
+func (e *Engine) Getpid() int {
+	if sa, ok := e.adapter.(*SubprocessAdapter); ok {
+		return sa.Pid()
+	}
+	return 0
+}
+
+// Close sends a quit command to the engine and closes the underlying adapter.
 func (e *Engine) Close() error {
-	if err := e.Run(CmdQuit); err != nil {
-		return err
+	quitErr := e.Run(CmdQuit{})
+	closeErr := e.adapter.Close()
+	if quitErr != nil {
+		return quitErr
 	}
-	if err := e.in.Close(); err != nil {
-		return err
-	}
-	if err := e.out.Close(); err != nil {
-		return err
-	}
-	return e.cmd.Process.Kill()
+	return closeErr
 }
 
 func (e *Engine) processCommandLocked(cmd Cmd) error {
@@ -181,25 +154,18 @@ func (e *Engine) processCommand(cmd Cmd) error {
 	if e.debug {
 		e.logger.Println(cmd.String())
 	}
-	if _, err := fmt.Fprintln(e.in, cmd.String()); err != nil {
+	lines, err := e.adapter.Exchange(cmd)
+	if err != nil {
 		return err
 	}
-	if posCmd, ok := cmd.(*CmdPosition); ok {
-		e.position = posCmd
+	if e.debug {
+		for _, line := range lines {
+			e.logger.Println(line)
+		}
 	}
 	if posCmd, ok := cmd.(CmdPosition); ok {
-		e.position = &posCmd
+		e.position = posCmd
+		e.hasPos = true
 	}
-	if err := cmd.ProcessResponse(e); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (e *Engine) readLine(scanner *bufio.Scanner) string {
-	s := scanner.Text()
-	if e.debug {
-		e.logger.Println(s)
-	}
-	return s
+	return cmd.Handle(lines, e)
 }

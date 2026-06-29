@@ -5,76 +5,122 @@ import (
 	"testing"
 )
 
-func assertGameCurrentPositionInvariant(t *testing.T, g *Game) {
+func assertGameTreeCurrentPositionInvariant(t *testing.T, g *Game) {
 	t.Helper()
 
 	if g == nil {
 		t.Fatal("game is nil")
 	}
-	if g.pos == nil {
-		t.Fatal("game current position is nil")
+	if g.currentPosition() == nil {
+		t.Fatal("tree current position is nil")
 	}
 	if g.Position() == nil {
 		t.Fatal("Position() is nil")
 	}
-	if g.CurrentPosition() == nil {
-		t.Fatal("CurrentPosition() is nil")
+	if g.MoveTree().Current().Position() == nil {
+		t.Fatal("MoveTree().Current().Position() is nil")
 	}
-	if g.Position().String() != g.pos.String() {
-		t.Fatalf("Position() = %q, want game current position %q", g.Position(), g.pos)
+	if g.Position().String() != g.currentPosition().String() {
+		t.Fatalf("Position() = %q, want tree current position %q", g.Position(), g.currentPosition())
 	}
-	if g.CurrentPosition().String() != g.pos.String() {
-		t.Fatalf("CurrentPosition() = %q, want game current position %q", g.CurrentPosition(), g.pos)
+	if g.MoveTree().Current().Position().String() != g.currentPosition().String() {
+		t.Fatalf("MoveTree().Current().Position() = %q, want tree current position %q", g.MoveTree().Current().Position(), g.currentPosition())
 	}
-	if g.currentMove != nil && g.currentMove.position != nil && g.currentMove.position.String() != g.pos.String() {
-		t.Fatalf("current move position = %q, want game current position %q", g.currentMove.position, g.pos)
+	if g.MoveTree().Current() != nil && g.MoveTree().Current().position != nil && g.MoveTree().Current().position.String() != g.currentPosition().String() {
+		t.Fatalf("current move position = %q, want tree current position %q", g.MoveTree().Current().position, g.currentPosition())
 	}
 }
 
-func TestGameCurrentPositionInvariantAfterClonePreservesCursor(t *testing.T) {
+func TestGameTreeCurrentPositionInvariantAfterClonePreservesCursor(t *testing.T) {
 	g := NewGame()
 	for _, move := range []string{"e4", "e5", "Nf3"} {
-		if err := g.PushMove(move, nil); err != nil {
+		if _, err := g.PushMove(move, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	if !g.GoBack() {
+	if !g.MoveTree().GoBack() {
 		t.Fatal("expected to navigate back")
 	}
-	want := g.CurrentPosition().String()
+	want := g.MoveTree().Current().Position().String()
 
 	clone := g.Clone()
 
-	assertGameCurrentPositionInvariant(t, clone)
-	if got := clone.CurrentPosition().String(); got != want {
+	assertGameTreeCurrentPositionInvariant(t, clone)
+	if got := clone.MoveTree().Current().Position().String(); got != want {
 		t.Fatalf("clone current position = %q, want %q", got, want)
 	}
 }
 
-func TestGameCurrentPositionInvariantAfterDirectGameOperations(t *testing.T) {
+func TestGameTreeCurrentPositionInvariantAfterDirectGameOperations(t *testing.T) {
 	g := NewGame()
-	assertGameCurrentPositionInvariant(t, g)
+	assertGameTreeCurrentPositionInvariant(t, g)
 
 	for _, move := range []string{"e4", "e5", "Nf3"} {
-		if err := g.PushMove(move, nil); err != nil {
+		if _, err := g.PushMove(move, nil); err != nil {
 			t.Fatal(err)
 		}
-		assertGameCurrentPositionInvariant(t, g)
+		assertGameTreeCurrentPositionInvariant(t, g)
 	}
 
-	if !g.GoBack() {
+	if !g.MoveTree().GoBack() {
 		t.Fatal("expected to navigate back")
 	}
-	assertGameCurrentPositionInvariant(t, g)
+	assertGameTreeCurrentPositionInvariant(t, g)
 
-	if !g.GoForward() {
+	if !g.MoveTree().GoForward() {
 		t.Fatal("expected to navigate forward")
 	}
-	assertGameCurrentPositionInvariant(t, g)
+	assertGameTreeCurrentPositionInvariant(t, g)
 }
 
-func TestGameCurrentPositionInvariantAfterPGNParse(t *testing.T) {
+func TestPositionReturnsDefensiveCopyAfterGoForward(t *testing.T) {
+	g := NewGame()
+	for _, move := range []string{"e4", "e5"} {
+		if _, err := g.PushMove(move, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if !g.MoveTree().GoBack() {
+		t.Fatal("expected to navigate back")
+	}
+	if !g.MoveTree().GoForward() {
+		t.Fatal("expected to navigate forward")
+	}
+	if g.Position() == g.MoveTree().Current().position {
+		t.Fatal("Position shared current position pointer with move node")
+	}
+	assertGameTreeCurrentPositionInvariant(t, g)
+}
+
+func TestAddVariationStoresPosition(t *testing.T) {
+	g := NewGame()
+	move, err := algebraicNotation{}.Decode(g.Position(), "e4")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := g.MoveTree().AddVariation(nil, move); err != nil {
+		t.Fatal(err)
+	}
+	children := g.MoveTree().Root().Children()
+	if len(children) != 1 {
+		t.Fatalf("root children = %d, want 1", len(children))
+	}
+	if children[0].Position() == nil {
+		t.Fatal("variation position is nil")
+	}
+	if got, want := children[0].Position().String(), g.Position().Update(move).String(); got != want {
+		t.Fatalf("variation position = %q, want %q", got, want)
+	}
+	if !g.MoveTree().GoForward() {
+		t.Fatal("expected to navigate into variation")
+	}
+	assertGameTreeCurrentPositionInvariant(t, g)
+}
+
+func TestGameTreeCurrentPositionInvariantAfterPGNParse(t *testing.T) {
 	opt, err := PGN(strings.NewReader("1. e4 e5 2. Nf3 *"))
 	if err != nil {
 		t.Fatal(err)
@@ -82,21 +128,38 @@ func TestGameCurrentPositionInvariantAfterPGNParse(t *testing.T) {
 
 	g := NewGame(opt)
 
-	assertGameCurrentPositionInvariant(t, g)
+	assertGameTreeCurrentPositionInvariant(t, g)
 }
 
-func TestGameCurrentPositionInvariantAfterSplitUsesLineLeaf(t *testing.T) {
+func TestGameTreeCurrentPositionInvariantAfterPGNParseWithNestedVariations(t *testing.T) {
+	opt, err := PGN(strings.NewReader("1. e4 (1. d4 d5 (1... Nf6)) e5 2. Nf3 *"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	g := NewGame(opt)
+
+	assertGameTreeCurrentPositionInvariant(t, g)
+	if !g.IsAtEnd() {
+		t.Fatalf("parsed tree current = %s, want main-line leaf", g.MoveTree().Current().Move())
+	}
+	if got, want := len(g.MoveTree().Variations(g.MoveTree().Root())), 1; got != want {
+		t.Fatalf("root variations = %d, want %d", got, want)
+	}
+}
+
+func TestGameTreeCurrentPositionInvariantAfterSplitUsesLineLeaf(t *testing.T) {
 	g := NewGame()
 	for _, move := range []string{"e4", "e5", "Nf3"} {
-		if err := g.PushMove(move, nil); err != nil {
+		if _, err := g.PushMove(move, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	if !g.GoBack() {
+	if !g.MoveTree().GoBack() {
 		t.Fatal("expected to navigate back before adding a variation")
 	}
-	if err := g.PushMove("Nc3", nil); err != nil {
+	if _, err := g.PushMove("Nc3", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -105,9 +168,9 @@ func TestGameCurrentPositionInvariantAfterSplitUsesLineLeaf(t *testing.T) {
 		t.Fatalf("split game count = %d, want 2", len(splitGames))
 	}
 	for _, splitGame := range splitGames {
-		assertGameCurrentPositionInvariant(t, splitGame)
+		assertGameTreeCurrentPositionInvariant(t, splitGame)
 		if !splitGame.IsAtEnd() {
-			t.Fatalf("split game current position = %q, want leaf position", splitGame.CurrentPosition())
+			t.Fatalf("split tree current position = %q, want leaf position", splitGame.MoveTree().Current().Position())
 		}
 	}
 }

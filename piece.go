@@ -202,45 +202,49 @@ var allPieces = [12]Piece{
 	BlackKing, BlackQueen, BlackRook, BlackBishop, BlackKnight, BlackPawn,
 }
 
+//nolint:gochecknoglobals // Immutable lookup tables.
+var (
+	pieceTypes = [13]PieceType{
+		NoPieceType,
+		King, Queen, Rook, Bishop, Knight, Pawn,
+		King, Queen, Rook, Bishop, Knight, Pawn,
+	}
+	pieceColors = [13]Color{
+		NoColor,
+		White, White, White, White, White, White,
+		Black, Black, Black, Black, Black, Black,
+	}
+)
+
 // NewPiece returns the piece matching the PieceType and Color.
 // NoPiece is returned if the PieceType or Color isn't valid.
 func NewPiece(t PieceType, c Color) Piece {
-	for _, p := range allPieces {
-		if p.Color() == c && p.Type() == t {
-			return p
-		}
+	if t < King || t > Pawn {
+		return NoPiece
+	}
+	switch c {
+	case White:
+		return Piece(t)
+	case Black:
+		return Piece(int(t) + 6)
 	}
 	return NoPiece
 }
 
 // Type returns the type of the piece.
 func (p Piece) Type() PieceType {
-	switch p {
-	case WhiteKing, BlackKing:
-		return King
-	case WhiteQueen, BlackQueen:
-		return Queen
-	case WhiteRook, BlackRook:
-		return Rook
-	case WhiteBishop, BlackBishop:
-		return Bishop
-	case WhiteKnight, BlackKnight:
-		return Knight
-	case WhitePawn, BlackPawn:
-		return Pawn
+	if p < NoPiece || int(p) >= len(pieceTypes) {
+		return NoPieceType
 	}
-	return NoPieceType
+	return pieceTypes[p]
 }
 
 // Color returns the color of the piece.
 func (p Piece) Color() Color {
-	switch p {
-	case WhiteKing, WhiteQueen, WhiteRook, WhiteBishop, WhiteKnight, WhitePawn:
-		return White
-	case BlackKing, BlackQueen, BlackRook, BlackBishop, BlackKnight, BlackPawn:
-		return Black
+	if p < NoPiece || int(p) >= len(pieceColors) {
+		return NoColor
 	}
-	return NoColor
+	return pieceColors[p]
 }
 
 // String implements the fmt.Stringer interface.
@@ -252,7 +256,7 @@ func (p Piece) String() string {
 }
 
 // DarkString is equivalent to String() except colors reversed for terminal
-// windows in dark mode
+// windows in dark mode.
 func (p Piece) DarkString() string {
 	return pieceDarkUnicodes[int(p)]
 }

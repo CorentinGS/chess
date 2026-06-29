@@ -267,6 +267,23 @@ func TestGetRandomMove(t *testing.T) {
 	}
 }
 
+func TestGetRandomMoveWithZeroTotalWeight(t *testing.T) {
+	book := &PolyglotBook{
+		entries: []PolyglotEntry{
+			{Key: 1, Move: 100, Weight: 0, Learn: 0},
+			{Key: 1, Move: 101, Weight: 0, Learn: 0},
+		},
+	}
+
+	move, err := book.GetRandomMove(1)
+	if err != nil {
+		t.Fatalf("GetRandomMove() error = %v", err)
+	}
+	if move != nil {
+		t.Fatalf("GetRandomMove() = %v, want nil", move)
+	}
+}
+
 func TestInvalidBookData(t *testing.T) {
 	// Test invalid file size
 	invalidData := []byte{0x00, 0x01, 0x02} // Not multiple of 16
@@ -778,7 +795,21 @@ func BenchmarkToMoveMap(b *testing.B) {
 
 	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = book.ToMoveMap()
+	}
+}
+
+func TestFastRandDistribution(t *testing.T) {
+	// fastRand now wraps math/rand/v2.Uint32. We don't test randomness
+	// quality (that's the std lib's job), just that the helper returns
+	// a uint32 without panicking and produces varying values.
+	seen := make(map[uint32]struct{}, 32)
+	for range 32 {
+		v := fastRand()
+		seen[v] = struct{}{}
+	}
+	if len(seen) < 16 {
+		t.Errorf("fastRand produced too few distinct values: %d/32", len(seen))
 	}
 }

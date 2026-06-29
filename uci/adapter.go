@@ -1,0 +1,98 @@
+package uci
+
+import (
+	"bufio"
+	"errors"
+	"fmt"
+	"io"
+	"os/exec"
+)
+
+// Adapter abstracts the transport layer between the Engine and a UCI process.
+// Implementations send a command and return the engine's response lines.
+type Adapter interface {
+	Exchange(cmd Cmd) ([]string, error)
+	Close() error
+}
+
+// SubprocessAdapter is an Adapter that communicates with a UCI engine running
+// as a subprocess via stdin/stdout pipes.
+type SubprocessAdapter struct {
+	cmd     *exec.Cmd
+	writer  *io.PipeWriter
+	reader  *io.PipeReader
+	scanner *bufio.Scanner
+}
+
+// NewSubprocessAdapter locates the executable at the given path, starts it as a
+// subprocess, and returns a SubprocessAdapter wired to its stdin/stdout.
+func NewSubprocessAdapter(path string) (*SubprocessAdapter, error) {
+	path, err := exec.LookPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("uci: executable not found at path %s %w", path, err)
+	}
+	rIn, wIn := io.Pipe()
+	rOut, wOut := io.Pipe()
+	cmd := exec.Command(path) //nolint:noctx // lifecycle is managed explicitly via Close() which kills the process
+	cmd.Stdin = rIn
+	cmd.Stdout = wOut
+	if err = cmd.Start(); err != nil {
+		_ = rIn.Close()
+		_ = wIn.Close()
+		_ = rOut.Close()
+		_ = wOut.Close()
+		return nil, fmt.Errorf("uci: failed to start executable %s: %w", path, err)
+	}
+	go func() {
+		_ = cmd.Wait()
+	}()
+	return &SubprocessAdapter{
+		cmd:     cmd,
+		writer:  wIn,
+		reader:  rOut,
+		scanner: bufio.NewScanner(rOut),
+	}, nil
+}
+
+// Exchange sends a command to the engine and returns the response lines, or an
+// error if communication fails.
+func (s *SubprocessAdapter) Exchange(cmd Cmd) ([]string, error) {
+	if _, err := fmt.Fprintln(s.writer, cmd.String()); err != nil {
+		return nil, err
+	}
+	if cmd.IsDone("") {
+		return nil, nil
+	}
+	var lines []string
+	for s.scanner.Scan() {
+		line := s.scanner.Text()
+		lines = append(lines, line)
+		if cmd.IsDone(line) {
+			break
+		}
+	}
+	if err := s.scanner.Err(); err != nil {
+		return lines, err
+	}
+	return lines, nil
+}
+
+// Close closes the communication pipes and kills the subprocess.
+func (s *SubprocessAdapter) Close() error {
+	var errs []error
+	if s.writer != nil {
+		errs = append(errs, s.writer.Close())
+	}
+	if s.reader != nil {
+		errs = append(errs, s.reader.Close())
+	}
+	if s.cmd != nil && s.cmd.Process != nil {
+		errs = append(errs, s.cmd.Process.Kill())
+	}
+	return errors.Join(errs...)
+}
+
+// Pid returns the operating system process ID of the engine subprocess.
+func (s *SubprocessAdapter) Pid() int {
+	return s.cmd.Process.Pid
+}

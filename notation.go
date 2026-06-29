@@ -29,26 +29,23 @@ var emptyComponents = moveComponents{}
 //nolint:gochecknoglobals // false positive.
 var pgnRegex = regexp.MustCompile(`^(?:([RNBQKP]?)([abcdefgh]?)(\d?)(x?)([abcdefgh])(\d)(=[QRBN])?|(O-O(?:-O)?))([+#!?]|e\.p\.)*$`)
 
-const piecesPoolCapacity = 4
-
 // Use string pools for common strings to reduce allocations.
 var (
 	//nolint:gochecknoglobals // false positive
 	stringPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return new(strings.Builder)
 		},
 	}
-
-	// Pre-allocate slices for options to avoid allocations in hot path
-	//nolint:gochecknoglobals // false positive
-	pieceOptionsPool = sync.Pool{
-		New: func() interface{} {
-			s := make([]string, 0, piecesPoolCapacity)
-			return &s // Return pointer to slice
-		},
-	}
 )
+
+func getStringBuilder() *strings.Builder {
+	sb, ok := stringPool.Get().(*strings.Builder)
+	if !ok || sb == nil {
+		return new(strings.Builder)
+	}
+	return sb
+}
 
 // Constants for common strings to avoid allocations.
 const (
@@ -65,61 +62,65 @@ const (
 	captureStr = "x"
 )
 
-// Pre-allocate piece type maps for faster lookups.
-var pieceTypeToChar = map[PieceType]string{
-	King:   kingStr,
-	Queen:  queenStr,
-	Rook:   rookStr,
-	Bishop: bishopStr,
-	Knight: knightStr,
+// Pre-allocate piece type lookup tables for faster hot-path encoding.
+var (
+	pieceTypeToChar = [7]string{
+		King:        kingStr,
+		Queen:       queenStr,
+		Rook:        rookStr,
+		Bishop:      bishopStr,
+		Knight:      knightStr,
+		Pawn:        "",
+		NoPieceType: "",
+	}
+
+	uciPromoToPieceType = [256]PieceType{
+		'n': Knight,
+		'b': Bishop,
+		'r': Rook,
+		'q': Queen,
+	}
+)
+
+func pieceTypeChar(p PieceType) string {
+	if p < NoPieceType || int(p) >= len(pieceTypeToChar) {
+		return ""
+	}
+	return pieceTypeToChar[p]
 }
 
-// Encoder is the interface implemented by objects that can
-// encode a move into a string given the position.  It is not
-// the encoders responsibility to validate the move.
-type Encoder interface {
-	Encode(pos *Position, m *Move) string
-}
-
-// Decoder is the interface implemented by objects that can
-// decode a string into a move given the position. It is not
-// the decoders responsibility to validate the move.  An error
-// is returned if the string could not be decoded.
-type Decoder interface {
-	Decode(pos *Position, s string) (*Move, error)
-}
-
-// Notation is the interface implemented by objects that can
-// encode and decode moves.
-type Notation interface {
-	Encoder
-	Decoder
-}
-
-// UCINotation is a more computer friendly alternative to algebraic
+// uciNotation is a more computer friendly alternative to algebraic
 // notation.  This notation uses the same format as the UCI (Universal Chess
 // Interface).  Examples: e2e4, e7e5, e1g1 (white short castling), e7e8q (for promotion).
-type UCINotation struct{}
+type uciNotation struct{}
 
 // String implements the fmt.Stringer interface and returns
 // the notation's name.
-func (UCINotation) String() string {
-	return "UCI Notation"
+func (uciNotation) String() string {
+	return "UCI notation"
 }
 
-// Encode implements the Encoder interface.
-func (UCINotation) Encode(_ *Position, m *Move) string {
+// Encode implements the encoder interface.
+func (uciNotation) Encode(_ *Position, m Move) string {
 	const maxLen = 5
+	// Null move: encode as "0000" (UCI convention).
+	if m.HasTag(Null) {
+		return "0000"
+	}
 	// Get a string builder from the pool
-	sb, _ := stringPool.Get().(*strings.Builder)
+	sb := getStringBuilder()
 	sb.Reset()
 	defer stringPool.Put(sb)
 
 	// Exact size needed: 4 chars for squares + up to 1 for promotion
 	sb.Grow(maxLen)
 
-	sb.Write(m.S1().Bytes())
-	sb.Write(m.S2().Bytes())
+	s1Bytes := m.S1().Bytes()
+	s2Bytes := m.S2().Bytes()
+	sb.WriteByte(s1Bytes[0])
+	sb.WriteByte(s1Bytes[1])
+	sb.WriteByte(s2Bytes[0])
+	sb.WriteByte(s2Bytes[1])
 	if m.Promo() != NoPieceType {
 		sb.Write(m.Promo().Bytes())
 	}
@@ -127,23 +128,30 @@ func (UCINotation) Encode(_ *Position, m *Move) string {
 	return sb.String()
 }
 
-// Decode implements the Decoder interface.
-func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
+// Decode implements the decoder interface.
+func (uciNotation) Decode(pos *Position, s string) (Move, error) {
+	// Null move: "0000" is the UCI convention.
+	if s == "0000" {
+		return NewNullMove(), nil
+	}
+
 	const promoLen = 5
 
 	l := len(s)
 	if l < 4 || l > 5 {
-		return nil, fmt.Errorf("chess: invalid UCI notation length %d in %q", l, s)
+		return Move{}, fmt.Errorf("chess: invalid UCI notation length %d in %q", l, s)
 	}
-	for idx := 0; idx < 2; idx += 2 {
-		if s[idx+0] < 'a' || s[idx+0] > 'h' {
-			return nil, fmt.Errorf("chess: invalid UCI notation sq:%v file:%v",
-				idx/2, s[0])
-		}
-		if s[idx+1] < '1' || s[idx+1] > '8' {
-			return nil, fmt.Errorf("chess: invalid UCI notation sq:%v rank:%v",
-				idx/2, s[0])
-		}
+	if s[0] < 'a' || s[0] > 'h' {
+		return Move{}, fmt.Errorf("chess: invalid UCI notation sq:0 file:%c", s[0])
+	}
+	if s[1] < '1' || s[1] > '8' {
+		return Move{}, fmt.Errorf("chess: invalid UCI notation sq:0 rank:%c", s[1])
+	}
+	if s[2] < 'a' || s[2] > 'h' {
+		return Move{}, fmt.Errorf("chess: invalid UCI notation sq:1 file:%c", s[2])
+	}
+	if s[3] < '1' || s[3] > '8' {
+		return Move{}, fmt.Errorf("chess: invalid UCI notation sq:1 rank:%c", s[3])
 	}
 
 	// Convert directly instead of using map lookups
@@ -151,47 +159,46 @@ func (UCINotation) Decode(pos *Position, s string) (*Move, error) {
 	s2 := Square((s[2] - 'a') + (s[3]-'1')*8)
 
 	if s1 < A1 || s1 > H8 || s2 < A1 || s2 > H8 {
-		return nil, fmt.Errorf("chess: invalid squares in UCI notation %q", s)
+		return Move{}, fmt.Errorf("chess: invalid squares in UCI notation %q", s)
 	}
 
 	m := Move{s1: s1, s2: s2}
 
 	// Promotion (Use a precomputed lookup)
 	if l == promoLen {
-		promoMap := [256]PieceType{
-			'n': Knight, 'b': Bishop, 'r': Rook, 'q': Queen,
-		}
-		promo := promoMap[s[4]]
+		promo := uciPromoToPieceType[s[4]]
 		if promo == NoPieceType {
-			return nil, fmt.Errorf("chess: invalid promotion piece in UCI notation %q", s)
+			return Move{}, fmt.Errorf("chess: invalid promotion piece in UCI notation %q", s)
 		}
 		m.promo = promo
 	}
 
 	if pos == nil {
-		return &m, nil
+		return m, nil
 	}
 
 	m.tags = moveTags(m, pos)
 
-	m.position = pos.Update(&m)
-
-	return &m, nil
+	return m, nil
 }
 
-// AlgebraicNotation (or Standard Algebraic Notation) is the
+// algebraicNotation (or Standard Algebraic notation) is the
 // official chess notation used by FIDE. Examples: e4, e5,
 // O-O (short castling), e8=Q (promotion).
-type AlgebraicNotation struct{}
+type algebraicNotation struct{}
 
 // String implements the fmt.Stringer interface and returns
 // the notation's name.
-func (AlgebraicNotation) String() string {
-	return "Algebraic Notation"
+func (algebraicNotation) String() string {
+	return "Algebraic notation"
 }
 
-// Encode implements the Encoder interface.
-func (AlgebraicNotation) Encode(pos *Position, m *Move) string {
+// Encode implements the encoder interface.
+func (algebraicNotation) Encode(pos *Position, m Move) string {
+	// Null move: emit "Z0" (ChessBase / Scid convention).
+	if m.HasTag(Null) {
+		return "Z0"
+	}
 	// Handle castling without builder
 	checkChar := getCheckChar(pos, m)
 	if m.HasTag(KingSideCastle) {
@@ -202,12 +209,12 @@ func (AlgebraicNotation) Encode(pos *Position, m *Move) string {
 	}
 
 	// Get a string builder from the pool
-	sb, _ := stringPool.Get().(*strings.Builder)
+	sb := getStringBuilder()
 	sb.Reset()
 	defer stringPool.Put(sb)
 
 	p := pos.Board().Piece(m.S1())
-	if pChar := pieceTypeToChar[p.Type()]; pChar != "" {
+	if pChar := pieceTypeChar(p.Type()); pChar != "" {
 		sb.WriteString(pChar)
 	}
 
@@ -226,7 +233,7 @@ func (AlgebraicNotation) Encode(pos *Position, m *Move) string {
 
 	if m.promo != NoPieceType {
 		sb.WriteString(equalStr)
-		sb.WriteString(pieceTypeToChar[m.promo])
+		sb.WriteString(pieceTypeChar(m.promo))
 	}
 
 	sb.WriteString(getCheckChar(pos, m))
@@ -253,145 +260,81 @@ func algebraicNotationParts(s string) (moveComponents, error) {
 	}, nil
 }
 
-// cleanMove creates a standardized string from move components.
-func (mc moveComponents) clean() string {
-	// Get a string builder from pool
-	sb, _ := stringPool.Get().(*strings.Builder)
-	sb.Reset()
-	defer stringPool.Put(sb)
-
-	sb.WriteString(mc.piece)
-	sb.WriteString(mc.originFile)
-	sb.WriteString(mc.originRank)
-	sb.WriteString(mc.capture)
-	sb.WriteString(mc.file)
-	sb.WriteString(mc.rank)
-	sb.WriteString(mc.promotes)
-	sb.WriteString(mc.castles)
-
-	return sb.String()
-}
-
-// generateMoveOptions creates possible alternative notations for a move.
-func (mc moveComponents) generateOptions() []string {
-	// Get pre-allocated slice from pool
-	options := pieceOptionsPool.Get().(*[]string)
-	*options = (*options)[:0]           // Clear but keep capacity
-	defer pieceOptionsPool.Put(options) // Now passing pointer
-
-	// Build move options using string builder for efficiency
-	sb, _ := stringPool.Get().(*strings.Builder)
-	defer stringPool.Put(sb)
-
-	if mc.piece != "" {
-		// Option 1: no origin coordinates
-		sb.Reset()
-		sb.WriteString(mc.piece)
-		sb.WriteString(mc.capture)
-		sb.WriteString(mc.file)
-		sb.WriteString(mc.rank)
-		sb.WriteString(mc.promotes)
-		sb.WriteString(mc.castles)
-		*options = append(*options, sb.String())
-
-		// Option 2: with rank, no file
-		sb.Reset()
-		sb.WriteString(mc.piece)
-		sb.WriteString(mc.originRank)
-		sb.WriteString(mc.capture)
-		sb.WriteString(mc.file)
-		sb.WriteString(mc.rank)
-		sb.WriteString(mc.promotes)
-		sb.WriteString(mc.castles)
-		*options = append(*options, sb.String())
-
-		// Option 3: with file, no rank
-		sb.Reset()
-		sb.WriteString(mc.piece)
-		sb.WriteString(mc.originFile)
-		sb.WriteString(mc.capture)
-		sb.WriteString(mc.file)
-		sb.WriteString(mc.rank)
-		sb.WriteString(mc.promotes)
-		sb.WriteString(mc.castles)
-		*options = append(*options, sb.String())
-	} else {
-		if mc.capture != "" {
-			// Pawn capture without rank
-			sb.Reset()
-			sb.WriteString(mc.originFile)
-			sb.WriteString(mc.capture)
-			sb.WriteString(mc.file)
-			sb.WriteString(mc.rank)
-			sb.WriteString(mc.promotes)
-			*options = append(*options, sb.String())
-		}
-		if mc.originFile != "" && mc.originRank != "" {
-			// Full coordinates version
-			sb.Reset()
-			sb.WriteString(mc.capture)
-			sb.WriteString(mc.file)
-			sb.WriteString(mc.rank)
-			sb.WriteString(mc.promotes)
-			*options = append(*options, sb.String())
-		}
+// Decode implements the decoder interface.
+func (algebraicNotation) Decode(pos *Position, s string) (Move, error) {
+	// Null move: accept several common spellings used across tools:
+	//   "Z0", "Z1"  - ChessBase / Scid convention
+	//   "--"        - pgn-extract, Scid and various editors
+	//   "@@"        - some exporters
+	switch s {
+	case "Z0", "Z1", "--", "@@":
+		return NewNullMove(), nil
 	}
 
-	return *options
-}
-
-// Decode implements the Decoder interface.
-func (AlgebraicNotation) Decode(pos *Position, s string) (*Move, error) {
-	// Parse move components
 	components, err := algebraicNotationParts(s)
 	if err != nil {
-		return nil, err
+		return Move{}, err
 	}
 
-	// Get cleaned input move
-	cleanedInput := components.clean()
-
-	// Try matching against valid moves
-	for _, m := range pos.ValidMovesUnsafe() {
-		// Encode current move
-		moveStr := AlgebraicNotation{}.Encode(pos, &m)
-
-		// Parse and clean encoded move
-		notationParts, algebraicNotationError := algebraicNotationParts(moveStr)
-		if algebraicNotationError != nil {
-			continue // Skip invalid moves
-		}
-
-		// Compare cleaned versions
-		if cleanedInput == notationParts.clean() {
-			return &m, nil
-		}
-
-		// Try alternative notations
-		for _, opt := range components.generateOptions() {
-			if opt == notationParts.clean() {
-				return &m, nil
-			}
-		}
+	dest := NoSquare
+	if components.file != "" && components.rank != "" {
+		dest = squareFromFileRank(components.file[0], components.rank[0])
 	}
 
-	return nil, fmt.Errorf("chess: move %s is not valid", s)
+	return resolveSANMove(pos, sanMoveData{
+		castle:     components.castles,
+		piece:      algebraicPieceType(components.piece),
+		originFile: components.originFile,
+		originRank: components.originRank,
+		dest:       dest,
+		capture:    components.capture != "",
+		promotion:  algebraicPromotion(components.promotes),
+		canonical:  true,
+	})
 }
 
-// LongAlgebraicNotation is a fully expanded version of
+func algebraicPieceType(piece string) PieceType {
+	switch piece {
+	case kingStr:
+		return King
+	case queenStr:
+		return Queen
+	case rookStr:
+		return Rook
+	case bishopStr:
+		return Bishop
+	case knightStr:
+		return Knight
+	default:
+		return Pawn
+	}
+}
+
+func algebraicPromotion(promotes string) PieceType {
+	if len(promotes) != 2 || promotes[0] != '=' {
+		return NoPieceType
+	}
+	return algebraicPieceType(promotes[1:])
+}
+
+// longAlgebraicNotation is a fully expanded version of
 // algebraic notation in which the starting and ending
 // squares are specified.
 // Examples: e2e4, Rd3xd7, O-O (short castling), e7e8=Q (promotion).
-type LongAlgebraicNotation struct{}
+type longAlgebraicNotation struct{}
 
 // String implements the fmt.Stringer interface and returns
 // the notation's name.
-func (LongAlgebraicNotation) String() string {
-	return "Long Algebraic Notation"
+func (longAlgebraicNotation) String() string {
+	return "Long Algebraic notation"
 }
 
-// Encode implements the Encoder interface.
-func (LongAlgebraicNotation) Encode(pos *Position, m *Move) string {
+// Encode implements the encoder interface.
+func (longAlgebraicNotation) Encode(pos *Position, m Move) string {
+	// Null move: emit "0000" (UCI / long-algebraic convention).
+	if m.HasTag(Null) {
+		return "0000"
+	}
 	checkChar := getCheckChar(pos, m)
 	if m.HasTag(KingSideCastle) {
 		return "O-O" + checkChar
@@ -399,7 +342,7 @@ func (LongAlgebraicNotation) Encode(pos *Position, m *Move) string {
 		return "O-O-O" + checkChar
 	}
 	p := pos.Board().Piece(m.S1())
-	pChar := charFromPieceType(p.Type())
+	pChar := pieceTypeChar(p.Type())
 	s1Str := m.s1.String()
 	capChar := ""
 	if m.HasTag(Capture) || m.HasTag(EnPassant) {
@@ -412,80 +355,84 @@ func (LongAlgebraicNotation) Encode(pos *Position, m *Move) string {
 	return pChar + s1Str + capChar + m.s2.String() + promoText + checkChar
 }
 
-// Decode implements the Decoder interface.
-func (LongAlgebraicNotation) Decode(pos *Position, s string) (*Move, error) {
-	return AlgebraicNotation{}.Decode(pos, s)
+// Decode implements the decoder interface.
+func (longAlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
+	// "0000" is the UCI / long-algebraic spelling for a null move; the
+	// algebraic decoder doesn't recognise it.
+	if s == "0000" {
+		return NewNullMove(), nil
+	}
+	return algebraicNotation{}.Decode(pos, s)
 }
 
-func getCheckChar(pos *Position, move *Move) string {
+func getCheckChar(pos *Position, move Move) string {
 	if !move.HasTag(Check) {
 		return ""
 	}
 	nextPos := pos.Update(move)
 	if nextPos.Status() == Checkmate {
-		return "#"
+		return mateStr
 	}
-	return "+"
+	return checkStr
 }
 
-func formS1(pos *Position, m *Move) string {
+func formS1(pos *Position, m Move) string {
 	p := pos.board.Piece(m.s1)
 	if p.Type() == Pawn {
 		return ""
 	}
 
-	var req, fileReq, rankReq bool
+	var (
+		disambiguationNeeded bool
+		otherOnSameFile      bool
+		otherOnSameRank      bool
+	)
 
 	// Use a string builder from the pool
-	sb, _ := stringPool.Get().(*strings.Builder)
+	sb := getStringBuilder()
 	sb.Reset()
 	defer stringPool.Put(sb)
 
 	for _, mv := range pos.ValidMovesUnsafe() {
-		if mv.s1 != m.s1 && mv.s2 == m.s2 && p == pos.board.Piece(mv.s1) {
-			req = true
-
-			if mv.s1.File() == m.s1.File() {
-				rankReq = true
-			}
-
-			if mv.s1.Rank() == m.s1.Rank() {
-				fileReq = true
-			}
+		if mv.s1 == m.s1 || mv.s2 != m.s2 {
+			continue
+		}
+		if p != pos.board.Piece(mv.s1) {
+			continue
+		}
+		disambiguationNeeded = true
+		if mv.s1.File() == m.s1.File() {
+			otherOnSameFile = true
+		}
+		if mv.s1.Rank() == m.s1.Rank() {
+			otherOnSameRank = true
 		}
 	}
 
-	if fileReq || !rankReq && req {
+	// SAN disambiguation rules (FIDE):
+	//   * If no other same-type piece can move to s2, no disambiguation needed.
+	//   * If file alone disambiguates, emit the file.
+	//   * Otherwise (file shared with another same-target piece), emit the rank.
+	//   * If three or more pieces share the same file, emit both.
+	if !disambiguationNeeded {
+		return ""
+	}
+	if !otherOnSameFile {
+		sb.WriteByte(m.s1.File().Byte())
+		return sb.String()
+	}
+	if otherOnSameRank {
+		// Three or more same-file pieces: emit both file and rank.
 		sb.WriteByte(m.s1.File().Byte())
 	}
-
-	if rankReq {
-		sb.WriteByte(m.s1.Rank().Byte())
-	}
-
+	sb.WriteByte(m.s1.Rank().Byte())
 	return sb.String()
 }
 
 func charForPromo(p PieceType) string {
-	c := charFromPieceType(p)
+	c := pieceTypeChar(p)
 	if c != "" {
 		c = "=" + c
 	}
 	return c
-}
-
-func charFromPieceType(p PieceType) string {
-	switch p {
-	case King:
-		return "K"
-	case Queen:
-		return "Q"
-	case Rook:
-		return "R"
-	case Bishop:
-		return "B"
-	case Knight:
-		return "N"
-	}
-	return ""
 }

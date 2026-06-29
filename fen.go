@@ -21,7 +21,7 @@ func decodeFEN(fen string) (*Position, error) {
 	}
 	b, err := fenBoard(parts[0])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("chess: fen: board: %w", err)
 	}
 	turn, ok := fenTurnMap[parts[1]]
 	if !ok {
@@ -29,11 +29,11 @@ func decodeFEN(fen string) (*Position, error) {
 	}
 	rights, err := formCastleRights(parts[2])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("chess: fen: castle rights: %w", err)
 	}
 	sq, err := formEnPassant(parts[3])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("chess: fen: en passant: %w", err)
 	}
 	halfMoveClock, err := strconv.Atoi(parts[4])
 	if err != nil || halfMoveClock < 0 {
@@ -44,7 +44,7 @@ func decodeFEN(fen string) (*Position, error) {
 		return nil, errors.New("chess: fen invalid move count")
 	}
 	pos := &Position{
-		board:           b,
+		board:           *b,
 		turn:            turn,
 		castleRights:    rights,
 		enPassantSquare: sq,
@@ -66,7 +66,7 @@ var (
 	//note: this is a sync.Pool
 	//nolint:gochecknoglobals // this is a pool.
 	pieceMapPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return make(map[Square]Piece, pieceMapSize)
 		},
 	}
@@ -75,17 +75,26 @@ var (
 	//note: this is a sync.Pool
 	//nolint:gochecknoglobals // this is a pool.
 	fileMapPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return make(map[File]Piece, fileMapSize)
 		},
 	}
 )
 
-// clearMap helper to clear a map without deallocating.
-func clearMap[K comparable, V any](m map[K]V) {
-	for k := range m {
-		delete(m, k)
+func getPieceMap() map[Square]Piece {
+	m, ok := pieceMapPool.Get().(map[Square]Piece)
+	if !ok || m == nil {
+		return make(map[Square]Piece, pieceMapSize)
 	}
+	return m
+}
+
+func getFileMap() map[File]Piece {
+	m, ok := fileMapPool.Get().(map[File]Piece)
+	if !ok || m == nil {
+		return make(map[File]Piece, fileMapSize)
+	}
+	return m
 }
 
 // fenBoard generates board from FEN format while minimizing allocations.
@@ -97,12 +106,12 @@ func fenBoard(boardStr string) (*Board, error) {
 	var rankBuffer [maxRankLen]string
 
 	// Get maps from pools
-	m, _ := pieceMapPool.Get().(map[Square]Piece)
-	fileMap, _ := fileMapPool.Get().(map[File]Piece)
+	m := getPieceMap()
+	fileMap := getFileMap()
 
 	// Clear maps (in case they were reused)
-	clearMap(m)
-	clearMap(fileMap)
+	clear(m)
+	clear(fileMap)
 
 	// Ensure maps are returned to pools on exit
 	defer func() {
@@ -141,11 +150,11 @@ func fenBoard(boardStr string) (*Board, error) {
 		rank := Rank(7 - i)
 
 		// Clear fileMap for reuse
-		clearMap(fileMap)
+		clear(fileMap)
 
 		// Parse rank into reused map
 		if err := fenFormRank(rankBuffer[i], fileMap); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("chess: fen: rank %d: %w", 8-i, err)
 		}
 
 		// Transfer pieces to main map
@@ -158,7 +167,7 @@ func fenBoard(boardStr string) (*Board, error) {
 	// Note: NewBoard must copy the map since we're returning m to the pool
 	board, err := NewBoard(m)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("chess: fen: board construction: %w", err)
 	}
 	return board, nil
 }
@@ -195,16 +204,15 @@ func fenFormRank(rankStr string, m map[File]Piece) error {
 }
 
 func formCastleRights(castleStr string) (CastleRights, error) {
-	// check for duplicates aka. KKkq right now is valid
-	for _, s := range []string{"K", "Q", "k", "q", "-"} {
-		if strings.Count(castleStr, s) > 1 {
-			return "-", fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
-		}
-	}
-	for _, r := range castleStr {
-		c := fmt.Sprintf("%c", r)
+	var seen [256]bool
+	for i := range castleStr {
+		c := castleStr[i]
 		switch c {
-		case "K", "Q", "k", "q", "-":
+		case 'K', 'Q', 'k', 'q', '-':
+			if seen[c] {
+				return "-", fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
+			}
+			seen[c] = true
 		default:
 			return "-", fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
 		}
@@ -217,7 +225,7 @@ func formEnPassant(enPassant string) (Square, error) {
 		return NoSquare, nil
 	}
 	sq := SquareFromString(enPassant)
-	if sq == NoSquare || !(sq.Rank() == Rank3 || sq.Rank() == Rank6) {
+	if sq == NoSquare || (sq.Rank() != Rank3 && sq.Rank() != Rank6) {
 		return NoSquare, fmt.Errorf("chess: fen invalid En Passant square %s", enPassant)
 	}
 	return sq, nil

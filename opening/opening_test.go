@@ -3,17 +3,18 @@ package opening_test
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
-	"github.com/corentings/chess/v2"
-	"github.com/corentings/chess/v2/opening"
+	"github.com/corentings/chess/v3"
+	"github.com/corentings/chess/v3/opening"
 )
 
 func ExampleDefaultBook_find() {
 	g := chess.NewGame()
-	_ = g.PushMove("e4", nil)
-	_ = g.PushMove("e6", nil)
+	_, _ = g.PushMove("e4", nil)
+	_, _ = g.PushMove("e6", nil)
 
 	// print French Defense
 	book, err := opening.DefaultBook()
@@ -29,8 +30,8 @@ func ExampleDefaultBook_find() {
 
 func ExampleDefaultBook_possible() {
 	g := chess.NewGame()
-	_ = g.PushMove("e4", nil)
-	_ = g.PushMove("d5", nil)
+	_, _ = g.PushMove("e4", nil)
+	_, _ = g.PushMove("d5", nil)
 
 	// print all variantions of the Scandinavian Defense
 	book, err := opening.DefaultBook()
@@ -69,10 +70,10 @@ func TestDefaultBook(t *testing.T) {
 
 func TestFind(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("d5", nil); err != nil {
+	if _, err := g.PushMove("d5", nil); err != nil {
 		t.Fatal(err)
 	}
 	book, err := opening.DefaultBook()
@@ -91,7 +92,7 @@ func TestFind(t *testing.T) {
 
 func TestPossible(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.PushMove("g3", nil); err != nil {
+	if _, err := g.PushMove("g3", nil); err != nil {
 		t.Fatal(err)
 	}
 	book, err := opening.DefaultBook()
@@ -111,10 +112,10 @@ func TestOpeningGameRace(t *testing.T) {
 		t.Fatalf("DefaultBook() failed: %v", err)
 	}
 	g := chess.NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.PushMove("e5", nil); err != nil {
 		t.Fatal(err)
 	}
 	o := book.Find(g.Moves())
@@ -124,7 +125,7 @@ func TestOpeningGameRace(t *testing.T) {
 
 	// Call Game() from multiple goroutines concurrently
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -137,8 +138,77 @@ func TestOpeningGameRace(t *testing.T) {
 	wg.Wait()
 }
 
+func TestNewBookFailsFastOnMalformedRow(t *testing.T) {
+	data := "eco\tname\tfyn\tmoves\nA00\tBroken\tonly-three-columns\n"
+
+	_, err := opening.NewBook(strings.NewReader(data))
+	if err == nil {
+		t.Fatal("NewBook() succeeded for malformed row")
+	}
+	if !strings.Contains(err.Error(), "ECO row 2") {
+		t.Fatalf("expected row-numbered error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "expected at least 4 columns") {
+		t.Fatalf("expected malformed column error, got %v", err)
+	}
+}
+
+func TestNewBookFailsFastOnInvalidOpeningMove(t *testing.T) {
+	data := "eco\tname\tfyn\tmoves\nA00\tBroken Opening\t\t1.e2e5\n"
+
+	_, err := opening.NewBook(strings.NewReader(data))
+	if err == nil {
+		t.Fatal("NewBook() succeeded for invalid opening move")
+	}
+	if !strings.Contains(err.Error(), "ECO row 2 (A00 Broken Opening)") {
+		t.Fatalf("expected row and opening context, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "decode move e2e5") {
+		t.Fatalf("expected invalid move context, got %v", err)
+	}
+}
+
+func TestOpeningGameReturnsCallerOwnedGame(t *testing.T) {
+	data := "eco\tname\tfyn\tmoves\nC20\tKing Pawn Game\t\t1.e2e4 e7e5\n"
+	book, err := opening.NewBook(strings.NewReader(data))
+	if err != nil {
+		t.Fatalf("NewBook() failed: %v", err)
+	}
+
+	g := chess.NewGame()
+	if _, err := g.PushMove("e4", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := g.PushMove("e5", nil); err != nil {
+		t.Fatal(err)
+	}
+	o := book.Find(g.Moves())
+	if o == nil {
+		t.Fatal("expected to find opening")
+	}
+
+	game1 := o.Game()
+	if game1 == nil {
+		t.Fatal("Game() returned nil")
+	}
+	if _, err := game1.PushMove("Nf3", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	game2 := o.Game()
+	if game2 == nil {
+		t.Fatal("Game() returned nil on second call")
+	}
+	if got := len(game2.Moves()); got != 2 {
+		t.Fatalf("expected second Game() result to have 2 moves, got %d", got)
+	}
+	if game1 == game2 {
+		t.Fatal("Game() returned the same pointer twice")
+	}
+}
+
 func BenchmarkDefaultBook(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, err := opening.DefaultBook()
 		if err != nil {
 			b.Fatal(err)
@@ -146,18 +216,9 @@ func BenchmarkDefaultBook(b *testing.B) {
 	}
 }
 
-func BenchmarkDefaultBookCached(b *testing.B) {
-	// Warm up the cache
-	_, _ = opening.DefaultBook()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = opening.DefaultBook()
-	}
-}
-
 func BenchmarkNewBookParse(b *testing.B) {
 	// This benchmark measures the full parse cost
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, _ = opening.NewBook(bytes.NewReader(nil))
 	}
 }

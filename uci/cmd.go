@@ -1,7 +1,6 @@
 package uci
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"math"
@@ -9,155 +8,154 @@ import (
 	"strings"
 	"time"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
-// Cmd is a UCI compliant command.
+// Cmd represents a command sent to a UCI engine. Each implementation defines
+// how the command is serialized (String), when the engine's response is
+// complete (IsDone), how to process the response (Handle), and whether the
+// command requires exclusive access to the engine (LockRequired).
 type Cmd interface {
 	fmt.Stringer
-	ProcessResponse(e *Engine) error
+	IsDone(line string) bool
+	Handle(lines []string, e *Engine) error
+	LockRequired() bool
 }
 
-type cmdNoOptions struct {
-	F    func(e *Engine) error
-	Name string
-}
+// CmdUCI sends the "uci" command and waits for the "uciok" response. The engine
+// reports its identity and available options.
+type CmdUCI struct{}
 
-func (cmd cmdNoOptions) String() string {
-	return cmd.Name
-}
+func (CmdUCI) String() string { return "uci" }
 
-func (cmd cmdNoOptions) ProcessResponse(e *Engine) error {
-	return cmd.F(e)
-}
+func (CmdUCI) IsDone(line string) bool { return line == "uciok" }
 
-var (
-	// CmdUCI corresponds to the "uci" command:
-	// tell engine to use the uci (universal chess interface),
-	// this will be send once as a first command after program boot
-	// to tell the engine to switch to uci mode.
-	// After receiving the uci command the engine must identify itself with the "id" command
-	// and sent the "option" commands to tell the GUI which engine settings the engine supports if any.
-	// After that the engine should sent "uciok" to acknowledge the uci mode.
-	// If no uciok is sent within a certain time period, the engine task will be killed by the GUI.
-	//nolint:gochecknoglobals // Will need to improve this
-	// TODO: Remove global variable
-	CmdUCI = cmdNoOptions{Name: "uci", F: func(e *Engine) error {
-		e.id = map[string]string{}
-		e.options = map[string]Option{}
-		scanner := bufio.NewScanner(e.out)
-		for scanner.Scan() {
-			text := e.readLine(scanner)
-			k, v, err := parseIDLine(text)
-			if err == nil {
-				e.id[k] = v
-				continue
-			}
-			o := &Option{}
-			err = o.UnmarshalText([]byte(text))
-			if err == nil {
-				e.options[o.Name] = *o
-				continue
-			}
-			if text == "uciok" {
-				break
+func (CmdUCI) LockRequired() bool { return true }
+
+func (CmdUCI) Handle(lines []string, e *Engine) error {
+	e.id = map[string]string{}
+	e.options = map[string]Option{}
+	for _, text := range lines {
+		k, v, err := parseIDLine(text)
+		if err == nil {
+			e.id[k] = v
+			continue
+		}
+		o := &Option{}
+		errOpt := o.UnmarshalText([]byte(text))
+		if errOpt == nil {
+			e.options[o.Name] = *o
+			continue
+		}
+		if e.debug {
+			switch {
+			case strings.HasPrefix(text, "id "):
+				e.logger.Printf("uci: dropping malformed id line %q: %v", text, err)
+			case strings.HasPrefix(text, "option "):
+				e.logger.Printf("uci: dropping malformed option line %q: %v", text, errOpt)
 			}
 		}
-		return nil
-	}}
+	}
+	return nil
+}
 
-	// CmdIsReady corresponds to the "isready" command:
-	// this is used to synchronize the engine with the GUI. When the GUI has sent a command or
-	// multiple commands that can take some time to complete,
-	// this command can be used to wait for the engine to be ready again or
-	// to ping the engine to find out if it is still alive.
-	// E.g. this should be sent after setting the path to the tablebases as this can take some time.
-	// This command is also required once before the engine is asked to do any search
-	// to wait for the engine to finish initializing.
-	// This command must always be answered with "readyok" and can be sent also when the engine is calculating
-	// in which case the engine should also immediately answer with "readyok" without stopping the search.
-	CmdIsReady = cmdNoOptions{Name: "isready", F: func(e *Engine) error {
-		scanner := bufio.NewScanner(e.out)
-		for scanner.Scan() {
-			text := e.readLine(scanner)
-			if text == "readyok" {
-				break
-			}
+// CmdIsReady sends the "isready" command and waits for the "readyok" response,
+// confirming the engine is ready to accept further commands.
+type CmdIsReady struct{}
+
+func (CmdIsReady) String() string { return "isready" }
+
+func (CmdIsReady) IsDone(line string) bool { return line == "readyok" }
+
+func (CmdIsReady) LockRequired() bool { return true }
+
+func (CmdIsReady) Handle(_ []string, _ *Engine) error { return nil }
+
+// CmdUCINewGame sends the "ucinewgame" command, signaling the engine to clear
+// any state from previous games (e.g. hash tables).
+type CmdUCINewGame struct{}
+
+func (CmdUCINewGame) String() string { return "ucinewgame" }
+
+func (CmdUCINewGame) IsDone(_ string) bool { return true }
+
+func (CmdUCINewGame) LockRequired() bool { return true }
+
+func (CmdUCINewGame) Handle(_ []string, _ *Engine) error { return nil }
+
+// CmdPonderHit sends the "ponderhit" command, informing the engine that the
+// opponent has played the move it was pondering.
+type CmdPonderHit struct{}
+
+func (CmdPonderHit) String() string { return "ponderhit" }
+
+func (CmdPonderHit) IsDone(_ string) bool { return true }
+
+func (CmdPonderHit) LockRequired() bool { return false }
+
+func (CmdPonderHit) Handle(_ []string, _ *Engine) error { return nil }
+
+// CmdStop sends the "stop" command, instructing the engine to stop calculating
+// and return the best move found so far.
+type CmdStop struct{}
+
+func (CmdStop) String() string { return "stop" }
+
+func (CmdStop) IsDone(_ string) bool { return true }
+
+func (CmdStop) LockRequired() bool { return false }
+
+func (CmdStop) Handle(_ []string, _ *Engine) error { return nil }
+
+// CmdQuit sends the "quit" command, instructing the engine to exit.
+type CmdQuit struct{}
+
+func (CmdQuit) String() string { return "quit" }
+
+func (CmdQuit) IsDone(_ string) bool { return true }
+
+func (CmdQuit) LockRequired() bool { return true }
+
+func (CmdQuit) Handle(_ []string, _ *Engine) error { return nil }
+
+// CmdEval sends the "eval" command and parses the engine's static evaluation
+// output. Not all engines support this command.
+type CmdEval struct{}
+
+func (CmdEval) String() string { return "eval" }
+
+func (CmdEval) IsDone(line string) bool {
+	lower := strings.ToLower(line)
+	return strings.HasPrefix(line, "Final evaluation") ||
+		strings.Contains(lower, "error") ||
+		strings.Contains(lower, "unknown command")
+}
+
+func (CmdEval) LockRequired() bool { return true }
+
+func (CmdEval) Handle(lines []string, e *Engine) error {
+	for _, text := range lines {
+		lower := strings.ToLower(text)
+		if strings.Contains(lower, "error") || strings.Contains(lower, "unknown command") {
+			return errors.New("eval command not supported")
 		}
-		return nil
-	}}
-
-	// CmdUCINewGame corresponds to the "ucinewgame" command:
-	// this is sent to the engine when the next search (started with "position" and "go") will be from
-	// a different game. This can be a new game the engine should play or a new game it should analyse but
-	// also the next position from a testsuite with positions only.
-	// If the GUI hasn't sent a "ucinewgame" before the first "position" command, the engine shouldn't
-	// expect any further ucinewgame commands as the GUI is probably not supporting the ucinewgame command.
-	// So the engine should not rely on this command even though all new GUIs should support it.
-	// As the engine's reaction to "ucinewgame" can take some time the GUI should always send "isready"
-	// after "ucinewgame" to wait for the engine to finish its operation.
-	CmdUCINewGame = cmdNoOptions{Name: "ucinewgame", F: func(_ *Engine) error {
-		return nil
-	}}
-
-	// CmdPonderHit corresponds to the "ponderhit" command:
-	// the user has played the expected move. This will be sent if the engine was told to ponder on the same move
-	// the user has played. The engine should continue searching but switch from pondering to normal search.
-	CmdPonderHit = cmdNoOptions{Name: "ponderhit", F: func(_ *Engine) error {
-		return nil
-	}}
-
-	// CmdStop corresponds to the "stop" command:
-	// stop calculating as soon as possible,
-	// don't forget the "bestmove" and possibly the "ponder" token when finishing the search.
-	CmdStop = cmdNoOptions{Name: "stop", F: func(_ *Engine) error {
-		return nil
-	}}
-
-	// CmdQuit (shouldn't be used directly as its handled by Engine.Close()) corresponds to the "quit" command:
-	// quit the program as soon as possible.
-	CmdQuit = cmdNoOptions{Name: "quit", F: func(_ *Engine) error {
-		return nil
-	}}
-
-	// CmdEval is a non-standard command that requests the engine's static evaluation of the current position.
-	CmdEval = cmdNoOptions{Name: "eval", F: func(e *Engine) error {
-		scanner := bufio.NewScanner(e.out)
-		for scanner.Scan() {
-			text := e.readLine(scanner)
-			if strings.Contains(text, "error") {
-				return errors.New("eval command not supported")
+		if strings.HasPrefix(text, "Final evaluation") {
+			parts := strings.Fields(text)
+			if len(parts) < 3 {
+				return fmt.Errorf("uci: malformed eval line %q", text)
 			}
-			if strings.HasPrefix(text, "Final evaluation") {
-				parts := strings.Fields(text)
-				if len(parts) >= 3 {
-					evalStr := parts[2]
-					eval, err := strconv.ParseFloat(evalStr, 64)
-					if err == nil {
-						e.eval = int(math.Round(eval * 100))
-					}
-					break
-				}
+			eval, err := strconv.ParseFloat(parts[2], 64)
+			if err != nil {
+				return fmt.Errorf("uci: invalid eval value %q: %w", parts[2], err)
 			}
+			e.eval = int(math.Round(eval * 100))
+			break
 		}
-		return nil
-	}}
-)
+	}
+	return nil
+}
 
-// CmdSetOption corresponds to the "setoption" command:
-// this is sent to the engine when the user wants to change the internal parameters
-// of the engine. For the "button" type no value is needed.
-// One string will be sent for each parameter and this will only be sent when the engine is waiting.
-// The name of the option in  should not be case sensitive and can inludes spaces like also the value.
-// The substrings "value" and "name" should be avoided in  and  to allow unambiguous parsing,
-// for example do not use  = "draw value".
-// Here are some strings for the example below:
-//
-//	 "setoption name Nullmove value true\n"
-//	"setoption name Selectivity value 3\n"
-//	 "setoption name Style value Risky\n"
-//	 "setoption name Clear Hash\n"
-//	 "setoption name NalimovPath value c:\chess\tb\4;c:\chess\tb\5\n"
+// CmdSetOption sends a "setoption" command to change an engine option at runtime.
 type CmdSetOption struct {
 	Name  string
 	Value string
@@ -167,20 +165,17 @@ func (cmd CmdSetOption) String() string {
 	return fmt.Sprintf("setoption name %s value %s", cmd.Name, cmd.Value)
 }
 
-// ProcessResponse implements the Cmd interface.
-func (cmd CmdSetOption) ProcessResponse(_ *Engine) error {
-	return nil
-}
+func (CmdSetOption) IsDone(_ string) bool { return true }
 
-// CmdPosition corresponds to the "position" command:
-// set up the position described in fenstring on the internal board and
-// play the moves on the internal chess board.
-// if the game was played  from the start position the string "startpos" will be sent
-// Note: no "new" command is needed. However, if this position is from a different game than
-// the last position sent to the engine, the GUI should have sent a "ucinewgame" inbetween.
+func (CmdSetOption) LockRequired() bool { return false }
+
+func (CmdSetOption) Handle(_ []string, _ *Engine) error { return nil }
+
+// CmdPosition sends a "position" command to set the engine's current position,
+// optionally applying a sequence of moves from the starting position or a FEN.
 type CmdPosition struct {
 	Position *chess.Position
-	Moves    []*chess.Move
+	Moves    []chess.Move
 }
 
 func (cmd CmdPosition) String() string {
@@ -192,59 +187,22 @@ func (cmd CmdPosition) String() string {
 	}
 	moveStrs := []string{}
 	for _, m := range cmd.Moves {
-		mStr := chess.UCINotation{}.Encode(nil, m)
+		mStr, _ := chess.UCI().Encode(nil, m)
 		moveStrs = append(moveStrs, mStr)
 	}
 	return fmt.Sprintf("position fen %s moves %s", cmd.Position, strings.Join(moveStrs, " "))
 }
 
-// ProcessResponse implements the Cmd interface.
-func (CmdPosition) ProcessResponse(_ *Engine) error {
-	return nil
-}
+func (CmdPosition) IsDone(_ string) bool { return true }
 
-// CmdGo corresponds to the "go" command:
-// start calculating on the current position set up with the "position" command.
-// There are a number of commands that can follow this command, all will be sent in the same string.
-// If one command is not send its value should be interpreted as it would not influence the search.
-//   - searchmoves  ....
-//     restrict search to this moves only
-//     Example: After "position startpos" and "go infinite searchmoves e2e4 d2d4"
-//     the engine should only search the two moves e2e4 and d2d4 in the initial position.
-//   - ponder
-//     start searching in pondering mode.
-//     Do not exit the search in ponder mode, even if it's mate!
-//     This means that the last move sent in in the position string is the ponder move.
-//     The engine can do what it wants to do, but after a "ponderhit" command
-//     it should execute the suggested move to ponder on. This means that the ponder move sent by
-//     the GUI can be interpreted as a recommendation about which move to ponder. However, if the
-//     engine decides to ponder on a different move, it should not display any mainlines as they are
-//     likely to be misinterpreted by the GUI because the GUI expects the engine to ponder
-//     on the suggested move.
-//   - wtime
-//     white has x msec left on the clock
-//   - btime
-//     black has x msec left on the clock
-//   - winc
-//     white increment per move in mseconds if x > 0
-//   - binc
-//     black increment per move in mseconds if x > 0
-//   - movestogo
-//     there are x moves to the next time control,
-//     this will only be sent if x > 0,
-//     if you don't get this and get the wtime and btime it's sudden death
-//   - depth
-//     search x plies only.
-//   - nodes
-//     search x nodes only,
-//   - mate
-//     search for a mate in x moves
-//   - movetime
-//     search exactly x mseconds
-//   - infinite
-//     search until the "stop" command. Do not exit the search without being told so in this mode!
+func (CmdPosition) LockRequired() bool { return true }
+
+func (CmdPosition) Handle(_ []string, _ *Engine) error { return nil }
+
+// CmdGo sends a "go" command to start the engine's search. The fields control
+// search parameters such as time limits, depth, and node counts.
 type CmdGo struct {
-	SearchMoves    []*chess.Move
+	SearchMoves    []chess.Move
 	WhiteTime      time.Duration
 	BlackTime      time.Duration
 	WhiteIncrement time.Duration
@@ -296,53 +254,63 @@ func (cmd CmdGo) String() string {
 	if len(cmd.SearchMoves) > 0 {
 		a = append(a, "searchmoves")
 		for _, m := range cmd.SearchMoves {
-			mStr := chess.UCINotation{}.Encode(nil, m)
+			mStr, _ := chess.UCI().Encode(nil, m)
 			a = append(a, mStr)
 		}
 	}
 	return strings.Join(a, " ")
 }
 
-// ProcessResponse implements the Cmd interface.
-// TODO: Refactor this function to be shorter and more readable.
-//
-//nolint:nestif // work to be done
-func (CmdGo) ProcessResponse(e *Engine) error {
-	const maxParts = 4
+func (CmdGo) IsDone(line string) bool {
+	return strings.HasPrefix(line, "bestmove")
+}
 
-	scanner := bufio.NewScanner(e.out)
+func (CmdGo) LockRequired() bool { return true }
+
+func parseBestMoveLine(text string, e *Engine) (chess.Move, chess.Move, error) {
+	const minParts = 2
+	const ponderPartIdx = 3
+	const minPonderParts = 4
+	parts := strings.Split(text, " ")
+	if len(parts) < minParts {
+		return chess.Move{}, chess.Move{}, fmt.Errorf("best move not found %s", text)
+	}
+	var position *chess.Position
+	if e.hasPos {
+		position = e.position.Position
+	}
+	bestMove, err := decodeUCIMove(position, parts[1])
+	if err != nil {
+		return chess.Move{}, chess.Move{}, err
+	}
+	var ponderMove chess.Move
+	if len(parts) >= minPonderParts {
+		ponderMove, err = decodeUCIMove(position, parts[ponderPartIdx])
+		if err != nil {
+			return chess.Move{}, chess.Move{}, err
+		}
+	}
+	return bestMove, ponderMove, nil
+}
+
+func (CmdGo) Handle(lines []string, e *Engine) error {
 	results := SearchResults{MultiPVInfo: make([]Info, 1)}
-	for scanner.Scan() {
-		text := e.readLine(scanner)
+	for _, text := range lines {
 		if strings.HasPrefix(text, "bestmove") {
-			parts := strings.Split(text, " ")
-			if len(parts) <= 1 {
-				return errors.New("best move not found " + text)
-			}
-			var position *chess.Position
-			if e.position != nil {
-				position = e.position.Position
-			} else {
-				position = nil
-			}
-			bestMove, err := chess.UCINotation{}.Decode(position, parts[1])
+			bestMove, ponderMove, err := parseBestMoveLine(text, e)
 			if err != nil {
 				return err
 			}
 			results.BestMove = bestMove
-			if len(parts) >= maxParts {
-				ponderMove, decodeErr := chess.UCINotation{}.Decode(position, parts[3])
-				if decodeErr != nil {
-					return decodeErr
-				}
-				results.Ponder = ponderMove
-			}
-			break
+			results.Ponder = ponderMove
+			continue
 		}
 
 		info := &Info{}
-		err := info.UnmarshalText([]byte(text))
-		if err != nil {
+		if err := info.UnmarshalText([]byte(text)); err != nil {
+			if e.debug && strings.HasPrefix(text, "info ") {
+				e.logger.Printf("uci: dropping unparseable info line %q: %v", text, err)
+			}
 			continue
 		}
 
@@ -352,10 +320,8 @@ func (CmdGo) ProcessResponse(e *Engine) error {
 
 		if info.Multipv > 1 && info.Multipv < 300 {
 			currentPVCount := len(results.MultiPVInfo)
-			if info.Multipv > currentPVCount {
-				for i := currentPVCount; i < info.Multipv; i++ {
-					results.MultiPVInfo = append(results.MultiPVInfo, Info{})
-				}
+			for i := currentPVCount; i < info.Multipv; i++ {
+				results.MultiPVInfo = append(results.MultiPVInfo, Info{})
 			}
 			results.MultiPVInfo[info.Multipv-1] = *info
 		}
@@ -363,6 +329,17 @@ func (CmdGo) ProcessResponse(e *Engine) error {
 	results.MultiPVInfo[0] = results.Info
 	e.results = results
 	return nil
+}
+
+func decodeUCIMove(pos *chess.Position, text string) (chess.Move, error) {
+	if pos != nil {
+		return chess.UCI().Decode(pos, text)
+	}
+	raw, err := chess.UCI().DecodeRaw(text)
+	if err != nil {
+		return chess.Move{}, err
+	}
+	return raw.Move(), nil
 }
 
 func parseIDLine(s string) (string, string, error) {

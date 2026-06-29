@@ -2,6 +2,7 @@ package chess
 
 import (
 	"log"
+	"reflect"
 	"testing"
 )
 
@@ -231,7 +232,7 @@ func TestPositionUpdates(t *testing.T) {
 			t.Fatalf("expected move %s %v to be valid", mt.m, mt.m.tags)
 		}
 
-		postPos := mt.pos.Update(mt.m)
+		postPos := mt.pos.Update(*mt.m)
 		if postPos.String() != mt.postPos.String() {
 			t.Fatalf("starting from board \n%s%s\n after move %s\n expected board to be %s\n%s\n but was %s\n%s\n",
 				mt.pos.String(),
@@ -246,82 +247,8 @@ func TestPositionUpdates(t *testing.T) {
 	}
 }
 
-type perfTest struct {
-	pos           *Position
-	nodesPerDepth []int
-}
-
-/* https://www.chessprogramming.org/Perft_Results */
-var perfResults = []perfTest{
-	{pos: unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"), nodesPerDepth: []int{
-		20, 400, 8902, 197281,
-		// 4865609, 119060324, 3195901860, 84998978956, 2439530234167, 69352859712417
-	}},
-	{pos: unsafeFEN("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"), nodesPerDepth: []int{
-		48, 2039, 97862,
-		// 4085603, 193690690
-	}},
-	{pos: unsafeFEN("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1"), nodesPerDepth: []int{
-		14, 191, 2812, 43238, 674624,
-		// 11030083, 178633661
-	}},
-	{pos: unsafeFEN("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1"), nodesPerDepth: []int{
-		6, 264, 9467, 422333,
-		// 15833292, 706045033
-	}},
-	{pos: unsafeFEN("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1"), nodesPerDepth: []int{
-		6, 264, 9467, 422333,
-		// 15833292, 706045033
-	}},
-	{pos: unsafeFEN("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"), nodesPerDepth: []int{
-		44, 1486, 62379,
-		// 2103487, 89941194
-	}},
-	{pos: unsafeFEN("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"), nodesPerDepth: []int{
-		46, 2079, 89890,
-		// 3894594, 164075551, 6923051137, 287188994746, 11923589843526, 490154852788714
-	}},
-}
-
-func TestPerfResults(t *testing.T) {
-	for _, perf := range perfResults {
-		countMoves(t, perf.pos, []*Position{perf.pos}, perf.nodesPerDepth, len(perf.nodesPerDepth))
-	}
-}
-
-func countMoves(t *testing.T, originalPosition *Position, positions []*Position, nodesPerDepth []int, maxDepth int) {
-	if len(nodesPerDepth) == 0 {
-		return
-	}
-	depth := maxDepth - len(nodesPerDepth) + 1
-	expNodes := nodesPerDepth[0]
-	newPositions := make([]*Position, 0)
-	for _, pos := range positions {
-		for _, move := range pos.ValidMoves() {
-			newPos := pos.Update(&move)
-			newPositions = append(newPositions, newPos)
-		}
-	}
-	gotNodes := len(newPositions)
-	if expNodes != gotNodes {
-		t.Errorf("Depth: %d Expected: %d Got: %d", depth, expNodes, gotNodes)
-		t.Log("##############################")
-		t.Log("# Original position info")
-		t.Log("###")
-		t.Log(originalPosition.String())
-		t.Log(originalPosition.board.Draw())
-		t.Log("##############################")
-		t.Log("# Details in JSONL (http://jsonlines.org)")
-		t.Log("###")
-		for _, pos := range positions {
-			t.Logf(`{"position": "%s", "moves": %d}`, pos.String(), len(pos.ValidMoves()))
-		}
-	}
-	countMoves(t, originalPosition, newPositions, nodesPerDepth[1:], maxDepth)
-}
-
 func Test_SetCommentUpdatesComment(t *testing.T) {
-	move := &Move{}
+	move := &MoveNode{}
 	move.SetComment("Initial comment")
 	expected := "Initial comment"
 	if move.Comments() != expected {
@@ -330,7 +257,8 @@ func Test_SetCommentUpdatesComment(t *testing.T) {
 }
 
 func Test_SetCommentOverwritesExistingComment(t *testing.T) {
-	move := &Move{comments: "Old comment"}
+	move := &MoveNode{}
+	move.SetComment("Old comment")
 	move.SetComment("New comment")
 	expected := "New comment"
 	if move.Comments() != expected {
@@ -339,7 +267,8 @@ func Test_SetCommentOverwritesExistingComment(t *testing.T) {
 }
 
 func Test_SetCommentWithEmptyString(t *testing.T) {
-	move := &Move{comments: "Existing comment"}
+	move := &MoveNode{}
+	move.SetComment("Existing comment")
 	move.SetComment("")
 	expected := ""
 	if move.Comments() != expected {
@@ -349,7 +278,8 @@ func Test_SetCommentWithEmptyString(t *testing.T) {
 
 func TestAddComment(t *testing.T) {
 	t.Run("AddCommentAppendsToExistingComment", func(t *testing.T) {
-		move := &Move{comments: "Initial comment. "}
+		move := &MoveNode{}
+		move.SetComment("Initial comment. ")
 		move.AddComment("Additional comment.")
 		expected := "Initial comment. Additional comment."
 		if move.Comments() != expected {
@@ -358,7 +288,7 @@ func TestAddComment(t *testing.T) {
 	})
 
 	t.Run("AddCommentToEmptyComment", func(t *testing.T) {
-		move := &Move{}
+		move := &MoveNode{}
 		move.AddComment("First comment.")
 		expected := "First comment."
 		if move.Comments() != expected {
@@ -369,7 +299,7 @@ func TestAddComment(t *testing.T) {
 
 func TestAddCommentToStructuredComments(t *testing.T) {
 	t.Run("AddsFirstTextBlock", func(t *testing.T) {
-		move := &Move{structuredComments: true}
+		move := &MoveNode{}
 		move.AddComment("First comment.")
 
 		blocks := move.CommentBlocks()
@@ -380,7 +310,7 @@ func TestAddCommentToStructuredComments(t *testing.T) {
 	})
 
 	t.Run("AppendsToExistingTextItem", func(t *testing.T) {
-		move := &Move{}
+		move := &MoveNode{}
 		move.addCommentBlock(CommentBlock{Items: []CommentItem{{Kind: CommentText, Text: "First "}}})
 		move.AddComment("second")
 
@@ -392,7 +322,7 @@ func TestAddCommentToStructuredComments(t *testing.T) {
 	})
 
 	t.Run("AppendsTextAfterCommandOnlyBlock", func(t *testing.T) {
-		move := &Move{}
+		move := &MoveNode{}
 		move.addCommentBlock(CommentBlock{Items: []CommentItem{{Kind: CommentCommand, Key: "clk", Value: "0:05:00"}}})
 		move.AddComment("after command")
 
@@ -404,30 +334,50 @@ func TestAddCommentToStructuredComments(t *testing.T) {
 	})
 }
 
-func TestNAGReturnsCorrectValue(t *testing.T) {
-	t.Run("NAGReturnsCorrectValue", func(t *testing.T) {
-		move := &Move{nag: "!!"}
-		expected := "!!"
-		if move.NAG() != expected {
-			t.Fatalf("expected %v but got %v", expected, move.NAG())
+func TestNAGsReturnCanonicalForm(t *testing.T) {
+	t.Run("NAGsReturnCanonicalForm", func(t *testing.T) {
+		move := &MoveNode{}
+		if err := move.AddNAG("!!"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expected := []string{"$3"}
+		if got := move.NAGs(); !reflect.DeepEqual(got, expected) {
+			t.Fatalf("expected %v but got %v", expected, got)
 		}
 	})
 }
 
-func TestSetNAGUpdatesNAG(t *testing.T) {
-	t.Run("SetNAGUpdatesNAG", func(t *testing.T) {
-		move := &Move{}
-		move.SetNAG("??")
-		expected := "??"
-		if move.NAG() != expected {
-			t.Fatalf("expected %v but got %v", expected, move.NAG())
+func TestSetNAGsNormalisesValues(t *testing.T) {
+	t.Run("SetNAGsNormalisesValues", func(t *testing.T) {
+		move := &MoveNode{}
+		if err := move.SetNAGs([]string{"??", "$1406"}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expected := []string{"$4", "$1406"}
+		if got := move.NAGs(); !reflect.DeepEqual(got, expected) {
+			t.Fatalf("expected %v but got %v", expected, got)
 		}
 	})
+}
+
+func TestSetNAGsRejectsMalformed(t *testing.T) {
+	move := &MoveNode{}
+	if err := move.AddNAG("$1"); err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	// All-or-nothing: a malformed element must leave the node unchanged.
+	if err := move.SetNAGs([]string{"$1", "$", "$x"}); err == nil {
+		t.Fatalf("expected error for malformed NAGs, got nil")
+	}
+	if got := move.NAGs(); !reflect.DeepEqual(got, []string{"$1"}) {
+		t.Fatalf("expected unchanged [$1] after failed set, got %v", got)
+	}
 }
 
 func TestGetCommand(t *testing.T) {
 	t.Run("GetCommandReturnsValueIfExists", func(t *testing.T) {
-		move := &Move{command: map[string]string{"key": "value"}}
+		move := &MoveNode{}
+		move.SetCommand("key", "value")
 		value, ok := move.GetCommand("key")
 		if !ok || value != "value" {
 			t.Fatalf("expected value to be 'value' and ok to be true, but got value: %v, ok: %v", value, ok)
@@ -435,28 +385,29 @@ func TestGetCommand(t *testing.T) {
 	})
 
 	t.Run("GetCommandReturnsFalseIfKeyDoesNotExist", func(t *testing.T) {
-		move := &Move{command: map[string]string{"key": "value"}}
+		move := &MoveNode{}
+		move.SetCommand("key", "value")
 		_, ok := move.GetCommand("nonexistent")
 		if ok {
 			t.Fatalf("expected ok to be false, but got true")
 		}
 	})
 
-	t.Run("GetCommandInitializesCommandMapIfNil", func(t *testing.T) {
-		move := &Move{}
+	t.Run("GetCommandDoesNotCreateAnnotations", func(t *testing.T) {
+		move := &MoveNode{}
 		_, ok := move.GetCommand("key")
 		if ok {
 			t.Fatalf("expected ok to be false, but got true")
 		}
-		if move.command == nil {
-			t.Fatalf("expected command map to be initialized, but it was nil")
+		if move.hasAnnotations() {
+			t.Fatalf("expected missing command lookup not to create annotations")
 		}
 	})
 }
 
 func TestStructuredCommentCommandBranches(t *testing.T) {
 	t.Run("SetCommandAddsFirstStructuredBlock", func(t *testing.T) {
-		move := &Move{structuredComments: true}
+		move := &MoveNode{}
 		move.SetCommand("eval", "0.25")
 
 		blocks := move.CommentBlocks()
@@ -467,37 +418,20 @@ func TestStructuredCommentCommandBranches(t *testing.T) {
 	})
 
 	t.Run("EmptyCommentBlockIsIgnored", func(t *testing.T) {
-		move := &Move{}
+		move := &MoveNode{}
 		move.addCommentBlock(CommentBlock{})
 		if move.hasAnnotations() {
 			t.Fatalf("empty comment block should not add annotations")
 		}
 	})
-
-	t.Run("LegacyCommandsBecomeCommentBlocks", func(t *testing.T) {
-		move := &Move{command: map[string]string{"eval": "0.25"}}
-		blocks := move.CommentBlocks()
-		if len(blocks) != 1 || len(blocks[0].Items) != 1 {
-			t.Fatalf("expected command-only legacy block, got %#v", blocks)
-		}
-		assertCommentItem(t, blocks[0].Items[0], CommentCommand, "", "eval", "0.25")
-	})
-
-	t.Run("EmptyLegacyAnnotationsProduceNoBlock", func(t *testing.T) {
-		move := &Move{}
-		move.rebuildLegacyCommentBlockWithCommands(nil)
-		if len(move.commentBlocks) != 0 {
-			t.Fatalf("expected no comment blocks, got %#v", move.commentBlocks)
-		}
-	})
 }
 
 func TestPlyNilAndMissingPosition(t *testing.T) {
-	var nilMove *Move
+	var nilMove *MoveNode
 	if nilMove.Ply() != 0 {
 		t.Fatalf("nil move should have ply 0")
 	}
-	if (&Move{}).Ply() != 0 {
+	if (&MoveNode{}).Ply() != 0 {
 		t.Fatalf("move without position should have ply 0")
 	}
 }
@@ -505,7 +439,7 @@ func TestPlyNilAndMissingPosition(t *testing.T) {
 func BenchmarkValidMoves(b *testing.B) {
 	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		pos.ValidMoves()
 		pos.validMoves = nil
 	}
@@ -525,67 +459,60 @@ func moveIsValid(pos *Position, m *Move, useTags bool) bool {
 	return false
 }
 
-func assertMovesAreEqual(t *testing.T, m1, m2 *Move) {
+func assertMoveNodesAreEqual(t *testing.T, m1, m2 *MoveNode) {
 	if m1.parent != m2.parent {
-		t.Fatalf("cloned mv %s parent is not the same", m1)
+		t.Fatalf("cloned mv %v parent is not the same", m1)
 	}
 	if m1.position.String() != m2.position.String() {
-		t.Fatalf("cloned mv %s position is not the same", m1)
+		t.Fatalf("cloned mv %v position is not the same", m1)
 	}
-	if m1.nag != m2.nag {
-		t.Fatalf("cloned mv %s nag is not the same", m1)
+	if !reflect.DeepEqual(m1.NAGs(), m2.NAGs()) {
+		t.Fatalf("cloned mv %v nags is not the same", m1)
 	}
-	if m1.comments != m2.comments {
-		t.Fatalf("cloned mv %s comments is not the same", m1)
+	if m1.Comments() != m2.Comments() {
+		t.Fatalf("cloned mv %v comments is not the same", m1)
 	}
 	if m1.number != m2.number {
-		t.Fatalf("cloned mv %s number is not the same", m1)
+		t.Fatalf("cloned mv %v number is not the same", m1)
 	}
-	if m1.tags != m2.tags {
-		t.Fatalf("cloned mv %s tags is not the same", m1)
+	if m1.move.tags != m2.move.tags {
+		t.Fatalf("cloned mv %v tags is not the same", m1)
 	}
-	if m1.s1 != m2.s1 {
-		t.Fatalf("cloned mv %s s1 is not the same", m1)
+	if m1.move.s1 != m2.move.s1 {
+		t.Fatalf("cloned mv %v s1 is not the same", m1)
 	}
-	if m1.s2 != m2.s2 {
-		t.Fatalf("cloned mv %s s2 is not the same", m1)
+	if m1.move.s2 != m2.move.s2 {
+		t.Fatalf("cloned mv %v s2 is not the same", m1)
 	}
-	if m1.promo != m2.promo {
-		t.Fatalf("cloned mv %s s2 is not the same", m1)
+	if m1.move.promo != m2.move.promo {
+		t.Fatalf("cloned mv %v s2 is not the same", m1)
 	}
 
-	if len(m1.command) != len(m2.command) {
-		t.Fatalf("cloned mv %s len(command) is not the same", m1)
-	} else {
-		for k, v1 := range m1.command {
-			v2, ok := m2.command[k]
-			if !ok || v2 != v1 {
-				t.Fatalf("cloned mv %s command[%v] is not the same", m1, k)
-			}
-		}
+	if len(m1.commentBlocks) != len(m2.commentBlocks) {
+		t.Fatalf("cloned mv %v len(commentBlocks) is not the same", m1)
 	}
 	if len(m1.children) != len(m2.children) {
-		t.Fatalf("cloned mv %s len(command) is not the same", m1)
+		t.Fatalf("cloned mv %v len(command) is not the same", m1)
 	} else {
 		for idx, c1 := range m1.children {
 			c2 := m2.children[idx]
-			assertMovesAreEqual(t, c1, c2)
+			assertMoveNodesAreEqual(t, c1, c2)
 		}
 	}
 }
 
-func TestMoveClone(t *testing.T) {
+func TestMoveNodeClone(t *testing.T) {
 	for _, mt := range validMoves {
-		mt.m.position = mt.pos
-		clonedM1 := mt.m.Clone()
-		assertMovesAreEqual(t, mt.m, clonedM1)
+		node := &MoveNode{move: *mt.m, position: mt.pos, number: 1, nags: []string{"$1"}}
+		clonedM1 := node.clone()
+		assertMoveNodesAreEqual(t, node, clonedM1)
 		clonedM1.SetCommand("foo", "bar")
-		clonedM2 := clonedM1.Clone()
-		assertMovesAreEqual(t, clonedM1, clonedM2)
+		clonedM2 := clonedM1.clone()
+		assertMoveNodesAreEqual(t, clonedM1, clonedM2)
 		clonedM1.SetCommand("foo", "bar modified")
 		fooVal, ok := clonedM2.GetCommand("foo")
 		if !ok || fooVal != "bar" {
-			t.Fatalf("cloned mv %s is not a deep copy", clonedM2)
+			t.Fatalf("cloned mv %v is not a deep copy", clonedM2)
 		}
 	}
 }

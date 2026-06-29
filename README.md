@@ -1,11 +1,51 @@
-# Chess Library
+# Chess — Go (Golang) chess library
 
-[![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/corentings/chess)
+[![pkg.go.dev](https://pkg.go.dev/badge/github.com/corentings/chess/v3.svg)](https://pkg.go.dev/github.com/corentings/chess/v3)
 [![Go Report Card](https://goreportcard.com/badge/corentings/chess)](https://goreportcard.com/report/corentings/chess)
 [![License](http://img.shields.io/badge/license-mit-blue.svg?style=flat-square)](https://raw.githubusercontent.com/corentings/chess/master/LICENSE)
 [![codecov](https://codecov.io/gh/corentings/chess/branch/main/graph/badge.svg)](https://codecov.io/gh/corentings/chess)
 [![CI](https://github.com/corentings/chess/actions/workflows/ci.yaml/badge.svg)](https://github.com/corentings/chess/actions/workflows/ci.yaml)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/corentings/chess)](https://golang.org/doc/devel/release.html)
+
+> A fast, well-tested Go chess library for move generation, PGN/FEN, UCI/Stockfish,
+> opening books, and board image generation.
+
+## Features
+
+- Legal **move generation** via [bitboards](https://chessprogramming.org/Bitboards)
+- **PGN** encode/decode, plus a streaming **PGNDecoder** for large game databases
+- **FEN** encode/decode for board positions
+- **UCI** client to drive engines like [Stockfish](https://stockfishchess.org/)
+- **Opening book** exploration (ECO — Encyclopaedia of Chess Openings)
+- SVG board **image generation**
+- **Notations**: Algebraic (SAN), Long Algebraic, and UCI
+- Checkmate, stalemate, repetition, and draw detection
+- **Variations** support in the move tree
+- `Unsafe*` fast-path APIs for performance-critical paths
+
+## Table of Contents
+
+- [Introduction](#introduction)
+- [Recent Updates](#recent-updates)
+- [Why I Forked](#why-i-forked)
+- [Credits](#credits)
+- [Disclaimer](#disclaimer)
+- [Contributions](#contributions)
+- [Repo Structure](#repo-structure)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Example Random Game](#example-random-game)
+  - [Example Stockfish v. Stockfish](#example-stockfish-v-stockfish)
+  - [Movement](#movement)
+  - [Outcome](#outcome)
+  - [PGN](#pgn)
+  - [FEN](#fen)
+  - [Notations](#notations)
+  - [Moves](#moves)
+- [Perft](#perft)
+- [Variation Tree](#variation-tree)
+- [Performance](#performance)
+  - [Benchmarks](#benchmarks)
 
 ## Introduction
 
@@ -13,7 +53,7 @@
 checkmate detection, PGN encoding, UCI interoperability, image generation, opening book exploration, and others. It is
 well tested and optimized for performance.
 
-![rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1](example.png)
+![Chess board rendered from the starting position by the Go chess library](example.png)
 
 ## Recent Updates
 
@@ -23,7 +63,7 @@ descriptive errors for invalid moves. This ensures consistent game correctness a
 **Performance Options**: Added unsafe variants for high-performance scenarios:
 
 - `UnsafeMove()` - ~1.5x faster than `Move()`
-- `UnsafePushNotationMove()` - ~1.1x faster than `PushNotationMove()`
+- `UnsafePushMoveText()` - ~1.1x faster than `PushMoveText()`
 
 **API Consistency**: Refactored move methods for clear validation behavior and consistent performance options across all
 move APIs.
@@ -46,11 +86,8 @@ open-source community and allowing for faster development.
 
 ## Disclaimer
 
-**Breaking Changes**: This package is under the `/v2` namespace to signify that it might not be backward compatible with
-the original package.
-While some parts might work as plug-and-play, others might require changes.
-Unfortunately, I do not plan to maintain a breaking change list at this time, but I expect in-code comments and the
-compiler/linter to assist with migration.
+**Breaking Changes**: v3 is a major release with API changes that are not backward compatible with v2. See the
+[MIGRATION.md](MIGRATION.md) guide for a detailed list of breaking changes and how to update your code.
 
 **Maintenance**: This package is primarily maintained for my current work and projects.
 It is shared as a respect for the original work and to contribute to the community. My main focus is:
@@ -85,7 +122,7 @@ If you have ideas or want to help make this package more robust and widely usabl
 **chess** can be installed using "go get".
 
 ```bash
-go get -u github.com/corentings/chess/v2
+go get -u github.com/corentings/chess/v3
 ``` 
 
 ## Usage
@@ -99,7 +136,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
 func main() {
@@ -109,7 +146,7 @@ func main() {
 		// select a random move
 		moves := game.ValidMoves()
 		move := moves[rand.Intn(len(moves))]
-		if err := game.Move(&move, nil); err != nil {
+		if err := game.Move(move, nil); err != nil {
 			panic(err) // Should not happen with valid moves
 		}
 	}
@@ -146,8 +183,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/corentings/chess/v2"
-	"github.com/corentings/chess/v2/uci"
+	"github.com/corentings/chess/v3"
+	"github.com/corentings/chess/v3/uci"
 )
 
 func main() {
@@ -158,7 +195,7 @@ func main() {
 	}
 	defer eng.Close()
 	// initialize uci with new game
-	if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame); err != nil {
+	if err := eng.Run(uci.CmdUCI{}, uci.CmdIsReady{}, uci.CmdUCINewGame{}); err != nil {
 		panic(err)
 	}
 	// have stockfish play speed chess against itself (10 msec per move)
@@ -194,7 +231,7 @@ The library offers two move execution methods to balance safety and performance:
 ```go
 game := chess.NewGame()
 moves := game.ValidMoves()
-err := game.Move(&moves[0], nil)
+err := game.Move(moves[0], nil)
 if err != nil {
 // Handle invalid move error
 }
@@ -206,28 +243,28 @@ if err != nil {
 game := chess.NewGame()
 moves := game.ValidMoves()
 // Only use when you're certain the move is valid
-err := game.UnsafeMove(&moves[0], nil)
+err := game.UnsafeMove(moves[0], nil)
 if err != nil {
 // Handle error (should not occur with valid moves)
 }
 ```
 
-**PushNotationMove()** - Validates moves using any notation (recommended for general use):
+**PushMoveText()** - Validates moves using any notation (recommended for general use):
 
 ```go
 game := chess.NewGame()
-err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+err := game.PushMoveText("e4", chess.SAN(), nil)
 if err != nil {
 // Handle invalid move or notation error
 }
 ```
 
-**UnsafePushNotationMove()** - High-performance notation parsing without move validation:
+**UnsafePushMoveText()** - High-performance notation parsing without move validation:
 
 ```go
 game := chess.NewGame()
 // Only use when you're certain the move is valid
-err := game.UnsafePushNotationMove("e4", chess.AlgebraicNotation{}, nil)
+err := game.UnsafePushMoveText("e2e4", chess.UCI(), nil)
 if err != nil {
 // Handle notation parsing error (should not occur with valid notation)
 }
@@ -235,7 +272,7 @@ if err != nil {
 
 > **Performance Note**:
 > - `UnsafeMove()` provides ~1.5x performance improvement over `Move()` by skipping validation
-> - `UnsafePushNotationMove()` provides ~1.1x performance improvement over `PushNotationMove()` by skipping move
+> - `UnsafePushMoveText()` provides ~1.1x performance improvement over `PushMoveText()` by skipping move
     validation
 > - Use unsafe variants only when moves are pre-validated or known to be legal
 
@@ -246,17 +283,17 @@ Valid moves generated from the game's current position:
 ```go
 game := chess.NewGame()
 moves := game.ValidMoves()
-game.Move(&moves[0], nil)
+game.Move(moves[0], nil)
 fmt.Println(moves[0]) // b1a3
 ```
 
-#### Parse Notation
+#### Parse Move Text
 
-PushNotationMove method accepts string input using any supported notation:
+PushMoveText method accepts move text using an explicit codec:
 
 ```go
 game := chess.NewGame()
-if err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil); err != nil {
+if err := game.PushMoveText("e4", chess.SAN(), nil); err != nil {
 // handle error
 }
 ```
@@ -273,7 +310,7 @@ game := chess.NewGame()
 validMoves := game.ValidMoves()
 if len(validMoves) > 0 {
 // This will succeed - move is known to be valid
-if err := game.Move(&validMoves[0], nil); err != nil {
+if err := game.Move(validMoves[0], nil); err != nil {
 fmt.Println("Move failed:", err)
 } else {
 fmt.Println("Move succeeded")
@@ -281,14 +318,14 @@ fmt.Println("Move succeeded")
 }
 
 // Using notation parsing with validation
-if err := game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil); err != nil {
+if err := game.PushMoveText("e4", chess.SAN(), nil); err != nil {
 fmt.Println("Move failed:", err)
 } else {
 fmt.Println("e4 move succeeded")
 }
 
 // Invalid notation will be caught
-if err := game.PushNotationMove("e5", chess.AlgebraicNotation{}, nil); err != nil {
+if err := game.PushMoveText("e5", chess.SAN(), nil); err != nil {
 fmt.Println("Move failed:", err)
 // Output: Move failed: [invalid move error]
 }
@@ -301,13 +338,13 @@ game := chess.NewGame()
 
 // Option 1: Using Move structs directly (~1.5x faster)
 validMoves := game.ValidMoves()
-selectedMove := &validMoves[0] // We know this is valid
+selectedMove := validMoves[0] // We know this is valid
 if err := game.UnsafeMove(selectedMove, nil); err != nil {
 panic(err) // Should not happen with pre-validated moves
 }
 
 // Option 2: Using notation (~1.1x faster)  
-if err := game.UnsafePushNotationMove("e4", chess.AlgebraicNotation{}, nil); err != nil {
+if err := game.UnsafePushMoveText("e4", chess.SAN(), nil); err != nil {
 panic(err) // Should not happen with valid notation/moves
 }
 ```
@@ -323,10 +360,10 @@ Black wins by checkmate (Fool's Mate):
 
 ```go
 game := chess.NewGame()
-game.PushNotationMove("f3", chess.AlgebraicNotation{}, nil)
-game.PushNotationMove("e6", chess.AlgebraicNotation{}, nil)
-game.PushNotationMove("g4", chess.AlgebraicNotation{}, nil)
-game.PushNotationMove("Qh4", chess.AlgebraicNotation{}, nil)
+game.PushMoveText("f3", chess.SAN(), nil)
+game.PushMoveText("e6", chess.SAN(), nil)
+game.PushMoveText("g4", chess.SAN(), nil)
+game.PushMoveText("Qh4", chess.SAN(), nil)
 fmt.Println(game.Outcome()) // 0-1
 fmt.Println(game.Method()) // Checkmate
 /*
@@ -350,7 +387,7 @@ Black king has no safe move:
 fenStr := "k1K5/8/8/8/8/8/8/1Q6 w - - 0 1"
 fen, _ := chess.FEN(fenStr)
 game := chess.NewGame(fen)
-game.PushNotationMove("Qb6", chess.AlgebraicNotation{}, nil)
+game.PushMoveText("Qb6", chess.SAN(), nil)
 fmt.Println(game.Outcome()) // 1/2-1/2
 fmt.Println(game.Method()) // Stalemate
 /*
@@ -372,8 +409,10 @@ Black resigns and white wins:
 
 ```go
 game := chess.NewGame()
-game.PushNotationMove("f3", chess.AlgebraicNotation{}, nil)
-game.Resign(chess.Black)
+game.PushMoveText("f3", chess.SAN(), nil)
+if err := game.Resign(chess.Black); err != nil {
+	panic(err)
+}
 fmt.Println(game.Outcome()) // 1-0
 fmt.Println(game.Method()) // Resignation
 ```
@@ -399,7 +438,7 @@ until Fivefold Repetition.
 game := chess.NewGame()
 moves := []string{"Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8"}
 for _, m := range moves {
-game.PushNotationMove(m, chess.AlgebraicNotation{}, nil)
+game.PushMoveText(m, chess.SAN(), nil)
 }
 fmt.Println(game.EligibleDraws()) //  [DrawOffer ThreefoldRepetition]
 ```
@@ -418,7 +457,7 @@ moves := []string{
 "Nf3", "Nf6", "Ng1", "Ng8",
 }
 for _, m := range moves {
-game.PushNotationMove(m, chess.AlgebraicNotation{}, nil)
+game.PushMoveText(m, chess.SAN(), nil)
 }
 fmt.Println(game.Outcome()) // 1/2-1/2
 fmt.Println(game.Method()) // FivefoldRepetition
@@ -446,7 +485,7 @@ checkmate.
 ```go
 fen, _ := chess.FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 149 23")
 game := chess.NewGame(fen)
-game.PushNotationMove("Kf8", chess.AlgebraicNotation{}, nil)
+game.PushMoveText("Kf8", chess.SAN(), nil)
 fmt.Println(game.Outcome()) // 1/2-1/2
 fmt.Println(game.Method()) // SeventyFiveMoveRule
 ```  
@@ -509,8 +548,8 @@ Moves and tag pairs added to the PGN output:
 ```go
 game := chess.NewGame()
 game.AddTagPair("Event", "F/S Return Match")
-game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil)
-game.PushNotationMove("e5", chess.AlgebraicNotation{}, nil)
+game.PushMoveText("e4", chess.SAN(), nil)
+game.PushMoveText("e5", chess.SAN(), nil)
 fmt.Println(game)
 /*
 [Event "F/S Return Match"]
@@ -522,14 +561,14 @@ fmt.Println(game)
 #### PGN comment annotations
 
 Parsed PGN comments preserve comment block boundaries, command annotation order, and duplicate command annotations. Use
-`Move.CommentBlocks()` when an importer needs structured access to each `{...}` block and the ordered text or command
+`MoveNode.CommentBlocks()` when an importer needs structured access to each `{...}` block and the ordered text or command
 items inside it. The returned blocks are defensive copies.
 
 ```go
 game := chess.NewGame(pgn)
-move := game.Moves()[0]
+node := game.MoveTree().MainLine()[0]
 
-for _, block := range move.CommentBlocks() {
+for _, block := range node.CommentBlocks() {
 	for _, item := range block.Items {
 		switch item.Kind {
 		case chess.CommentText:
@@ -541,31 +580,57 @@ for _, block := range move.CommentBlocks() {
 }
 ```
 
-The legacy helpers `Move.Comments()`, `Move.GetCommand()`, `Move.SetCommand()`, `Move.SetComment()`, and
-`Move.AddComment()` remain available for callers that only need a flattened text comment or single command value.
+The helpers `MoveNode.Comments()`, `MoveNode.GetCommand()`, `MoveNode.SetCommand()`, `MoveNode.SetComment()`, and
+`MoveNode.AddComment()` remain available for callers that only need a flattened text comment or single command value.
 
 #### Scan PGN
 
-For parsing large PGN database files use Scanner:
+For parsing large PGN database files, use `PGNGames` (Go 1.23+ iterator):
 
 ```go
 f, err := os.Open("lichess_db_standard_rated_2013-01.pgn")
 if err != nil {
-panic(err)
+    panic(err)
 }
 defer f.Close()
 
-scanner := chess.NewScanner(f)
-// Read all games
-for scanner.HasNext() {
-game, err := scanner.ParseNext()
-if err != nil {
-log.Fatal("Failed to parse game: %v", err)
-}
-fmt.Println(game.GetTagPair("Site"))
-// Output &{Site https://lichess.org/8jb5kiqw}
+for game, err := range chess.PGNGames(f) {
+    if err != nil {
+        log.Fatal("Failed to parse game: %v", err)
+    }
+    fmt.Println(game.GetTagPair("Site"))
+    // Output &{Site https://lichess.org/8jb5kiqw}
 }
 ```
+
+Or use `PGNDecoder` directly for index/offset access:
+
+```go
+f, err := os.Open("lichess_db_standard_rated_2013-01.pgn")
+if err != nil {
+    panic(err)
+}
+defer f.Close()
+
+dec := chess.NewPGNDecoder(f)
+for {
+    game, err := dec.Decode()
+    if err == io.EOF {
+        break
+    }
+    if err != nil {
+        log.Fatal("Failed to parse game: %v", err)
+    }
+    fmt.Println(game.GetTagPair("Site"))
+}
+```
+
+`PGNDecoder` fully decodes each record into a `Game`, including move tree
+positions, SAN resolution, checks, castling, promotions, en passant, comments,
+NAGs, and tag pairs. In v3.0.0-beta.2 this path was tuned for large PGN
+imports: SAN moves are resolved from direct candidate origins, and internal
+position snapshots avoid a separate heap-allocated board copy while public
+defensive-copy APIs remain unchanged.
 
 #### Scan PGN expanding all variations
 
@@ -574,19 +639,16 @@ To expand every variation into a distinct Game:
 ```go
 f, err := os.Open("lichess_db_standard_rated_2013-01.pgn")
 if err != nil {
-panic(err)
+    panic(err)
 }
 defer f.Close()
 
-scanner := chess.NewScanner(f, chess.WithExpandVariations())
-// Read all games
-for scanner.HasNext() {
-game, err := scanner.ParseNext()
-if err != nil {
-log.Fatal("Failed to parse game: %v", err)
-}
-fmt.Println(game.GetTagPair("Site"))
-// Output &{Site https://lichess.org/8jb5kiqw}
+for game, err := range chess.PGNGames(f, chess.WithPGNExpandVariations()) {
+    if err != nil {
+        log.Fatal("Failed to parse game: %v", err)
+    }
+    fmt.Println(game.GetTagPair("Site"))
+    // Output &{Site https://lichess.org/8jb5kiqw}
 }
 ```
 
@@ -618,10 +680,10 @@ pos := game.Position()
 fmt.Println(pos.String()) // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 ```
 
-### Notations
+### Move Text Codecs
 
 [Chess Notation](https://en.wikipedia.org/wiki/Chess_notation) define how moves are encoded in a serialized format.
-Chess uses a notation when converting to and from PGN and for accepting move text.
+Chess uses move text codecs when converting to and from PGN and for accepting move text.
 
 #### Algebraic Notation
 
@@ -630,23 +692,23 @@ official chess notation used by FIDE. Examples: e2, e5, O-O (short castling), e8
 
 ```go
 game := chess.NewGame()
-game.PushNotationMove("e4", chess.AlgebraicNotation{}, nil)
-game.PushNotationMove("e5", chess.AlgebraicNotation{}, nil)
+game.PushMoveText("e4", chess.SAN(), nil)
+game.PushMoveText("e5", chess.SAN(), nil)
 fmt.Println(game) // 1.e4 e5  *
 ```
 
 #### Long Algebraic Notation
 
 [Long Algebraic Notation](https://en.wikipedia.org/wiki/Algebraic_notation_(chess)#Long_algebraic_notation)
-LongAlgebraicNotation is a more beginner friendly alternative to algebraic notation, where the origin of the piece is
+LongAlgebraic() is a more beginner friendly alternative to algebraic notation, where the origin of the piece is
 visible as well as the destination. Examples: Rd1xd8+, Ng8f6.
 
 ```go
 game := chess.NewGame()
-game.PushNotationMove("f2f3", chess.LongAlgebraicNotation{}, nil)
-game.PushNotationMove("e7e5", chess.LongAlgebraicNotation{}, nil)
-game.PushNotationMove("g2g4", chess.LongAlgebraicNotation{}, nil)
-game.PushNotationMove("Qd8h4", chess.LongAlgebraicNotation{}, nil)
+game.PushMoveText("f2f3", chess.LongAlgebraic(), nil)
+game.PushMoveText("e7e5", chess.LongAlgebraic(), nil)
+game.PushMoveText("g2g4", chess.LongAlgebraic(), nil)
+game.PushMoveText("Qd8h4", chess.LongAlgebraic(), nil)
 fmt.Println(game) // 1.f2f3 e7e5 2.g2g4 Qd8h4#  0-1
 ```
 
@@ -657,9 +719,9 @@ Interface notation. Examples: e2e4, e7e5, e1g1 (white short castling), e7e8q (fo
 
 ```go
 game := chess.NewGame()
-game.PushNotationMove("e2e4", chess.UCINotation{}, nil)
-game.PushNotationMove("e7e5", chess.UCINotation{}, nil)
-fmt.Println(game) // 1.e2e4 e7e5  *
+game.PushMoveText("e2e4", chess.UCI(), nil)
+game.PushMoveText("e7e5", chess.UCI(), nil)
+fmt.Println(game) // 1.e4 e5  *
 ```
 
 #### Text Representation
@@ -684,7 +746,7 @@ fmt.Println(game.Position().Board().Draw())
 
 ### Moves
 
-Moves is a convenient API for accessing aligned positions, moves, and comments. Moves is useful when trying to understand detailed information about a game. Below is an
+MoveHistory is a convenient API for accessing aligned positions, moves, and comments. MoveHistory is useful when trying to understand detailed information about a game. Below is an
 example showing how to see which side castled first.
 
 ```go
@@ -694,7 +756,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
 func main() {
@@ -709,9 +771,9 @@ func main() {
 	}
 	game := chess.NewGame(pgn)
 	color := chess.NoColor
-	for _, mh := range game.Moves() {
-		if mh.HasTag(chess.KingSideCastle) || mh.HasTag(chess.QueenSideCastle) {
-			color = mh.Position().Turn()
+	for _, mh := range game.MoveHistory() {
+		if mh.Move.HasTag(chess.KingSideCastle) || mh.Move.HasTag(chess.QueenSideCastle) {
+			color = mh.PrePosition.Turn()
 			break
 		}
 	}
@@ -725,6 +787,171 @@ func main() {
 	}
 }
 ```
+
+## Perft
+
+[Perft](https://www.chessprogramming.org/Perft) (performance test) is the
+standard correctness and performance benchmark for a chess move generator: it
+counts every legal move sequence of a given length reachable from a starting
+position. This package exposes Perft on `*Position`; the traversal uses the
+same legality rules that govern normal play while applying moves through an
+internal make/unmake path for performance.
+
+### Bulk node count
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/corentings/chess/v3"
+)
+
+func main() {
+	pos := chess.StartingPosition()
+	fmt.Println("startpos d5:", pos.Perft(5)) // 4 865 609
+	fmt.Println("startpos d6:", pos.Perft(6)) // 119 060 324
+}
+```
+
+A depth of 0 returns 1 (the position itself counts as a leaf). A position with
+no legal moves (checkmate or stalemate) returns 0 for any depth greater than 0.
+
+### Per-move breakdown (`Divide`)
+
+`Divide` returns the per-root-move Perft breakdown as a map from each legal
+move to its leaf count. It is the standard way to localize a divergence when
+two move generators disagree at a given depth.
+
+```go
+package main
+
+import (
+	"fmt"
+	"sort"
+
+	"github.com/corentings/chess/v3"
+)
+
+func main() {
+	pos := chess.StartingPosition()
+	results := pos.Divide(1)
+
+	keys := make([]chess.Move, 0, len(results))
+	for m := range results {
+		keys = append(keys, m)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].String() < keys[j].String()
+	})
+	for _, m := range keys {
+		fmt.Printf("%s: %d\n", m, results[m])
+	}
+}
+```
+
+Map iteration order is unspecified; sort by `Move.String()` for a stable
+display. Move strings are long-algebraic (`s1s2` plus a promotion suffix) and
+are intended for debugging, not for chess notation.
+
+### Canonical positions
+
+The package's Perft tests verify six canonical positions from
+[chessprogramming.org/Perft_Results](https://www.chessprogramming.org/Perft_Results)
+through depth 4–6. For a side-by-side performance comparison against another
+Go chess library, see [`benchcmp/perft/`](./benchcmp/perft/).
+
+## Move Tree
+
+A `Game` owns a `MoveTree` containing the moves that have been played. The root
+is a synthetic position node before any move has been played. Each non-root
+`MoveNode` holds the `Move` it represents, its `Position` after the move, its
+parent and ordered continuations, plus comments, NAGs, and `[%clk ...]`-style
+command annotations. The first continuation is the main line; later
+continuations are variations.
+
+Use `Game.Move`, `Game.UnsafeMove`, `Game.PushMove`, or
+`Game.PushMoveText` to play moves on the active cursor. Those methods keep
+game legality, terminal outcome guards, and result evaluation in sync with the
+tree. `MoveTree` exposes traversal, cursor navigation, and variation editing;
+it does not expose a public API for advancing the active game state directly.
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/corentings/chess/v3"
+)
+
+func main() {
+	g := chess.NewGame()
+	g.PushMove("e4", nil)
+	g.PushMove("e5", nil)
+
+	// Walk the main line.
+	for _, n := range g.MoveTree().MainLine() {
+		fmt.Printf("%s ", n.Move())
+	}
+	fmt.Println()
+}
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/corentings/chess/v3"
+)
+
+func main() {
+	g, _ := chess.ParsePGN(strings.NewReader(
+		`[Result "*"] 1. e4 e5 (1... c5 {Sicilian}) 2. Nf3 *`,
+	))
+
+	tree := g.MoveTree()
+	e4 := tree.MainChild(tree.Root()) // first move of the main line
+
+	// Walk the main line by following the main continuation at each node.
+	fmt.Print("main: ")
+	for n := e4; n != nil; n = tree.MainChild(n) {
+		fmt.Printf("%s ", n.Move())
+	}
+	fmt.Println()
+
+	// Enumerate sideline variations at e4.
+	fmt.Print("variations at e4: ")
+	for _, v := range tree.Variations(e4) {
+		fmt.Printf("%s ", v.Move())
+	}
+	fmt.Println()
+}
+```
+
+Useful APIs over the tree:
+
+- `Game.MoveTree() *MoveTree` — returns the game tree and active cursor.
+- `MoveTree.Root() *MoveNode` — root position node.
+- `MoveTree.Current() *MoveNode` — active cursor node.
+- `MoveTree.MainLine() []*MoveNode` — main-line nodes, excluding the root.
+- `MoveTree.MainChild(node *MoveNode) *MoveNode` — main continuation.
+- `MoveTree.Continuations(node *MoveNode) []*MoveNode` — all continuations.
+- `MoveTree.Variations(node *MoveNode) []*MoveNode` — sideline continuations.
+- `MoveTree.AddVariation(parent *MoveNode, move Move) (*MoveNode, error)` —
+  validate and append a sideline.
+- `MoveTree.GoBack()`, `MoveTree.GoForward()`, and
+  `MoveTree.NavigateToMainLine()` — move the active cursor without changing
+  game outcome metadata.
+- `node.Move()`, `node.Position()`, `node.Comments()`, `node.NAG()`,
+  `node.Children()`, and `node.Parent()` — per-node data.
+
+Perft does not store its results in the game tree; it walks a temporary move
+tree internally, so it does not affect the `MoveTree` you see from `Game`.
 
 ## Performance
 
@@ -740,13 +967,22 @@ The benchmarks can be run with the following command:
 go test -bench=.
 ```
 
-Results from the baseline 2015 MBP:
+Results vary by hardware. For comparative benchmarking use
+[`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat):
 
 ```
-BenchmarkBitboardReverse-4              2000000000               1.01 ns/op
-BenchmarkStalemateStatus-4                500000              3116 ns/op
-BenchmarkInvalidStalemateStatus-4         500000              2290 ns/op
-BenchmarkPositionHash-4                  1000000              1864 ns/op
-BenchmarkValidMoves-4                     100000             13445 ns/op
-BenchmarkPGN-4                               300           5549192 ns/op
+go test -bench=. -count=10 > new.txt
+benchstat base.txt new.txt
 ```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full benchmark workflow.
+
+The v3.0.0-beta.2 PGN decode work was measured with:
+
+```
+go test -run '^$' -bench '^BenchmarkPGN_FullGameDecode_(BigBig|Big|CompleteGameDetails|ExpandVariations)$' -benchmem -count=6 ./
+```
+
+On the project `big_big.pgn` fixture, `BenchmarkPGN_FullGameDecode_BigBig`
+improved from roughly `1.48s/op` and `6.62M allocs/op` to roughly `0.91s/op`
+and `5.55M allocs/op` on the maintainer benchmark machine.

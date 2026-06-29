@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/corentings/chess/v2"
-	"github.com/corentings/chess/v2/uci"
+	"github.com/corentings/chess/v3"
+	"github.com/corentings/chess/v3/uci"
 )
 
 var engines = []string{"stockfish", "lc0"}
@@ -40,7 +40,7 @@ func Test_EngineEval(t *testing.T) {
 			defer eng.Close()
 
 			cmdPos := uci.CmdPosition{Position: pos}
-			err = eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame, cmdPos, uci.CmdEval)
+			err = eng.Run(uci.CmdUCI{}, uci.CmdIsReady{}, uci.CmdUCINewGame{}, cmdPos, uci.CmdEval{})
 
 			if name == "stockfish" {
 				if err != nil {
@@ -83,12 +83,15 @@ func Test_EngineInfo(t *testing.T) {
 			cmdWDL := uci.CmdSetOption{Name: "UCI_ShowWDL", Value: "true"}
 			cmdPos := uci.CmdPosition{Position: pos}
 			cmdGo := uci.CmdGo{MoveTime: time.Second / 10}
-			if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame, cmdMultiPV, cmdWDL, cmdPos, cmdGo); err != nil {
+			if err := eng.Run(uci.CmdUCI{}, uci.CmdIsReady{}, uci.CmdUCINewGame{}, cmdMultiPV, cmdWDL, cmdPos, cmdGo); err != nil {
 				t.Fatal("failed to run command", err)
 			}
 
 			move := eng.SearchResults().Info.PV[0]
-			moveStr := chess.AlgebraicNotation{}.Encode(pos, move)
+			moveStr, err := chess.SAN().Encode(pos, move)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if moveStr != "Ne5" {
 				t.Errorf("expected Ne5, got %s", moveStr)
@@ -124,7 +127,7 @@ func Test_EngineMultiPVInfo(t *testing.T) {
 			cmdMultiPV := uci.CmdSetOption{Name: "multipv", Value: "2"}
 			cmdPos := uci.CmdPosition{Position: pos}
 			cmdGo := uci.CmdGo{MoveTime: time.Second / 10}
-			if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, uci.CmdUCINewGame, cmdMultiPV, cmdPos, cmdGo); err != nil {
+			if err := eng.Run(uci.CmdUCI{}, uci.CmdIsReady{}, uci.CmdUCINewGame{}, cmdMultiPV, cmdPos, cmdGo); err != nil {
 				t.Fatal("failed to run command", err)
 			}
 
@@ -135,13 +138,19 @@ func Test_EngineMultiPVInfo(t *testing.T) {
 			}
 
 			move := multiPVInfo[0].PV[0]
-			moveStr := chess.AlgebraicNotation{}.Encode(pos, move)
+			moveStr, err := chess.SAN().Encode(pos, move)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if moveStr != "Ne5" {
 				t.Errorf("expected Ne5, got %s", moveStr)
 			}
 
 			move = multiPVInfo[1].PV[0]
-			moveStr = chess.AlgebraicNotation{}.Encode(pos, move)
+			moveStr, err = chess.SAN().Encode(pos, move)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if moveStr != "e5" {
 				t.Errorf("expected e5, got %s", moveStr)
 			}
@@ -164,12 +173,11 @@ func Test_UCIMovesTags(t *testing.T) {
 			setOpt := uci.CmdSetOption{Name: "UCI_Elo", Value: "1500"}
 			setPos := uci.CmdPosition{Position: chess.StartingPosition()}
 			setGo := uci.CmdGo{MoveTime: time.Second / 10}
-			if err := eng.Run(uci.CmdUCI, uci.CmdIsReady, setOpt, uci.CmdUCINewGame, setPos, setGo); err != nil {
+			if err := eng.Run(uci.CmdUCI{}, uci.CmdIsReady{}, setOpt, uci.CmdUCINewGame{}, setPos, setGo); err != nil {
 				t.Fatal("failed to run command", err)
 			}
 
 			game := chess.NewGame()
-			notation := chess.AlgebraicNotation{}
 
 			for game.Outcome() == chess.NoOutcome {
 				cmdPos := uci.CmdPosition{Position: game.Position()}
@@ -180,7 +188,10 @@ func Test_UCIMovesTags(t *testing.T) {
 
 				move := eng.SearchResults().BestMove
 				pos := game.Position()
-				san := notation.Encode(pos, move)
+				san, encodeErr := chess.SAN().Encode(pos, move)
+				if encodeErr != nil {
+					t.Fatal(encodeErr)
+				}
 
 				err = game.PushMove(san, nil)
 				if err != nil {

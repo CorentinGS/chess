@@ -3,28 +3,28 @@ package opening
 import (
 	"bytes"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
-var (
-	defaultBook     *BookECO
-	defaultBookErr  error
-	defaultBookOnce sync.Once
-)
+var defaultBook = mustBook(bytes.NewReader(ecoData))
 
 // DefaultBook returns the standard ECO opening book.
-// The book is parsed lazily on first call and cached for subsequent calls.
 // It is safe for concurrent use.
 func DefaultBook() (*BookECO, error) {
-	defaultBookOnce.Do(func() {
-		defaultBook, defaultBookErr = NewBook(bytes.NewReader(ecoData))
-	})
-	return defaultBook, defaultBookErr
+	return defaultBook, nil
+}
+
+func mustBook(r io.Reader) *BookECO {
+	book, err := NewBook(r)
+	if err != nil {
+		panic(fmt.Errorf("opening: invalid embedded ECO data: %w", err))
+	}
+	return book
 }
 
 // BookECO represents the Encyclopedia of Chess Openings https://en.wikipedia.org/wiki/Encyclopaedia_of_Chess_Openings
@@ -36,47 +36,46 @@ type BookECO struct {
 
 // NewBook creates a new opening book from an ECO TSV reader.
 // Use this for custom opening data or when you need isolation from the default book.
+// NewBook validates the input during construction so malformed books fail
+// before use. Opening.Game returns a caller-owned clone of the cached game.
 func NewBook(r io.Reader) (*BookECO, error) {
 	b := &BookECO{
 		root: &node{
-			children: map[string]*node{},
+			children: map[uint32]*node{},
 			pos:      chess.NewGame().Position(),
 		},
 		startingPosition: chess.NewGame().Position(),
 	}
 	csvReader := csv.NewReader(r)
 	csvReader.Comma = '\t'
+	csvReader.FieldsPerRecord = -1
 	records, err := csvReader.ReadAll()
 	if err != nil {
 		return nil, fmt.Errorf("opening: failed to parse ECO data: %w", err)
 	}
 	for i, row := range records {
+		rowNum := i + 1
 		if i == 0 {
 			continue // skip header
 		}
 		if len(row) < 4 {
-			continue // skip malformed rows
+			return nil, fmt.Errorf("opening: ECO row %d: expected at least 4 columns, got %d", rowNum, len(row))
 		}
-		o := newOpening(row[0], row[1], row[3])
-		if err := b.insert(o); err != nil {
-			return nil, fmt.Errorf("opening: failed to insert opening %s: %w", o.code, err)
+		moveList := parseMoveList(row[3])
+		o, err := newOpening(row[0], row[1], row[3], moveList)
+		if err != nil {
+			return nil, fmt.Errorf("opening: ECO row %d (%s %s): %w", rowNum, row[0], row[1], err)
+		}
+		if err = b.insertOpening(o); err != nil {
+			return nil, fmt.Errorf("opening: ECO row %d (%s %s): %w", rowNum, row[0], row[1], err)
 		}
 	}
 	return b, nil
 }
 
-// NewBookECO returns a new BookECO using the default embedded ECO data.
-// Deprecated: Use DefaultBook() for the standard book or NewBook() for custom data.
-func NewBookECO() *BookECO {
-	b, err := DefaultBook()
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
 // Find implements the Book interface.
-func (b *BookECO) Find(moves []*chess.Move) *Opening {
+// Use Find for performance-sensitive opening detection paths.
+func (b *BookECO) Find(moves []chess.Move) *Opening {
 	for n := b.followPath(b.root, moves); n != nil; n = n.parent {
 		if n.opening != nil {
 			return n.opening
@@ -86,94 +85,103 @@ func (b *BookECO) Find(moves []*chess.Move) *Opening {
 }
 
 // Possible implements the Book interface.
-func (b *BookECO) Possible(moves []*chess.Move) []*Opening {
-	n := b.followPath(b.root, moves)
+// Use Possible for performance-sensitive opening exploration paths.
+func (b *BookECO) Possible(moves []chess.Move) []*Opening {
+	root := b.followPath(b.root, moves)
 	var openings []*Opening
-	for _, n := range b.nodeList(n) {
-		if n.opening != nil {
-			openings = append(openings, n.opening)
-		}
-	}
+	b.collectOpenings(root, &openings)
 	return openings
 }
 
-func (b *BookECO) followPath(n *node, moves []*chess.Move) *node {
+// collectOpenings walks the subtree rooted at n and appends each node's
+// opening (if any) directly into the result slice, avoiding the intermediate
+// []*node allocation that nodeList/collectNodes used to require.
+func (b *BookECO) collectOpenings(n *node, result *[]*Opening) {
+	if n.opening != nil {
+		*result = append(*result, n.opening)
+	}
+	for _, c := range n.children {
+		b.collectOpenings(c, result)
+	}
+}
+
+func (b *BookECO) followPath(n *node, moves []chess.Move) *node {
 	if len(moves) == 0 {
 		return n
 	}
-	c, ok := n.children[moves[0].String()]
+	c, ok := n.children[moveKey(moves[0])]
 	if !ok {
 		return n
 	}
 	return b.followPath(c, moves[1:])
 }
 
-func (b *BookECO) insert(o *Opening) error {
-	posList := []*chess.Position{b.startingPosition}
-	var moves []*chess.Move
-	for _, s := range parseMoveList(o.pgn) {
-		pos := posList[len(posList)-1]
-		m, err := chess.UCINotation{}.Decode(pos, s)
-		if err != nil {
-			return fmt.Errorf("error decoding move %s: %w", s, err)
-		}
-		moves = append(moves, m)
-		posList = append(posList, pos.Update(m))
+func (b *BookECO) insertOpening(o *Opening) error {
+	if len(o.moveList) == 0 {
+		return errors.New("opening has no moves")
 	}
+
 	n := b.root
-	b.ins(n, o, posList[1:], moves)
+	for _, moveStr := range o.moveList {
+		m, err := chess.UCI().Decode(n.pos, moveStr)
+		if err != nil {
+			return fmt.Errorf("decode move %s: %w", moveStr, err)
+		}
+		key := moveKey(m)
+		if child, ok := n.children[key]; ok {
+			n = child
+			continue
+		}
+
+		if !isLegalMove(n.pos, m) {
+			return fmt.Errorf("apply move %s: move is not valid for the current position", moveStr)
+		}
+
+		child := &node{
+			parent:   n,
+			children: map[uint32]*node{},
+			pos:      n.pos.Update(m),
+		}
+		n.children[key] = child
+		n = child
+	}
+	n.opening = o
 	return nil
 }
 
-func (b *BookECO) ins(n *node, o *Opening, posList []*chess.Position, moves []*chess.Move) {
-	pos := posList[0]
-	move := moves[0]
-	moveStr := move.String()
-	var child *node
-	for mv, c := range n.children {
-		if mv == moveStr {
-			child = c
-			break
+func isLegalMove(pos *chess.Position, move chess.Move) bool {
+	for _, validMove := range pos.ValidMovesUnsafe() {
+		if validMove.S1() == move.S1() && validMove.S2() == move.S2() && validMove.Promo() == move.Promo() {
+			return true
 		}
 	}
-	if child == nil {
-		child = &node{
-			parent:   n,
-			children: map[string]*node{},
-			pos:      pos,
-		}
-		n.children[moveStr] = child
-	}
-	if len(posList) == 1 {
-		child.opening = o
-		return
-	}
-	b.ins(child, o, posList[1:], moves[1:])
+	return false
+}
+
+// Bit layout for moveKey: a Square fits in 6 bits (0..63), a PieceType fits
+// in the low 3 bits of the second 6-bit field. The packed key is therefore
+// S1 | S2<<6 | Promo<<12 (18 bits total, fits in a uint32).
+const (
+	moveKeySquareBits = 6
+	moveKeyPromoShift = moveKeySquareBits * 2
+)
+
+func moveKey(move chess.Move) uint32 {
+	return uint32(move.S1()) |
+		uint32(move.S2())<<moveKeySquareBits |
+		uint32(move.Promo())<<moveKeyPromoShift
 }
 
 type node struct {
 	parent   *node
-	children map[string]*node
+	children map[uint32]*node
 	opening  *Opening
 	pos      *chess.Position
 }
 
-func (b *BookECO) nodeList(root *node) []*node {
-	var result []*node
-	b.collectNodes(root, &result)
-	return result
-}
-
-func (b *BookECO) collectNodes(n *node, result *[]*node) {
-	*result = append(*result, n)
-	for _, c := range n.children {
-		b.collectNodes(c, result)
-	}
-}
-
 // 1.b2b4 e7e5 2.c1b2 f7f6 3.e2e4 f8b4 4.f1c4 b8c6 5.f2f4 d8e7 6.f4f5 g7g6.
 func parseMoveList(pgn string) []string {
-	strs := strings.Split(pgn, " ")
+	strs := strings.Fields(pgn)
 	var cp []string
 	for _, s := range strs {
 		i := strings.Index(s, ".")

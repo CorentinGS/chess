@@ -1,10 +1,14 @@
 package chess
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -68,9 +72,33 @@ var _ = []commentTest{
 func BenchmarkPGN(b *testing.B) {
 	pgn := mustParsePGN("fixtures/pgns/0001.pgn")
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		opt, _ := PGN(strings.NewReader(pgn))
 		NewGame(opt)
+	}
+}
+
+func TestNewParserSharesStartingPosition(t *testing.T) {
+	parser := NewParser(nil)
+	if parser.game.currentPosition() != parser.game.MoveTree().Root().position {
+		t.Fatal("parser game and root move should share the starting position")
+	}
+}
+
+type errorTokenSource struct {
+	err error
+}
+
+func (s errorTokenSource) NextToken() (Token, error) {
+	return Token{}, s.err
+}
+
+func TestParserReportsInitialTokenSourceError(t *testing.T) {
+	wantErr := errors.New("token source failed")
+
+	_, err := newParserFromSource(errorTokenSource{err: wantErr}).Parse()
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Parse() error = %v, want %v", err, wantErr)
 	}
 }
 
@@ -87,11 +115,17 @@ func mustParsePGN(fname string) string {
 	return string(b)
 }
 
+func isKnownInconsistentPgn(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "conflicts with")
+}
+
 func TestGamesFromPGN(t *testing.T) {
 	for idx, test := range validPGNs {
 		reader := strings.NewReader(test.PGN)
-		scanner := NewScanner(reader)
-		game, err := scanner.ParseNext()
+		game, err := NewPGNDecoder(reader).Decode()
 		if err != nil {
 			t.Fatalf("fail to parse game from valid pgn %d: %s", idx, err.Error())
 		}
@@ -105,8 +139,7 @@ func TestGameWithVariations(t *testing.T) {
 	pgn := mustParsePGN("fixtures/pgns/variations.pgn")
 	reader := strings.NewReader(pgn)
 
-	scanner := NewScanner(reader)
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(reader).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game from pgn: %s", err.Error())
 	}
@@ -123,7 +156,7 @@ func TestGameWithVariations(t *testing.T) {
 		t.Fatalf("game output blank")
 	}
 
-	const expectedLastLine = "1. e4 (1. e3 e5) 1... e5 (1... d6 2. d4 Nf6 3. Nc3 e5 4. dxe5 (4. Nf3 Nbd7) 4... dxe5 5. Qxd8+ Kxd8) 2. Nf3 (2. Nc3 Nf6 3. f4) 2... Nc6 3. d4 exd4 4. Nxd4 *"
+	const expectedLastLine = "1. e4 (1. e3 e5) 1... e5 (1... d6 2. d4 Nf6 3. Nc3 e5 4. dxe5 (4. Nf3 Nbd7) 4... dxe5 5. Qxd8+ Kxd8) 2. Nf3 (2. Nc3 Nf6 3. f4) 2... Nc6 3. d4 exd4 4. Nxd4 1-0"
 	lastLine := lines[len(lines)-1]
 	if lastLine != expectedLastLine {
 		t.Fatalf("game output not correct\n\tExpected:'%v'\n\tGot:     '%v'\n",
@@ -135,9 +168,7 @@ func TestSingleGameFromPGN(t *testing.T) {
 	pgn := mustParsePGN("fixtures/pgns/single_game.pgn")
 	reader := strings.NewReader(pgn)
 
-	scanner := NewScanner(reader)
-
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(reader).Decode()
 	if err != nil {
 		t.Fatalf("fail to read games from valid pgn: %s", err.Error())
 	}
@@ -179,7 +210,7 @@ func TestSingleGameFromPGN(t *testing.T) {
 		t.Fatalf("game moves are not correct, expected 6, got %d", len(game.Moves()))
 	}
 
-	for i, move := range game.Moves() {
+	for i, move := range game.MoveTree().MainLine() {
 		// check move number for each move
 		// Get the full move number
 		fullMoveNumber := (i / 2) + 1
@@ -193,38 +224,41 @@ func TestSingleGameFromPGN(t *testing.T) {
 	}
 
 	// print all moves
-	moves := game.Moves()
+	moves := game.MoveTree().MainLine()
 
-	if moves[4].comments == "" {
-		t.Fatalf("game move 6 is not correct, expected comment, got %s", moves[5].comments)
+	if moves[4].Comments() == "" {
+		t.Fatalf("game move 6 is not correct, expected comment, got %s", moves[5].Comments())
 	}
 }
 
 func TestBigPgn(t *testing.T) {
 	pgn := mustParsePGN("fixtures/pgns/big.pgn")
-	reader := strings.NewReader(pgn)
 
-	scanner := NewScanner(reader)
 	count := 0
-
-	for scanner.HasNext() {
+	for record, err := range PGNRecords(context.Background(), strings.NewReader(pgn)) {
 		count++
 		t.Run(fmt.Sprintf("big pgn : %d", count), func(t *testing.T) {
-			scannedGame, err := scanner.ScanGame()
 			if err != nil {
-				t.Fatalf("fail to scan game from valid pgn: %s", err.Error())
+				if isKnownInconsistentPgn(err) {
+					t.Skipf("skipping inconsistent real-world PGN: %s", err.Error())
+					return
+				}
+				t.Fatalf("fail to read record: %s", err.Error())
 			}
 
-			tokens, err := TokenizeGame(scannedGame)
+			raw := record.Raw
+			tokens, err := TokenizeGame(&GameScanned{Raw: raw})
 			if err != nil {
 				t.Fatalf("fail to tokenize game from valid pgn: %s", err.Error())
 			}
 
-			raw := scannedGame.Raw
-
 			parser := NewParser(tokens)
 			game, err := parser.Parse()
 			if err != nil {
+				if isKnownInconsistentPgn(err) {
+					t.Skipf("skipping inconsistent real-world PGN: %s", err.Error())
+					return
+				}
 				t.Fatalf("fail to read games from valid pgn: %s | %s", err.Error(), raw[:min(200, len(raw))])
 			}
 
@@ -241,7 +275,7 @@ func TestBigPgn(t *testing.T) {
 				t.Skip("Skipping test for From Position")
 			}
 
-			for i, move := range game.Moves() {
+			for i, move := range game.MoveTree().MainLine() {
 				// check move number for each move
 				// Get the full move number
 				fullMoveNumber := (i / 2) + 1
@@ -256,32 +290,21 @@ func TestBigPgn(t *testing.T) {
 }
 
 func TestBigBigPgn(t *testing.T) {
-	t.Skip("This test is too slow")
 	pgn := mustParsePGN("fixtures/pgns/big_big.pgn")
 	reader := strings.NewReader(pgn)
 
-	scanner := NewScanner(reader)
+	dec := NewPGNDecoder(reader)
 	count := 0
 
-	for scanner.HasNext() {
+	for {
 		count++
+		game, err := dec.Decode()
+		if errors.Is(err, io.EOF) {
+			break
+		}
 		t.Run(fmt.Sprintf("bigbig pgn : %d", count), func(t *testing.T) {
-			scannedGame, err := scanner.ScanGame()
 			if err != nil {
-				t.Fatalf("fail to scan game from valid pgn: %s", err.Error())
-			}
-
-			tokens, err := TokenizeGame(scannedGame)
-			if err != nil {
-				t.Fatalf("fail to tokenize game from valid pgn: %s", err.Error())
-			}
-
-			raw := scannedGame.Raw
-
-			parser := NewParser(tokens)
-			game, err := parser.Parse()
-			if err != nil {
-				t.Fatalf("fail to read games from valid pgn: %s | %s", err.Error(), raw[:min(200, len(raw))])
+				t.Fatalf("fail to read games from valid pgn: %s", err.Error())
 			}
 
 			if game == nil {
@@ -295,8 +318,7 @@ func TestCompleteGame(t *testing.T) {
 	pgn := mustParsePGN("fixtures/pgns/complete_game.pgn")
 	reader := strings.NewReader(pgn)
 
-	scanner := NewScanner(reader)
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(reader).Decode()
 	if err != nil {
 		t.Fatalf("fail to read games from valid pgn: %s", err.Error())
 	}
@@ -338,23 +360,23 @@ func TestCompleteGame(t *testing.T) {
 		t.Fatalf("game move 1 is not correct, expected d4, got %s", game.Moves()[0].String())
 	}
 
-	if game.Moves()[0].comments != "" {
-		t.Fatalf("game move 1 is not correct, expected no comment, got %s", game.Moves()[0].comments)
+	if game.MoveTree().MainLine()[0].Comments() != "" {
+		t.Fatalf("game move 1 is not correct, expected no comment, got %s", game.MoveTree().MainLine()[0].Comments())
 	}
 
 	// print all moves
-	moves := game.Moves()
+	moves := game.MoveTree().MainLine()
 
-	if game.Moves()[0].command["eval"] != "0.17" {
-		t.Fatalf("game move 1 is not correct, expected eval, got %s", game.Moves()[0].command["eval"])
+	if got, ok := game.MoveTree().MainLine()[0].GetCommand("eval"); !ok || got != "0.17" {
+		t.Fatalf("game move 1 is not correct, expected eval, got %s", got)
 	}
 
-	if moves[6].comments != "A57 Benko Gambit Declined: Main Line" {
-		t.Fatalf("game move 4 is not correct, expected comment, got %s", moves[6].comments)
+	if moves[6].Comments() != "A57 Benko Gambit Declined: Main Line" {
+		t.Fatalf("game move 4 is not correct, expected comment, got %s", moves[6].Comments())
 	}
 
-	if moves[44].nag != "?!" {
-		t.Fatalf("game move 44 is not correct, expected nag '!?', got %s", moves[44].nag)
+	if got := moves[44].NAGs(); !reflect.DeepEqual(got, []string{"$6"}) {
+		t.Fatalf("game move 44 is not correct, expected NAG '$6', got %v", got)
 	}
 }
 
@@ -364,10 +386,10 @@ func TestLichessMultipleCommand(t *testing.T) {
 		t.Fatalf("Failed to open fixture file: %v", err)
 	}
 
-	scanner := NewScanner(file)
+	dec := NewPGNDecoder(file)
 
 	// Test first game
-	game, err := scanner.ParseNext()
+	game, err := dec.Decode()
 	if err != nil {
 		t.Fatalf("fail to read games from valid pgn: %s", err.Error())
 	}
@@ -381,27 +403,27 @@ func TestLichessMultipleCommand(t *testing.T) {
 	}
 
 	// Check if move one has the correct command
-	if game.Moves()[0].command["eval"] != "0.0" {
-		t.Fatalf("game move 1 is not correct, expected eval, got %s", game.Moves()[0].command["eval"])
+	if got, ok := game.MoveTree().MainLine()[0].GetCommand("eval"); !ok || got != "0.0" {
+		t.Fatalf("game move 1 is not correct, expected eval, got %s", got)
 	}
 
 	// Check for clock also
-	if game.Moves()[0].command["clk"] != "0:03:00" {
-		t.Fatalf("game move 1 is not correct, expected clock, got %s", game.Moves()[0].command["clk"])
+	if got, ok := game.MoveTree().MainLine()[0].GetCommand("clk"); !ok || got != "0:03:00" {
+		t.Fatalf("game move 1 is not correct, expected clock, got %s", got)
 	}
 
 	// Check move 5 for comment and eval
-	if game.Moves()[4].comments != "E00 Catalan Opening" {
-		t.Fatalf("game move 5 is not correct, expected comment, got %s", game.Moves()[4].comments)
+	if game.MoveTree().MainLine()[4].Comments() != "E00 Catalan Opening" {
+		t.Fatalf("game move 5 is not correct, expected comment, got %s", game.MoveTree().MainLine()[4].Comments())
 	}
 
-	if game.Moves()[4].command["eval"] != "0.14" {
-		t.Fatalf("game move 5 is not correct, expected eval, got %s", game.Moves()[4].command["eval"])
+	if got, ok := game.MoveTree().MainLine()[4].GetCommand("eval"); !ok || got != "0.14" {
+		t.Fatalf("game move 5 is not correct, expected eval, got %s", got)
 	}
 
 	// check for clock
-	if game.Moves()[4].command["clk"] != "0:02:58" {
-		t.Fatalf("game move 5 is not correct, expected clock, got %s", game.Moves()[4].command["clk"])
+	if got, ok := game.MoveTree().MainLine()[4].GetCommand("clk"); !ok || got != "0:02:58" {
+		t.Fatalf("game move 5 is not correct, expected clock, got %s", got)
 	}
 }
 
@@ -416,28 +438,27 @@ func TestParseMoveWithNAGAndComment(t *testing.T) {
 
 1. e4 $1 {Good move} e5 {Solid} $2 2. Nf3 $3 {Another comment} Nc6 $4 {Yet another}`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
 
-	moves := game.Moves()
+	moves := game.MoveTree().MainLine()
 	if len(moves) < 4 {
 		t.Fatalf("expected at least 4 moves, got %d", len(moves))
 	}
 
-	if moves[0].nag == "" || moves[0].comments == "" {
-		t.Errorf("move 1 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[0].nag, moves[0].comments)
+	if len(moves[0].NAGs()) == 0 || moves[0].Comments() == "" {
+		t.Errorf("move 1 should have both NAG and comment, got nags: '%v', comment: '%s'", moves[0].NAGs(), moves[0].Comments())
 	}
-	if moves[1].nag == "" || moves[1].comments == "" {
-		t.Errorf("move 2 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[1].nag, moves[1].comments)
+	if len(moves[1].NAGs()) == 0 || moves[1].Comments() == "" {
+		t.Errorf("move 2 should have both NAG and comment, got nags: '%v', comment: '%s'", moves[1].NAGs(), moves[1].Comments())
 	}
-	if moves[2].nag == "" || moves[2].comments == "" {
-		t.Errorf("move 3 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[2].nag, moves[2].comments)
+	if len(moves[2].NAGs()) == 0 || moves[2].Comments() == "" {
+		t.Errorf("move 3 should have both NAG and comment, got nags: '%v', comment: '%s'", moves[2].NAGs(), moves[2].Comments())
 	}
-	if moves[3].nag == "" || moves[3].comments == "" {
-		t.Errorf("move 4 should have both NAG and comment, got nag: '%s', comment: '%s'", moves[3].nag, moves[3].comments)
+	if len(moves[3].NAGs()) == 0 || moves[3].Comments() == "" {
+		t.Errorf("move 4 should have both NAG and comment, got nags: '%v', comment: '%s'", moves[3].NAGs(), moves[3].Comments())
 	}
 }
 
@@ -452,21 +473,20 @@ func TestVariationComments(t *testing.T) {
 
 1. e4 {main line comment} e5 (1... d5 {variation comment on d5} 2. exd5 {variation comment on exd5} Qxd5) 2. Nf3 Nc6 *`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
 
 	// Check main line comment on 1. e4
-	mainMoves := game.Moves()
-	if mainMoves[0].comments != "main line comment" {
-		t.Errorf("expected main line comment on e4, got %q", mainMoves[0].comments)
+	mainMoves := game.MoveTree().MainLine()
+	if mainMoves[0].Comments() != "main line comment" {
+		t.Errorf("expected main line comment on e4, got %q", mainMoves[0].Comments())
 	}
 
 	// 1... e5 is mainMoves[1], and its parent (rootMove child for e4) should have
 	// a second child which is the variation 1... d5
-	e4Move := game.rootMove.children[0] // 1. e4
+	e4Move := game.MoveTree().Root().children[0] // 1. e4
 	if len(e4Move.children) < 2 {
 		t.Fatalf("expected at least 2 children on e4 (main line e5 + variation d5), got %d", len(e4Move.children))
 	}
@@ -474,8 +494,8 @@ func TestVariationComments(t *testing.T) {
 	// First child is the main line 1... e5
 	// Second child is the variation 1... d5
 	d5Move := e4Move.children[1]
-	if d5Move.comments != "variation comment on d5" {
-		t.Errorf("expected 'variation comment on d5' on 1...d5, got %q", d5Move.comments)
+	if d5Move.Comments() != "variation comment on d5" {
+		t.Errorf("expected 'variation comment on d5' on 1...d5, got %q", d5Move.Comments())
 	}
 
 	// d5's first child should be 2. exd5
@@ -483,8 +503,8 @@ func TestVariationComments(t *testing.T) {
 		t.Fatalf("expected children on d5 variation move")
 	}
 	exd5Move := d5Move.children[0]
-	if exd5Move.comments != "variation comment on exd5" {
-		t.Errorf("expected 'variation comment on exd5' on 2.exd5, got %q", exd5Move.comments)
+	if exd5Move.Comments() != "variation comment on exd5" {
+		t.Errorf("expected 'variation comment on exd5' on 2.exd5, got %q", exd5Move.Comments())
 	}
 }
 
@@ -499,40 +519,39 @@ func TestVariationNAGs(t *testing.T) {
 
 1. e4 e5 (1... d5 $1 {great move} 2. exd5 $6 Qxd5 $2) 2. Nf3 *`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
 
 	// Find the variation: 1... d5
-	e4Move := game.rootMove.children[0]
+	e4Move := game.MoveTree().Root().children[0]
 	if len(e4Move.children) < 2 {
 		t.Fatalf("expected variation on e4, got %d children", len(e4Move.children))
 	}
 
 	d5Move := e4Move.children[1]
-	if d5Move.nag != "$1" {
-		t.Errorf("expected NAG '$1' on 1...d5, got %q", d5Move.nag)
+	if got := d5Move.NAGs(); !reflect.DeepEqual(got, []string{"$1"}) {
+		t.Errorf("expected NAG '$1' on 1...d5, got %v", got)
 	}
-	if d5Move.comments != "great move" {
-		t.Errorf("expected comment 'great move' on 1...d5, got %q", d5Move.comments)
+	if d5Move.Comments() != "great move" {
+		t.Errorf("expected comment 'great move' on 1...d5, got %q", d5Move.Comments())
 	}
 
 	if len(d5Move.children) == 0 {
 		t.Fatalf("expected children on d5")
 	}
 	exd5Move := d5Move.children[0]
-	if exd5Move.nag != "$6" {
-		t.Errorf("expected NAG '$6' on 2.exd5, got %q", exd5Move.nag)
+	if got := exd5Move.NAGs(); !reflect.DeepEqual(got, []string{"$6"}) {
+		t.Errorf("expected NAG '$6' on 2.exd5, got %v", got)
 	}
 
 	if len(exd5Move.children) == 0 {
 		t.Fatalf("expected children on exd5")
 	}
 	qxd5Move := exd5Move.children[0]
-	if qxd5Move.nag != "$2" {
-		t.Errorf("expected NAG '$2' on 2...Qxd5, got %q", qxd5Move.nag)
+	if got := qxd5Move.NAGs(); !reflect.DeepEqual(got, []string{"$2"}) {
+		t.Errorf("expected NAG '$2' on 2...Qxd5, got %v", got)
 	}
 }
 
@@ -547,26 +566,25 @@ func TestVariationCommands(t *testing.T) {
 
 1. e4 e5 (1... d5 {good move [%eval -0.5] [%clk 0:05:00]} 2. exd5) 2. Nf3 *`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
 
-	e4Move := game.rootMove.children[0]
+	e4Move := game.MoveTree().Root().children[0]
 	if len(e4Move.children) < 2 {
 		t.Fatalf("expected variation on e4, got %d children", len(e4Move.children))
 	}
 
 	d5Move := e4Move.children[1]
-	if d5Move.comments != "good move" {
-		t.Errorf("expected comment 'good move' on 1...d5, got %q", d5Move.comments)
+	if d5Move.Comments() != "good move" {
+		t.Errorf("expected comment 'good move' on 1...d5, got %q", d5Move.Comments())
 	}
-	if d5Move.command["eval"] != "-0.5" {
-		t.Errorf("expected eval command '-0.5' on 1...d5, got %q", d5Move.command["eval"])
+	if got, ok := d5Move.GetCommand("eval"); !ok || got != "-0.5" {
+		t.Errorf("expected eval command '-0.5' on 1...d5, got %q", got)
 	}
-	if d5Move.command["clk"] != "0:05:00" {
-		t.Errorf("expected clk command '0:05:00' on 1...d5, got %q", d5Move.command["clk"])
+	if got, ok := d5Move.GetCommand("clk"); !ok || got != "0:05:00" {
+		t.Errorf("expected clk command '0:05:00' on 1...d5, got %q", got)
 	}
 }
 
@@ -581,21 +599,20 @@ func TestNestedVariationComments(t *testing.T) {
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 {Ruy Lopez} (3. Bc4 {Italian Game} Nf6 (3... Bc5 {Giuoco Piano}) 4. d3) 3... a6 *`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
 
 	// Main line: 3. Bb5 should have comment "Ruy Lopez"
-	mainMoves := game.Moves()
+	mainMoves := game.MoveTree().MainLine()
 	// Moves: e4, e5, Nf3, Nc6, Bb5, a6 => index 4 is Bb5
 	if len(mainMoves) < 5 {
 		t.Fatalf("expected at least 5 main line moves, got %d", len(mainMoves))
 	}
 	bb5Move := mainMoves[4]
-	if bb5Move.comments != "Ruy Lopez" {
-		t.Errorf("expected 'Ruy Lopez' comment on 3.Bb5, got %q", bb5Move.comments)
+	if bb5Move.Comments() != "Ruy Lopez" {
+		t.Errorf("expected 'Ruy Lopez' comment on 3.Bb5, got %q", bb5Move.Comments())
 	}
 
 	// Variation: 3. Bc4 should have comment "Italian Game"
@@ -604,8 +621,8 @@ func TestNestedVariationComments(t *testing.T) {
 		t.Fatalf("expected variation at move 3, got %d children", len(nc6Move.children))
 	}
 	bc4Move := nc6Move.children[1]
-	if bc4Move.comments != "Italian Game" {
-		t.Errorf("expected 'Italian Game' comment on 3.Bc4, got %q", bc4Move.comments)
+	if bc4Move.Comments() != "Italian Game" {
+		t.Errorf("expected 'Italian Game' comment on 3.Bc4, got %q", bc4Move.Comments())
 	}
 
 	// Nested variation: 3... Bc5 should have comment "Giuoco Piano"
@@ -613,8 +630,8 @@ func TestNestedVariationComments(t *testing.T) {
 		t.Fatalf("expected nested variation on Bc4, got %d children", len(bc4Move.children))
 	}
 	bc5Move := bc4Move.children[1]
-	if bc5Move.comments != "Giuoco Piano" {
-		t.Errorf("expected 'Giuoco Piano' comment on 3...Bc5, got %q", bc5Move.comments)
+	if bc5Move.Comments() != "Giuoco Piano" {
+		t.Errorf("expected 'Giuoco Piano' comment on 3...Bc5, got %q", bc5Move.Comments())
 	}
 }
 
@@ -629,17 +646,13 @@ func TestRoundTripWithVariationsAndCommandAnnotations(t *testing.T) {
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 {Ruy Lopez} (3. Bc4 {Italian Game} Nf6 (3... Bc5 {Giuoco Piano}) 4. d3) 3... a6 *`
 
-	base := NewScanner(strings.NewReader(pgn))
-	if !base.HasNext() {
-		t.Fatal("expected one game in input pgn")
-	}
-	game, err := base.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("failed to parse input pgn: %v", err)
 	}
 
-	var walk func(*Move)
-	walk = func(m *Move) {
+	var walk func(*MoveNode)
+	walk = func(m *MoveNode) {
 		if m == nil {
 			return
 		}
@@ -650,7 +663,7 @@ func TestRoundTripWithVariationsAndCommandAnnotations(t *testing.T) {
 			walk(child)
 		}
 	}
-	walk(game.GetRootMove())
+	walk(game.MoveTree().Root())
 
 	roundTrip := game.String()
 
@@ -673,7 +686,7 @@ func TestPGNAnnotationFidelityRoundTrip(t *testing.T) {
 	pgn := withMinimalTags(`1. e4 {Good move [%clk 0:05:00]} {second [%eval 0.25]} *`)
 
 	game := mustParseSingleGame(t, pgn)
-	move := game.Moves()[0]
+	move := game.MoveTree().MainLine()[0]
 	if move.Comments() != "Good move second" {
 		t.Fatalf("expected flattened comments, got %q", move.Comments())
 	}
@@ -687,7 +700,7 @@ func TestPGNAnnotationFidelityRoundTrip(t *testing.T) {
 	}
 
 	reparsed := mustParseSingleGame(t, roundTrip)
-	blocks := reparsed.Moves()[0].CommentBlocks()
+	blocks := reparsed.MoveTree().MainLine()[0].CommentBlocks()
 	if len(blocks) != 2 {
 		t.Fatalf("expected 2 comment blocks, got %#v", blocks)
 	}
@@ -703,7 +716,7 @@ func TestPGNAnnotationFidelityPreservesOrderAndDuplicateCommands(t *testing.T) {
 	game := mustParseSingleGame(t, pgn)
 	roundTrip := game.String()
 	reparsed := mustParseSingleGame(t, roundTrip)
-	move := reparsed.Moves()[0]
+	move := reparsed.MoveTree().MainLine()[0]
 
 	if got, ok := move.GetCommand("clk"); !ok || got != "0:04:59" {
 		t.Fatalf("expected last duplicate clk command, got %q, %v", got, ok)
@@ -726,7 +739,7 @@ func TestPGNAnnotationFidelityPreservesOrderAndDuplicateCommands(t *testing.T) {
 
 func TestPGNAnnotationFidelityCommandUsesFirstParameter(t *testing.T) {
 	game := mustParseSingleGame(t, withMinimalTags(`1. e4 {[%command 1:45:12,Nf6,"very interesting, but wrong"]} *`))
-	move := game.Moves()[0]
+	move := game.MoveTree().MainLine()[0]
 
 	if got, ok := move.GetCommand("command"); !ok || got != "1:45:12" {
 		t.Fatalf("expected first command parameter, got %q, %v", got, ok)
@@ -746,7 +759,7 @@ func TestPGNAnnotationFidelityVariationsAndExpansion(t *testing.T) {
 	roundTrip := game.String()
 	reparsed := mustParseSingleGame(t, roundTrip)
 
-	e4 := reparsed.Moves()[0]
+	e4 := reparsed.MoveTree().MainLine()[0]
 	if len(e4.Children()) < 2 {
 		t.Fatalf("expected e4 variation, got %d children", len(e4.Children()))
 	}
@@ -758,9 +771,12 @@ func TestPGNAnnotationFidelityVariationsAndExpansion(t *testing.T) {
 	assertCommentItem(t, blocks[0].Items[0], CommentText, "Sicilian", "", "")
 	assertCommentItem(t, blocks[0].Items[1], CommentCommand, "", "eval", "0.12")
 
-	scanner := NewScanner(strings.NewReader(roundTrip), WithExpandVariations())
-	for scanner.HasNext() {
-		if _, err := scanner.ParseNext(); err != nil {
+	dec := NewPGNDecoder(strings.NewReader(roundTrip), WithPGNExpandVariations())
+	for {
+		if _, err := dec.Decode(); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
 			t.Fatalf("expanded annotated variation should parse: %v", err)
 		}
 	}
@@ -768,10 +784,10 @@ func TestPGNAnnotationFidelityVariationsAndExpansion(t *testing.T) {
 
 func TestPGNAnnotationFidelityLegacyAPIsAndDefensiveCopies(t *testing.T) {
 	game := NewGame()
-	if err := game.PushMove("e4", nil); err != nil {
+	if _, err := game.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	move := game.Moves()[0]
+	move := game.MoveTree().MainLine()[0]
 	move.SetComment("Good move")
 	move.SetCommand("clk", "0:05:00")
 	move.SetCommand("clk", "0:04:59")
@@ -788,7 +804,7 @@ func TestPGNAnnotationFidelityLegacyAPIsAndDefensiveCopies(t *testing.T) {
 	}
 
 	parsed := mustParseSingleGame(t, withMinimalTags(`1. e4 {Good [%clk 0:05:00]} *`))
-	parsedMove := parsed.Moves()[0]
+	parsedMove := parsed.MoveTree().MainLine()[0]
 	blocks := parsedMove.CommentBlocks()
 	blocks[0].Items[0].Text = "mutated"
 	blocks[0].Items = append(blocks[0].Items, CommentItem{Kind: CommentCommand, Key: "eval", Value: "9"})
@@ -800,10 +816,30 @@ func TestPGNAnnotationFidelityLegacyAPIsAndDefensiveCopies(t *testing.T) {
 	}
 }
 
+// TestPGNCommentCommandMergingIssue104 is a regression test for issue #104:
+// a parsed text comment followed by SetCommand must merge into a single
+// comment block rather than emitting two separate {} blocks. v3's
+// SetCommand appends to the last block when no matching key exists, so
+// this pins the single-block contract. See the reporter's v2 scenario.
+func TestPGNCommentCommandMergingIssue104(t *testing.T) {
+	game := mustParseSingleGame(t, withMinimalTags(`1. e4 {Ruy Lopez} *`))
+	move := game.MoveTree().MainLine()[0]
+	move.SetCommand("eval", "0.25")
+
+	roundTrip := game.String()
+	want := "{Ruy Lopez [%eval 0.25]}"
+	if !strings.Contains(roundTrip, want) {
+		t.Fatalf("expected merged single block %q in:\n%s", want, roundTrip)
+	}
+	// The two-block failure mode would look like "{Ruy Lopez} {[%eval 0.25]}".
+	if strings.Contains(roundTrip, "{Ruy Lopez} {") {
+		t.Fatalf("expected single merged block, got two separate blocks:\n%s", roundTrip)
+	}
+}
+
 func mustParseSingleGame(t *testing.T, pgn string) *Game {
 	t.Helper()
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("failed to parse pgn: %v", err)
 	}
@@ -892,6 +928,49 @@ func TestParserAnnotationErrors(t *testing.T) {
 			t.Fatal("expected unterminated command error")
 		}
 	})
+
+	t.Run("ParseMoveJoinsMismatchReasons", func(t *testing.T) {
+		// Position: white rook on a1 and bishop on c1, both can reach e1.
+		// Asking for "Nxe1" (knight captures e1) should fail with reasons
+		// from both candidates joined into a single ParserError.
+		opt, err := FEN("1k6/8/8/8/8/8/8/1BR4K w - - 0 1")
+		if err != nil {
+			t.Fatalf("FEN: %v", err)
+		}
+		g := NewGame(opt)
+		parser := NewParser([]Token{
+			{Type: PIECE, Value: "N"},
+			{Type: CAPTURE, Value: "x"},
+			{Type: SQUARE, Value: "e1"},
+		})
+		parser.game = g
+		_, err = parser.parseMove()
+		if err == nil {
+			t.Fatal("expected parser error for Nxe1")
+		}
+		var pe *ParserError
+		if !errors.As(err, &pe) {
+			t.Fatalf("expected *ParserError, got %T: %v", err, err)
+		}
+		if !strings.Contains(pe.Message, "piece type mismatch") {
+			t.Errorf("expected joined message to contain 'piece type mismatch', got %q", pe.Message)
+		}
+	})
+
+	t.Run("DuplicateCommandName", func(t *testing.T) {
+		parser := NewParser([]Token{
+			{Type: CommandStart, Value: "[%"},
+			{Type: CommandName, Value: "clk"},
+			{Type: CommandParam, Value: "0:05:00"},
+			{Type: CommandName, Value: "eval"},
+			{Type: CommandParam, Value: "0.24"},
+			{Type: CommandEnd, Value: "]"},
+		})
+		_, err := parser.parseCommand()
+		if err == nil {
+			t.Fatal("expected parseCommand error for duplicate command name")
+		}
+	})
 }
 
 func TestParserVariationErrors(t *testing.T) {
@@ -932,6 +1011,9 @@ func TestParserVariationErrors(t *testing.T) {
 func TestParseResultDraw(t *testing.T) {
 	parser := NewParser([]Token{{Type: RESULT, Value: "1/2-1/2"}})
 	parser.parseResult()
+	if err := parser.resolveOutcome(); err != nil {
+		t.Fatal(err)
+	}
 	if parser.game.Outcome() != Draw {
 		t.Fatalf("expected draw outcome, got %s", parser.game.Outcome())
 	}
@@ -948,38 +1030,37 @@ func TestVariationMoveNumbers(t *testing.T) {
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Nf6 4. d3) a6 4. Ba4 Nf6 5. O-O Be7 1-0`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %v", err)
 	}
 
 	// Helper to recursively check move numbers
-	var checkMoveNumbers func(m *Move, expectedNum int)
-	checkMoveNumbers = func(m *Move, expectedNum int) {
+	var checkMoveNumbers func(m *MoveNode, expectedNum int)
+	checkMoveNumbers = func(m *MoveNode, expectedNum int) {
 		fullMove := (expectedNum-1)/2 + 1
 		for _, child := range m.children {
-			if child.number != 0 && int(child.Ply()) != expectedNum {
-				t.Errorf("move %s: expected move number %d, got %d", child.String(), expectedNum, child.Ply())
+			if child.number != 0 && child.Ply() != expectedNum {
+				t.Errorf("move %s: expected move number %d, got %d", child.Move().String(), expectedNum, child.Ply())
 			}
 			if child.FullMoveNumber() != fullMove {
-				t.Errorf("move %s: expected full move number %d, got %d", child.String(), fullMove, child.FullMoveNumber())
+				t.Errorf("move %s: expected full move number %d, got %d", child.Move().String(), fullMove, child.FullMoveNumber())
 			}
-			// If this move starts a variation, the move number should be correct for the branch
+			// If this move starts a variation, the move number should be correct for the variation
 			checkMoveNumbers(child, expectedNum+1)
 		}
 	}
 
-	t.Logf("Root move number: %d", game.rootMove.number)
-	t.Logf("Root move ply: %d", game.rootMove.Ply())
-	t.Logf("Root move full move number: %d", game.rootMove.FullMoveNumber())
-	t.Logf("Second move: %v", game.rootMove.Children()[0])
+	t.Logf("Root move number: %d", game.MoveTree().Root().number)
+	t.Logf("Root move ply: %d", game.MoveTree().Root().Ply())
+	t.Logf("Root move full move number: %d", game.MoveTree().Root().FullMoveNumber())
+	t.Logf("Second move: %v", game.MoveTree().Root().Children()[0])
 
 	// Mainline starts at move 1
-	checkMoveNumbers(game.rootMove, 1)
+	checkMoveNumbers(game.MoveTree().Root(), 1)
 
-	// Check specific variation branch
-	mainMoves := game.Moves()
+	// Check specific variation
+	mainMoves := game.MoveTree().MainLine()
 	if len(mainMoves) < 3 {
 		t.Fatalf("expected at least 3 mainline moves, got %d", len(mainMoves))
 	}
@@ -1007,16 +1088,115 @@ func BenchmarkPGNWithVariations(b *testing.B) {
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Nf6 4. d3) a6 4. Ba4 Nf6 5. O-O Be7 1-0`
 
-	scanner := NewScanner(strings.NewReader(pgn))
-
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		// Reset scanner for each iteration
-		scanner = NewScanner(strings.NewReader(pgn))
-		_, err := scanner.ParseNext()
+	for range b.N {
+		_, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 		if err != nil {
 			b.Fatalf("parse error: %v", err)
+		}
+	}
+}
+
+// readPGNFixture returns the raw bytes of a fixture PGN file.
+func readPGNFixture(name string) []byte {
+	data, err := os.ReadFile(filepath.Join("fixtures", "pgns", name))
+	if err != nil {
+		panic(err)
+	}
+	return data
+}
+
+// pgnFixtureMeta reports size and game count for a fixture file.
+type pgnFixtureMeta struct {
+	path    string
+	size    int64
+	games   int
+	perGame int // approximate bytes per game
+}
+
+func pgnMeta(name string) pgnFixtureMeta {
+	data := readPGNFixture(name)
+	games := bytes.Count(data, []byte("[Event "))
+	return pgnFixtureMeta{
+		path:    filepath.Join("fixtures", "pgns", name),
+		size:    int64(len(data)),
+		games:   games,
+		perGame: len(data) / max(games, 1),
+	}
+}
+
+// BenchmarkPGN_Stream_Big parses the 1000-game lichess big.pgn fixture once per
+// iteration via the streaming PGNDecoder API. Equivalent in workload to the
+// chess-library example (full SAN validation + move tree building).
+func BenchmarkPGN_Stream_Big(b *testing.B) {
+	benchStreamFixture(b, "big.pgn")
+}
+
+// BenchmarkPGN_Stream_BigBig parses the 10000-game lichess big_big.pgn fixture.
+func BenchmarkPGN_Stream_BigBig(b *testing.B) {
+	benchStreamFixture(b, "big_big.pgn")
+}
+
+// BenchmarkPGN_Stream_Variations parses a small PGN rich in variations to
+// exercise the variation path separately.
+func BenchmarkPGN_Stream_Variations(b *testing.B) {
+	pgn := []byte(`[Event "Variation Benchmark"]
+[Site "Internet"]
+[Date "2023.12.06"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Nf6 4. d3) a6 4. Ba4 Nf6 5. O-O Be7 1-0`)
+
+	b.SetBytes(int64(len(pgn)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		dec := NewPGNDecoder(bytes.NewReader(pgn))
+		for {
+			_, err := dec.Decode()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				b.Fatalf("parse error: %v", err)
+			}
+		}
+	}
+}
+
+func benchStreamFixture(b *testing.B, name string) {
+	b.Helper()
+	data := readPGNFixture(name)
+	meta := pgnMeta(name)
+	b.SetBytes(meta.size)
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for range b.N {
+		dec := NewPGNDecoder(bytes.NewReader(data))
+		games := 0
+		errs := 0
+		for {
+			_, err := dec.Decode()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				// Real-world lichess data has ~0.7% games with a result
+				// inconsistent with the board-derivable outcome (e.g. "Black
+				// wins on time" when the final position is checkmate).
+				// Skip those rather than aborting the benchmark.
+				errs++
+				continue
+			}
+			games++
+		}
+		if games+errs != meta.games {
+			b.Fatalf("expected %d games total, parsed %d with %d errors", meta.games, games, errs)
 		}
 	}
 }

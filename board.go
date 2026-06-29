@@ -6,40 +6,39 @@ allowing for efficient move generation and position analysis.
 
 Board Layout:
 
-    8 | r n b q k b n r
-    7 | p p p p p p p p
-    6 | - - - - - - - -
-    5 | - - - - - - - -
-    4 | - - - - - - - -
-    3 | - - - - - - - -
-    2 | P P P P P P P P
-    1 | R N B Q K B N R
-      ---------------
-        A B C D E F G H
+	8 | r n b q k b n r
+	7 | p p p p p p p p
+	6 | - - - - - - - -
+	5 | - - - - - - - -
+	4 | - - - - - - - -
+	3 | - - - - - - - -
+	2 | P P P P P P P P
+	1 | R N B Q K B N R
+	  ---------------
+	    A B C D E F G H
 
 Usage:
 
-    // Create a new board with starting position
-    squares := map[Square]Piece{
-        NewSquare(FileE, Rank1): WhiteKing,
-        NewSquare(FileD, Rank8): BlackQueen,
-    }
-    board := NewBoard(squares)
+	// Create a new board with starting position
+	squares := map[Square]Piece{
+	    NewSquare(FileE, Rank1): WhiteKing,
+	    NewSquare(FileD, Rank8): BlackQueen,
+	}
+	board := NewBoard(squares)
 
-    // Check piece at square
-    piece := board.Piece(NewSquare(FileE, Rank1))
+	// Check piece at square
+	piece := board.Piece(NewSquare(FileE, Rank1))
 
-    // Get all piece positions.
-    positions := board.SquareMap()
+	// Get all piece positions.
+	positions := board.SquareMap()
 */
-
 package chess
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Board represents a chess board and its relationship between squares and pieces.
@@ -58,11 +57,11 @@ type Board struct {
 	bbBlackBishop bitboard
 	bbBlackKnight bitboard
 	bbBlackPawn   bitboard
-	whiteSqs      bitboard // all white pieces
-	blackSqs      bitboard // all black pieces
-	emptySqs      bitboard // all empty squares
-	whiteKingSq   Square   // cached white king square
-	blackKingSq   Square   // cached black king square
+	whiteSqs      bitboard                   // all white pieces
+	blackSqs      bitboard                   // all black pieces
+	emptySqs      bitboard                   // all empty squares
+	whiteKingSq   Square                     // cached white king square
+	blackKingSq   Square                     // cached black king square
 	mailbox       [numOfSquaresInBoard]Piece // O(1) piece lookup per square
 }
 
@@ -111,7 +110,7 @@ func NewBoard(m map[Square]Piece) (*Board, error) {
 // SquareMap returns a mapping of squares to pieces.
 // A square is only added to the map if it is occupied.
 func (b *Board) SquareMap() map[Square]Piece {
-	m := map[Square]Piece{}
+	m := make(map[Square]Piece, numOfSquaresInBoard)
 	for sq := range numOfSquaresInBoard {
 		p := b.Piece(Square(sq))
 		if p != NoPiece {
@@ -144,7 +143,7 @@ const (
 // For UpDown, pieces are mirrored across the horizontal center line.
 // For LeftRight, pieces are mirrored across the vertical center line.
 func (b *Board) Flip(fd FlipDirection) (*Board, error) {
-	m := map[Square]Piece{}
+	m := make(map[Square]Piece, numOfSquaresInBoard)
 	for sq := range numOfSquaresInBoard {
 		var mv Square
 		switch fd {
@@ -164,7 +163,7 @@ func (b *Board) Flip(fd FlipDirection) (*Board, error) {
 
 // Transpose flips the board over the A8 to H1 diagonal.
 func (b *Board) Transpose() (*Board, error) {
-	m := map[Square]Piece{}
+	m := make(map[Square]Piece, numOfSquaresInBoard)
 	for sq := range numOfSquaresInBoard {
 		file := File(7 - Square(sq).Rank())
 		rank := Rank(7 - Square(sq).File())
@@ -195,7 +194,7 @@ func (b *Board) Draw() string {
 
 // Draw2 returns visual representation of the board useful for debugging.
 // It is similar to Draw() except allows the caller to specify perspective
-// and dark mode options
+// and dark mode options.
 func (b *Board) Draw2(perspective Color, darkMode bool) string {
 	if perspective == Black {
 		return b.drawForBlack(darkMode)
@@ -204,50 +203,52 @@ func (b *Board) Draw2(perspective Color, darkMode bool) string {
 	return b.drawForWhite(darkMode)
 }
 
-// drawForWhite returns visual representation of the board from white's perspective
+// drawForWhite returns visual representation of the board from white's perspective.
 func (b *Board) drawForWhite(darkMode bool) string {
-	s := "\n A B C D E F G H\n"
+	var sb strings.Builder
+	sb.Grow(154)
+	sb.WriteString("\n A B C D E F G H\n")
 	for r := 7; r >= 0; r-- {
-		s += Rank(r).String()
+		sb.WriteString(Rank(r).String())
 		for f := range numOfSquaresInRow {
 			p := b.Piece(NewSquare(File(f), Rank(r)))
-			if p == NoPiece {
-				s += "-"
-			} else {
-				if darkMode {
-					s += p.DarkString()
-				} else {
-					s += p.String()
-				}
+			switch {
+			case p == NoPiece:
+				sb.WriteByte('-')
+			case darkMode:
+				sb.WriteString(p.DarkString())
+			default:
+				sb.WriteString(p.String())
 			}
-			s += " "
+			sb.WriteByte(' ')
 		}
-		s += "\n"
+		sb.WriteByte('\n')
 	}
-	return s
+	return sb.String()
 }
 
-// drawForBlack returns visual representation of the board from black's perspective
+// drawForBlack returns visual representation of the board from black's perspective.
 func (b *Board) drawForBlack(darkMode bool) string {
-	s := "\n H G F E D C B A\n"
-	for r := 0; r <= 7; r++ {
-		s += Rank(r).String()
+	var sb strings.Builder
+	sb.Grow(154)
+	sb.WriteString("\n H G F E D C B A\n")
+	for r := range 8 {
+		sb.WriteString(Rank(r).String())
 		for f := numOfSquaresInRow - 1; f >= 0; f-- {
 			p := b.Piece(NewSquare(File(f), Rank(r)))
-			if p == NoPiece {
-				s += "-"
-			} else {
-				if darkMode {
-					s += p.DarkString()
-				} else {
-					s += p.String()
-				}
+			switch {
+			case p == NoPiece:
+				sb.WriteByte('-')
+			case darkMode:
+				sb.WriteString(p.DarkString())
+			default:
+				sb.WriteString(p.String())
 			}
-			s += " "
+			sb.WriteByte(' ')
 		}
-		s += "\n"
+		sb.WriteByte('\n')
 	}
-	return s
+	return sb.String()
 }
 
 // String implements the fmt.Stringer interface and returns
@@ -317,7 +318,7 @@ func (b *Board) MarshalText() ([]byte, error) {
 func (b *Board) UnmarshalText(text []byte) error {
 	cp, err := fenBoard(string(text))
 	if err != nil {
-		return err
+		return fmt.Errorf("chess: unmarshal board FEN: %w", err)
 	}
 	*b = *cp
 	return nil
@@ -328,13 +329,15 @@ func (b *Board) UnmarshalText(text []byte) error {
 // in the following order: WhiteKing, WhiteQueen, WhiteRook, WhiteBishop, WhiteKnight
 // WhitePawn, BlackKing, BlackQueen, BlackRook, BlackBishop, BlackKnight, BlackPawn.
 func (b *Board) MarshalBinary() ([]byte, error) {
-	bbs := []bitboard{
+	bbs := [...]bitboard{
 		b.bbWhiteKing, b.bbWhiteQueen, b.bbWhiteRook, b.bbWhiteBishop, b.bbWhiteKnight, b.bbWhitePawn,
 		b.bbBlackKing, b.bbBlackQueen, b.bbBlackRook, b.bbBlackBishop, b.bbBlackKnight, b.bbBlackPawn,
 	}
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, bbs)
-	return buf.Bytes(), err
+	buf := make([]byte, 8*len(bbs))
+	for i, bb := range bbs {
+		binary.BigEndian.PutUint64(buf[i*8:], uint64(bb))
+	}
+	return buf, nil
 }
 
 // UnmarshalBinary implements the encoding.BinaryUnmarshaler interface and parses
@@ -364,77 +367,109 @@ func (b *Board) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-//nolint:mnd // magic number is used for bitboard size.
-func (b *Board) update(m *Move) {
+func (b *Board) update(m Move) {
 	p1 := b.Piece(m.s1)
+	captured := b.Piece(m.s2)
 	s1BB := bbForSquare(m.s1)
 	s2BB := bbForSquare(m.s2)
 
-	// move s1 piece to s2
-	for _, p := range allPieces {
-		bb := b.bbForPiece(p)
-		// remove what was at s2
-		if err := b.setBBForPiece(p, bb & ^s2BB); err != nil {
-			panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
+	if p1 == NoPiece {
+		return
+	}
+
+	whiteSqs := b.whiteSqs
+	blackSqs := b.blackSqs
+	if p1.Color() == White {
+		whiteSqs = (whiteSqs & ^s1BB) | s2BB
+		if captured != NoPiece {
+			blackSqs &^= s2BB
 		}
-		// move what was at s1 to s2
-		if bb.Occupied(m.s1) {
-			bb = b.bbForPiece(p)
-			if err := b.setBBForPiece(p, (bb & ^s1BB)|s2BB); err != nil {
-				panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
-			}
+	} else {
+		blackSqs = (blackSqs & ^s1BB) | s2BB
+		if captured != NoPiece {
+			whiteSqs &^= s2BB
 		}
 	}
-	// check promotion
-	if m.promo != NoPieceType && p1 != NoPiece {
+
+	if captured != NoPiece {
+		b.setPieceBB(captured, b.bbForPiece(captured)&^s2BB)
+	}
+
+	b.setPieceBB(p1, b.bbForPiece(p1)&^s1BB)
+
+	if m.promo != NoPieceType {
 		newPiece := NewPiece(m.promo, p1.Color())
-		// remove pawn
-		bbPawn := b.bbForPiece(p1)
-		if err := b.setBBForPiece(p1, bbPawn & ^s1BB & ^s2BB); err != nil {
-			panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
-		}
-		// add promo piece
-		bbPromo := b.bbForPiece(newPiece)
-		if err := b.setBBForPiece(newPiece, bbPromo|s2BB); err != nil {
-			panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
-		}
+		b.setPieceBB(newPiece, b.bbForPiece(newPiece)|s2BB)
 		b.mailbox[m.s1] = NoPiece
 		b.mailbox[m.s2] = newPiece
 	} else {
+		b.setPieceBB(p1, b.bbForPiece(p1)|s2BB)
 		b.mailbox[m.s1] = NoPiece
 		b.mailbox[m.s2] = p1
 	}
-	// remove captured en passant piece
+
 	if m.HasTag(EnPassant) {
 		if p1.Color() == White {
-			b.bbBlackPawn = ^(bbForSquare(m.s2) << 8) & b.bbBlackPawn
+			capturedBB := s2BB << 8
+			b.bbBlackPawn = ^capturedBB & b.bbBlackPawn
+			blackSqs &^= capturedBB
 			b.mailbox[m.s2-8] = NoPiece
 		} else {
-			b.bbWhitePawn = ^(bbForSquare(m.s2) >> 8) & b.bbWhitePawn
+			capturedBB := s2BB >> 8
+			b.bbWhitePawn = ^capturedBB & b.bbWhitePawn
+			whiteSqs &^= capturedBB
 			b.mailbox[m.s2+8] = NoPiece
 		}
 	}
-	// move rook for castle
+
+	b.moveRookForCastle(m, p1, &whiteSqs, &blackSqs)
+
+	b.whiteSqs = whiteSqs
+	b.blackSqs = blackSqs
+	b.emptySqs = ^(whiteSqs | blackSqs)
+
+	switch {
+	case p1 == WhiteKing:
+		b.whiteKingSq = m.s2
+	case p1 == BlackKing:
+		b.blackKingSq = m.s2
+	case captured == WhiteKing:
+		b.whiteKingSq = NoSquare
+	case captured == BlackKing:
+		b.blackKingSq = NoSquare
+	}
+}
+
+func (b *Board) setPieceBB(p Piece, bb bitboard) {
+	if err := b.setBBForPiece(p, bb); err != nil {
+		panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))
+	}
+}
+
+//nolint:mnd // magic number is used for bitboard shifts.
+func (b *Board) moveRookForCastle(m Move, p1 Piece, whiteSqs, blackSqs *bitboard) {
 	switch {
 	case p1.Color() == White && m.HasTag(KingSideCastle):
 		b.bbWhiteRook = b.bbWhiteRook & ^bbForSquare(H1) | bbForSquare(F1)
+		*whiteSqs = (*whiteSqs & ^bbForSquare(H1)) | bbForSquare(F1)
 		b.mailbox[H1] = NoPiece
 		b.mailbox[F1] = WhiteRook
 	case p1.Color() == White && m.HasTag(QueenSideCastle):
 		b.bbWhiteRook = (b.bbWhiteRook & ^bbForSquare(A1)) | bbForSquare(D1)
+		*whiteSqs = (*whiteSqs & ^bbForSquare(A1)) | bbForSquare(D1)
 		b.mailbox[A1] = NoPiece
 		b.mailbox[D1] = WhiteRook
 	case p1.Color() == Black && m.HasTag(KingSideCastle):
 		b.bbBlackRook = b.bbBlackRook & ^bbForSquare(H8) | bbForSquare(F8)
+		*blackSqs = (*blackSqs & ^bbForSquare(H8)) | bbForSquare(F8)
 		b.mailbox[H8] = NoPiece
 		b.mailbox[F8] = BlackRook
 	case p1.Color() == Black && m.HasTag(QueenSideCastle):
 		b.bbBlackRook = (b.bbBlackRook & ^bbForSquare(A8)) | bbForSquare(D8)
+		*blackSqs = (*blackSqs & ^bbForSquare(A8)) | bbForSquare(D8)
 		b.mailbox[A8] = NoPiece
 		b.mailbox[D8] = BlackRook
 	}
-
-	b.calcConvienceBBs(m)
 }
 
 func (b *Board) calcConvienceBBs(m *Move) {
@@ -518,10 +553,23 @@ func (b *Board) hasSufficientMaterial() bool {
 	if b.bbWhiteKing == 0 || b.bbBlackKing == 0 {
 		return true
 	}
-	count := map[PieceType]int{}
-	pieceMap := b.SquareMap()
-	for _, p := range pieceMap {
-		count[p.Type()]++
+	var count [7]int
+	whiteCount := 0
+	blackCount := 0
+	for sq, p := range b.mailbox {
+		pieceType := p.Type()
+		if pieceType == NoPieceType {
+			continue
+		}
+		count[pieceType]++
+		if pieceType == Bishop {
+			switch Square(sq).color() {
+			case White:
+				whiteCount++
+			case Black:
+				blackCount++
+			}
+		}
 	}
 	// 	king versus king
 	if count[Bishop] == 0 && count[Knight] == 0 {
@@ -537,18 +585,6 @@ func (b *Board) hasSufficientMaterial() bool {
 	}
 	// king and bishop(s) versus king and bishop(s) with the bishops on the same colour.
 	if count[Knight] == 0 {
-		whiteCount := 0
-		blackCount := 0
-		for sq, p := range pieceMap {
-			if p.Type() == Bishop {
-				switch sq.color() {
-				case White:
-					whiteCount++
-				case Black:
-					blackCount++
-				}
-			}
-		}
 		if whiteCount == 0 || blackCount == 0 {
 			return false
 		}
@@ -613,7 +649,7 @@ func (b *Board) setBBForPiece(p Piece, bb bitboard) error {
 	case BlackPawn:
 		b.bbBlackPawn = bb
 	default:
-		return fmt.Errorf("invalid piece %s", p)
+		return fmt.Errorf("chess: invalid piece %s", p)
 	}
 	return nil
 }
