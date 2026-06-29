@@ -137,7 +137,10 @@ func (c MoveTextCodec) String() string {
 	}
 }
 
-// Encode formats a legal move from the supplied position.
+// Encode formats a move from the supplied position. Tag-dependent suffixes
+// (check, capture, disambiguation) are recomputed from the resulting position
+// rather than trusted from the input move; Decode returns already-tagged
+// moves from the legal-move generator and does not recompute.
 func (c MoveTextCodec) Encode(pos *Position, m Move) (string, error) {
 	if err := c.validate(); err != nil {
 		return "", err
@@ -145,20 +148,22 @@ func (c MoveTextCodec) Encode(pos *Position, m Move) (string, error) {
 
 	switch c.format {
 	case MoveTextFormatSAN:
+		if m.HasTag(Null) {
+			return "Z0", nil
+		}
 		if pos == nil {
 			return "", ErrMoveTextMissingPosition
 		}
-		if !m.HasTag(Null) {
-			m.tags = moveTags(m, pos)
-		}
+		m.tags = moveTags(m, pos)
 		return algebraicNotation{}.Encode(pos, m), nil
 	case MoveTextFormatLongAlgebraic:
+		if m.HasTag(Null) {
+			return "0000", nil
+		}
 		if pos == nil {
 			return "", ErrMoveTextMissingPosition
 		}
-		if !m.HasTag(Null) {
-			m.tags = moveTags(m, pos)
-		}
+		m.tags = moveTags(m, pos)
 		return longAlgebraicNotation{}.Encode(pos, m), nil
 	case MoveTextFormatUCI:
 		return uciNotation{}.Encode(pos, m), nil

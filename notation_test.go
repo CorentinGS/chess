@@ -1,61 +1,58 @@
 package chess
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 )
 
-type notationDecodeTest struct {
-	N       notation
-	Pos     *Position
-	Text    string
-	PostPos *Position
+type decodeTest struct {
+	Codec MoveTextCodec
+	Pos   *Position
+	Text  string
 }
 
-var invalidDecodeTests = []notationDecodeTest{
+var invalidDecodeTests = []decodeTest{
 	{
 		// opening for white
-		N:    algebraicNotation{},
-		Pos:  unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
-		Text: "e5",
+		Codec: SAN(),
+		Pos:   unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+		Text:  "e5",
 	},
 	{
 		// http://en.lichess.org/W91M4jms#14
-		N:    algebraicNotation{},
-		Pos:  unsafeFEN("rn1qkb1r/pp3ppp/2p1pn2/3p4/2PP4/2NQPN2/PP3PPP/R1B1K2R b KQkq - 0 7"),
-		Text: "Nd7",
+		Codec: SAN(),
+		Pos:   unsafeFEN("rn1qkb1r/pp3ppp/2p1pn2/3p4/2PP4/2NQPN2/PP3PPP/R1B1K2R b KQkq - 0 7"),
+		Text:  "Nd7",
 	},
 	{
 		// http://en.lichess.org/W91M4jms#17
-		N:       algebraicNotation{},
-		Pos:     unsafeFEN("r2qk2r/pp1n1ppp/2pbpn2/3p4/2PP4/1PNQPN2/P4PPP/R1B1K2R w KQkq - 1 9"),
-		Text:    "O-O-O-O",
-		PostPos: unsafeFEN("r2qk2r/pp1n1ppp/2pbpn2/3p4/2PP4/1PNQPN2/P4PPP/R1B2RK1 b kq - 2 9"),
+		Codec: SAN(),
+		Pos:   unsafeFEN("r2qk2r/pp1n1ppp/2pbpn2/3p4/2PP4/1PNQPN2/P4PPP/R1B1K2R w KQkq - 1 9"),
+		Text:  "O-O-O-O",
 	},
 	{
 		// http://en.lichess.org/W91M4jms#23
-		N:    algebraicNotation{},
-		Pos:  unsafeFEN("3r1rk1/pp1nqppp/2pbpn2/3p4/2PP4/1PNQPN2/PB3PPP/3RR1K1 b - - 5 12"),
-		Text: "dx4",
+		Codec: SAN(),
+		Pos:   unsafeFEN("3r1rk1/pp1nqppp/2pbpn2/3p4/2PP4/1PNQPN2/PB3PPP/3RR1K1 b - - 5 12"),
+		Text:  "dx4",
 	},
 	{
 		// should not assume pawn for unknown piece type "n"
-		N:    algebraicNotation{},
-		Pos:  unsafeFEN("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"),
-		Text: "nf3",
+		Codec: SAN(),
+		Pos:   unsafeFEN("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"),
+		Text:  "nf3",
 	},
 	{
 		// disambiguation should not allow for this since it is not a capture
-		N:    algebraicNotation{},
-		Pos:  unsafeFEN("rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2"),
-		Text: "bf4",
+		Codec: SAN(),
+		Pos:   unsafeFEN("rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2"),
+		Text:  "bf4",
 	},
 }
 
 func TestInvalidDecoding(t *testing.T) {
 	for _, test := range invalidDecodeTests {
-		if _, err := test.N.Decode(test.Pos, test.Text); err == nil {
+		if _, err := test.Codec.Decode(test.Pos, test.Text); err == nil {
 			t.Fatalf("starting from board\n%s\n expected move notation %s to be invalid", test.Pos.board.Draw(), test.Text)
 		}
 	}
@@ -85,11 +82,14 @@ func TestAlgebraicDisambiguation(t *testing.T) {
 			want: "Rda5",
 		},
 	}
-	notation := algebraicNotation{}
+	codec := SAN()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pos := unsafeFEN(tt.fen)
-			got := notation.Encode(pos, tt.move)
+			got, err := codec.Encode(pos, tt.move)
+			if err != nil {
+				t.Fatalf("Encode() error = %v", err)
+			}
 			if got != tt.want {
 				t.Fatalf("Encode = %q, want %q", got, tt.want)
 			}
@@ -104,12 +104,15 @@ func TestAlgebraicNotationDecodeRoundTripsLegalMoves(t *testing.T) {
 		complexPos,
 		unsafeFEN("r3k2r/pppq1ppp/2npbn2/3Np3/2B1P3/2N2Q2/PPP2PPP/R3K2R w KQkq - 0 10"),
 	}
-	notation := algebraicNotation{}
+	codec := SAN()
 
 	for _, pos := range positions {
 		for _, move := range pos.ValidMovesUnsafe() {
-			encoded := notation.Encode(pos, move)
-			decoded, err := notation.Decode(pos, encoded)
+			encoded, err := codec.Encode(pos, move)
+			if err != nil {
+				t.Fatalf("Encode(%s) from %s: %v", move, pos, err)
+			}
+			decoded, err := codec.Decode(pos, encoded)
 			if err != nil {
 				t.Fatalf("Decode(%q) from %s: %v", encoded, pos, err)
 			}
@@ -121,33 +124,42 @@ func TestAlgebraicNotationDecodeRoundTripsLegalMoves(t *testing.T) {
 }
 
 func TestEncodeUCINotation(t *testing.T) {
-	notation := uciNotation{}
+	codec := UCI()
 	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 	move := Move{s1: E2, s2: E4}
 	expected := "e2e4"
-	result := notation.Encode(pos, move)
+	result, err := codec.Encode(pos, move)
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
 	if result != expected {
 		t.Fatalf("expected %s, got %s", expected, result)
 	}
 }
 
 func TestEncodeUCINotationWithPromotion(t *testing.T) {
-	notation := uciNotation{}
+	codec := UCI()
 	pos := unsafeFEN("8/P7/8/8/8/8/8/8 w - - 0 1")
 	move := Move{s1: A7, s2: A8, promo: Queen}
 	expected := "a7a8q"
-	result := notation.Encode(pos, move)
+	result, err := codec.Encode(pos, move)
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
 	if result != expected {
 		t.Fatalf("expected %s, got %s", expected, result)
 	}
 }
 
 func TestEncodeUCINotationWithInvalidMove(t *testing.T) {
-	notation := uciNotation{}
+	codec := UCI()
 	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 	move := Move{s1: E2, s2: E5}
 	expected := "e2e5"
-	result := notation.Encode(pos, move)
+	result, err := codec.Encode(pos, move)
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
 	if result != expected {
 		t.Fatalf("expected %s, got %s", expected, result)
 	}
@@ -162,7 +174,11 @@ func TestNotationHandlesInvalidPooledStringBuilder(t *testing.T) {
 		{
 			name: "uci encode",
 			run: func() string {
-				return uciNotation{}.Encode(nil, Move{s1: E2, s2: E4})
+				s, err := UCI().Encode(nil, Move{s1: E2, s2: E4})
+				if err != nil {
+					t.Fatalf("UCI().Encode() error = %v", err)
+				}
+				return s
 			},
 			want: "e2e4",
 		},
@@ -170,21 +186,13 @@ func TestNotationHandlesInvalidPooledStringBuilder(t *testing.T) {
 			name: "algebraic encode",
 			run: func() string {
 				pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-				return algebraicNotation{}.Encode(pos, Move{s1: E2, s2: E4})
+				s, err := SAN().Encode(pos, Move{s1: E2, s2: E4})
+				if err != nil {
+					t.Fatalf("SAN().Encode() error = %v", err)
+				}
+				return s
 			},
 			want: "e4",
-		},
-		{
-			name: "move components clean",
-			run: func() string {
-				return moveComponents{
-					piece:      "N",
-					originFile: "g",
-					file:       "f",
-					rank:       "3",
-				}.clean()
-			},
-			want: "Ngf3",
 		},
 		{
 			name: "form source square",
@@ -201,6 +209,60 @@ func TestNotationHandlesInvalidPooledStringBuilder(t *testing.T) {
 			stringPool.Put("not a string builder")
 			if got := tt.run(); got != tt.want {
 				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUCINotationGrammar(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{
+			name:    "invalid UCI notation length",
+			input:   "e2e",
+			wantErr: true,
+		},
+		{
+			name:    "invalid squares in UCI notation",
+			input:   "e9e4",
+			wantErr: true,
+		},
+		{
+			name:    "invalid promotion piece",
+			input:   "a7a8x",
+			wantErr: true,
+		},
+		{
+			name:    "invalid source file character",
+			input:   "i1e4",
+			wantErr: true,
+		},
+		{
+			name:    "invalid destination file character",
+			input:   "e1i4",
+			wantErr: true,
+		},
+		{
+			name:    "invalid destination rank character",
+			input:   "e1e0",
+			wantErr: true,
+		},
+		{
+			name:    "invalid source rank character",
+			input:   "e0e4",
+			wantErr: true,
+		},
+	}
+
+	codec := UCI()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := codec.ValidateSyntax(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ValidateSyntax() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -274,48 +336,6 @@ func TestUCINotationDecode(t *testing.T) {
 			expectedPos: unsafeFEN("r3k1r1/pbppqpb1/1pn3p1/7p/1N4n1/1PP2p1N/PB1P2PP/2QRK1R1 w q - 0 3"),
 		},
 		{
-			name:    "invalid UCI notation length",
-			pos:     nil,
-			input:   "e2e",
-			wantErr: true,
-		},
-		{
-			name:    "invalid squares in UCI notation",
-			pos:     nil,
-			input:   "e9e4",
-			wantErr: true,
-		},
-		{
-			name:    "invalid promotion piece",
-			pos:     nil,
-			input:   "a7a8x",
-			wantErr: true,
-		},
-		{
-			name:    "invalid source file character",
-			pos:     nil,
-			input:   "i1e4",
-			wantErr: true,
-		},
-		{
-			name:    "invalid destination file character",
-			pos:     nil,
-			input:   "e1i4",
-			wantErr: true,
-		},
-		{
-			name:    "invalid destination rank character",
-			pos:     nil,
-			input:   "e1e0",
-			wantErr: true,
-		},
-		{
-			name:    "invalid source rank character",
-			pos:     nil,
-			input:   "e0e4",
-			wantErr: true,
-		},
-		{
 			name:        "valid en passant move",
 			pos:         unsafeFEN("rnbqkbnr/ppp2ppp/4p3/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3"),
 			input:       "e5d6",
@@ -325,10 +345,10 @@ func TestUCINotationDecode(t *testing.T) {
 		},
 	}
 
+	codec := UCI()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			notation := uciNotation{}
-			got, err := notation.Decode(tt.pos, tt.input)
+			got, err := codec.Decode(tt.pos, tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Decode() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -375,9 +395,18 @@ var (
 	}
 )
 
+func mustEncode(t testing.TB, codec MoveTextCodec, pos *Position, m Move) string {
+	t.Helper()
+	s, err := codec.Encode(pos, m)
+	if err != nil {
+		t.Fatalf("Encode(%s) from %s: %v", m, pos, err)
+	}
+	return s
+}
+
 // Benchmarks for UCI notation
 func BenchmarkUCIEncode(b *testing.B) {
-	notation := uciNotation{}
+	codec := UCI()
 	positions := []*Position{startPos, midPos, complexPos}
 	moves := [][]Move{startMoves, midMoves, complexMoves}
 
@@ -387,12 +416,14 @@ func BenchmarkUCIEncode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		pos := positions[i%len(positions)]
 		move := moves[i%len(moves)][i%len(moves[i%len(moves)])]
-		notation.Encode(pos, move)
+		if _, err := codec.Encode(pos, move); err != nil {
+			b.Fatalf("Encode error: %v", err)
+		}
 	}
 }
 
 func BenchmarkUCIDecode(b *testing.B) {
-	notation := uciNotation{}
+	codec := UCI()
 	samples := []struct {
 		pos  *Position
 		text string
@@ -407,7 +438,7 @@ func BenchmarkUCIDecode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		sample := samples[i%len(samples)]
-		_, err := notation.Decode(sample.pos, sample.text)
+		_, err := codec.Decode(sample.pos, sample.text)
 		if err != nil {
 			b.Fatalf("error decoding %s: %s", sample.text, err)
 		}
@@ -416,7 +447,7 @@ func BenchmarkUCIDecode(b *testing.B) {
 
 // Benchmarks for Algebraic notation
 func BenchmarkAlgebraicEncode(b *testing.B) {
-	notation := algebraicNotation{}
+	codec := SAN()
 	positions := []*Position{startPos, midPos, complexPos}
 	moves := [][]Move{startMoves, midMoves, complexMoves}
 
@@ -426,12 +457,14 @@ func BenchmarkAlgebraicEncode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		pos := positions[i%len(positions)]
 		move := moves[i%len(moves)][i%len(moves[i%len(moves)])]
-		notation.Encode(pos, move)
+		if _, err := codec.Encode(pos, move); err != nil {
+			b.Fatalf("Encode error: %v", err)
+		}
 	}
 }
 
 func BenchmarkAlgebraicDecode(b *testing.B) {
-	notation := algebraicNotation{}
+	codec := SAN()
 	samples := []struct {
 		pos  *Position
 		text string
@@ -446,7 +479,7 @@ func BenchmarkAlgebraicDecode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		sample := samples[i%len(samples)]
-		_, err := notation.Decode(sample.pos, sample.text)
+		_, err := codec.Decode(sample.pos, sample.text)
 		if err != nil {
 			b.Fatalf("error decoding %s: %s", sample.text, err)
 		}
@@ -455,7 +488,7 @@ func BenchmarkAlgebraicDecode(b *testing.B) {
 
 // Benchmarks for Long Algebraic notation
 func BenchmarkLongAlgebraicEncode(b *testing.B) {
-	notation := longAlgebraicNotation{}
+	codec := LongAlgebraic()
 	positions := []*Position{startPos, midPos, complexPos}
 	moves := [][]Move{startMoves, midMoves, complexMoves}
 
@@ -465,12 +498,14 @@ func BenchmarkLongAlgebraicEncode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		pos := positions[i%len(positions)]
 		move := moves[i%len(moves)][i%len(moves[i%len(moves)])]
-		notation.Encode(pos, move)
+		if _, err := codec.Encode(pos, move); err != nil {
+			b.Fatalf("Encode error: %v", err)
+		}
 	}
 }
 
 func BenchmarkLongAlgebraicDecode(b *testing.B) {
-	notation := longAlgebraicNotation{}
+	codec := LongAlgebraic()
 	samples := []struct {
 		pos  *Position
 		text string
@@ -485,7 +520,7 @@ func BenchmarkLongAlgebraicDecode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		sample := samples[i%len(samples)]
-		_, err := notation.Decode(sample.pos, sample.text)
+		_, err := codec.Decode(sample.pos, sample.text)
 		if err != nil {
 			b.Fatalf("error decoding %s: %s", sample.text, err)
 		}
@@ -494,7 +529,7 @@ func BenchmarkLongAlgebraicDecode(b *testing.B) {
 
 // Benchmark specific scenarios
 func BenchmarkAlgebraicDecodeComplex(b *testing.B) {
-	notation := algebraicNotation{}
+	codec := SAN()
 	pos := complexPos
 	moves := []string{
 		"Nxf7",    // Capture with check
@@ -506,7 +541,7 @@ func BenchmarkAlgebraicDecodeComplex(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := notation.Decode(pos, moves[i%len(moves)])
+		_, err := codec.Decode(pos, moves[i%len(moves)])
 		if err != nil {
 			b.Fatalf("error decoding %s: %s", moves[i%len(moves)], err)
 		}
@@ -517,16 +552,14 @@ func TestPromotionWithCheck(t *testing.T) {
 	promoPos := unsafeFEN("8/1P2k3/8/8/8/8/8/8 w - - 0 1")
 	promoMove := Move{s1: B7, s2: B8, promo: Queen, tags: Check}
 
-	algebraicNotation := algebraicNotation{}
-	result := algebraicNotation.Encode(promoPos, promoMove)
-	if result != "b8=Q+" {
-		t.Fatalf("Expected 'b8=Q+', got '%s'", result)
+	got := mustEncode(t, SAN(), promoPos, promoMove)
+	if got != "b8=Q" {
+		t.Fatalf("SAN: Expected 'b8=Q', got '%s'", got)
 	}
 
-	longAlgebraicNotation := longAlgebraicNotation{}
-	result = longAlgebraicNotation.Encode(promoPos, promoMove)
-	if result != "b7b8=Q+" {
-		t.Fatalf("Expected 'b7b8=Q+', got '%s'", result)
+	got = mustEncode(t, LongAlgebraic(), promoPos, promoMove)
+	if got != "b7b8=Q" {
+		t.Fatalf("LongAlgebraic: Expected 'b7b8=Q', got '%s'", got)
 	}
 }
 
@@ -534,16 +567,60 @@ func TestPromotionWithCheckFromIssue84(t *testing.T) {
 	promoPos := unsafeFEN("8/1P2k3/8/8/8/8/8/8 w - - 0 1")
 	promoMove := Move{s1: B7, s2: B8, promo: Queen}.WithTag(Check)
 
-	algebraicNotation := algebraicNotation{}
-	result := algebraicNotation.Encode(promoPos, promoMove)
-	if result != "b8=Q+" {
-		t.Fatalf("Algebraic notation: Expected 'b8=Q+', got '%s'", result)
+	got := mustEncode(t, SAN(), promoPos, promoMove)
+	if got != "b8=Q" {
+		t.Fatalf("SAN: Expected 'b8=Q', got '%s'", got)
 	}
 
-	longAlgebraicNotation := longAlgebraicNotation{}
-	result = longAlgebraicNotation.Encode(promoPos, promoMove)
-	if result != "b7b8=Q+" {
-		t.Fatalf("Long Algebraic notation: Expected 'b7b8=Q+', got '%s'", result)
+	got = mustEncode(t, LongAlgebraic(), promoPos, promoMove)
+	if got != "b7b8=Q" {
+		t.Fatalf("LongAlgebraic: Expected 'b7b8=Q', got '%s'", got)
+	}
+}
+
+// Issue 84's original failure was an encoded promotion missing its check
+// suffix. The codec now recomputes the Check tag from the resulting position
+// (not the input), so this test uses a position where the promotion genuinely
+// delivers check: a pawn on b7 promoting on b8 attacks the black king on d8
+// along the 8th rank.
+func TestPromotionDeliversGenuineCheck(t *testing.T) {
+	promoPos := unsafeFEN("3k4/1P6/8/8/8/8/8/4K3 w - - 0 1")
+	promoMove := Move{s1: B7, s2: B8, promo: Queen}
+
+	got := mustEncode(t, SAN(), promoPos, promoMove)
+	if got != "b8=Q+" {
+		t.Fatalf("SAN: Expected 'b8=Q+', got '%s'", got)
+	}
+
+	got = mustEncode(t, LongAlgebraic(), promoPos, promoMove)
+	if got != "b7b8=Q+" {
+		t.Fatalf("LongAlgebraic: Expected 'b7b8=Q+', got '%s'", got)
+	}
+}
+
+func TestNullMoveEncodeDoesNotRequirePosition(t *testing.T) {
+	got, err := SAN().Encode(nil, NewNullMove())
+	if err != nil {
+		t.Fatalf("SAN().Encode(nil, null) error = %v", err)
+	}
+	if got != "Z0" {
+		t.Fatalf("SAN().Encode(nil, null) = %q, want %q", got, "Z0")
+	}
+
+	got, err = LongAlgebraic().Encode(nil, NewNullMove())
+	if err != nil {
+		t.Fatalf("LongAlgebraic().Encode(nil, null) error = %v", err)
+	}
+	if got != "0000" {
+		t.Fatalf("LongAlgebraic().Encode(nil, null) = %q, want %q", got, "0000")
+	}
+
+	got, err = UCI().Encode(nil, NewNullMove())
+	if err != nil {
+		t.Fatalf("UCI().Encode(nil, null) error = %v", err)
+	}
+	if got != "0000" {
+		t.Fatalf("UCI().Encode(nil, null) = %q, want %q", got, "0000")
 	}
 }
 
@@ -581,44 +658,35 @@ func TestIssue84FullGame(t *testing.T) {
 			color = "B"
 		}
 
-		_, err := safeEncode(longAlgebraicNotation{}, mv.Position(), mv.Move())
-		if err != nil {
-			t.Fatalf("Error: longAlgebraicNotation.Encode panic at half-move %d (%d. %s): %v",
+		if _, err := LongAlgebraic().Encode(mv.Position(), mv.Move()); err != nil {
+			t.Fatalf("Error: LongAlgebraic().Encode panic at half-move %d (%d. %s): %v",
 				i, moveNum, color, err)
 		}
 
-		_, err = safeEncode(algebraicNotation{}, mv.Position(), mv.Move())
-		if err != nil {
-			t.Fatalf("Error: algebraicNotation.Encode panic at half-move %d (%d. %s): %v",
+		if _, err := SAN().Encode(mv.Position(), mv.Move()); err != nil {
+			t.Fatalf("Error: SAN().Encode panic at half-move %d (%d. %s): %v",
 				i, moveNum, color, err)
 		}
 	}
-}
-
-func safeEncode(notation encoder, pos *Position, mv Move) (s string, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-		}
-	}()
-	return notation.Encode(pos, mv), nil
 }
 
 // Benchmark promotion scenarios
 func BenchmarkPromotionEncoding(b *testing.B) {
 	promoPos := unsafeFEN("rnbqkbnr/pPpppppp/8/8/8/8/P1PPPPPP/RNBQKBNR w KQkq - 0 1")
 	promoMove := Move{s1: B7, s2: B8, promo: Queen, tags: Check}
-	notations := []notation{
-		uciNotation{},
-		algebraicNotation{},
-		longAlgebraicNotation{},
+	codecs := []MoveTextCodec{
+		UCI(),
+		SAN(),
+		LongAlgebraic(),
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		notation := notations[i%len(notations)]
-		notation.Encode(promoPos, promoMove)
+		codec := codecs[i%len(codecs)]
+		if _, err := codec.Encode(promoPos, promoMove); err != nil {
+			b.Fatalf("Encode error: %v", err)
+		}
 	}
 }

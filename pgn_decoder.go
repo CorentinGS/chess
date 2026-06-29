@@ -142,26 +142,20 @@ func (r PGNRecord) Decode(opts ...PGNOption) (*Game, error) {
 
 // Tags returns the PGN tag pairs in this record without building a Game.
 func (r PGNRecord) Tags() (map[string]string, error) {
-	tokens, err := TokenizeGame(&GameScanned{Raw: r.Raw})
-	if err != nil {
-		return nil, err
-	}
-
+	lex := NewLexer(r.Raw)
 	tags := make(map[string]string)
-	for i := 0; i < len(tokens); i++ {
-		if tokens[i].Type == EOF {
-			break
+	for {
+		tok := lex.NextToken()
+		if tok.Type == EOF || tok.Type != TagStart {
+			return tags, nil
 		}
-		if tokens[i].Type != TagStart {
-			continue
+		key := lex.NextToken()
+		val := lex.NextToken()
+		end := lex.NextToken()
+		if end.Type == TagEnd && key.Type == TagKey && val.Type == TagValue {
+			tags[key.Value] = val.Value
 		}
-		if i+3 >= len(tokens) || tokens[i+1].Type != TagKey || tokens[i+2].Type != TagValue {
-			continue
-		}
-		tags[tokens[i+1].Value] = tokens[i+2].Value
-		i += 3
 	}
-	return tags, nil
 }
 
 // PGNRecords returns an iterator over raw PGN records.
@@ -352,30 +346,35 @@ func PGNEvents(r io.Reader, opts ...PGNOption) iter.Seq2[PGNEvent, error] {
 }
 
 func yieldPGNRecordEvents(record PGNRecord, yield func(PGNEvent, error) bool) bool {
-	tokens, err := TokenizeGame(&GameScanned{Raw: record.Raw})
-	if err != nil {
-		return yield(PGNEvent{}, err)
-	}
-
-	for i := 0; i < len(tokens); i++ {
-		token := tokens[i]
-		event := PGNEvent{Index: record.Index, Offset: record.Offset}
-		switch token.Type {
-		case EOF:
+	lex := NewLexer(record.Raw)
+	var pending *Token
+	for {
+		var tok Token
+		if pending != nil {
+			tok = *pending
+			pending = nil
+		} else {
+			tok = lex.NextToken()
+		}
+		if tok.Type == EOF {
 			return yield(PGNEvent{Kind: PGNGameEnd, Index: record.Index, Offset: record.Offset}, nil)
+		}
+		event := PGNEvent{Index: record.Index, Offset: record.Offset}
+		switch tok.Type {
 		case TagStart:
-			if i+2 < len(tokens) && tokens[i+1].Type == TagKey && tokens[i+2].Type == TagValue {
+			key := lex.NextToken()
+			val := lex.NextToken()
+			lex.NextToken() // TagEnd
+			if key.Type == TagKey && val.Type == TagValue {
 				event.Kind = PGNTag
-				event.Name = tokens[i+1].Value
-				event.Value = tokens[i+2].Value
-				i += 2
+				event.Name = key.Value
+				event.Value = val.Value
 				if !yield(event, nil) {
 					return false
 				}
 			}
 		case CommentStart:
-			comment, next := collectPGNComment(tokens, i+1)
-			i = next
+			comment := collectPGNComment(lex)
 			if comment != "" {
 				event.Kind = PGNComment
 				event.Value = comment
@@ -385,7 +384,7 @@ func yieldPGNRecordEvents(record PGNRecord, yield func(PGNEvent, error) bool) bo
 			}
 		case NAG:
 			event.Kind = PGNNAG
-			event.NAG = token.Value
+			event.NAG = tok.Value
 			if !yield(event, nil) {
 				return false
 			}
@@ -400,46 +399,51 @@ func yieldPGNRecordEvents(record PGNRecord, yield func(PGNEvent, error) bool) bo
 				return false
 			}
 		default:
-			if isPGNMoveToken(token.Type) {
-				move, next := collectPGNMove(tokens, i)
-				i = next - 1
+			if isPGNMoveToken(tok.Type) {
+				move, terminator := collectPGNMove(lex, tok)
 				event.Kind = PGNMove
 				event.Move = move
 				if !yield(event, nil) {
 					return false
 				}
+				pending = &terminator
 			}
 		}
 	}
-
-	return yield(PGNEvent{Kind: PGNGameEnd, Index: record.Index, Offset: record.Offset}, nil)
 }
 
-func collectPGNComment(tokens []Token, start int) (string, int) {
+func collectPGNComment(lex *Lexer) string {
 	var b strings.Builder
-	for i := start; i < len(tokens); i++ {
-		switch tokens[i].Type {
+	lastWasComment := false
+	for {
+		tok := lex.NextToken()
+		switch tok.Type {
 		case COMMENT:
-			b.WriteString(tokens[i].Value)
-			if i+1 < len(tokens) && tokens[i+1].Type == CommandStart && b.Len() > 0 {
+			b.WriteString(tok.Value)
+			lastWasComment = true
+		case CommandStart:
+			if lastWasComment && b.Len() > 0 {
 				b.WriteByte(' ')
 			}
+			lastWasComment = false
 		case CommentEnd:
-			return b.String(), i
+			return b.String()
+		case EOF:
+			return b.String()
 		}
 	}
-	return b.String(), len(tokens)
 }
 
-func collectPGNMove(tokens []Token, start int) (string, int) {
+func collectPGNMove(lex *Lexer, first Token) (string, Token) {
 	var b strings.Builder
-	for i := start; i < len(tokens); i++ {
-		if !isPGNMoveToken(tokens[i].Type) {
-			return b.String(), i
+	b.WriteString(first.Value)
+	for {
+		tok := lex.NextToken()
+		if !isPGNMoveToken(tok.Type) {
+			return b.String(), tok
 		}
-		b.WriteString(tokens[i].Value)
+		b.WriteString(tok.Value)
 	}
-	return b.String(), len(tokens)
 }
 
 func isPGNMoveToken(tokenType TokenType) bool {

@@ -22,7 +22,6 @@ import (
 // Parser holds the state needed during parsing.
 type Parser struct {
 	game         *Game
-	currentMove  *MoveNode
 	tokens       pgnTokenSource
 	moveText     MoveTextCodec
 	token        Token
@@ -69,7 +68,6 @@ func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *Parser {
 	}
 	pos := StartingPosition()
 	tree := newMoveTree(pos)
-	rootMove := tree.Root()
 	parser := &Parser{
 		tokens: tokens,
 		game: &Game{
@@ -78,8 +76,7 @@ func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *Parser {
 			outcome:  NoOutcome,
 			method:   NoMethod,
 		},
-		currentMove: rootMove,
-		moveText:    options.moveTextCodec,
+		moveText: options.moveTextCodec,
 	}
 	token, err := tokens.NextToken()
 	if err != nil {
@@ -109,6 +106,13 @@ func (p *Parser) advance() {
 
 func (p *Parser) atEnd() bool {
 	return p.currentToken().Type == EOF
+}
+
+func (p *Parser) currentMove() *MoveNode {
+	if p == nil || p.game == nil || p.game.tree == nil {
+		return nil
+	}
+	return p.game.tree.Current()
 }
 
 // Parse processes all tokens and returns the complete game.
@@ -154,8 +158,6 @@ func (p *Parser) Parse() (*Game, error) {
 	if err := p.resolveOutcome(); err != nil {
 		return nil, err
 	}
-	p.game.tree.setCurrent(p.currentMove)
-
 	return p.game, nil
 }
 
@@ -285,7 +287,7 @@ func (p *Parser) parseMoveText() error {
 		switch token.Type {
 		case MoveNumber:
 			number, err := strconv.ParseUint(token.Value, 10, 32)
-			if err == nil && p.currentMove != nil {
+			if err == nil && p.currentMove() != nil {
 				moveNumber = number
 				ply = int((moveNumber-1)*2 + 1)
 			}
@@ -317,7 +319,7 @@ func (p *Parser) parseMoveText() error {
 				tok := p.currentToken()
 				switch tok.Type {
 				case NAG:
-					if nagErr := p.currentMove.AddNAG(tok.Value); nagErr != nil {
+					if nagErr := p.currentMove().AddNAG(tok.Value); nagErr != nil {
 						return &ParserError{
 							Message:    nagErr.Error(),
 							TokenValue: tok.Value,
@@ -331,8 +333,8 @@ func (p *Parser) parseMoveText() error {
 					if err != nil {
 						return err
 					}
-					if p.currentMove != nil {
-						p.currentMove.addCommentBlock(block)
+					if current := p.currentMove(); current != nil {
+						current.addCommentBlock(block)
 					}
 				default:
 					break collectLoop
@@ -344,8 +346,8 @@ func (p *Parser) parseMoveText() error {
 			if err != nil {
 				return err
 			}
-			if p.currentMove != nil {
-				p.currentMove.addCommentBlock(block)
+			if current := p.currentMove(); current != nil {
+				current.addCommentBlock(block)
 			}
 
 		case VariationStart:
@@ -642,7 +644,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	p.advance() // consume (
 
 	// Save current state to restore later
-	parentMove := p.currentMove
+	parentMove := p.currentMove()
 	oldCurrent := p.game.tree.Current()
 
 	// For variations at game start, we attach to root
@@ -653,7 +655,6 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 		variationParent = parentMove.parent
 	}
 
-	p.currentMove = variationParent
 	p.game.tree.setCurrent(variationParent)
 
 	moveNumber := parentMoveNumber
@@ -695,12 +696,12 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 			if err != nil {
 				return err
 			}
-			if p.currentMove != nil {
-				p.currentMove.addCommentBlock(block)
+			if current := p.currentMove(); current != nil {
+				current.addCommentBlock(block)
 			}
 
 		case NAG:
-			if nagErr := p.currentMove.AddNAG(p.currentToken().Value); nagErr != nil {
+			if nagErr := p.currentMove().AddNAG(p.currentToken().Value); nagErr != nil {
 				return &ParserError{
 					Message:    nagErr.Error(),
 					TokenValue: p.currentToken().Value,
@@ -733,7 +734,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 				tok := p.currentToken()
 				switch tok.Type {
 				case NAG:
-					if nagErr := p.currentMove.AddNAG(tok.Value); nagErr != nil {
+					if nagErr := p.currentMove().AddNAG(tok.Value); nagErr != nil {
 						return &ParserError{
 							Message:    nagErr.Error(),
 							TokenValue: tok.Value,
@@ -747,8 +748,8 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 					if err != nil {
 						return err
 					}
-					if p.currentMove != nil {
-						p.currentMove.addCommentBlock(block)
+					if current := p.currentMove(); current != nil {
+						current.addCommentBlock(block)
 					}
 				default:
 					break collectVariationAnnotations
@@ -769,7 +770,6 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 
 	p.advance() // consume )
 
-	p.currentMove = parentMove
 	p.game.tree.setCurrent(oldCurrent)
 
 	return nil
@@ -794,15 +794,15 @@ func outcomeFromResultString(s string) Outcome {
 }
 
 func (p *Parser) addMove(move Move, number uint) {
-	node := &MoveNode{move: move, parent: p.currentMove, number: number}
-	p.currentMove.children = append(p.currentMove.children, node)
+	parent := p.currentMove()
+	node := &MoveNode{move: move, parent: parent, number: number}
+	parent.children = append(parent.children, node)
 
 	// Update position
 	if newPos := p.game.currentPosition().Update(move); newPos != nil {
 		node.position = newPos
 	}
 
-	p.currentMove = node
 	p.game.tree.setCurrent(node)
 }
 
@@ -828,18 +828,8 @@ func parsePieceType(s string) PieceType {
 
 // parseSquare converts a square name (e.g., "e4") into a Square.
 func parseSquare(s string) Square {
-	const squareLen = 2
-	if len(s) != squareLen {
+	if len(s) != 2 {
 		return NoSquare
 	}
-
-	file := int(s[0] - 'a')
-	rank := int(s[1] - '1')
-
-	// Validate file and rank are within bounds
-	if file < 0 || file > 7 || rank < 0 || rank > 7 {
-		return NoSquare
-	}
-
-	return Square(rank*8 + file)
+	return squareFromFileRank(s[0], s[1])
 }

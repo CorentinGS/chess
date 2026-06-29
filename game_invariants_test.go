@@ -131,6 +131,23 @@ func TestGameTreeCurrentPositionInvariantAfterPGNParse(t *testing.T) {
 	assertGameTreeCurrentPositionInvariant(t, g)
 }
 
+func TestGameTreeCurrentPositionInvariantAfterPGNParseWithNestedVariations(t *testing.T) {
+	opt, err := PGN(strings.NewReader("1. e4 (1. d4 d5 (1... Nf6)) e5 2. Nf3 *"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	g := NewGame(opt)
+
+	assertGameTreeCurrentPositionInvariant(t, g)
+	if !g.IsAtEnd() {
+		t.Fatalf("parsed tree current = %s, want main-line leaf", g.MoveTree().Current().Move())
+	}
+	if got, want := len(g.MoveTree().Variations(g.MoveTree().Root())), 1; got != want {
+		t.Fatalf("root variations = %d, want %d", got, want)
+	}
+}
+
 func TestGameTreeCurrentPositionInvariantAfterSplitUsesLineLeaf(t *testing.T) {
 	g := NewGame()
 	for _, move := range []string{"e4", "e5", "Nf3"} {

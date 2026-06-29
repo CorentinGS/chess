@@ -29,23 +29,12 @@ var emptyComponents = moveComponents{}
 //nolint:gochecknoglobals // false positive.
 var pgnRegex = regexp.MustCompile(`^(?:([RNBQKP]?)([abcdefgh]?)(\d?)(x?)([abcdefgh])(\d)(=[QRBN])?|(O-O(?:-O)?))([+#!?]|e\.p\.)*$`)
 
-const piecesPoolCapacity = 4
-
 // Use string pools for common strings to reduce allocations.
 var (
 	//nolint:gochecknoglobals // false positive
 	stringPool = sync.Pool{
 		New: func() any {
 			return new(strings.Builder)
-		},
-	}
-
-	// Pre-allocate slices for options to avoid allocations in hot path
-	//nolint:gochecknoglobals // false positive
-	pieceOptionsPool = sync.Pool{
-		New: func() any {
-			s := make([]string, 0, piecesPoolCapacity)
-			return &s // Return pointer to slice
 		},
 	}
 )
@@ -98,28 +87,6 @@ func pieceTypeChar(p PieceType) string {
 		return ""
 	}
 	return pieceTypeToChar[p]
-}
-
-// encoder is the interface implemented by objects that can
-// encode a move into a string given the position.  It is not
-// the encoders responsibility to validate the move.
-type encoder interface {
-	Encode(pos *Position, m Move) string
-}
-
-// decoder is the interface implemented by objects that can
-// decode a string into a move given the position. It is not
-// the decoders responsibility to validate the move.  An error
-// is returned if the string could not be decoded.
-type decoder interface {
-	Decode(pos *Position, s string) (Move, error)
-}
-
-// notation is the interface implemented by objects that can
-// encode and decode moves.
-type notation interface {
-	encoder
-	decoder
 }
 
 // uciNotation is a more computer friendly alternative to algebraic
@@ -295,58 +262,6 @@ func algebraicNotationParts(s string) (moveComponents, error) {
 	}, nil
 }
 
-// cleanMove creates a standardized string from move components.
-func (mc moveComponents) clean() string {
-	// Get a string builder from pool
-	sb := getStringBuilder()
-	sb.Reset()
-	defer stringPool.Put(sb)
-
-	sb.WriteString(mc.piece)
-	sb.WriteString(mc.originFile)
-	sb.WriteString(mc.originRank)
-	sb.WriteString(mc.capture)
-	sb.WriteString(mc.file)
-	sb.WriteString(mc.rank)
-	sb.WriteString(mc.promotes)
-	sb.WriteString(mc.castles)
-
-	return sb.String()
-}
-
-// generateMoveOptions creates possible alternative notations for a move.
-func (mc moveComponents) generateOptions() []string {
-	// Get pre-allocated slice from pool
-	options, ok := pieceOptionsPool.Get().(*[]string)
-	if !ok {
-		options = &[]string{}
-	}
-	*options = (*options)[:0]           // Clear but keep capacity
-	defer pieceOptionsPool.Put(options) // Now passing pointer
-
-	if mc.piece != "" {
-		// Option 1: no origin coordinates
-		*options = append(*options, mc.piece+mc.capture+mc.file+mc.rank+mc.promotes+mc.castles)
-
-		// Option 2: with rank, no file
-		*options = append(*options, mc.piece+mc.originRank+mc.capture+mc.file+mc.rank+mc.promotes+mc.castles)
-
-		// Option 3: with file, no rank
-		*options = append(*options, mc.piece+mc.originFile+mc.capture+mc.file+mc.rank+mc.promotes+mc.castles)
-	} else {
-		if mc.capture != "" {
-			// Pawn capture without rank
-			*options = append(*options, mc.originFile+mc.capture+mc.file+mc.rank+mc.promotes)
-		}
-		if mc.originFile != "" && mc.originRank != "" {
-			// Full coordinates version
-			*options = append(*options, mc.capture+mc.file+mc.rank+mc.promotes)
-		}
-	}
-
-	return *options
-}
-
 // Decode implements the decoder interface.
 func (algebraicNotation) Decode(pos *Position, s string) (Move, error) {
 	// Null move: accept several common spellings used across tools:
@@ -378,67 +293,6 @@ func (algebraicNotation) Decode(pos *Position, s string) (Move, error) {
 		promotion:  algebraicPromotion(components.promotes),
 		canonical:  true,
 	})
-}
-
-func algebraicMoveMatches(pos *Position, m Move, components moveComponents) bool {
-	if components.castles != "" {
-		return matchesCastle(m, components.castles)
-	}
-
-	if components.file == "" || components.rank == "" {
-		return false
-	}
-
-	//nolint:gosec // file is [a-h] (empty-checked above) and rank is [0-9] per the SAN regex; out-of-range ranks fail the m.s2 compare and fit Square (int8).
-	dest := Square((components.file[0] - 'a') + (components.rank[0]-'1')*8)
-	if m.s2 != dest {
-		return false
-	}
-
-	piece := pos.Board().Piece(m.s1)
-	if piece.Type() != algebraicPieceType(components.piece) {
-		return false
-	}
-
-	if components.originFile != "" && m.s1.File().Byte() != components.originFile[0] {
-		return false
-	}
-	if components.originRank != "" && m.s1.Rank().Byte() != components.originRank[0] {
-		return false
-	}
-	if !satisfiesRequiredDisambiguation(pos, m, components) {
-		return false
-	}
-
-	moveCaptures := m.HasTag(Capture) || m.HasTag(EnPassant)
-	if (components.capture != "") != moveCaptures {
-		return false
-	}
-
-	return m.promo == algebraicPromotion(components.promotes)
-}
-
-func satisfiesRequiredDisambiguation(pos *Position, m Move, components moveComponents) bool {
-	if components.originFile == "" && components.originRank == "" {
-		return formS1(pos, m) == ""
-	}
-	if components.originFile != "" && components.originFile[0] != m.s1.File().Byte() {
-		return false
-	}
-	if components.originRank != "" && components.originRank[0] != m.s1.Rank().Byte() {
-		return false
-	}
-	return true
-}
-
-func matchesCastle(m Move, castles string) bool {
-	switch castles {
-	case castleKS:
-		return m.HasTag(KingSideCastle)
-	case castleQS:
-		return m.HasTag(QueenSideCastle)
-	}
-	return false
 }
 
 func algebraicPieceType(piece string) PieceType {
@@ -490,7 +344,7 @@ func (longAlgebraicNotation) Encode(pos *Position, m Move) string {
 		return "O-O-O" + checkChar
 	}
 	p := pos.Board().Piece(m.S1())
-	pChar := charFromPieceType(p.Type())
+	pChar := pieceTypeChar(p.Type())
 	s1Str := m.s1.String()
 	capChar := ""
 	if m.HasTag(Capture) || m.HasTag(EnPassant) {
@@ -578,25 +432,9 @@ func formS1(pos *Position, m Move) string {
 }
 
 func charForPromo(p PieceType) string {
-	c := charFromPieceType(p)
+	c := pieceTypeChar(p)
 	if c != "" {
 		c = "=" + c
 	}
 	return c
-}
-
-func charFromPieceType(p PieceType) string {
-	switch p {
-	case King:
-		return "K"
-	case Queen:
-		return "Q"
-	case Rook:
-		return "R"
-	case Bishop:
-		return "B"
-	case Knight:
-		return "N"
-	}
-	return ""
 }

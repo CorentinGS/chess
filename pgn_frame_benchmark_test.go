@@ -26,3 +26,60 @@ func BenchmarkPGN_Frame_Big(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkPGNRecord_Tags_Big(b *testing.B) {
+	data := readPGNFixture("big.pgn")
+	meta := pgnMeta("big.pgn")
+	b.SetBytes(meta.size)
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for record, err := range PGNRecords(context.Background(), bytes.NewReader(data)) {
+			if err != nil {
+				b.Fatalf("record error: %v", err)
+			}
+			if _, err := record.Tags(); err != nil {
+				b.Fatalf("Tags error: %v", err)
+			}
+		}
+	}
+}
+
+func BenchmarkPGNEvents_Big(b *testing.B) {
+	data := readPGNFixture("big.pgn")
+	meta := pgnMeta("big.pgn")
+	b.SetBytes(meta.size)
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for _, err := range PGNEvents(bytes.NewReader(data)) {
+			if err != nil {
+				b.Fatalf("event error: %v", err)
+			}
+		}
+	}
+}
+
+func BenchmarkPGNRecord_TagsThenDecode_Big(b *testing.B) {
+	data := readPGNFixture("big.pgn")
+	meta := pgnMeta("big.pgn")
+	b.SetBytes(meta.size)
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for record, err := range PGNRecords(context.Background(), bytes.NewReader(data)) {
+			if err != nil {
+				b.Fatalf("record error: %v", err)
+			}
+			if _, err := record.Tags(); err != nil {
+				b.Fatalf("Tags error: %v", err)
+			}
+			if _, err := record.Decode(); err != nil {
+				b.Fatalf("Decode error: %v", err)
+			}
+		}
+	}
+}

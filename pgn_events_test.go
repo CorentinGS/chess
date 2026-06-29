@@ -93,3 +93,21 @@ func TestPGNRecordTagsExtractsTagsWithoutDecodingGame(t *testing.T) {
 		t.Fatal("White tag missing")
 	}
 }
+
+func TestPGNRecordTagsOnTruncatedTag(t *testing.T) {
+	var record chess.PGNRecord
+	for r, err := range chess.PGNRecords(context.Background(), strings.NewReader(`[Event "x"`)) {
+		if err != nil {
+			t.Fatalf("PGNRecords error: %v", err)
+		}
+		record = r
+	}
+
+	tags, err := record.Tags()
+	if err != nil {
+		t.Fatalf("Tags error: %v", err)
+	}
+	if len(tags) != 0 {
+		t.Fatalf("tags = %v, want empty map", tags)
+	}
+}
