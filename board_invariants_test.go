@@ -6,16 +6,10 @@ import (
 )
 
 func TestMailboxConsistency(t *testing.T) {
-	t.Run("starting_position", func(t *testing.T) {
-		g := NewGame()
-		if err := verifyMailboxConsistency(g.Position().Board()); err != nil {
-			t.Fatal(err)
-		}
-	})
+	t.Parallel()
 
-	t.Run("after_quiet_moves", func(t *testing.T) {
-		g := NewGame()
-		moves := []string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "d2d3", "d7d5"}
+	playAndVerify := func(t *testing.T, g *Game, moves []string) {
+		t.Helper()
 		for _, moveStr := range moves {
 			move, err := uciNotation{}.Decode(g.Position(), moveStr)
 			if err != nil {
@@ -28,61 +22,38 @@ func TestMailboxConsistency(t *testing.T) {
 				t.Fatalf("mailbox inconsistent after %s: %v", moveStr, err)
 			}
 		}
+	}
+
+	t.Run("starting_position", func(t *testing.T) {
+		t.Parallel()
+		g := NewGame()
+		if err := verifyMailboxConsistency(g.Position().Board()); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("after_quiet_moves", func(t *testing.T) {
+		t.Parallel()
+		playAndVerify(t, NewGame(), []string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "d2d3", "d7d5"})
 	})
 
 	t.Run("castling", func(t *testing.T) {
-		g := NewGame()
-		moves := []string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "e1g1", "f8c5", "d2d3", "e8g8"}
-		for _, moveStr := range moves {
-			move, err := uciNotation{}.Decode(g.Position(), moveStr)
-			if err != nil {
-				t.Fatalf("failed to parse move %s: %v", moveStr, err)
-			}
-			if _, err := g.Move(move, nil); err != nil {
-				t.Fatalf("failed to play move %s: %v", moveStr, err)
-			}
-			if err := verifyMailboxConsistency(g.Position().Board()); err != nil {
-				t.Fatalf("mailbox inconsistent after castling %s: %v", moveStr, err)
-			}
-		}
+		t.Parallel()
+		playAndVerify(t, NewGame(), []string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "e1g1", "f8c5", "d2d3", "e8g8"})
 	})
 
 	t.Run("en_passant", func(t *testing.T) {
-		g := NewGame()
-		moves := []string{"e2e4", "a7a6", "e4e5", "d7d5", "e5d6"}
-		for _, moveStr := range moves {
-			move, err := uciNotation{}.Decode(g.Position(), moveStr)
-			if err != nil {
-				t.Fatalf("failed to parse move %s: %v", moveStr, err)
-			}
-			if _, err := g.Move(move, nil); err != nil {
-				t.Fatalf("failed to play move %s: %v", moveStr, err)
-			}
-			if err := verifyMailboxConsistency(g.Position().Board()); err != nil {
-				t.Fatalf("mailbox inconsistent after en passant %s: %v", moveStr, err)
-			}
-		}
+		t.Parallel()
+		playAndVerify(t, NewGame(), []string{"e2e4", "a7a6", "e4e5", "d7d5", "e5d6"})
 	})
 
 	t.Run("promotion", func(t *testing.T) {
+		t.Parallel()
 		opt, err := FEN("4k3/P7/8/8/8/8/8/4K3 w - - 0 1")
 		if err != nil {
 			t.Fatal(err)
 		}
-		g := NewGame(opt)
-		moves := []string{"a7a8q"}
-		for _, moveStr := range moves {
-			move, err := uciNotation{}.Decode(g.Position(), moveStr)
-			if err != nil {
-				t.Fatalf("failed to parse move %s: %v", moveStr, err)
-			}
-			if _, err := g.Move(move, nil); err != nil {
-				t.Fatalf("failed to play move %s: %v", moveStr, err)
-			}
-			if err := verifyMailboxConsistency(g.Position().Board()); err != nil {
-				t.Fatalf("mailbox inconsistent after promotion %s: %v", moveStr, err)
-			}
-		}
+		playAndVerify(t, NewGame(opt), []string{"a7a8q"})
 	})
 
 	t.Run("perft_positions", func(t *testing.T) {

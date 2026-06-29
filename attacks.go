@@ -51,7 +51,7 @@ func pinnedRayForPiece(pos *Position, s1 Square) bitboard {
 	return 0
 }
 
-func sliderBitboards(board *Board, c Color) (queen bitboard, rook bitboard, bishop bitboard) {
+func sliderBitboards(board *Board, c Color) (bitboard, bitboard, bitboard) {
 	if c == White {
 		return board.bbWhiteQueen, board.bbWhiteRook, board.bbWhiteBishop
 	}

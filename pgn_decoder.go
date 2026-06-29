@@ -2,6 +2,7 @@ package chess
 
 import (
 	"context"
+	"errors"
 	"io"
 	"iter"
 	"runtime"
@@ -118,7 +119,7 @@ func PGNGames(r io.Reader, opts ...PGNOption) iter.Seq2[*Game, error] {
 		dec := NewPGNDecoder(r, opts...)
 		for {
 			game, err := dec.Decode()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return
 			}
 			if !yield(game, err) || err != nil {
@@ -169,7 +170,7 @@ func PGNRecords(ctx context.Context, r io.Reader, opts ...PGNOption) iter.Seq2[P
 			}
 
 			record, err := framer.next()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return
 			}
 			if !yield(record, err) || err != nil {

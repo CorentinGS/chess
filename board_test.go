@@ -296,7 +296,7 @@ func BenchmarkPieceMailbox(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = board.Piece(chess.A1)
 		_ = board.Piece(chess.E4)
 		_ = board.Piece(chess.H8)

@@ -136,7 +136,7 @@ func BenchmarkFenBoard(b *testing.B) {
 			b.ResetTimer()
 			b.ReportAllocs()
 			// Run the benchmark
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				board, err := fenBoard(bm.fen)
 				if err != nil {
 					b.Fatal(err)

@@ -114,9 +114,10 @@ type Info struct {
 	CPULoad           int
 }
 
-func (i Info) copy() Info {
-	i.PV = append([]chess.Move{}, i.PV...)
-	return i
+func (info *Info) copy() Info {
+	out := *info
+	out.PV = append([]chess.Move{}, info.PV...)
+	return out
 }
 
 func copyInfoSlice(src []Info) []Info {
@@ -136,6 +137,40 @@ func parseInfoInt(field, value string) (int, error) {
 		return 0, fmt.Errorf("uci: invalid info %s %q: %w", field, value, err)
 	}
 	return v, nil
+}
+
+// assignIntField parses value as an integer and assigns it to the Info field
+// identified by field. It returns true when the field was recognised.
+func (info *Info) assignIntField(field, value string) (bool, error) {
+	v, err := parseInfoInt(field, value)
+	if err != nil {
+		return false, err
+	}
+	switch field {
+	case "depth":
+		info.Depth = v
+	case "seldepth":
+		info.Seldepth = v
+	case "multipv":
+		info.Multipv = v
+	case "cp":
+		info.Score.CP = v
+	case "nodes":
+		info.Nodes = v
+	case "currmovenumber":
+		info.CurrentMoveNumber = v
+	case "hashfull":
+		info.Hashfull = v
+	case "tbhits":
+		info.TBHits = v
+	case "nps":
+		info.NPS = v
+	case "cpuload":
+		info.CPULoad = v
+	default:
+		return false, nil
+	}
+	return true, nil
 }
 
 func nextInfoToken(s string) (string, string, bool) {
@@ -215,10 +250,7 @@ func (score Score) LossPct() (float32, error) {
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface and parses.
 // data like the following:
-// info depth 24 seldepth 32 multipv 1 score cp 29 wdl 791 209 0 nodes 5130101 nps 819897 hashfull 967 tbhits 0 time 6257 pv d2d4
-// TODO: Refactor this function to be shorter.
-//
-//nolint:funlen // This function is long because it has to parse a lot of different fields.
+// info depth 24 seldepth 32 multipv 1 score cp 29 wdl 791 209 0 nodes 5130101 nps 819897 hashfull 967 tbhits 0 time 6257 pv d2d4.
 func (info *Info) UnmarshalText(text []byte) error {
 	line := string(text)
 	token, rest, ok := nextInfoToken(line)
@@ -226,8 +258,12 @@ func (info *Info) UnmarshalText(text []byte) error {
 		return fmt.Errorf("uci: invalid info line %s", line)
 	}
 	ref := ""
+	var (
+		s        string
+		nextRest string
+	)
 	for {
-		s, nextRest, ok := nextInfoToken(rest)
+		s, nextRest, ok = nextInfoToken(rest)
 		if !ok {
 			break
 		}
@@ -248,37 +284,13 @@ func (info *Info) UnmarshalText(text []byte) error {
 			continue
 		}
 		switch ref {
-		case "depth":
-			v, err := parseInfoInt("depth", s)
-			if err != nil {
-				return err
-			}
-			info.Depth = v
-		case "seldepth":
-			v, err := parseInfoInt("seldepth", s)
-			if err != nil {
-				return err
-			}
-			info.Seldepth = v
-		case "multipv":
-			v, err := parseInfoInt("multipv", s)
-			if err != nil {
-				return err
-			}
-			info.Multipv = v
-		case "cp":
-			v, err := parseInfoInt("cp", s)
-			if err != nil {
-				return err
-			}
-			info.Score.CP = v
 		case "wdl":
-			draw, nextRest, ok := nextInfoToken(rest)
-			if !ok {
+			draw, drawRest, wdlOK := nextInfoToken(rest)
+			if !wdlOK {
 				return fmt.Errorf("uci: truncated wdl score: %s", line)
 			}
-			loss, afterLoss, ok := nextInfoToken(nextRest)
-			if !ok {
+			loss, afterLoss, wdlOK := nextInfoToken(drawRest)
+			if !wdlOK {
 				return fmt.Errorf("uci: truncated wdl score: %s", line)
 			}
 			rest = afterLoss
@@ -296,66 +308,34 @@ func (info *Info) UnmarshalText(text []byte) error {
 			if err != nil {
 				return err
 			}
-		case "nodes":
-			v, err := parseInfoInt("nodes", s)
-			if err != nil {
-				return err
-			}
-			info.Nodes = v
 		case "mate":
 			v, err := parseInfoInt("mate", s)
 			if err != nil {
 				return err
 			}
 			info.Score.Mate = v
-		case "currmovenumber":
-			v, err := parseInfoInt("currmovenumber", s)
-			if err != nil {
-				return err
-			}
-			info.CurrentMoveNumber = v
-		case "currmove":
-			raw, err := chess.UCI().DecodeRaw(s)
-			if err != nil {
-				return fmt.Errorf("uci: invalid info currmove %q: %w", s, err)
-			}
-			info.CurrentMove = raw.Move()
-		case "hashfull":
-			v, err := parseInfoInt("hashfull", s)
-			if err != nil {
-				return err
-			}
-			info.Hashfull = v
-		case "tbhits":
-			v, err := parseInfoInt("tbhits", s)
-			if err != nil {
-				return err
-			}
-			info.TBHits = v
 		case "time":
 			v, err := parseInfoInt("time", s)
 			if err != nil {
 				return err
 			}
 			info.Time = time.Millisecond * time.Duration(v)
-		case "nps":
-			v, err := parseInfoInt("nps", s)
+		case "currmove":
+			raw, err := chess.UCI().DecodeRaw(s)
 			if err != nil {
-				return err
+				return fmt.Errorf("uci: invalid info currmove %q: %w", s, err)
 			}
-			info.NPS = v
-		case "cpuload":
-			v, err := parseInfoInt("cpuload", s)
-			if err != nil {
-				return err
-			}
-			info.CPULoad = v
+			info.CurrentMove = raw.Move()
 		case "pv":
 			raw, err := chess.UCI().DecodeRaw(s)
 			if err != nil {
 				return fmt.Errorf("uci: invalid info pv move %q: %w", s, err)
 			}
 			info.PV = append(info.PV, raw.Move())
+		default:
+			if _, err := info.assignIntField(ref, s); err != nil {
+				return err
+			}
 		}
 		if ref != "pv" {
 			ref = ""

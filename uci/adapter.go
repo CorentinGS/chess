@@ -33,10 +33,10 @@ func NewSubprocessAdapter(path string) (*SubprocessAdapter, error) {
 	}
 	rIn, wIn := io.Pipe()
 	rOut, wOut := io.Pipe()
-	cmd := exec.Command(path)
+	cmd := exec.Command(path) //nolint:noctx // lifecycle is managed explicitly via Close() which kills the process
 	cmd.Stdin = rIn
 	cmd.Stdout = wOut
-	if err := cmd.Start(); err != nil {
+	if err = cmd.Start(); err != nil {
 		_ = rIn.Close()
 		_ = wIn.Close()
 		_ = rOut.Close()

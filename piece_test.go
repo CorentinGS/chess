@@ -8,6 +8,7 @@ import (
 )
 
 func TestPieceType_FENString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		pt   chess.PieceType
@@ -32,6 +33,7 @@ func TestPieceType_FENString(t *testing.T) {
 }
 
 func TestPieceType_Bytes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		pt   chess.PieceType
@@ -56,6 +58,7 @@ func TestPieceType_Bytes(t *testing.T) {
 }
 
 func TestPieceType_ToPolyglotPromotionValue(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		pt   chess.PieceType
@@ -80,6 +83,7 @@ func TestPieceType_ToPolyglotPromotionValue(t *testing.T) {
 }
 
 func TestPieceType_StringRoundTrip(t *testing.T) {
+	t.Parallel()
 	for _, pt := range chess.PieceTypes() {
 		t.Run(pt.String(), func(t *testing.T) {
 			t.Parallel()
@@ -94,6 +98,7 @@ func TestPieceType_StringRoundTrip(t *testing.T) {
 }
 
 func TestPieceTypeFromByte(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		in   byte
@@ -120,6 +125,7 @@ func TestPieceTypeFromByte(t *testing.T) {
 }
 
 func TestPieceTypeFromString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		in   string

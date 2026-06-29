@@ -325,7 +325,7 @@ func BenchmarkStalemateStatus(b *testing.B) {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		g.Position().Status()
 	}
 }
@@ -341,7 +341,7 @@ func BenchmarkInvalidStalemateStatus(b *testing.B) {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		g.Position().Status()
 	}
 }
@@ -354,7 +354,7 @@ func BenchmarkPositionHash(b *testing.B) {
 	}
 	g := NewGame(fen)
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		g.Position().ZobristHash()
 	}
 }
@@ -1365,7 +1365,7 @@ func FuzzTestPushMoveText(f *testing.F) {
 	f.Add("e4", 1)
 	f.Add("Nb1c3", 2)
 
-	f.Fuzz(func(t *testing.T, move string, codecType int) {
+	f.Fuzz(func(_ *testing.T, move string, codecType int) {
 		game := NewGame()
 
 		var codec MoveTextCodec
@@ -2162,7 +2162,7 @@ func TestMoveVsUnsafeMovePerformance(t *testing.T) {
 
 	// Test Move (with validation)
 	start := time.Now()
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		gameClone := game.Clone()
 		_, err := gameClone.Move(move, nil)
 		if err != nil {
@@ -2173,7 +2173,7 @@ func TestMoveVsUnsafeMovePerformance(t *testing.T) {
 
 	// Test UnsafeMove (without validation)
 	start = time.Now()
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		gameClone := game.Clone()
 		_, err := gameClone.UnsafeMove(move, nil)
 		if err != nil {
@@ -2282,7 +2282,7 @@ func TestPushMoveTextVsUnsafePushMoveTextPerformance(t *testing.T) {
 
 	// Test PushMoveText (with validation)
 	start := time.Now()
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		gameClone := game.Clone()
 		_, err := gameClone.PushMoveText(moveStr, SAN(), nil)
 		if err != nil {
@@ -2293,7 +2293,7 @@ func TestPushMoveTextVsUnsafePushMoveTextPerformance(t *testing.T) {
 
 	// Test UnsafePushMoveText (without validation)
 	start = time.Now()
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		gameClone := game.Clone()
 		_, err := gameClone.UnsafePushMoveText(unsafeMoveStr, UCI(), nil)
 		if err != nil {

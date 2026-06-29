@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -246,8 +247,7 @@ func pawnPromotes(turn Color, dest Square) bool {
 func resolveSANCastle(pos *Position, castle string) (Move, error) {
 	var castles [2]Move
 	count := castleMovesInto(pos, &castles, generateLegalAnnotated)
-	for i := range count {
-		m := castles[i]
+	for _, m := range castles[:count] {
 		if castle == castleKS && m.HasTag(KingSideCastle) {
 			return m, nil
 		}
@@ -259,7 +259,7 @@ func resolveSANCastle(pos *Position, castle string) (Move, error) {
 }
 
 func errorsInvalidSANMove() error {
-	return fmt.Errorf("chess: no legal move found for position")
+	return errors.New("chess: no legal move found for position")
 }
 
 func squareFromFileRank(file, rank byte) Square {

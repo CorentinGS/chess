@@ -240,15 +240,15 @@ func loadPieceSVGs() map[string]string {
 		"internal/pieces/wQ.svg",
 		"internal/pieces/wR.svg",
 	}
-	pieceSVGs := make(map[string]string, len(pieceFiles))
+	svgs := make(map[string]string, len(pieceFiles))
 	for _, f := range pieceFiles {
 		b, err := piecesFS.ReadFile(f)
 		if err != nil {
 			panic(fmt.Sprintf("image: failed to read embedded asset %s: %v", f, err))
 		}
-		pieceSVGs[f] = innerSVG(f, string(b))
+		svgs[f] = innerSVG(f, string(b))
 	}
-	return pieceSVGs
+	return svgs
 }
 
 func innerSVG(name, svg string) string {

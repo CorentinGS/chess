@@ -110,7 +110,7 @@ func findGameStart(data []byte, start int, atEOF bool) int {
 	return start
 }
 
-// Helper to find the start of a game without tags
+// Helper to find the start of a game without tags.
 func findTaglessGameStart(data []byte, start int, atEOF bool) int {
 	// If the first character is not '[', find the next '[' character
 	if start < len(data) && data[start] != '1' {
@@ -260,8 +260,8 @@ func (f *pgnFramer) next() (PGNRecord, error) {
 			if f.eof {
 				return PGNRecord{}, io.EOF
 			}
-			if err := f.readMore(); err != nil && len(f.buffer) == 0 {
-				return PGNRecord{}, err
+			if readErr := f.readMore(); readErr != nil && len(f.buffer) == 0 {
+				return PGNRecord{}, readErr
 			}
 			continue
 		}

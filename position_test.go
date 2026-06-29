@@ -245,14 +245,14 @@ func TestValidMovesIterEarlyReturn(t *testing.T) {
 
 func BenchmarkValidMovesCopy(b *testing.B) {
 	pos := StartingPosition()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = pos.ValidMoves()
 	}
 }
 
 func BenchmarkValidMovesUnsafe(b *testing.B) {
 	pos := StartingPosition()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = pos.ValidMovesUnsafe()
 	}
 }
@@ -328,7 +328,7 @@ func TestZobristHashSamePositionEquivalence(t *testing.T) {
 func BenchmarkSamePositionHash(b *testing.B) {
 	pos1 := StartingPosition()
 	pos2 := StartingPosition()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = pos1.SamePosition(pos2)
 	}
 }
@@ -336,7 +336,7 @@ func BenchmarkSamePositionHash(b *testing.B) {
 func BenchmarkSamePositionString(b *testing.B) {
 	pos1 := StartingPosition()
 	pos2 := StartingPosition()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = pos1.board.String() == pos2.board.String() &&
 			pos1.turn == pos2.turn &&
 			pos1.castleRights.String() == pos2.castleRights.String() &&

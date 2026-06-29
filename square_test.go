@@ -7,6 +7,7 @@ import (
 )
 
 func TestNewSquare_FromFileAndRank(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		f    chess.File
@@ -33,6 +34,7 @@ func TestNewSquare_FromFileAndRank(t *testing.T) {
 }
 
 func TestNewSquare_RoundTripsThroughFileAndRank(t *testing.T) {
+	t.Parallel()
 	for _, sq := range allSquares() {
 		t.Run(sq.String(), func(t *testing.T) {
 			t.Parallel()
@@ -44,6 +46,7 @@ func TestNewSquare_RoundTripsThroughFileAndRank(t *testing.T) {
 }
 
 func TestSquare_StringRoundTrip(t *testing.T) {
+	t.Parallel()
 	for _, sq := range allSquares() {
 		t.Run(sq.String(), func(t *testing.T) {
 			t.Parallel()
@@ -55,6 +58,7 @@ func TestSquare_StringRoundTrip(t *testing.T) {
 }
 
 func TestSquare_Bytes(t *testing.T) {
+	t.Parallel()
 	for _, sq := range allSquares() {
 		t.Run(sq.String(), func(t *testing.T) {
 			t.Parallel()
@@ -70,6 +74,7 @@ func TestSquare_Bytes(t *testing.T) {
 }
 
 func TestSquareFromString(t *testing.T) {
+	t.Parallel()
 	valid := []struct {
 		in   string
 		want chess.Square
@@ -102,6 +107,7 @@ func TestSquareFromString(t *testing.T) {
 }
 
 func TestFile_StringAndByte(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		f    chess.File
@@ -131,6 +137,7 @@ func TestFile_StringAndByte(t *testing.T) {
 }
 
 func TestRank_StringAndByte(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		r    chess.Rank

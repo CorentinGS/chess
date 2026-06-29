@@ -202,7 +202,7 @@ func (c MoveTextCodec) Decode(pos *Position, s string) (Move, error) {
 		return Move{}, fmt.Errorf("%w: %w", ErrInvalidMoveText, err)
 	}
 	if !move.HasTag(Null) {
-		if err := validatePositionMove(pos, move); err != nil {
+		if err = validatePositionMove(pos, move); err != nil {
 			return Move{}, fmt.Errorf("%w: %w", ErrInvalidMoveText, err)
 		}
 	}

@@ -42,8 +42,18 @@ func (CmdUCI) Handle(lines []string, e *Engine) error {
 			continue
 		}
 		o := &Option{}
-		if err = o.UnmarshalText([]byte(text)); err == nil {
+		errOpt := o.UnmarshalText([]byte(text))
+		if errOpt == nil {
 			e.options[o.Name] = *o
+			continue
+		}
+		if e.debug {
+			switch {
+			case strings.HasPrefix(text, "id "):
+				e.logger.Printf("uci: dropping malformed id line %q: %v", text, err)
+			case strings.HasPrefix(text, "option "):
+				e.logger.Printf("uci: dropping malformed option line %q: %v", text, errOpt)
+			}
 		}
 	}
 	return nil
@@ -131,14 +141,15 @@ func (CmdEval) Handle(lines []string, e *Engine) error {
 		}
 		if strings.HasPrefix(text, "Final evaluation") {
 			parts := strings.Fields(text)
-			if len(parts) >= 3 {
-				evalStr := parts[2]
-				eval, err := strconv.ParseFloat(evalStr, 64)
-				if err == nil {
-					e.eval = int(math.Round(eval * 100))
-				}
-				break
+			if len(parts) < 3 {
+				return fmt.Errorf("uci: malformed eval line %q", text)
 			}
+			eval, err := strconv.ParseFloat(parts[2], 64)
+			if err != nil {
+				return fmt.Errorf("uci: invalid eval value %q: %w", parts[2], err)
+			}
+			e.eval = int(math.Round(eval * 100))
+			break
 		}
 	}
 	return nil
@@ -256,38 +267,50 @@ func (CmdGo) IsDone(line string) bool {
 
 func (CmdGo) LockRequired() bool { return true }
 
-func (CmdGo) Handle(lines []string, e *Engine) error {
-	const maxParts = 4
+func parseBestMoveLine(text string, e *Engine) (chess.Move, chess.Move, error) {
+	const minParts = 2
+	const ponderPartIdx = 3
+	const minPonderParts = 4
+	parts := strings.Split(text, " ")
+	if len(parts) < minParts {
+		return chess.Move{}, chess.Move{}, fmt.Errorf("best move not found %s", text)
+	}
+	var position *chess.Position
+	if e.hasPos {
+		position = e.position.Position
+	}
+	bestMove, err := decodeUCIMove(position, parts[1])
+	if err != nil {
+		return chess.Move{}, chess.Move{}, err
+	}
+	var ponderMove chess.Move
+	if len(parts) >= minPonderParts {
+		ponderMove, err = decodeUCIMove(position, parts[ponderPartIdx])
+		if err != nil {
+			return chess.Move{}, chess.Move{}, err
+		}
+	}
+	return bestMove, ponderMove, nil
+}
 
+func (CmdGo) Handle(lines []string, e *Engine) error {
 	results := SearchResults{MultiPVInfo: make([]Info, 1)}
 	for _, text := range lines {
 		if strings.HasPrefix(text, "bestmove") {
-			parts := strings.Split(text, " ")
-			if len(parts) <= 1 {
-				return fmt.Errorf("best move not found %s", text)
-			}
-			var position *chess.Position
-			if e.hasPos {
-				position = e.position.Position
-			}
-			bestMove, err := decodeUCIMove(position, parts[1])
+			bestMove, ponderMove, err := parseBestMoveLine(text, e)
 			if err != nil {
 				return err
 			}
 			results.BestMove = bestMove
-			if len(parts) >= maxParts {
-				ponderMove, decodeErr := decodeUCIMove(position, parts[3])
-				if decodeErr != nil {
-					return decodeErr
-				}
-				results.Ponder = ponderMove
-			}
+			results.Ponder = ponderMove
 			continue
 		}
 
 		info := &Info{}
-		err := info.UnmarshalText([]byte(text))
-		if err != nil {
+		if err := info.UnmarshalText([]byte(text)); err != nil {
+			if e.debug && strings.HasPrefix(text, "info ") {
+				e.logger.Printf("uci: dropping unparseable info line %q: %v", text, err)
+			}
 			continue
 		}
 
@@ -297,10 +320,8 @@ func (CmdGo) Handle(lines []string, e *Engine) error {
 
 		if info.Multipv > 1 && info.Multipv < 300 {
 			currentPVCount := len(results.MultiPVInfo)
-			if info.Multipv > currentPVCount {
-				for i := currentPVCount; i < info.Multipv; i++ {
-					results.MultiPVInfo = append(results.MultiPVInfo, Info{})
-				}
+			for i := currentPVCount; i < info.Multipv; i++ {
+				results.MultiPVInfo = append(results.MultiPVInfo, Info{})
 			}
 			results.MultiPVInfo[info.Multipv-1] = *info
 		}

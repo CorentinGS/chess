@@ -3,28 +3,28 @@ package opening
 import (
 	"bytes"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 
 	"github.com/corentings/chess/v3"
 )
 
-var (
-	defaultBook     *BookECO
-	errDefaultBook  error
-	defaultBookOnce sync.Once
-)
+var defaultBook = mustBook(bytes.NewReader(ecoData))
 
 // DefaultBook returns the standard ECO opening book.
-// The book is parsed lazily on first call and cached for subsequent calls.
 // It is safe for concurrent use.
 func DefaultBook() (*BookECO, error) {
-	defaultBookOnce.Do(func() {
-		defaultBook, errDefaultBook = NewBook(bytes.NewReader(ecoData))
-	})
-	return defaultBook, errDefaultBook
+	return defaultBook, nil
+}
+
+func mustBook(r io.Reader) *BookECO {
+	book, err := NewBook(r)
+	if err != nil {
+		panic(fmt.Errorf("opening: invalid embedded ECO data: %w", err))
+	}
+	return book
 }
 
 // BookECO represents the Encyclopedia of Chess Openings https://en.wikipedia.org/wiki/Encyclopaedia_of_Chess_Openings
@@ -37,8 +37,7 @@ type BookECO struct {
 // NewBook creates a new opening book from an ECO TSV reader.
 // Use this for custom opening data or when you need isolation from the default book.
 // NewBook validates the input during construction so malformed books fail
-// before use. Opening.Game replays validated move paths on demand instead of
-// storing games for every opening.
+// before use. Opening.Game returns a caller-owned clone of the cached game.
 func NewBook(r io.Reader) (*BookECO, error) {
 	b := &BookECO{
 		root: &node{
@@ -63,8 +62,11 @@ func NewBook(r io.Reader) (*BookECO, error) {
 			return nil, fmt.Errorf("opening: ECO row %d: expected at least 4 columns, got %d", rowNum, len(row))
 		}
 		moveList := parseMoveList(row[3])
-		o := newOpening(row[0], row[1], row[3], moveList)
-		if err := b.insertOpening(o); err != nil {
+		o, err := newOpening(row[0], row[1], row[3], moveList)
+		if err != nil {
+			return nil, fmt.Errorf("opening: ECO row %d (%s %s): %w", rowNum, row[0], row[1], err)
+		}
+		if err = b.insertOpening(o); err != nil {
 			return nil, fmt.Errorf("opening: ECO row %d (%s %s): %w", rowNum, row[0], row[1], err)
 		}
 	}
@@ -116,7 +118,7 @@ func (b *BookECO) followPath(n *node, moves []chess.Move) *node {
 
 func (b *BookECO) insertOpening(o *Opening) error {
 	if len(o.moveList) == 0 {
-		return fmt.Errorf("opening has no moves")
+		return errors.New("opening has no moves")
 	}
 
 	n := b.root

@@ -24,7 +24,7 @@ type PolyglotEntry struct {
 // PolyglotMove represents a decoded chess move from a polyglot entry.
 // The coordinates use 0-based indices where:
 // - Files go from 0 (a-file) to 7 (h-file)
-// - Ranks go from 0 (1st rank) to 7 (8th rank)
+// - Ranks go from 0 (1st rank) to 7 (8th rank).
 type PolyglotMove struct {
 	FromFile     int  // Source file (0-7)
 	FromRank     int  // Source rank (0-7)
@@ -96,13 +96,9 @@ func convertPolyglotCastleToUCI(fromFile, toFile, rank byte) (byte, byte, byte, 
 
 func (pm PolyglotMove) ToMove() Move {
 	var moveBuf [5]byte
-	//nolint:gosec // FromFile/FromRank/ToFile/ToRank are 0-7 per the struct doc and &0x7 mask in NewPolyglotMove.
 	moveBuf[0] = 'a' + byte(pm.FromFile)
-	//nolint:gosec // FromFile/FromRank/ToFile/ToRank are 0-7 per the struct doc and &0x7 mask in NewPolyglotMove.
 	moveBuf[1] = '1' + byte(pm.FromRank)
-	//nolint:gosec // FromFile/FromRank/ToFile/ToRank are 0-7 per the struct doc and &0x7 mask in NewPolyglotMove.
 	moveBuf[2] = 'a' + byte(pm.ToFile)
-	//nolint:gosec // FromFile/FromRank/ToFile/ToRank are 0-7 per the struct doc and &0x7 mask in NewPolyglotMove.
 	moveBuf[3] = '1' + byte(pm.ToRank)
 
 	if pm.CastlingMove {
@@ -143,7 +139,7 @@ type BookSource interface {
 	Size() (int64, error)
 }
 
-// ReaderBookSource implements BookSource for io.Reader
+// ReaderBookSource implements BookSource for io.Reader.
 type ReaderBookSource struct {
 	reader    io.Reader
 	data      []byte // Buffered data for Size() implementation
@@ -151,7 +147,7 @@ type ReaderBookSource struct {
 }
 
 // NewReaderBookSource creates a new reader-based book source
-// Note: This will read the entire input into memory to support Size() and multiple reads
+// Note: This will read the entire input into memory to support Size() and multiple reads.
 func NewReaderBookSource(reader io.Reader) (*ReaderBookSource, error) {
 	// Read all data into memory
 	data, err := io.ReadAll(reader)
@@ -166,13 +162,13 @@ func NewReaderBookSource(reader io.Reader) (*ReaderBookSource, error) {
 	}, nil
 }
 
-// Read implements BookSource for ReaderBookSource
-func (r *ReaderBookSource) Read(p []byte) (n int, err error) {
+// Read implements BookSource for ReaderBookSource.
+func (r *ReaderBookSource) Read(p []byte) (int, error) {
 	if r.readIndex >= int64(len(r.data)) {
 		return 0, io.EOF
 	}
 
-	n = copy(p, r.data[r.readIndex:])
+	n := copy(p, r.data[r.readIndex:])
 	r.readIndex += int64(n)
 
 	if n < len(p) {
@@ -181,23 +177,23 @@ func (r *ReaderBookSource) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
-// Size implements BookSource for ReaderBookSource
+// Size implements BookSource for ReaderBookSource.
 func (r *ReaderBookSource) Size() (int64, error) {
 	return int64(len(r.data)), nil
 }
 
-// FileBookSource implements BookSource for files
+// FileBookSource implements BookSource for files.
 type FileBookSource struct {
 	path string
 }
 
-// BytesBookSource implements BookSource for byte slices
+// BytesBookSource implements BookSource for byte slices.
 type BytesBookSource struct {
 	data  []byte
 	index int64
 }
 
-// NewBytesBookSource creates a new memory-based book source
+// NewBytesBookSource creates a new memory-based book source.
 func NewBytesBookSource(data []byte) *BytesBookSource {
 	return &BytesBookSource{
 		data:  data,
@@ -205,13 +201,13 @@ func NewBytesBookSource(data []byte) *BytesBookSource {
 	}
 }
 
-// Read implements BookSource for BytesBookSource
-func (b *BytesBookSource) Read(p []byte) (n int, err error) {
+// Read implements BookSource for BytesBookSource.
+func (b *BytesBookSource) Read(p []byte) (int, error) {
 	if b.index >= int64(len(b.data)) {
 		return 0, io.EOF
 	}
 
-	n = copy(p, b.data[b.index:])
+	n := copy(p, b.data[b.index:])
 	b.index += int64(n)
 
 	if n < len(p) {
@@ -220,12 +216,12 @@ func (b *BytesBookSource) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
-// Size implements BookSource for BytesBookSource
+// Size implements BookSource for BytesBookSource.
 func (b *BytesBookSource) Size() (int64, error) {
 	return int64(len(b.data)), nil
 }
 
-// LoadFromSource loads a polyglot book from any BookSource
+// LoadFromSource loads a polyglot book from any BookSource.
 func LoadFromSource(source BookSource) (*PolyglotBook, error) {
 	size, err := source.Size()
 	if err != nil {
@@ -371,7 +367,7 @@ func DecodeMove(move uint16) PolyglotMove {
 	}
 }
 
-// Helper function to identify castling moves
+// Helper function to identify castling moves.
 func isCastlingMove(fromFile, fromRank, toFile, toRank int) bool {
 	return fromFile == 4 && (fromRank == 0 || fromRank == 7) &&
 		(toFile == 0 || toFile == 7) && toRank == fromRank
@@ -395,7 +391,7 @@ func isCastlingMove(fromFile, fromRank, toFile, toRank int) bool {
 func (book *PolyglotBook) GetRandomMove(positionHash uint64) (*PolyglotEntry, error) {
 	moves := book.FindMoves(positionHash)
 	if len(moves) == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilnil // nil,nil is the documented "no move for this position" signal
 	}
 
 	totalWeight := 0
@@ -403,7 +399,7 @@ func (book *PolyglotBook) GetRandomMove(positionHash uint64) (*PolyglotEntry, er
 		totalWeight += int(move.Weight)
 	}
 	if totalWeight == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilnil // nil,nil is the documented "no weighted move available" signal
 	}
 
 	rn := int(rand.Uint32()) % totalWeight

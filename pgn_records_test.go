@@ -30,7 +30,7 @@ func TestPGNRecordsStreamsRecordsWithIndexAndOffset(t *testing.T) {
 	if records[0].Offset != 2 {
 		t.Fatalf("first offset = %d, want 2", records[0].Offset)
 	}
-	if !strings.Contains(string(records[0].Raw), `[Event "one"]`) {
+	if !strings.Contains(records[0].Raw, `[Event "one"]`) {
 		t.Fatalf("first record raw does not contain first game: %q", records[0].Raw)
 	}
 }

@@ -2,6 +2,7 @@ package chess
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 )
 
@@ -79,7 +80,7 @@ func (t *MoveTree) Variations(parent *MoveNode) []*MoveNode {
 
 func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, error) {
 	if t == nil || t.current == nil {
-		return nil, fmt.Errorf("chess: move tree has no current position")
+		return nil, errors.New("chess: move tree has no current position")
 	}
 	options = cmp.Or(options, &MoveInsertOptions{})
 
@@ -109,13 +110,13 @@ func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, er
 // AddVariation validates and appends move as a variation from parent.
 func (t *MoveTree) AddVariation(parent *MoveNode, move Move) (*MoveNode, error) {
 	if t == nil || t.root == nil {
-		return nil, fmt.Errorf("chess: move tree has no root position")
+		return nil, errors.New("chess: move tree has no root position")
 	}
 	if parent == nil {
 		parent = t.root
 	}
 	if parent.position == nil {
-		return nil, fmt.Errorf("chess: variation parent has no position")
+		return nil, errors.New("chess: variation parent has no position")
 	}
 	if err := validatePositionMove(parent.position, move); err != nil {
 		return nil, err
@@ -255,7 +256,7 @@ func sameMove(a, b Move) bool {
 
 func validatePositionMove(pos *Position, move Move) error {
 	if pos == nil {
-		return fmt.Errorf("no current position")
+		return errors.New("no current position")
 	}
 	if move.HasTag(Null) {
 		return nil
@@ -266,4 +267,45 @@ func validatePositionMove(pos *Position, move Move) error {
 		}
 	}
 	return fmt.Errorf("move %s is not valid for the current position", move.String())
+}
+
+// collectPaths returns all paths from the given move to each leaf node.
+// Each path is represented as a slice of *MoveNode, starting with the given node
+// and ending with a leaf (a move with no children).
+func collectPaths(node *MoveNode) [][]*MoveNode {
+	if node == nil {
+		return nil
+	}
+	// If leaf, return a single path containing this node
+	if len(node.children) == 0 {
+		return [][]*MoveNode{{node}}
+	}
+	// Otherwise, collect paths from each child and prepend this node
+	var paths [][]*MoveNode
+	for _, c := range node.children {
+		childPaths := collectPaths(c)
+		for _, p := range childPaths {
+			path := append([]*MoveNode{node}, p...)
+			paths = append(paths, path)
+		}
+	}
+	return paths
+}
+
+func findClonedMove(original, clone, target *MoveNode) *MoveNode {
+	if original == nil || clone == nil || target == nil {
+		return nil
+	}
+	if original == target {
+		return clone
+	}
+	for i, child := range original.children {
+		if i >= len(clone.children) {
+			return nil
+		}
+		if found := findClonedMove(child, clone.children[i], target); found != nil {
+			return found
+		}
+	}
+	return nil
 }

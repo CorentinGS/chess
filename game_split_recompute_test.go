@@ -114,9 +114,9 @@ func TestSplit_RecomputesTerminalOutcomesFromLeaf(t *testing.T) {
 				}
 				assertNoVariations(t, sg)
 			}
-		if !found {
-			t.Errorf("no split line recomputed to %s/%s", tt.wantOutcome, tt.wantMethod)
-		}
+			if !found {
+				t.Errorf("no split line recomputed to %s/%s", tt.wantOutcome, tt.wantMethod)
+			}
 		})
 	}
 }
@@ -200,7 +200,7 @@ func TestSplit_EmitsAutoDraws(t *testing.T) {
 		// automatic fivefold-repetition draw.
 		g := chess.NewGame()
 		cycle := []string{"Nf3", "Nf6", "Ng1", "Ng8"}
-		for i := 0; i < 4; i++ {
+		for range 4 {
 			for _, m := range cycle {
 				if _, err := g.PushMove(m, nil); err != nil {
 					t.Fatalf("push %s: %v", m, err)

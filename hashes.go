@@ -18,7 +18,7 @@ var polyglotHashesUint64 = func() [len(polyglotHashes)]uint64 {
 	return hashes
 }()
 
-// GetPolyglotHashes returns a reference to the static hash array
+// GetPolyglotHashes returns a reference to the static hash array.
 func GetPolyglotHashes() []string {
 	return polyglotHashes[:]
 }

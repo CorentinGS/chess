@@ -125,7 +125,7 @@ func TestOpeningGameRace(t *testing.T) {
 
 	// Call Game() from multiple goroutines concurrently
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -208,7 +208,7 @@ func TestOpeningGameReturnsCallerOwnedGame(t *testing.T) {
 }
 
 func BenchmarkDefaultBook(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, err := opening.DefaultBook()
 		if err != nil {
 			b.Fatal(err)
@@ -218,7 +218,7 @@ func BenchmarkDefaultBook(b *testing.B) {
 
 func BenchmarkNewBookParse(b *testing.B) {
 	// This benchmark measures the full parse cost
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, _ = opening.NewBook(bytes.NewReader(nil))
 	}
 }

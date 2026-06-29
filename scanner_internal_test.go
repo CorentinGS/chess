@@ -6,8 +6,8 @@ func BenchmarkCheckForResult(b *testing.B) {
 	data := []byte("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0\n[Event ")
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		for j := 0; j < len(data); j++ {
+	for range b.N {
+		for j := range data {
 			checkForResult(data, j)
 		}
 	}

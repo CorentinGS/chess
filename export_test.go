@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"errors"
 	"io"
 	"testing"
 
@@ -13,7 +14,7 @@ func TestMain(m *testing.M) {
 
 func PGN(r io.Reader) (func(*Game), error) {
 	game, err := ParsePGN(r)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return nil, ErrNoGameFound
 	}
 	if err != nil {

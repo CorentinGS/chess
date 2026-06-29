@@ -256,7 +256,7 @@ func (p Piece) String() string {
 }
 
 // DarkString is equivalent to String() except colors reversed for terminal
-// windows in dark mode
+// windows in dark mode.
 func (p Piece) DarkString() string {
 	return pieceDarkUnicodes[int(p)]
 }

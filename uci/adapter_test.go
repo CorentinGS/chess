@@ -1,6 +1,8 @@
 package uci_test
 
 import (
+	"bytes"
+	"log"
 	"strings"
 	"testing"
 
@@ -438,4 +440,138 @@ func Test_FakeAdapter_FullGame(t *testing.T) {
 	if san != "e4" {
 		t.Errorf("expected e4, got %s", san)
 	}
+}
+
+func Test_CmdEval_MalformedReturnsError(t *testing.T) {
+	pos := chess.StartingPosition()
+
+	t.Run("non-numeric value", func(t *testing.T) {
+		fake := &uci.FakeAdapter{
+			Responses: map[string][]string{
+				"eval": {"Final evaluation notanumber"},
+			},
+		}
+		eng := uci.NewWithAdapter(fake)
+		defer eng.Close()
+
+		err := eng.Run(uci.CmdPosition{Position: pos}, uci.CmdEval{})
+		if err == nil {
+			t.Fatal("expected error for malformed eval value, got nil")
+		}
+		if !strings.Contains(err.Error(), "notanumber") {
+			t.Errorf("expected error to mention the bad value, got %v", err)
+		}
+	})
+
+	t.Run("missing value", func(t *testing.T) {
+		fake := &uci.FakeAdapter{
+			Responses: map[string][]string{
+				"eval": {"Final evaluation"},
+			},
+		}
+		eng := uci.NewWithAdapter(fake)
+		defer eng.Close()
+
+		err := eng.Run(uci.CmdPosition{Position: pos}, uci.CmdEval{})
+		if err == nil {
+			t.Fatal("expected error for eval line with no value, got nil")
+		}
+	})
+}
+
+func Test_CmdUCI_MalformedOptionLoggedUnderDebug(t *testing.T) {
+	fake := &uci.FakeAdapter{
+		Responses: map[string][]string{
+			"uci": {
+				"id name TestEngine",
+				"option name Hash type spin default 16 min 1 max 1024",
+				"option name Bad type notatype default 1",
+				"uciok",
+			},
+		},
+	}
+
+	t.Run("logged and non-fatal when debug on", func(t *testing.T) {
+		var buf bytes.Buffer
+		eng := uci.NewWithAdapter(fake, uci.Logger(log.New(&buf, "", 0)), uci.Debug)
+		defer eng.Close()
+
+		if err := eng.Run(uci.CmdUCI{}); err != nil {
+			t.Fatalf("malformed option should not be fatal, got %v", err)
+		}
+
+		opts := eng.Options()
+		if _, ok := opts["Hash"]; !ok {
+			t.Error("expected the valid Hash option to still be parsed")
+		}
+		if _, ok := opts["Bad"]; ok {
+			t.Error("malformed option should not appear in Options()")
+		}
+
+		if !strings.Contains(buf.String(), "dropping malformed option line") {
+			t.Errorf("expected malformed option to be logged, got %q", buf.String())
+		}
+	})
+
+	t.Run("silent when debug off", func(t *testing.T) {
+		var buf bytes.Buffer
+		eng := uci.NewWithAdapter(fake, uci.Logger(log.New(&buf, "", 0)))
+		defer eng.Close()
+
+		if err := eng.Run(uci.CmdUCI{}); err != nil {
+			t.Fatalf("malformed option should not be fatal, got %v", err)
+		}
+		if buf.String() != "" {
+			t.Errorf("expected no logging without debug, got %q", buf.String())
+		}
+	})
+}
+
+func Test_CmdGo_MalformedInfoLineLoggedUnderDebug(t *testing.T) {
+	fake := &uci.FakeAdapter{
+		Responses: map[string][]string{
+			"go": {
+				"info depth abc",
+				"info depth 10 score cp 50 nodes 1000 pv e2e4",
+				"bestmove e2e4",
+			},
+		},
+	}
+
+	t.Run("logged and non-fatal when debug on", func(t *testing.T) {
+		var buf bytes.Buffer
+		eng := uci.NewWithAdapter(fake, uci.Logger(log.New(&buf, "", 0)), uci.Debug)
+		defer eng.Close()
+
+		pos := chess.StartingPosition()
+		if err := eng.Run(uci.CmdPosition{Position: pos}, uci.CmdGo{MoveTime: 100}); err != nil {
+			t.Fatalf("malformed info line should not be fatal, got %v", err)
+		}
+
+		results := eng.SearchResults()
+		if results.BestMove == (chess.Move{}) {
+			t.Fatal("expected best move to still be parsed")
+		}
+		if results.Info.Depth != 10 {
+			t.Errorf("expected valid info depth 10 to survive, got %d", results.Info.Depth)
+		}
+
+		if !strings.Contains(buf.String(), "dropping unparseable info line") {
+			t.Errorf("expected malformed info line to be logged, got %q", buf.String())
+		}
+	})
+
+	t.Run("silent when debug off", func(t *testing.T) {
+		var buf bytes.Buffer
+		eng := uci.NewWithAdapter(fake, uci.Logger(log.New(&buf, "", 0)))
+		defer eng.Close()
+
+		pos := chess.StartingPosition()
+		if err := eng.Run(uci.CmdPosition{Position: pos}, uci.CmdGo{MoveTime: 100}); err != nil {
+			t.Fatalf("malformed info line should not be fatal, got %v", err)
+		}
+		if buf.String() != "" {
+			t.Errorf("expected no logging without debug, got %q", buf.String())
+		}
+	})
 }

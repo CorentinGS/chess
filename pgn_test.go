@@ -72,7 +72,7 @@ var _ = []commentTest{
 func BenchmarkPGN(b *testing.B) {
 	pgn := mustParsePGN("fixtures/pgns/0001.pgn")
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		opt, _ := PGN(strings.NewReader(pgn))
 		NewGame(opt)
 	}
@@ -299,7 +299,7 @@ func TestBigBigPgn(t *testing.T) {
 	for {
 		count++
 		game, err := dec.Decode()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		t.Run(fmt.Sprintf("bigbig pgn : %d", count), func(t *testing.T) {
@@ -774,7 +774,7 @@ func TestPGNAnnotationFidelityVariationsAndExpansion(t *testing.T) {
 	dec := NewPGNDecoder(strings.NewReader(roundTrip), WithPGNExpandVariations())
 	for {
 		if _, err := dec.Decode(); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			t.Fatalf("expanded annotated variation should parse: %v", err)
@@ -1040,7 +1040,7 @@ func TestVariationMoveNumbers(t *testing.T) {
 	checkMoveNumbers = func(m *MoveNode, expectedNum int) {
 		fullMove := (expectedNum-1)/2 + 1
 		for _, child := range m.children {
-			if child.number != 0 && int(child.Ply()) != expectedNum {
+			if child.number != 0 && child.Ply() != expectedNum {
 				t.Errorf("move %s: expected move number %d, got %d", child.Move().String(), expectedNum, child.Ply())
 			}
 			if child.FullMoveNumber() != fullMove {
@@ -1090,7 +1090,7 @@ func BenchmarkPGNWithVariations(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, err := NewPGNDecoder(strings.NewReader(pgn)).Decode()
 		if err != nil {
 			b.Fatalf("parse error: %v", err)
@@ -1154,7 +1154,7 @@ func BenchmarkPGN_Stream_Variations(b *testing.B) {
 	b.SetBytes(int64(len(pgn)))
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		dec := NewPGNDecoder(bytes.NewReader(pgn))
 		for {
 			_, err := dec.Decode()
@@ -1176,7 +1176,7 @@ func benchStreamFixture(b *testing.B, name string) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		dec := NewPGNDecoder(bytes.NewReader(data))
 		games := 0
 		errs := 0

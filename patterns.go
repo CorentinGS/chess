@@ -157,7 +157,7 @@ func pawnMoves(pos *Position, sq Square) bitboard {
 	return capRight | capLeft | upOne | upTwo
 }
 
-func rayStep(from Square, to Square) (fileStep int, rankStep int, diagonal bool) {
+func rayStep(from Square, to Square) (int, int, bool) {
 	fileDelta := int(to.File()) - int(from.File())
 	rankDelta := int(to.Rank()) - int(from.Rank())
 	switch {

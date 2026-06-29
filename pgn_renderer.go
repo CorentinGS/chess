@@ -41,7 +41,7 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 
 	tagPairList := make([]sortableTagPair, len(g.tagPairs))
 
-	var idx uint = 0
+	var idx uint
 	for tag, value := range g.tagPairs {
 		tagPairList[idx] = sortableTagPair{
 			Key:   tag,
@@ -134,7 +134,7 @@ func cmpTags(a, b sortableTagPair) int {
 // resulting string is safe to embed inside a PGN tag value.
 func escapeTagValue(v string) string {
 	var sb strings.Builder
-	for i := 0; i < len(v); i++ {
+	for i := range len(v) {
 		c := v[i]
 		if c == '\\' || c == '"' {
 			sb.WriteByte('\\')
@@ -300,10 +300,9 @@ func writeCommentBlocks(blocks []CommentBlock, sb *strings.Builder) {
 }
 
 func writeEscapedCommentText(sb *strings.Builder, text string, lastByte byte) byte {
-	for i := 0; i < len(text); i++ {
+	for i := range len(text) {
 		if text[i] == '}' {
 			sb.WriteByte('\\')
-			lastByte = '\\'
 		}
 		sb.WriteByte(text[i])
 		lastByte = text[i]

@@ -314,31 +314,8 @@ func (p *Parser) parseMoveText() error {
 			ply++
 
 			// Collect all NAGs and comments that follow the move
-		collectLoop:
-			for {
-				tok := p.currentToken()
-				switch tok.Type {
-				case NAG:
-					if nagErr := p.currentMove().AddNAG(tok.Value); nagErr != nil {
-						return &ParserError{
-							Message:    nagErr.Error(),
-							TokenValue: tok.Value,
-							TokenType:  NAG,
-							Position:   p.position,
-						}
-					}
-					p.advance()
-				case CommentStart:
-					block, err := p.parseComment()
-					if err != nil {
-						return err
-					}
-					if current := p.currentMove(); current != nil {
-						current.addCommentBlock(block)
-					}
-				default:
-					break collectLoop
-				}
+			if err = p.collectMoveAnnotations(); err != nil {
+				return err
 			}
 
 		case CommentStart:
@@ -375,8 +352,7 @@ func (p *Parser) parseMove() (Move, error) {
 		move.tags = KingSideCastle
 		var castles [2]Move
 		count := castleMovesInto(p.game.currentPosition(), &castles, generateLegalAnnotated)
-		for i := range count {
-			m := castles[i]
+		for _, m := range castles[:count] {
 			if m.HasTag(KingSideCastle) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
@@ -399,8 +375,7 @@ func (p *Parser) parseMove() (Move, error) {
 		move.tags = QueenSideCastle
 		var castles [2]Move
 		count := castleMovesInto(p.game.currentPosition(), &castles, generateLegalAnnotated)
-		for i := range count {
-			m := castles[i]
+		for _, m := range castles[:count] {
 			if m.HasTag(QueenSideCastle) {
 				move.s1 = m.S1()
 				move.s2 = m.S2()
@@ -436,13 +411,14 @@ func (p *Parser) parseMove() (Move, error) {
 		p.advance()
 
 		// Check for disambiguation
-		if p.currentToken().Type == FILE {
+		switch p.currentToken().Type {
+		case FILE:
 			moveData.originFile = p.currentToken().Value
 			p.advance()
-		} else if p.currentToken().Type == RANK {
+		case RANK:
 			moveData.originRank = p.currentToken().Value
 			p.advance()
-		} else if p.currentToken().Type == DeambiguationSquare {
+		case DeambiguationSquare:
 			// Full square disambiguation (e.g., "Qe8f7" -> piece: Q, origin: e8, dest: f7)
 			originSquare := p.currentToken().Value
 			if len(originSquare) == 2 {
@@ -455,7 +431,6 @@ func (p *Parser) parseMove() (Move, error) {
 	case FILE:
 		moveData.originFile = p.currentToken().Value
 		p.advance()
-
 	}
 
 	// Handle capture
@@ -602,7 +577,6 @@ func (p *Parser) parseCommand() (CommentItem, error) {
 
 	for p.currentToken().Type != CommandEnd && !p.atEnd() {
 		switch p.currentToken().Type {
-
 		case CommandName:
 			if key != "" {
 				return CommentItem{}, &ParserError{
@@ -638,6 +612,36 @@ func (p *Parser) parseCommand() (CommentItem, error) {
 	}
 
 	return CommentItem{Kind: CommentCommand, Key: key, Value: value}, nil
+}
+
+// collectMoveAnnotations consumes all NAGs and comments immediately following
+// the current move, attaching them to the current move node.
+func (p *Parser) collectMoveAnnotations() error {
+	for {
+		tok := p.currentToken()
+		switch tok.Type {
+		case NAG:
+			if nagErr := p.currentMove().AddNAG(tok.Value); nagErr != nil {
+				return &ParserError{
+					Message:    nagErr.Error(),
+					TokenValue: tok.Value,
+					TokenType:  NAG,
+					Position:   p.position,
+				}
+			}
+			p.advance()
+		case CommentStart:
+			block, err := p.parseComment()
+			if err != nil {
+				return err
+			}
+			if current := p.currentMove(); current != nil {
+				current.addCommentBlock(block)
+			}
+		default:
+			return nil
+		}
+	}
 }
 
 func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
@@ -729,31 +733,8 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 			isBlackMove = !isBlackMove
 
 			// Collect all NAGs and comments that follow the move
-		collectVariationAnnotations:
-			for {
-				tok := p.currentToken()
-				switch tok.Type {
-				case NAG:
-					if nagErr := p.currentMove().AddNAG(tok.Value); nagErr != nil {
-						return &ParserError{
-							Message:    nagErr.Error(),
-							TokenValue: tok.Value,
-							TokenType:  NAG,
-							Position:   p.position,
-						}
-					}
-					p.advance()
-				case CommentStart:
-					block, err := p.parseComment()
-					if err != nil {
-						return err
-					}
-					if current := p.currentMove(); current != nil {
-						current.addCommentBlock(block)
-					}
-				default:
-					break collectVariationAnnotations
-				}
+			if err = p.collectMoveAnnotations(); err != nil {
+				return err
 			}
 
 		default:
@@ -782,11 +763,11 @@ func (p *Parser) parseResult() {
 
 func outcomeFromResultString(s string) Outcome {
 	switch s {
-	case "1-0":
+	case string(WhiteWon):
 		return WhiteWon
-	case "0-1":
+	case string(BlackWon):
 		return BlackWon
-	case "1/2-1/2":
+	case string(Draw):
 		return Draw
 	default:
 		return NoOutcome

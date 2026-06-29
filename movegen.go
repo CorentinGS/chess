@@ -85,21 +85,20 @@ func hasStandardMove(pos *Position) bool {
 	return visitStandardMoves(pos, generateLegalOnly, func(Move) bool { return true })
 }
 
-func visitLegalMoves(pos *Position, mode moveGenerationMode, visit func(Move) bool) bool {
+func visitLegalMoves(pos *Position, mode moveGenerationMode, visit func(Move) bool) {
 	if visitStandardMoves(pos, mode, visit) {
-		return true
+		return
 	}
 	if mode == generateUnsafeOnly {
-		return false
+		return
 	}
 	var castles [2]Move
 	count := castleMovesInto(pos, &castles, mode)
-	for i := range count {
-		if visit(castles[i]) {
-			return true
+	for _, m := range castles[:count] {
+		if visit(m) {
+			return
 		}
 	}
-	return false
 }
 
 func visitStandardMoves(pos *Position, mode moveGenerationMode, visit func(Move) bool) bool {
@@ -133,24 +132,21 @@ func visitStandardMoves(pos *Position, mode moveGenerationMode, visit func(Move)
 
 				m.s1 = s1
 				m.s2 = s2
+				kingSafe := mode == generateLegalOnly && ctx.provesOwnKingSafe(p, s2)
 
 				if (p == WhitePawn && s2.Rank() == Rank8) || (p == BlackPawn && s2.Rank() == Rank1) {
 					for _, pt := range promoPieceTypes {
 						m.promo = pt
-						m.tags = moveTagsForPiece(m, pos, mode, p, mode == generateLegalOnly && ctx.provesOwnKingSafe(p, s2))
-						if moveMatchesMode(m, mode) {
-							if visit(m) {
-								return true
-							}
+						m.tags = moveTagsForPiece(m, pos, mode, p, kingSafe)
+						if moveMatchesMode(m, mode) && visit(m) {
+							return true
 						}
 					}
 				} else {
 					m.promo = 0
-					m.tags = moveTagsForPiece(m, pos, mode, p, mode == generateLegalOnly && ctx.provesOwnKingSafe(p, s2))
-					if moveMatchesMode(m, mode) {
-						if visit(m) {
-							return true
-						}
+					m.tags = moveTagsForPiece(m, pos, mode, p, kingSafe)
+					if moveMatchesMode(m, mode) && visit(m) {
+						return true
 					}
 				}
 			}
@@ -192,7 +188,7 @@ func legalMoveContextFor(pos *Position, mode moveGenerationMode) legalMoveContex
 		checkMask: ^bitboard(0),
 	}
 	if pos.inCheck {
-		ctx.setChecks(pos, kingSq)
+		setChecks(&ctx, pos, kingSq)
 	}
 	return ctx
 }
@@ -216,7 +212,7 @@ func (ctx legalMoveContext) filter(pos *Position, p Piece, s1 Square, moves bitb
 	return moves
 }
 
-func (ctx legalMoveContext) provesOwnKingSafe(p Piece, s2 Square) bool {
+func (ctx legalMoveContext) provesOwnKingSafe(p Piece, _ Square) bool {
 	if p.Type() == King {
 		return false
 	}
@@ -229,7 +225,7 @@ func (ctx legalMoveContext) provesOwnKingSafe(p Piece, s2 Square) bool {
 	return true
 }
 
-func (ctx *legalMoveContext) setChecks(pos *Position, kingSq Square) {
+func setChecks(ctx *legalMoveContext, pos *Position, kingSq Square) {
 	board := pos.board
 	attacker := pos.turn.Other()
 	occ := ^board.emptySqs

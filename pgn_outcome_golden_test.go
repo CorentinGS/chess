@@ -28,7 +28,6 @@ func TestPGNOutcomeGolden(t *testing.T) {
 	}
 
 	for _, pgnPath := range files {
-		pgnPath := pgnPath
 		name := strings.TrimSuffix(filepath.Base(pgnPath), ".pgn")
 		t.Run(name, func(t *testing.T) {
 			data, err := os.ReadFile(pgnPath)

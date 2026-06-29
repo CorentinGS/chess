@@ -13,7 +13,7 @@ func BenchmarkPGN_Frame_Big(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		games := 0
 		for _, err := range PGNRecords(context.Background(), bytes.NewReader(data)) {
 			if err != nil {
@@ -34,7 +34,7 @@ func BenchmarkPGNRecord_Tags_Big(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		for record, err := range PGNRecords(context.Background(), bytes.NewReader(data)) {
 			if err != nil {
 				b.Fatalf("record error: %v", err)
@@ -53,7 +53,7 @@ func BenchmarkPGNEvents_Big(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		for _, err := range PGNEvents(bytes.NewReader(data)) {
 			if err != nil {
 				b.Fatalf("event error: %v", err)
@@ -69,7 +69,7 @@ func BenchmarkPGNRecord_TagsThenDecode_Big(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		for record, err := range PGNRecords(context.Background(), bytes.NewReader(data)) {
 			if err != nil {
 				b.Fatalf("record error: %v", err)

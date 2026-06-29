@@ -795,7 +795,7 @@ func BenchmarkToMoveMap(b *testing.B) {
 
 	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = book.ToMoveMap()
 	}
 }
@@ -805,7 +805,7 @@ func TestFastRandDistribution(t *testing.T) {
 	// quality (that's the std lib's job), just that the helper returns
 	// a uint32 without panicking and produces varying values.
 	seen := make(map[uint32]struct{}, 32)
-	for i := 0; i < 32; i++ {
+	for range 32 {
 		v := fastRand()
 		seen[v] = struct{}{}
 	}

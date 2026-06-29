@@ -4,7 +4,7 @@ import "testing"
 
 func TestClassifyOutcome(t *testing.T) {
 	mateBlackMated := "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4" // Qxf7#, black mated -> WhiteWon
-	mateWhiteMated := "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 3"       // fool's mate, white mated -> BlackWon
+	mateWhiteMated := "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 3"      // fool's mate, white mated -> BlackWon
 	stalemate := "5k2/5P2/5K2/8/8/8/8/8 b - - 0 1"
 	kvk0 := "8/8/8/3k4/3K4/8/8/8 w - - 0 60"      // insufficient material, isolated (clock 0)
 	kvk150 := "8/8/8/3k4/3K4/8/8/8 w - - 150 60"  // insufficient + clock 150 (precedence)

@@ -36,8 +36,8 @@ func classifyOutcome(pos *Position, repetitions int, rules outcomeRules) (Outcom
 		return NoOutcome, NoMethod
 	}
 
-	var outcome Outcome = NoOutcome
-	var method Method = NoMethod
+	var outcome = NoOutcome
+	var method = NoMethod
 
 	if !rules.ignoreFivefold && repetitions >= 5 {
 		outcome = Draw

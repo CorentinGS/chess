@@ -353,9 +353,8 @@ func (pos *Position) Ply() int {
 
 	if pos.turn == White {
 		return (pos.moveCount-1)*2 + 1
-	} else {
-		return (pos.moveCount) * 2
 	}
+	return (pos.moveCount) * 2
 }
 
 // String implements the fmt.Stringer interface and returns a
@@ -372,7 +371,7 @@ func (pos *Position) String() string {
 }
 
 // XFENString() is similar to String() except that it returns a string with
-// the X-FEN format
+// the X-FEN format.
 func (pos *Position) XFENString() string {
 	b := pos.board.String()
 	t := pos.turn.String()
@@ -593,7 +592,7 @@ func pieceZobristIndex(p Piece, sq Square) int {
 func (pos *Position) computeHash() uint64 {
 	var hash uint64
 	// XOR in all pieces
-	for sq := 0; sq < 64; sq++ {
+	for sq := range 64 {
 		p := pos.board.Piece(Square(sq))
 		if p != NoPiece {
 			idx := pieceZobristIndex(p, Square(sq))

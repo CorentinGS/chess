@@ -121,7 +121,7 @@ func TestHashFromFEN(t *testing.T) {
 			hashes[i] = hash
 		}
 
-		for i := 0; i < len(hashes); i++ {
+		for i := range hashes {
 			for j := i + 1; j < len(hashes); j++ {
 				if hashes[i] == hashes[j] {
 					t.Errorf("Expected different hashes for positions %s and %s",
@@ -141,7 +141,7 @@ func BenchmarkHashFromFEN(b *testing.B) {
 	for _, fen := range fens {
 		b.Run(fen, func(b *testing.B) {
 			b.ReportAllocs()
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				_, _ = chess.HashFromFEN(fen)
 			}
 		})

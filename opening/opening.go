@@ -2,6 +2,8 @@
 package opening
 
 import (
+	"fmt"
+
 	"github.com/corentings/chess/v3"
 )
 
@@ -14,28 +16,32 @@ type Opening struct {
 	pgn      string
 }
 
-func newOpening(code, title, pgn string, moveList []string) *Opening {
+func newOpening(code, title, pgn string, moveList []string) (*Opening, error) {
+	game, err := buildGame(moveList)
+	if err != nil {
+		return nil, err
+	}
 	return &Opening{
 		moveList: moveList,
 		code:     code,
 		title:    title,
 		pgn:      pgn,
-		game:     buildGame(moveList),
-	}
+		game:     game,
+	}, nil
 }
 
-func buildGame(moveList []string) *chess.Game {
+func buildGame(moveList []string) (*chess.Game, error) {
 	game := chess.NewGame()
 	for _, moveStr := range moveList {
 		m, err := chess.UCI().Decode(game.Position(), moveStr)
 		if err != nil {
-			return nil
+			return nil, fmt.Errorf("decode move %s: %w", moveStr, err)
 		}
-		if _, err := game.Move(m, nil); err != nil {
-			return nil
+		if _, err = game.Move(m, nil); err != nil {
+			return nil, fmt.Errorf("apply move %s: %w", moveStr, err)
 		}
 	}
-	return game
+	return game, nil
 }
 
 // Code returns the Encyclopaedia of Chess Openings (ECO) code.

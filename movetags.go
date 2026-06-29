@@ -106,10 +106,7 @@ func exposesOwnKingToSlider(m Move, pos *Position) bool {
 	orthogonal := kingSq.File() == m.s1.File() || kingSq.Rank() == m.s1.Rank()
 	if orthogonal {
 		rookBB &^= captured
-		if hvAttack(occ, kingSq)&(queenBB|rookBB) != 0 {
-			return true
-		}
-		return false
+		return hvAttack(occ, kingSq)&(queenBB|rookBB) != 0
 	}
 	bishopBB &^= captured
 	return diaAttack(occ, kingSq)&(queenBB|bishopBB) != 0

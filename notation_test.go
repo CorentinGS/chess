@@ -413,7 +413,7 @@ func BenchmarkUCIEncode(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		pos := positions[i%len(positions)]
 		move := moves[i%len(moves)][i%len(moves[i%len(moves)])]
 		if _, err := codec.Encode(pos, move); err != nil {
@@ -436,7 +436,7 @@ func BenchmarkUCIDecode(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		sample := samples[i%len(samples)]
 		_, err := codec.Decode(sample.pos, sample.text)
 		if err != nil {
@@ -454,7 +454,7 @@ func BenchmarkAlgebraicEncode(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		pos := positions[i%len(positions)]
 		move := moves[i%len(moves)][i%len(moves[i%len(moves)])]
 		if _, err := codec.Encode(pos, move); err != nil {
@@ -477,7 +477,7 @@ func BenchmarkAlgebraicDecode(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		sample := samples[i%len(samples)]
 		_, err := codec.Decode(sample.pos, sample.text)
 		if err != nil {
@@ -495,7 +495,7 @@ func BenchmarkLongAlgebraicEncode(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		pos := positions[i%len(positions)]
 		move := moves[i%len(moves)][i%len(moves[i%len(moves)])]
 		if _, err := codec.Encode(pos, move); err != nil {
@@ -518,7 +518,7 @@ func BenchmarkLongAlgebraicDecode(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		sample := samples[i%len(samples)]
 		_, err := codec.Decode(sample.pos, sample.text)
 		if err != nil {
@@ -540,7 +540,7 @@ func BenchmarkAlgebraicDecodeComplex(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		_, err := codec.Decode(pos, moves[i%len(moves)])
 		if err != nil {
 			b.Fatalf("error decoding %s: %s", moves[i%len(moves)], err)
@@ -683,7 +683,7 @@ func BenchmarkPromotionEncoding(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		codec := codecs[i%len(codecs)]
 		if _, err := codec.Encode(promoPos, promoMove); err != nil {
 			b.Fatalf("Encode error: %v", err)
