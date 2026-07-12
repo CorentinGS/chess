@@ -239,7 +239,7 @@ func newPGNFramer(r io.Reader, opts ...PGNOption) *pgnFramer {
 	options := applyPGNOptions(opts)
 	bufferSize := options.bufferSize
 	if bufferSize <= 0 {
-		bufferSize = 32 * 1024
+		bufferSize = 256 * 1024
 	}
 	return &pgnFramer{reader: bufio.NewReaderSize(r, bufferSize), chunk: make([]byte, bufferSize)}
 }
