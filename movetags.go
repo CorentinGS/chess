@@ -60,7 +60,7 @@ func moveTagsForPiece(m Move, pos *Position, mode moveGenerationMode, p Piece, o
 	// Simulate the move on a temporary board copy so we can test
 	// check status without mutating the actual position.
 	tempBoard := pos.board
-	tempBoard.update(local)
+	tempBoard.update(local, computeMoveEffect(&pos.board, local))
 	if !ownKingSafe && tempBoard.kingSquare(pos.turn) != NoSquare {
 		if isSquareAttackedBy(&tempBoard, tempBoard.kingSquare(pos.turn), pos.turn.Other()) {
 			tags |= inCheck

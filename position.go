@@ -134,80 +134,58 @@ func (pos *Position) Update(m Move) *Position {
 		halfMoveClock:   pos.halfMoveClock,
 		moveCount:       pos.moveCount,
 	}
-	newPos.applyMove(m)
-	// updateHash reads the pre-move board and hash on the original position.
-	newPos.hash = pos.updateHash(m, newPos.castleRights, newPos.enPassantSquare)
+	eff := newPos.applyMove(m)
+	// updateHash reads the pre-move board and hash on the original position,
+	// and consumes the moveEffect that drove the board mutation so the hash
+	// delta and the board read one interpretation of the move's physical facts.
+	newPos.hash = pos.updateHash(m, newPos.castleRights, newPos.enPassantSquare, eff)
 	return newPos
 }
 
-// updateHash computes the new Zobrist hash incrementally from a move.
-func (pos *Position) updateHash(m Move, newCR CastleRights, newEP Square) uint64 {
+// updateHash computes the new Zobrist hash incrementally from a move. It
+// consumes the moveEffect that drove the board mutation so the hash delta and
+// the board read one interpretation of the move's physical facts (en-passant
+// square, castle rook squares, capture target) instead of each re-reading
+// MoveTags and risking drift.
+//
+// newCR and newEP are the post-move castling rights and en-passant target
+// square — these are bookkeeping rules that live in their own helpers
+// (updateCastleRights, updateEnPassantSquare), not in moveEffect, so they are
+// passed in alongside.
+func (pos *Position) updateHash(m Move, newCR CastleRights, newEP Square, eff moveEffect) uint64 {
 	hash := pos.hash
 
 	// Toggle side to move
 	hash ^= polyglotHashesUint64[780]
 
-	// XOR out piece from origin square
-	p := pos.board.Piece(m.s1)
-	oldIdx := pieceZobristIndex(p, m.s1)
+	// XOR out moving piece from origin square
+	oldIdx := pieceZobristIndex(eff.moving, m.s1)
 	if oldIdx >= 0 {
 		hash ^= polyglotHashesUint64[oldIdx]
 	}
 
-	// Determine what piece ends up at destination
-	var destPiece Piece
-	if m.promo != NoPieceType {
-		destPiece = NewPiece(m.promo, pos.turn)
-	} else {
-		destPiece = p
-	}
-	destIdx := pieceZobristIndex(destPiece, m.s2)
+	// XOR in landing piece at destination (a promotion piece when eff.landing != eff.moving)
+	destIdx := pieceZobristIndex(eff.landing, m.s2)
 	if destIdx >= 0 {
 		hash ^= polyglotHashesUint64[destIdx]
 	}
 
-	// Handle captures (including en passant)
-	if m.HasTag(Capture) {
-		captured := pos.board.Piece(m.s2)
-		if captured != NoPiece {
-			capIdx := pieceZobristIndex(captured, m.s2)
-			if capIdx >= 0 {
-				hash ^= polyglotHashesUint64[capIdx]
-			}
-		}
-	}
-	if m.HasTag(EnPassant) {
-		// Captured pawn is adjacent to destination, not on destination
-		var capturedSq Square
-		if pos.turn == White {
-			capturedSq = m.s2 - 8
-		} else {
-			capturedSq = m.s2 + 8
-		}
-		captured := pos.board.Piece(capturedSq)
-		capIdx := pieceZobristIndex(captured, capturedSq)
+	// XOR out captured piece at its square. Normal capture and en passant
+	// share one branch: moveEffect already resolved the en-passant square to
+	// s2±8 when applicable.
+	if eff.capPiece != NoPiece {
+		capIdx := pieceZobristIndex(eff.capPiece, eff.capSq)
 		if capIdx >= 0 {
 			hash ^= polyglotHashesUint64[capIdx]
 		}
 	}
 
-	// Handle castling rook moves
-	if m.HasTag(KingSideCastle) {
-		if pos.turn == White {
-			hash ^= polyglotHashesUint64[pieceZobristIndex(WhiteRook, H1)]
-			hash ^= polyglotHashesUint64[pieceZobristIndex(WhiteRook, F1)]
-		} else {
-			hash ^= polyglotHashesUint64[pieceZobristIndex(BlackRook, H8)]
-			hash ^= polyglotHashesUint64[pieceZobristIndex(BlackRook, F8)]
-		}
-	} else if m.HasTag(QueenSideCastle) {
-		if pos.turn == White {
-			hash ^= polyglotHashesUint64[pieceZobristIndex(WhiteRook, A1)]
-			hash ^= polyglotHashesUint64[pieceZobristIndex(WhiteRook, D1)]
-		} else {
-			hash ^= polyglotHashesUint64[pieceZobristIndex(BlackRook, A8)]
-			hash ^= polyglotHashesUint64[pieceZobristIndex(BlackRook, D8)]
-		}
+	// XOR the castle rook between its origin and destination. The rook piece
+	// is always the moving side's rook; moveEffect carries the squares.
+	if eff.rookFrom != NoSquare {
+		rook := NewPiece(Rook, eff.moving.Color())
+		hash ^= polyglotHashesUint64[pieceZobristIndex(rook, eff.rookFrom)]
+		hash ^= polyglotHashesUint64[pieceZobristIndex(rook, eff.rookTo)]
 	}
 
 	// Update castling rights: XOR out removed rights

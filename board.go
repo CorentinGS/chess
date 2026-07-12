@@ -367,62 +367,55 @@ func (b *Board) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-func (b *Board) update(m Move) {
-	p1 := b.Piece(m.s1)
-	captured := b.Piece(m.s2)
+func (b *Board) update(m Move, eff moveEffect) {
+	if eff.moving == NoPiece {
+		return
+	}
+	p1 := eff.moving
 	s1BB := bbForSquare(m.s1)
 	s2BB := bbForSquare(m.s2)
 
-	if p1 == NoPiece {
-		return
-	}
-
 	whiteSqs := b.whiteSqs
 	blackSqs := b.blackSqs
-	if p1.Color() == White {
-		whiteSqs = (whiteSqs & ^s1BB) | s2BB
-		if captured != NoPiece {
-			blackSqs &^= s2BB
+
+	// Remove the captured piece from the occupancy aggregates before the
+	// moving piece's square changes. Doing the capture removal first means
+	// an unsafe move onto a friendly square (capPiece same color as the
+	// mover) clears capSqBB from the mover's aggregate and then re-adds s2BB
+	// below, so whiteSqs/blackSqs stay consistent with the piece bitboards
+	// and mailbox. Cap-effect semantics for legal captures are unchanged.
+	if eff.capPiece != NoPiece {
+		capSqBB := bbForSquare(eff.capSq)
+		b.setPieceBB(eff.capPiece, b.bbForPiece(eff.capPiece)&^capSqBB)
+		if eff.capPiece.Color() == White {
+			whiteSqs &^= capSqBB
+		} else {
+			blackSqs &^= capSqBB
 		}
-	} else {
-		blackSqs = (blackSqs & ^s1BB) | s2BB
-		if captured != NoPiece {
-			whiteSqs &^= s2BB
-		}
+		b.mailbox[eff.capSq] = NoPiece
 	}
 
-	if captured != NoPiece {
-		b.setPieceBB(captured, b.bbForPiece(captured)&^s2BB)
+	// Move the moving piece between s1 and s2 on the color-occupancy bitboards.
+	if p1.Color() == White {
+		whiteSqs = (whiteSqs &^ s1BB) | s2BB
+	} else {
+		blackSqs = (blackSqs &^ s1BB) | s2BB
 	}
 
 	b.setPieceBB(p1, b.bbForPiece(p1)&^s1BB)
 
-	if m.promo != NoPieceType {
-		newPiece := NewPiece(m.promo, p1.Color())
-		b.setPieceBB(newPiece, b.bbForPiece(newPiece)|s2BB)
-		b.mailbox[m.s1] = NoPiece
-		b.mailbox[m.s2] = newPiece
+	// Place the landing piece at s2 (a promotion piece when eff.landing != p1,
+	// the moving piece otherwise). For normal captures this overwrites the
+	// captured piece's mailbox entry left at m.s2 above.
+	if eff.landing != p1 {
+		b.setPieceBB(eff.landing, b.bbForPiece(eff.landing)|s2BB)
 	} else {
 		b.setPieceBB(p1, b.bbForPiece(p1)|s2BB)
-		b.mailbox[m.s1] = NoPiece
-		b.mailbox[m.s2] = p1
 	}
+	b.mailbox[m.s1] = NoPiece
+	b.mailbox[m.s2] = eff.landing
 
-	if m.HasTag(EnPassant) {
-		if p1.Color() == White {
-			capturedBB := s2BB << 8
-			b.bbBlackPawn = ^capturedBB & b.bbBlackPawn
-			blackSqs &^= capturedBB
-			b.mailbox[m.s2-8] = NoPiece
-		} else {
-			capturedBB := s2BB >> 8
-			b.bbWhitePawn = ^capturedBB & b.bbWhitePawn
-			whiteSqs &^= capturedBB
-			b.mailbox[m.s2+8] = NoPiece
-		}
-	}
-
-	b.moveRookForCastle(m, p1, &whiteSqs, &blackSqs)
+	b.moveRookForCastle(eff, &whiteSqs, &blackSqs)
 
 	b.whiteSqs = whiteSqs
 	b.blackSqs = blackSqs
@@ -433,9 +426,9 @@ func (b *Board) update(m Move) {
 		b.whiteKingSq = m.s2
 	case p1 == BlackKing:
 		b.blackKingSq = m.s2
-	case captured == WhiteKing:
+	case eff.capPiece == WhiteKing:
 		b.whiteKingSq = NoSquare
-	case captured == BlackKing:
+	case eff.capPiece == BlackKing:
 		b.blackKingSq = NoSquare
 	}
 }
@@ -447,28 +440,20 @@ func (b *Board) setPieceBB(p Piece, bb bitboard) {
 }
 
 //nolint:mnd // magic number is used for bitboard shifts.
-func (b *Board) moveRookForCastle(m Move, p1 Piece, whiteSqs, blackSqs *bitboard) {
-	switch {
-	case p1.Color() == White && m.HasTag(KingSideCastle):
-		b.bbWhiteRook = b.bbWhiteRook & ^bbForSquare(H1) | bbForSquare(F1)
-		*whiteSqs = (*whiteSqs & ^bbForSquare(H1)) | bbForSquare(F1)
-		b.mailbox[H1] = NoPiece
-		b.mailbox[F1] = WhiteRook
-	case p1.Color() == White && m.HasTag(QueenSideCastle):
-		b.bbWhiteRook = (b.bbWhiteRook & ^bbForSquare(A1)) | bbForSquare(D1)
-		*whiteSqs = (*whiteSqs & ^bbForSquare(A1)) | bbForSquare(D1)
-		b.mailbox[A1] = NoPiece
-		b.mailbox[D1] = WhiteRook
-	case p1.Color() == Black && m.HasTag(KingSideCastle):
-		b.bbBlackRook = b.bbBlackRook & ^bbForSquare(H8) | bbForSquare(F8)
-		*blackSqs = (*blackSqs & ^bbForSquare(H8)) | bbForSquare(F8)
-		b.mailbox[H8] = NoPiece
-		b.mailbox[F8] = BlackRook
-	case p1.Color() == Black && m.HasTag(QueenSideCastle):
-		b.bbBlackRook = (b.bbBlackRook & ^bbForSquare(A8)) | bbForSquare(D8)
-		*blackSqs = (*blackSqs & ^bbForSquare(A8)) | bbForSquare(D8)
-		b.mailbox[A8] = NoPiece
-		b.mailbox[D8] = BlackRook
+func (b *Board) moveRookForCastle(eff moveEffect, whiteSqs, blackSqs *bitboard) {
+	if eff.rookFrom == NoSquare {
+		return
+	}
+	rookPiece := NewPiece(Rook, eff.moving.Color())
+	fromBB := bbForSquare(eff.rookFrom)
+	toBB := bbForSquare(eff.rookTo)
+	b.setPieceBB(rookPiece, b.bbForPiece(rookPiece)&^fromBB|toBB)
+	b.mailbox[eff.rookFrom] = NoPiece
+	b.mailbox[eff.rookTo] = rookPiece
+	if eff.moving.Color() == White {
+		*whiteSqs = (*whiteSqs &^ fromBB) | toBB
+	} else {
+		*blackSqs = (*blackSqs &^ fromBB) | toBB
 	}
 }
 
