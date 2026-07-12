@@ -15,6 +15,7 @@ package chess
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -343,38 +344,48 @@ func (p *Parser) parseMoveText() error {
 	return nil
 }
 
-// parseMove collects move tokens into a SAN string following the SAN grammar,
-// then delegates to the notation module for resolution.
 func (p *Parser) parseMove() (Move, error) {
-	var sb strings.Builder
+	data := sanMoveData{
+		piece:     Pawn,
+		canonical: p.moveText.Policy() == MoveTextPolicyStrict,
+	}
 
 	// Castling: single token
 	if p.currentToken().Type == KingsideCastle || p.currentToken().Type == QueensideCastle {
-		sb.WriteString(p.currentToken().Value)
+		data.castle = p.currentToken().Value
 		p.advance()
 	} else {
 		// Regular move: piece? disambiguation? capture? square promotion? check?
 		hasPiece := p.currentToken().Type == PIECE
 		if hasPiece {
-			sb.WriteString(p.currentToken().Value)
+			data.piece = algebraicPieceType(p.currentToken().Value)
 			p.advance()
 		}
 
 		// Optional disambiguation (file, rank, or full origin square)
 		switch p.currentToken().Type {
-		case FILE, RANK, DeambiguationSquare:
-			sb.WriteString(p.currentToken().Value)
+		case FILE:
+			data.originFile = p.currentToken().Value
+			p.advance()
+		case RANK:
+			data.originRank = p.currentToken().Value
+			p.advance()
+		case DeambiguationSquare:
+			if value := p.currentToken().Value; len(value) == 2 {
+				data.originFile = value[:1]
+				data.originRank = value[1:]
+			}
 			p.advance()
 		}
 
 		// Optional capture
 		if p.currentToken().Type == CAPTURE {
-			sb.WriteString(p.currentToken().Value)
+			data.capture = true
 			p.advance()
 		}
 
 		// Required destination square
-		if p.currentToken().Type != SQUARE {
+		if p.currentToken().Type != SQUARE || len(p.currentToken().Value) != 2 {
 			return Move{}, &ParserError{
 				Message:    "expected destination square",
 				TokenType:  p.currentToken().Type,
@@ -383,12 +394,11 @@ func (p *Parser) parseMove() (Move, error) {
 			}
 		}
 		destSquare := p.currentToken().Value
-		sb.WriteString(destSquare)
+		data.dest = squareFromFileRank(destSquare[0], destSquare[1])
 		p.advance()
 
 		// Promotion with "="
 		if p.currentToken().Type == PROMOTION {
-			sb.WriteString(p.currentToken().Value)
 			p.advance()
 			if p.currentToken().Type != PromotionPiece {
 				return Move{}, &ParserError{
@@ -398,17 +408,16 @@ func (p *Parser) parseMove() (Move, error) {
 					Position:   p.position,
 				}
 			}
-			sb.WriteString(p.currentToken().Value)
+			data.promotion = algebraicPieceType(p.currentToken().Value)
 			p.advance()
 		} else if p.moveText.Policy() == MoveTextPolicyPGNImport &&
 			!hasPiece &&
 			p.currentToken().Type == PIECE &&
 			len(destSquare) == 2 && (destSquare[1] == '1' || destSquare[1] == '8') {
 			// Import-only promotion without "=" (e.g., e8Q).
-			// normaliseImportSAN in the codec inserts the missing "=".
 			v := p.currentToken().Value
 			if v == "Q" || v == "R" || v == "B" || v == "N" {
-				sb.WriteString(v)
+				data.promotion = algebraicPieceType(v)
 				p.advance()
 			}
 		}
@@ -416,24 +425,13 @@ func (p *Parser) parseMove() (Move, error) {
 
 	// Optional check/checkmate suffix
 	if p.currentToken().Type == CHECK || p.currentToken().Type == CHECKMATE {
-		sb.WriteString(p.currentToken().Value)
 		p.advance()
 	}
 
-	s := sb.String()
-	if s == "" {
-		return Move{}, &ParserError{
-			Message:    "expected move",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
-		}
-	}
-
-	move, err := p.moveText.Decode(p.game.currentPosition(), s)
+	move, err := resolveSANMove(p.game.currentPosition(), data)
 	if err != nil {
 		return Move{}, &ParserError{
-			Message:  strings.TrimPrefix(err.Error(), "chess: "),
+			Message:  strings.TrimPrefix(fmt.Errorf("%w: %w", ErrInvalidMoveText, err).Error(), "chess: "),
 			Position: p.position,
 		}
 	}
