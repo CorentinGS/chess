@@ -265,6 +265,18 @@ func (n *MoveNode) Children() []*MoveNode {
 	return append([]*MoveNode{}, n.children...)
 }
 
+// ChildrenIter returns an allocation-free iterator over the continuations.
+func (n *MoveNode) ChildrenIter(yield func(*MoveNode) bool) {
+	if n == nil {
+		return
+	}
+	for _, continuation := range n.children {
+		if !yield(continuation) {
+			return
+		}
+	}
+}
+
 func (n *MoveNode) Number() int {
 	if n == nil {
 		return 0

@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -350,55 +351,40 @@ func (pos *Position) Ply() int {
 // String implements the fmt.Stringer interface and returns a
 // string with the FEN format: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1.
 func (pos *Position) String() string {
-	b := pos.board.String()
-	t := pos.turn.String()
-	c := pos.castleRights.String()
-	sq := "-"
-	if pos.enPassantSquare != NoSquare {
-		sq = pos.enPassantSquare.String()
+	buf := pos.appendPositionKey(make([]byte, 0, 90), pos.enPassantSquare)
+	buf = append(buf, ' ')
+	buf = strconv.AppendInt(buf, int64(pos.halfMoveClock), 10)
+	buf = append(buf, ' ')
+	buf = strconv.AppendInt(buf, int64(pos.moveCount), 10)
+	return string(buf)
+}
+
+// PositionKey returns the four FEN fields that identify a position, without
+// the half-move clock and full-move number.
+func (pos *Position) PositionKey() string {
+	return string(pos.appendPositionKey(make([]byte, 0, 86), pos.enPassantSquare))
+}
+
+func (pos *Position) appendPositionKey(buf []byte, enPassantSquare Square) []byte {
+	buf = pos.board.appendFEN(buf)
+	buf = append(buf, ' ', pos.turn.String()[0], ' ')
+	buf = append(buf, pos.castleRights.String()...)
+	buf = append(buf, ' ')
+	if enPassantSquare == NoSquare {
+		return append(buf, '-')
 	}
-	return fmt.Sprintf("%s %s %s %s %d %d", b, t, c, sq, pos.halfMoveClock, pos.moveCount)
+	return append(buf, enPassantSquare.String()...)
 }
 
 // XFENString() is similar to String() except that it returns a string with
 // the X-FEN format.
 func (pos *Position) XFENString() string {
-	b := pos.board.String()
-	t := pos.turn.String()
-	c := pos.castleRights.String()
-	sq := "-"
-	if pos.enPassantSquare != NoSquare {
-		// Check if there is a pawn in a position to capture en passant
-		var rank Rank
-		if pos.turn == White {
-			rank = Rank5
-		} else {
-			rank = Rank4
-		}
-		// The en passant target square will always be on the rank opposite the current turn's pawns
-		file := pos.enPassantSquare.File()
-		potentialPawnFiles := []File{file - 1, file + 1} // Pawns that could capture en passant will be on an adjacent file
-
-		for _, f := range potentialPawnFiles {
-			if f < FileA || f > FileH { // Ensure file is within bounds
-				continue
-			}
-
-			potentialPawnSquare := NewSquare(f, rank)
-			potentialPawn := pos.board.Piece(potentialPawnSquare)
-			if potentialPawn == NoPiece {
-				continue
-			}
-			if potentialPawn.Type() != Pawn {
-				continue
-			}
-			if potentialPawn.Color() == pos.turn {
-				sq = pos.enPassantSquare.String()
-				break
-			}
-		}
-	}
-	return fmt.Sprintf("%s %s %s %s %d %d", b, t, c, sq, pos.halfMoveClock, pos.moveCount)
+	buf := pos.appendPositionKey(make([]byte, 0, 90), pos.relevantEnPassantSquare())
+	buf = append(buf, ' ')
+	buf = strconv.AppendInt(buf, int64(pos.halfMoveClock), 10)
+	buf = append(buf, ' ')
+	buf = strconv.AppendInt(buf, int64(pos.moveCount), 10)
+	return string(buf)
 }
 
 // ZobristHash returns the Zobrist hash of the position.

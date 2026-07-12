@@ -264,6 +264,13 @@ func BenchmarkPositionString(b *testing.B) {
 	}
 }
 
+func BenchmarkPositionKey(b *testing.B) {
+	pos := StartingPosition()
+	for b.Loop() {
+		_ = pos.PositionKey()
+	}
+}
+
 func BenchmarkPositionXFENString(b *testing.B) {
 	pos := StartingPosition()
 	for b.Loop() {

@@ -452,6 +452,14 @@ func BenchmarkMoveNodeChildren(b *testing.B) {
 	}
 }
 
+func BenchmarkMoveNodeChildrenIter(b *testing.B) {
+	node := &MoveNode{children: make([]*MoveNode, 8)}
+	for b.Loop() {
+		for range node.ChildrenIter {
+		}
+	}
+}
+
 func moveIsValid(pos *Position, m *Move, useTags bool) bool {
 	for _, move := range pos.ValidMoves() {
 		if move.s1 == m.s1 && move.s2 == m.s2 && move.promo == m.promo {

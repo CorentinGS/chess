@@ -254,11 +254,12 @@ func (b *Board) drawForBlack(darkMode bool) string {
 // String implements the fmt.Stringer interface and returns
 // a string in the FEN board format: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR.
 func (b *Board) String() string {
+	return string(b.appendFEN(make([]byte, 0, 71)))
+}
+
+func (b *Board) appendFEN(buf []byte) []byte {
 	const maxRankValue = 7
 	const numOfFiles = 8
-
-	// Use a buffer to build the string
-	buf := make([]byte, 0, 71)
 
 	// Buffer to count empty squares
 	emptyCount := 0
@@ -297,8 +298,7 @@ func (b *Board) String() string {
 		}
 	}
 
-	// Convert to string once at the end
-	return string(buf)
+	return buf
 }
 
 // Piece returns the piece for the given square.

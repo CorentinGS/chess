@@ -15,7 +15,6 @@ package chess
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -413,7 +412,7 @@ func (p *Parser) parseMove() (Move, error) {
 		} else if p.moveText.Policy() == MoveTextPolicyPGNImport &&
 			!hasPiece &&
 			p.currentToken().Type == PIECE &&
-			len(destSquare) == 2 && (destSquare[1] == '1' || destSquare[1] == '8') {
+			(destSquare[1] == '1' || destSquare[1] == '8') {
 			// Import-only promotion without "=" (e.g., e8Q).
 			v := p.currentToken().Value
 			if v == "Q" || v == "R" || v == "B" || v == "N" {
@@ -431,7 +430,7 @@ func (p *Parser) parseMove() (Move, error) {
 	move, err := resolveSANMove(p.game.currentPosition(), data)
 	if err != nil {
 		return Move{}, &ParserError{
-			Message:  strings.TrimPrefix(fmt.Errorf("%w: %w", ErrInvalidMoveText, err).Error(), "chess: "),
+			Message:  strings.TrimPrefix(ErrInvalidMoveText.Error()+": "+err.Error(), "chess: "),
 			Position: p.position,
 		}
 	}
