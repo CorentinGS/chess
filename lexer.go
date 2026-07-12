@@ -421,7 +421,18 @@ func (l *Lexer) readChar() {
 
 func (l *Lexer) readTagValue() Token {
 	l.readChar() // skip opening quote
+	position := l.position
+	for l.ch != '"' && l.ch != '\\' && l.ch != 0 {
+		l.readChar()
+	}
+	if l.ch != '\\' {
+		value := l.input[position:l.position]
+		l.readChar() // skip closing quote
+		return Token{Type: TagValue, Value: value}
+	}
+
 	var value strings.Builder
+	value.WriteString(l.input[position:l.position])
 	for l.ch != '"' && l.ch != 0 {
 		if l.ch == '\\' {
 			next := l.peekChar()
