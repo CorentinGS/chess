@@ -343,191 +343,101 @@ func (p *Parser) parseMoveText() error {
 	return nil
 }
 
-// parseMove processes tokens until it has a complete move, then validates against legal moves.
+// parseMove collects move tokens into a SAN string following the SAN grammar,
+// then delegates to the notation module for resolution.
 func (p *Parser) parseMove() (Move, error) {
-	move := Move{}
+	var sb strings.Builder
 
-	// Handle castling first as it's a special case
-	if p.currentToken().Type == KingsideCastle {
-		move.tags = KingSideCastle
-		var castles [2]Move
-		count := castleMovesInto(p.game.currentPosition(), &castles, generateLegalAnnotated)
-		for _, m := range castles[:count] {
-			if m.HasTag(KingSideCastle) {
-				move.s1 = m.S1()
-				move.s2 = m.S2()
-				if m.HasTag(Check) {
-					move = move.WithTag(Check)
-				}
-				p.advance()
-				return move, nil
-			}
-		}
-		return Move{}, &ParserError{
-			Message:    "illegal kingside castle",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
-		}
-	}
-
-	if p.currentToken().Type == QueensideCastle {
-		move.tags = QueenSideCastle
-		var castles [2]Move
-		count := castleMovesInto(p.game.currentPosition(), &castles, generateLegalAnnotated)
-		for _, m := range castles[:count] {
-			if m.HasTag(QueenSideCastle) {
-				move.s1 = m.S1()
-				move.s2 = m.S2()
-				if m.HasTag(Check) {
-					move = move.WithTag(Check)
-				}
-				p.advance()
-				return move, nil
-			}
-		}
-		return Move{}, &ParserError{
-			Message:    "illegal queenside castle",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
-		}
-	}
-
-	// Parse regular move
-	var moveData struct {
-		piece      string    // The piece type (if any)
-		originFile string    // Disambiguation file
-		originRank string    // Disambiguation rank
-		destSquare string    // Destination square
-		isCapture  bool      // Whether it's a capture
-		promotion  PieceType // Promotion piece type
-	}
-
-	// First token could be piece, file (for pawn moves), or square
-	switch p.currentToken().Type {
-	case PIECE:
-		moveData.piece = p.currentToken().Value
+	// Castling: single token
+	if p.currentToken().Type == KingsideCastle || p.currentToken().Type == QueensideCastle {
+		sb.WriteString(p.currentToken().Value)
 		p.advance()
+	} else {
+		// Regular move: piece? disambiguation? capture? square promotion? check?
+		hasPiece := p.currentToken().Type == PIECE
+		if hasPiece {
+			sb.WriteString(p.currentToken().Value)
+			p.advance()
+		}
 
-		// Check for disambiguation
+		// Optional disambiguation (file, rank, or full origin square)
 		switch p.currentToken().Type {
-		case FILE:
-			moveData.originFile = p.currentToken().Value
-			p.advance()
-		case RANK:
-			moveData.originRank = p.currentToken().Value
-			p.advance()
-		case DeambiguationSquare:
-			// Full square disambiguation (e.g., "Qe8f7" -> piece: Q, origin: e8, dest: f7)
-			originSquare := p.currentToken().Value
-			if len(originSquare) == 2 {
-				moveData.originFile = string(originSquare[0])
-				moveData.originRank = string(originSquare[1])
-			}
+		case FILE, RANK, DeambiguationSquare:
+			sb.WriteString(p.currentToken().Value)
 			p.advance()
 		}
 
-	case FILE:
-		moveData.originFile = p.currentToken().Value
-		p.advance()
-	}
-
-	// Handle capture
-	if p.currentToken().Type == CAPTURE {
-		moveData.isCapture = true
-		p.advance()
-	}
-
-	// Get destination square
-	if p.currentToken().Type != SQUARE {
-		return Move{}, &ParserError{
-			Message:    "expected destination square",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
+		// Optional capture
+		if p.currentToken().Type == CAPTURE {
+			sb.WriteString(p.currentToken().Value)
+			p.advance()
 		}
-	}
-	moveData.destSquare = p.currentToken().Value
-	p.advance()
 
-	// Get target square before promotion handling so import-only promotion
-	// spellings such as e8Q can be recognised without consuming ordinary
-	// piece tokens after non-promotion moves.
-	targetSquare := parseSquare(moveData.destSquare)
-	if targetSquare == NoSquare {
-		return Move{}, &ParserError{
-			Message:    "invalid destination square",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
-		}
-	}
-
-	// Handle promotion
-	if p.currentToken().Type == PROMOTION {
-		p.advance()
-		if p.currentToken().Type != PromotionPiece {
+		// Required destination square
+		if p.currentToken().Type != SQUARE {
 			return Move{}, &ParserError{
-				Message:    "expected promotion piece",
+				Message:    "expected destination square",
 				TokenType:  p.currentToken().Type,
 				TokenValue: p.currentToken().Value,
 				Position:   p.position,
 			}
 		}
-		moveData.promotion = parsePieceType(p.currentToken().Value)
+		destSquare := p.currentToken().Value
+		sb.WriteString(destSquare)
 		p.advance()
-	}
-	if p.moveText.Policy() == MoveTextPolicyPGNImport &&
-		moveData.promotion == NoPieceType &&
-		moveData.piece == "" &&
-		p.currentToken().Type == PIECE &&
-		isPromotionDestination(targetSquare) {
-		promo := parsePieceType(p.currentToken().Value)
-		switch promo {
-		case Queen, Rook, Bishop, Knight:
-			moveData.promotion = promo
+
+		// Promotion with "="
+		if p.currentToken().Type == PROMOTION {
+			sb.WriteString(p.currentToken().Value)
 			p.advance()
+			if p.currentToken().Type != PromotionPiece {
+				return Move{}, &ParserError{
+					Message:    "expected promotion piece",
+					TokenType:  p.currentToken().Type,
+					TokenValue: p.currentToken().Value,
+					Position:   p.position,
+				}
+			}
+			sb.WriteString(p.currentToken().Value)
+			p.advance()
+		} else if p.moveText.Policy() == MoveTextPolicyPGNImport &&
+			!hasPiece &&
+			p.currentToken().Type == PIECE &&
+			len(destSquare) == 2 && (destSquare[1] == '1' || destSquare[1] == '8') {
+			// Import-only promotion without "=" (e.g., e8Q).
+			// normaliseImportSAN in the codec inserts the missing "=".
+			v := p.currentToken().Value
+			if v == "Q" || v == "R" || v == "B" || v == "N" {
+				sb.WriteString(v)
+				p.advance()
+			}
 		}
 	}
 
-	movePieceType := Pawn
-	if moveData.piece != "" {
-		movePieceType = PieceTypeFromString(moveData.piece)
+	// Optional check/checkmate suffix
+	if p.currentToken().Type == CHECK || p.currentToken().Type == CHECKMATE {
+		sb.WriteString(p.currentToken().Value)
+		p.advance()
 	}
 
-	matched, err := resolveSANMove(p.game.currentPosition(), sanMoveData{
-		piece:      movePieceType,
-		originFile: moveData.originFile,
-		originRank: moveData.originRank,
-		dest:       targetSquare,
-		capture:    moveData.isCapture,
-		promotion:  moveData.promotion,
-		canonical:  p.moveText.Policy() == MoveTextPolicyStrict,
-	})
+	s := sb.String()
+	if s == "" {
+		return Move{}, &ParserError{
+			Message:    "expected move",
+			TokenType:  p.currentToken().Type,
+			TokenValue: p.currentToken().Value,
+			Position:   p.position,
+		}
+	}
+
+	move, err := p.moveText.Decode(p.game.currentPosition(), s)
 	if err != nil {
 		return Move{}, &ParserError{
 			Message:  strings.TrimPrefix(err.Error(), "chess: "),
 			Position: p.position,
 		}
 	}
-
-	move.s1 = matched.S1()
-	move.s2 = matched.S2()
-	move.tags = matched.tags
-	move.promo = matched.promo
-
-	// Handle check/checkmate if present
-	if p.currentToken().Type == CHECK {
-		move.tags |= Check
-		p.advance()
-	}
-
 	return move, nil
-}
-
-func isPromotionDestination(s Square) bool {
-	return s.Rank() == Rank1 || s.Rank() == Rank8
 }
 
 func (p *Parser) parseComment() (CommentBlock, error) {
@@ -785,32 +695,4 @@ func (p *Parser) addMove(move Move, number uint) {
 	}
 
 	p.game.tree.setCurrent(node)
-}
-
-// parsePieceType converts a piece character into a PieceType.
-func parsePieceType(s string) PieceType {
-	switch s {
-	case "P":
-		return Pawn
-	case "N":
-		return Knight
-	case "B":
-		return Bishop
-	case "R":
-		return Rook
-	case "Q":
-		return Queen
-	case "K":
-		return King
-	default:
-		return NoPieceType
-	}
-}
-
-// parseSquare converts a square name (e.g., "e4") into a Square.
-func parseSquare(s string) Square {
-	if len(s) != 2 {
-		return NoSquare
-	}
-	return squareFromFileRank(s[0], s[1])
 }

@@ -260,12 +260,10 @@ func algebraicNotationParts(s string) (moveComponents, error) {
 	}, nil
 }
 
-// Decode implements the decoder interface.
-func (algebraicNotation) Decode(pos *Position, s string) (Move, error) {
-	// Null move: accept several common spellings used across tools:
-	//   "Z0", "Z1"  - ChessBase / Scid convention
-	//   "--"        - pgn-extract, Scid and various editors
-	//   "@@"        - some exporters
+// decodeSANText parses a SAN string and resolves it to a legal move.
+// The canonical flag controls disambiguation strictness: true rejects
+// redundant disambiguation (strict SAN), false accepts it (PGN import).
+func decodeSANText(pos *Position, s string, canonical bool) (Move, error) {
 	switch s {
 	case "Z0", "Z1", "--", "@@":
 		return NewNullMove(), nil
@@ -289,7 +287,7 @@ func (algebraicNotation) Decode(pos *Position, s string) (Move, error) {
 		dest:       dest,
 		capture:    components.capture != "",
 		promotion:  algebraicPromotion(components.promotes),
-		canonical:  true,
+		canonical:  canonical,
 	})
 }
 
@@ -362,7 +360,7 @@ func (longAlgebraicNotation) Decode(pos *Position, s string) (Move, error) {
 	if s == "0000" {
 		return NewNullMove(), nil
 	}
-	return algebraicNotation{}.Decode(pos, s)
+	return decodeSANText(pos, s, true)
 }
 
 func getCheckChar(pos *Position, move Move) string {

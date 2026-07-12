@@ -190,21 +190,21 @@ func (c MoveTextCodec) Decode(pos *Position, s string) (Move, error) {
 		if c.policy == MoveTextPolicyPGNImport {
 			s = normaliseImportSAN(s)
 		}
-		move, err = algebraicNotation{}.Decode(pos, s)
+		// resolveSANMove already guarantees legality; no validatePositionMove needed.
+		move, err = decodeSANText(pos, s, c.policy == MoveTextPolicyStrict)
 	case MoveTextFormatLongAlgebraic:
+		// resolveSANMove already guarantees legality; no validatePositionMove needed.
 		move, err = longAlgebraicNotation{}.Decode(pos, s)
 	case MoveTextFormatUCI:
 		move, err = uciNotation{}.Decode(pos, s)
+		if err == nil && !move.HasTag(Null) {
+			err = validatePositionMove(pos, move)
+		}
 	default:
 		return Move{}, ErrInvalidMoveTextCodec
 	}
 	if err != nil {
 		return Move{}, fmt.Errorf("%w: %w", ErrInvalidMoveText, err)
-	}
-	if !move.HasTag(Null) {
-		if err = validatePositionMove(pos, move); err != nil {
-			return Move{}, fmt.Errorf("%w: %w", ErrInvalidMoveText, err)
-		}
 	}
 	return move, nil
 }

@@ -2411,7 +2411,7 @@ func TestCastlingInteractions(t *testing.T) {
 
 			// Make first move
 			pos := g.Position()
-			m1, err := algebraicNotation{}.Decode(pos, tt.firstMove)
+			m1, err := decodeSANText(pos, tt.firstMove, true)
 			if err != nil {
 				t.Fatalf("Failed to decode first move %s: %v", tt.firstMove, err)
 			}
