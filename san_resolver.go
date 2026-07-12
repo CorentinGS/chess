@@ -203,14 +203,9 @@ func sanPawnCandidateOrigins(pos *Position, data sanMoveData, origins *[16]Squar
 		}
 		if dest.Rank() > Rank1 {
 			one := dest - 8
-			if !pos.board.isOccupied(one) {
-				add(one)
-				if dest.Rank() == Rank4 {
-					two := dest - 16
-					if !pos.board.isOccupied(two) {
-						add(two)
-					}
-				}
+			add(one)
+			if dest.Rank() == Rank4 && !pos.board.isOccupied(one) {
+				add(dest - 16)
 			}
 		}
 		return count
@@ -227,14 +222,9 @@ func sanPawnCandidateOrigins(pos *Position, data sanMoveData, origins *[16]Squar
 	}
 	if dest.Rank() < Rank8 {
 		one := dest + 8
-		if !pos.board.isOccupied(one) {
-			add(one)
-			if dest.Rank() == Rank5 {
-				two := dest + 16
-				if !pos.board.isOccupied(two) {
-					add(two)
-				}
-			}
+		add(one)
+		if dest.Rank() == Rank5 && !pos.board.isOccupied(one) {
+			add(dest + 16)
 		}
 	}
 	return count
