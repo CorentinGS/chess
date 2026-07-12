@@ -23,6 +23,7 @@ import (
 type Parser struct {
 	game         *Game
 	tokens       pgnTokenSource
+	lexer        *Lexer
 	moveText     MoveTextCodec
 	token        Token
 	initErr      error
@@ -78,6 +79,11 @@ func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *Parser {
 		},
 		moveText: options.moveTextCodec,
 	}
+	if source, ok := tokens.(*lexerTokenSource); ok {
+		parser.lexer = source.lexer
+		parser.token = parser.lexer.NextToken()
+		return parser
+	}
 	token, err := tokens.NextToken()
 	if err != nil {
 		parser.initErr = err
@@ -96,6 +102,10 @@ func (p *Parser) currentToken() Token {
 // advance moves to the next token.
 func (p *Parser) advance() {
 	p.position++
+	if p.lexer != nil {
+		p.token = p.lexer.NextToken()
+		return
+	}
 	token, err := p.tokens.NextToken()
 	if err != nil {
 		p.token = Token{Type: Undefined, Value: err.Error()}

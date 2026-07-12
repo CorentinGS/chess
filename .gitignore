@@ -39,3 +39,5 @@ stockfish
 skills-lock.json
 CONTEXT.md
 docs/
+AGENTS.md
+.scratch/
