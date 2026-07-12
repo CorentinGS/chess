@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 )
 
 // Side represents a side of the board.
@@ -96,11 +97,22 @@ const (
 	startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" // Starting position FEN
 )
 
+var (
+	startingPositionOnce sync.Once
+	startingPosition     Position
+)
+
 // StartingPosition returns the starting position
 // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1.
 func StartingPosition() *Position {
-	pos, _ := decodeFEN(startFEN)
-	return pos
+	startingPositionOnce.Do(func() {
+		pos, err := decodeFEN(startFEN)
+		if err != nil {
+			panic(err)
+		}
+		startingPosition = *pos
+	})
+	return startingPosition.copy()
 }
 
 // AnyLegalMove reports whether the position has at least one legal move.
