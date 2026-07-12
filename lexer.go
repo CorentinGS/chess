@@ -252,7 +252,7 @@ func (l *Lexer) readResult() Token {
 }
 
 func (l *Lexer) readRank() Token {
-	rank := string(l.ch)
+	rank := l.input[l.position : l.position+1]
 	if !isRank(l.ch) {
 		l.readChar()
 		return Token{Type: RANK, Error: ErrInvalidRank(l.position), Value: rank}
@@ -317,7 +317,7 @@ func cleanCommentText(text string) string {
 // Update readPieceMove to handle piece moves.
 func (l *Lexer) readPieceMove() Token {
 	// Capture just the piece
-	piece := string(l.ch)
+	piece := l.input[l.position : l.position+1]
 	if !isPiece(l.ch) {
 		l.readChar()
 		return Token{Type: PIECE, Error: ErrInvalidPiece(l.position), Value: piece}
@@ -341,7 +341,7 @@ func (l *Lexer) readMove() Token {
 
 	// For pawn captures
 	if isFile(l.ch) {
-		file := string(l.ch)
+		file := l.input[l.position : l.position+1]
 		l.readChar()
 
 		// Check for capture
@@ -387,7 +387,7 @@ func (l *Lexer) readMove() Token {
 		l.readPosition = position + 1
 		l.readChar()
 		// Return just the first character as disambiguation
-		return Token{Type: FILE, Value: string(l.input[position])}
+		return Token{Type: FILE, Value: l.input[position : position+1]}
 	}
 
 	// Validate the square (e.g., "e4")
@@ -400,7 +400,7 @@ func (l *Lexer) readMove() Token {
 }
 
 func (l *Lexer) readPromotionPiece() Token {
-	piece := string(l.ch)
+	piece := l.input[l.position : l.position+1]
 	if !isPiece(l.ch) {
 		l.readChar()
 		return Token{Type: PromotionPiece, Error: ErrInvalidPiece(l.position), Value: piece}
@@ -498,10 +498,10 @@ func (l *Lexer) readNullMove() (Token, bool) {
 		if next != '0' && next != '1' {
 			return Token{}, false
 		}
-		value := string([]byte{l.ch, next})
+		position := l.position
 		l.readChar()
 		l.readChar()
-		return Token{Type: NullMove, Value: value}, true
+		return Token{Type: NullMove, Value: l.input[position:l.position]}, true
 
 	case '-':
 		if l.peekChar() != '-' {
@@ -717,7 +717,7 @@ func (l *Lexer) NextToken() Token {
 		}
 	}
 
-	tok := Token{Type: Undefined, Value: string(l.ch)}
+	tok := Token{Type: Undefined, Value: l.input[l.position : l.position+1]}
 	l.readChar()
 	return tok
 }
