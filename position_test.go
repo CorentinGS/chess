@@ -257,6 +257,28 @@ func BenchmarkValidMovesUnsafe(b *testing.B) {
 	}
 }
 
+func BenchmarkPositionString(b *testing.B) {
+	pos := StartingPosition()
+	for b.Loop() {
+		_ = pos.String()
+	}
+}
+
+func BenchmarkPositionXFENString(b *testing.B) {
+	pos := StartingPosition()
+	for b.Loop() {
+		_ = pos.XFENString()
+	}
+}
+
+func BenchmarkPositionUpdate(b *testing.B) {
+	pos := StartingPosition()
+	move := pos.ValidMovesUnsafe()[0]
+	for b.Loop() {
+		_ = pos.Update(move)
+	}
+}
+
 func TestZobristHashConsistency(t *testing.T) {
 	// Same positions must have the same hash
 	pos1 := StartingPosition()

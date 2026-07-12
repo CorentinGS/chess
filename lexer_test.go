@@ -112,6 +112,17 @@ func TestLexer_ParsesTagValueWithApostrophe(t *testing.T) {
 	}
 }
 
+func TestLexer_ParsesTagValueWithEscapedBackslash(t *testing.T) {
+	lexer := chess.NewLexer(`[Path "C:\\Games"]`)
+	lexer.NextToken()
+	lexer.NextToken()
+
+	token := lexer.NextToken()
+	if token.Type != chess.TagValue || token.Value != `C:\Games` {
+		t.Fatalf("TagValue = {%v, %q}, want {%v, %q}", token.Type, token.Value, chess.TagValue, `C:\Games`)
+	}
+}
+
 func TestLexer_CheckAndCheckmateSuffixes(t *testing.T) {
 	tests := []struct {
 		name     string

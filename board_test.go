@@ -302,3 +302,10 @@ func BenchmarkPieceMailbox(b *testing.B) {
 		_ = board.Piece(chess.H8)
 	}
 }
+
+func BenchmarkBoardString(b *testing.B) {
+	board := chess.StartingPosition().Board()
+	for b.Loop() {
+		_ = board.String()
+	}
+}
