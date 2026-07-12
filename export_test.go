@@ -20,7 +20,10 @@ func PGN(r io.Reader) (func(*Game), error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(g *Game) { g.copy(game) }, nil
+	return func(g *Game) {
+		g.copy(game)
+		g.tree = game.tree
+	}, nil
 }
 
 func NewParser(tokens []Token) *Parser {

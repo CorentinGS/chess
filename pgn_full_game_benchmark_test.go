@@ -180,9 +180,6 @@ func accumulatePGNDecodeSummary(summary *pgnDecodeSummary, game *Game) {
 	if game.Outcome() != NoOutcome {
 		summary.withOutcome++
 	}
-	for _, block := range game.comments {
-		summary.comments += len(block)
-	}
 	accumulateMoveTreeSummary(summary, game.MoveTree().Root())
 }
 

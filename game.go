@@ -34,14 +34,13 @@ type TagPairs map[string]string
 
 // A Game represents a single chess game.
 type Game struct {
-	outcome                        Outcome    // Game result
-	tagPairs                       TagPairs   // PGN tag pairs
-	tree                           *MoveTree  // Move tree and active cursor
-	comments                       [][]string // Game comments
-	method                         Method     // How the game ended
-	ignoreFivefoldRepetitionDraw   bool       // Flag for automatic FivefoldRepetition draw handling
-	ignoreSeventyFiveMoveRuleDraw  bool       // Flag for automatic SeventyFiveMoveRule draw handling
-	ignoreInsufficientMaterialDraw bool       // Flag for automatic InsufficientMaterial draw handling
+	outcome                        Outcome   // Game result
+	tagPairs                       TagPairs  // PGN tag pairs
+	tree                           *MoveTree // Move tree and active cursor
+	method                         Method    // How the game ended
+	ignoreFivefoldRepetitionDraw   bool      // Flag for automatic FivefoldRepetition draw handling
+	ignoreSeventyFiveMoveRuleDraw  bool      // Flag for automatic SeventyFiveMoveRule draw handling
+	ignoreInsufficientMaterialDraw bool      // Flag for automatic InsufficientMaterial draw handling
 }
 
 // FEN takes a string and returns a function that updates
@@ -168,33 +167,6 @@ func (g *Game) MoveHistory() []*MoveHistory {
 	return history
 }
 
-// Comments returns the comments for the game indexed by moves.
-func (g *Game) Comments() [][]string {
-	if g.comments == nil {
-		return [][]string{}
-	}
-	return copyComments(g.comments)
-}
-
-// copyComments returns a deep copy of comments. Internal use; the exported
-// Comments method goes through it as well.
-func copyComments(src [][]string) [][]string {
-	if src == nil {
-		return [][]string{}
-	}
-	out := make([][]string, len(src))
-	for i, c := range src {
-		if c == nil {
-			out[i] = nil
-			continue
-		}
-		cc := make([]string, len(c))
-		copy(cc, c)
-		out[i] = cc
-	}
-	return out
-}
-
 // Position returns the game's current position.
 func (g *Game) Position() *Position {
 	pos := g.currentPosition()
@@ -254,6 +226,7 @@ func (g *Game) UnmarshalText(text []byte) error {
 		return fmt.Errorf("chess: unmarshal game PGN: %w", err)
 	}
 	g.copy(game)
+	g.tree = game.tree // parsed game is local; hand over the tree, do not share it
 
 	return nil
 }
@@ -289,23 +262,22 @@ func (g *Game) RemoveTagPair(k string) bool {
 	return false
 }
 
-// copy copies the game state from the given game.
+// copy copies game state except the move tree from the given game. The caller
+// must set g.tree explicitly; copy never aliases or clones it.
 func (g *Game) copy(game *Game) {
 	g.tagPairs = maps.Clone(game.tagPairs)
-	g.tree = game.tree
 	g.outcome = game.outcome
 	g.method = game.method
-	g.comments = copyComments(game.comments)
 	g.ignoreFivefoldRepetitionDraw = game.ignoreFivefoldRepetitionDraw
 	g.ignoreSeventyFiveMoveRuleDraw = game.ignoreSeventyFiveMoveRuleDraw
 	g.ignoreInsufficientMaterialDraw = game.ignoreInsufficientMaterialDraw
 }
 
-// Clone returns a deep copy of the game.
+// Clone returns a deep copy of the game, including its move tree.
 func (g *Game) Clone() *Game {
 	ret := &Game{}
 	ret.copy(g)
-	ret.tree = g.tree.Clone()
+	ret.tree = g.tree.Clone() // copy() skips tree; Clone deep-copies it
 
 	return ret
 }

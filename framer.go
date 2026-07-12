@@ -1,9 +1,11 @@
-// PGN game framing: splits a byte stream into individual PGN game records.
+// PGN game framing: splits a byte stream into individual PGN game records and
+// bridges each record to a token stream for the parser.
 //
 // The pgnFramer type reads from an io.Reader, buffers data, and uses
 // splitPGNGames to emit complete PGN records as strings. The splitPGNGames
 // function and its helpers handle PGN-specific syntax including game metadata,
-// moves, comments, and variations.
+// moves, comments, and variations. GameScanned carries one framed record;
+// TokenizeGame lexes it into tokens. Token -> Game parsing lives in pgn.go.
 
 package chess
 
@@ -307,18 +309,6 @@ func (f *pgnFramer) advance(n int) {
 		return
 	}
 	f.buffer = f.buffer[n:]
-}
-
-func parsePGNText(raw string, options pgnOptions) (*Game, error) {
-	return newParserFromSource(&lexerTokenSource{lexer: NewLexer(raw)}, options).Parse()
-}
-
-type lexerTokenSource struct {
-	lexer *Lexer
-}
-
-func (s *lexerTokenSource) NextToken() (Token, error) {
-	return s.lexer.NextToken(), nil
 }
 
 func applyPGNOptions(opts []PGNOption) pgnOptions {

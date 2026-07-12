@@ -34,7 +34,7 @@ func (g *Game) buildOneGameFromPath(path []*MoveNode) *Game {
 
 	newG := &Game{}
 	newG.copy(g)
-	newG.tree = &MoveTree{root: rootMove, current: cur}
+	newG.tree = &MoveTree{root: rootMove, current: cur} // copy() skips tree; Split builds a fresh single-line tree
 
 	// Discard any manual outcome inherited from the parent game and recompute
 	// from the leaf using the Full policy (all automatic draws, honouring the

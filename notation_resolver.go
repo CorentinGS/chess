@@ -1,3 +1,9 @@
+// SAN resolver: parses and resolves Standard Algebraic Notation move text.
+//
+// Codec-internal companion to notation.go. The MoveTextCodec (see
+// move_text_codec.go, ADR-013) is the public surface; this file holds the SAN
+// parse and resolution used by the SAN and PGN-import notation types.
+
 package chess
 
 import (

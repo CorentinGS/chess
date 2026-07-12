@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file. See [conven
 - - -
 ## Unreleased
 
+#### Breaking Changes
+- remove `Position.ChangeTurn()` (dead: no internal callers; turn mutation is not a public operation).
+- remove `Game.Comments()` and the unexported `Game.comments` field; move annotations live on `MoveNode` (amends ADR-011).
+
+#### Removed
+- remove dead internal helper `sortedCommandKeys` (pgn_renderer.go).
+
+#### Changed
+- `Game.copy()` no longer aliases the move tree; every caller (`Clone`, `UnmarshalText`, `Split`, the test `PGN` option) sets the tree explicitly. Removes a latent shared-tree footgun without changing observable behaviour.
+- consolidate PGN parse locality: `parsePGNText` and `lexerTokenSource` move from `framer.go` to `pgn.go`, next to the `Parser` they feed; `framer.go` is now honestly framing + the tokenize bridge.
+- relabel the move-text notation layer as codec internals: header comments on `notation.go` and `notation_resolver.go` (renamed from `san_resolver.go`); no behaviour change (ADR-013, ADR-016).
+
 - - -
 
 ## v3.0.0-beta.2 - 2026-06-29

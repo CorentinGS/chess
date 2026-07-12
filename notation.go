@@ -1,3 +1,10 @@
+// Internal move-text notation for the MoveTextCodec (see ADR-013).
+//
+// The notation types here (algebraicNotation, longAlgebraicNotation,
+// uciNotation) are dispatch targets for MoveTextCodec, not a public surface.
+// SAN parse and resolution live in notation_resolver.go, and the public codec
+// API is in move_text_codec.go.
+
 package chess
 
 import (

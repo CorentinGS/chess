@@ -627,41 +627,6 @@ func TestVariationsWithNilMove(t *testing.T) {
 	}
 }
 
-func TestCommentsWithNoComments(t *testing.T) {
-	g := NewGame()
-	comments := g.Comments()
-	if len(comments) != 0 {
-		t.Fatalf("expected no comments but got %d", len(comments))
-	}
-}
-
-func TestCommentsWithSingleComment(t *testing.T) {
-	g := NewGame()
-	g.comments = [][]string{{"First comment"}}
-	comments := g.Comments()
-	if len(comments) != 1 || comments[0][0] != "First comment" {
-		t.Fatalf("expected one comment 'First comment' but got %v", comments)
-	}
-}
-
-func TestCommentsWithMultipleComments(t *testing.T) {
-	g := NewGame()
-	g.comments = [][]string{{"First comment"}, {"Second comment"}}
-	comments := g.Comments()
-	if len(comments) != 2 || comments[0][0] != "First comment" || comments[1][0] != "Second comment" {
-		t.Fatalf("expected comments 'First comment' and 'Second comment' but got %v", comments)
-	}
-}
-
-func TestCommentsWithNilComments(t *testing.T) {
-	g := NewGame()
-	g.comments = nil
-	comments := g.Comments()
-	if comments == nil || len(comments) != 0 {
-		t.Fatalf("expected no comments but got %v", comments)
-	}
-}
-
 func TestPushMove(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -847,6 +812,7 @@ func TestCopyGameState(t *testing.T) {
 
 	newGame := NewGame()
 	newGame.copy(original)
+	newGame.tree = original.tree // copy() does not set tree; caller hands it over
 
 	if newGame.currentPosition().String() != original.currentPosition().String() {
 		t.Fatalf("expected position %s but got %s", original.currentPosition().String(), newGame.currentPosition().String())
@@ -859,21 +825,6 @@ func TestCopyGameState(t *testing.T) {
 	}
 	if newGame.method != original.method {
 		t.Fatalf("expected method %d but got %d", original.method, newGame.method)
-	}
-	if len(newGame.Comments()) != len(original.Comments()) {
-		t.Fatalf("expected comments %v but got %v", original.Comments(), newGame.Comments())
-	}
-}
-
-func TestCopyGameStateWithNilComments(t *testing.T) {
-	original := NewGame()
-	original.comments = nil
-
-	newGame := NewGame()
-	newGame.copy(original)
-
-	if newGame.comments == nil {
-		t.Fatalf("expected comments to be initialized")
 	}
 }
 
@@ -915,9 +866,6 @@ func TestCloneGameState(t *testing.T) {
 	if clone.method != original.method {
 		t.Fatalf("expected method %d but got %d", original.method, clone.method)
 	}
-	if len(clone.Comments()) != len(original.Comments()) {
-		t.Fatalf("expected comments %v but got %v", original.Comments(), clone.Comments())
-	}
 
 	// make sure we can modify the clone without impact on the original
 	_, err := clone.PushMove("Nf6", nil)
@@ -935,14 +883,15 @@ func TestCloneGameState(t *testing.T) {
 	}
 }
 
-func TestCloneGameStateWithNilComments(t *testing.T) {
-	original := NewGame()
-	original.comments = nil
+func TestCopyDoesNotSetTree(t *testing.T) {
+	src := NewGame()
+	_, _ = src.PushMove("e4", nil)
 
-	clone := original.Clone()
-
-	if clone.comments == nil {
-		t.Fatalf("expected comments to be initialized")
+	dst := &Game{}
+	dst.copy(src)
+	// copy() intentionally does not touch tree; every caller sets it explicitly.
+	if dst.tree != nil {
+		t.Fatalf("copy() must not alias or set the tree; got %v", dst.tree)
 	}
 }
 

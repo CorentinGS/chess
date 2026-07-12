@@ -247,15 +247,6 @@ func writeMoveEncoding(node *MoveNode, currentMove *MoveNode, subVariation bool,
 	}
 }
 
-func sortedCommandKeys(commands map[string]string) []string {
-	keys := make([]string, 0, len(commands))
-	for key := range commands {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
-}
-
 func writeAnnotations(move *MoveNode, sb *strings.Builder) {
 	if move == nil {
 		return

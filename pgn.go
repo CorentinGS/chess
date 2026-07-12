@@ -51,6 +51,22 @@ func (s *sliceTokenSource) NextToken() (Token, error) {
 	return token, nil
 }
 
+// lexerTokenSource adapts a Lexer to the pgnTokenSource interface so the
+// parser can consume a raw PGN movetext stream without materialising every
+// token up front.
+type lexerTokenSource struct {
+	lexer *Lexer
+}
+
+func (s *lexerTokenSource) NextToken() (Token, error) {
+	return s.lexer.NextToken(), nil
+}
+
+// parsePGNText parses raw PGN movetext into a Game using the given options.
+func parsePGNText(raw string, options pgnOptions) (*Game, error) {
+	return newParserFromSource(&lexerTokenSource{lexer: NewLexer(raw)}, options).Parse()
+}
+
 // newParser creates a new parser instance initialized with the given tokens.
 // The parser starts with a root move containing the starting position.
 //

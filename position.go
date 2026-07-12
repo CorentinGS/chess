@@ -298,14 +298,6 @@ func (pos *Position) Turn() Color {
 	return pos.turn
 }
 
-// ChangeTurn returns a new position with the turn changed.
-func (pos *Position) ChangeTurn() *Position {
-	pos.turn = pos.turn.Other()
-	pos.hash = pos.computeHash()
-	pos.statusCached = false
-	return pos
-}
-
 // nullUpdateHash computes the Zobrist hash delta for a null move: the only
 // state that changed is the side to move (always flipped) and the en-passant
 // square (always cleared), so the only XOR is the side-to-move key plus any
