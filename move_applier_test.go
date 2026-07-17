@@ -366,3 +366,24 @@ func walkLockstep(t *testing.T, cow, inplace *Position, depth int) {
 		return false
 	})
 }
+
+// TestUpdatePreservesCastleRightsWithoutAllocating guards the alloc-free
+// fast path in updateCastleRights: a move that touches no castle square must
+// produce a Position with unchanged CastleRights and no string allocation.
+func TestUpdatePreservesCastleRightsWithoutAllocating(t *testing.T) {
+	pos, err := decodeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e2e4 := Move{s1: E2, s2: E4}
+
+	if got := pos.Update(e2e4).CastleRights(); got != "KQkq" {
+		t.Fatalf("post-move rights = %q, want KQkq", got)
+	}
+	allocs := testing.AllocsPerRun(100, func() {
+		_ = pos.Update(e2e4)
+	})
+	if allocs != 1 {
+		t.Fatalf("Update allocated %.0f times, want 1", allocs)
+	}
+}

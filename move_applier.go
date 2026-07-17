@@ -205,6 +205,9 @@ func (pos *Position) updateCastleRights(m Move) CastleRights {
 	if p == BlackKing || m.s1 == A8 || m.s2 == A8 {
 		removeq = true
 	}
+	if !removeK && !removeQ && !removek && !removeq {
+		return pos.castleRights
+	}
 	var buf [4]byte
 	n := 0
 	for i := range pos.castleRights {
