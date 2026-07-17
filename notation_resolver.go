@@ -52,7 +52,7 @@ func resolveSANMove(pos *Position, data sanMoveData) (Move, error) {
 			return false
 		}
 
-		piece := pos.Board().Piece(m.S1())
+		piece := pos.board.Piece(m.S1())
 		if piece.Type() != data.piece {
 			mismatchReasons = append(mismatchReasons, "piece type mismatch")
 			return false
