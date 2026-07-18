@@ -285,11 +285,13 @@ func (g *Game) Clone() *Game {
 
 // Positions returns all positions in the game in the main line.
 // This includes the starting position and all positions after each move.
+// The cursor is saved and restored so the caller's active position is unchanged.
 func (g *Game) Positions() []*Position {
 	root := g.tree.Root()
 	if root == nil || len(root.children) == 0 {
 		return []*Position{}
 	}
+	saved := g.tree.Current()
 	c := g.tree.Cursor()
 	c.Reset()
 	positions := make([]*Position, 0, len(root.children)+1)
@@ -301,7 +303,18 @@ func (g *Game) Positions() []*Position {
 			positions = append(positions, c.Peek().copy())
 		}
 	}
+	g.tree.setCurrent(saved)
 	return positions
+}
+
+// Cursor returns a [PositionCursor] handle onto the game's underlying
+// [MoveTree]. The cursor shares state with the tree — navigation methods
+// mutate the tree's active position.
+func (g *Game) Cursor() *PositionCursor {
+	if g == nil || g.tree == nil {
+		return nil
+	}
+	return g.tree.Cursor()
 }
 
 func (g *Game) numOfRepetitions() int {
