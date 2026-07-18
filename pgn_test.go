@@ -80,8 +80,15 @@ func BenchmarkPGN(b *testing.B) {
 
 func TestNewParserSharesStartingPosition(t *testing.T) {
 	parser := NewParser(nil)
-	if parser.game.currentPosition() != parser.game.MoveTree().Root().position {
-		t.Fatal("parser game and root move should share the starting position")
+	// The cursor's current position is a defensive copy of the root position
+	// once the tree owns its own cursor (ADR-016). They must be value-equal,
+	// not pointer-identical.
+	got, want := parser.game.currentPosition(), parser.game.MoveTree().Root().position
+	if got == nil || want == nil {
+		t.Fatalf("nil position: got=%v want=%v", got, want)
+	}
+	if got.String() != want.String() {
+		t.Fatalf("starting position mismatch: got=%q want=%q", got, want)
 	}
 }
 

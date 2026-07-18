@@ -34,7 +34,18 @@ func (g *Game) buildOneGameFromPath(path []*MoveNode) *Game {
 
 	newG := &Game{}
 	newG.copy(g)
-	newG.tree = &MoveTree{root: rootMove, current: cur} // copy() skips tree; Split builds a fresh single-line tree
+	// Build a fresh single-line tree; copy() skips tree. Seed rootPos from
+	// the path's starting position and let setCurrent replay the move chain
+	// so pos / undos / current are all consistent with the leaf cursor.
+	// current is left on root so setCurrent's "node == current" early-return
+	// does not skip the replay.
+	rootPos := g.tree.Root().position.copy()
+	newG.tree = &MoveTree{
+		root:    rootMove,
+		rootPos: rootPos,
+		pos:     rootPos.copy(),
+	}
+	newG.tree.setCurrent(cur)
 
 	// Discard any manual outcome inherited from the parent game and recompute
 	// from the leaf using the Full policy (all automatic draws, honouring the

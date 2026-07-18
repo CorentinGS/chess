@@ -14,15 +14,33 @@ type MoveInsertOptions struct {
 
 // MoveTree owns the move topology and active cursor for a game.
 //
-// The root is a synthetic position node, not a move occurrence.
+// The root is a synthetic position node, not a move occurrence. The cursor's
+// current position is tracked in pos alongside current: every navigation
+// (addMove, GoForward, GoBack, setCurrent) advances pos via the in-place
+// makeMove / unmakeMove pair (perft.go), with one entry in undos per level
+// between root and current. rootPos holds the starting position so the cursor
+// can be reset without re-deriving it from the synthetic root MoveNode.
+//
+// Per-node MoveNode.position is still populated from t.pos.copy() during
+// addMove so external readers keep working; ticket 04 removes that field and
+// forces everyone through the cursor.
 type MoveTree struct {
 	root    *MoveNode
 	current *MoveNode
+	rootPos *Position
+	pos     *Position
+	undos   []positionUndo
 }
 
 func newMoveTree(pos *Position) *MoveTree {
 	root := &MoveNode{position: pos}
-	return &MoveTree{root: root, current: root}
+	return &MoveTree{
+		root:    root,
+		current: root,
+		rootPos: pos,
+		pos:     pos.copy(),
+		undos:   nil,
+	}
 }
 
 // Root returns the root position node.
@@ -88,14 +106,22 @@ func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, er
 		if options.PromoteToMainLine {
 			t.promoteToMainLine(existing)
 		}
+		// Advance the cursor in place rather than re-deriving the post-move
+		// position from existing.position. The undo record keeps undos in
+		// sync with the depth between root and current.
+		t.undos = append(t.undos, t.pos.makeMove(existing.move))
 		t.current = existing
 		return existing, nil
 	}
 
 	node := &MoveNode{move: move, parent: t.current}
-	if t.current.position != nil {
-		node.position = t.current.position.Update(move)
-	}
+	// Advance the cursor in place; t.pos is now post-move.
+	t.undos = append(t.undos, t.pos.makeMove(move))
+	// MoveNode.position still carries a copy so external readers (and the
+	// addVariationUnchecked path that calls parent.position.Update) keep
+	// working until ticket 04 removes this field.
+	node.position = t.pos.copy()
+
 	if options.PromoteToMainLine {
 		t.current.children = append(t.current.children, nil)
 		copy(t.current.children[1:], t.current.children[:len(t.current.children)-1])
@@ -142,6 +168,13 @@ func (t *MoveTree) GoBack() bool {
 	if t == nil || t.current == nil || t.current.parent == nil {
 		return false
 	}
+	if len(t.undos) == 0 {
+		// Cursor invariant broken; refuse to advance rather than panic.
+		return false
+	}
+	undo := t.undos[len(t.undos)-1]
+	t.undos = t.undos[:len(t.undos)-1]
+	t.pos.unmakeMove(undo)
 	t.current = t.current.parent
 	return true
 }
@@ -151,7 +184,9 @@ func (t *MoveTree) GoForward() bool {
 	if t == nil || t.current == nil || len(t.current.children) == 0 {
 		return false
 	}
-	t.current = t.current.children[0]
+	child := t.current.children[0]
+	t.undos = append(t.undos, t.pos.makeMove(child.move))
+	t.current = child
 	return true
 }
 
@@ -160,11 +195,11 @@ func (t *MoveTree) NavigateToMainLine() {
 	if t == nil || t.root == nil {
 		return
 	}
+	t.resetCursor()
 	if len(t.root.children) == 0 {
-		t.current = t.root
 		return
 	}
-	t.current = t.root.children[0]
+	t.GoForward()
 }
 
 // Lines returns every root-to-leaf line in the tree.
@@ -184,42 +219,101 @@ func (t *MoveTree) Clone() *MoveTree {
 	if t == nil || t.root == nil {
 		return nil
 	}
-	ret := &MoveTree{root: t.root.clone()}
-	if t.current == nil {
-		ret.current = ret.root
+	ret := &MoveTree{
+		root:    t.root.clone(),
+		rootPos: t.rootPos.copy(),
+	}
+	ret.pos = ret.rootPos.copy()
+	ret.undos = nil
+	ret.current = ret.root
+	// Find the cloned equivalent of the original cursor and replay forward
+	// so pos / undos match the new current.
+	var target *MoveNode
+	if t.current == nil || t.current == t.root {
+		target = ret.root
 	} else {
-		ret.current = findClonedMove(t.root, ret.root, t.current)
-		if ret.current == nil {
-			ret.current = ret.root
+		target = findClonedMove(t.root, ret.root, t.current)
+		if target == nil {
+			target = ret.root
 		}
 	}
+	ret.setCurrent(target)
 	return ret
 }
 
 func (t *MoveTree) position() *Position {
-	if t == nil || t.current == nil {
+	if t == nil || t.pos == nil {
 		return nil
 	}
-	return t.current.position
+	return t.pos
 }
 
 func (t *MoveTree) setRootPosition(pos *Position) {
 	if t == nil || t.root == nil {
 		return
 	}
+	t.rootPos = pos
 	t.root.position = pos
-	if t.current == nil {
-		t.current = t.root
+	t.resetCursor()
+}
+
+// resetCursor rewinds pos to rootPos and clears the undo stack. current lands
+// on the synthetic root, ready for addMove / GoForward to push forward again.
+func (t *MoveTree) resetCursor() {
+	if t == nil {
+		return
 	}
-	if t.current == t.root {
-		t.current.position = pos
-	}
+	t.pos = t.rootPos.copy()
+	t.undos = t.undos[:0]
+	t.current = t.root
 }
 
 func (t *MoveTree) setCurrent(node *MoveNode) {
-	if t != nil {
-		t.current = node
+	if t == nil {
+		return
 	}
+	if node == nil {
+		node = t.root
+	}
+	if node == t.current {
+		return
+	}
+	// Direct child of current: advance one step. This is the hot path for
+	// linear parsing (PGN addMove, GoForward after a findExisting).
+	if node.parent == t.current {
+		t.undos = append(t.undos, t.pos.makeMove(node.move))
+		t.current = node
+		return
+	}
+	// Strict ancestor of current: pop undos back without re-deriving.
+	if isAncestor(node, t.current) {
+		for t.current != node {
+			if !t.GoBack() {
+				break
+			}
+		}
+		return
+	}
+	// Different subtree: reset and replay the root-to-target chain. Walk
+	// recursively so the chain lives on the call stack instead of a heap
+	// slice — this is the variation-entry/exit hot path in PGN parsing.
+	t.resetCursor()
+	if node == t.root {
+		return
+	}
+	t.replayTo(node)
+	t.current = node
+}
+
+// replayTo advances pos from rootPos to node's position, pushing one undo per
+// move along the root-to-node chain. Recursive so the chain stays on the call
+// stack (no heap alloc per variation).
+func (t *MoveTree) replayTo(node *MoveNode) {
+	if node == nil || node == t.root {
+		return
+	}
+	t.replayTo(node.parent)
+	t.undos = append(t.undos, t.pos.makeMove(node.move))
 }
 
 func (t *MoveTree) findExistingMove(move Move) *MoveNode {
