@@ -7,14 +7,12 @@ import (
 	"testing"
 )
 
-// Alloc-budget ratchet: ceilings sit ~1% above the post-ticket-02 baseline
-// (cursor infrastructure: t.rootPos / t.pos / t.undos on MoveTree). Lower as
-// fixes land; never raise without confirming the alloc growth is real.
-// Ticket 04 (drop MoveNode.position) is expected to ratchet these back below
-// the pre-cursor ceilings.
+// Alloc-budget ratchet: ceilings sit ~5% above the post-ticket-04 baseline
+// (per-node Position dropped; positions resolved lazily via the cursor).
+// Lower as fixes land; never raise without confirming the alloc growth is real.
 const (
-	pgnAllocBudgetBigBig = 2_900_000
-	pgnAllocBudgetBig    = 700_000
+	pgnAllocBudgetBigBig = 2_100_000
+	pgnAllocBudgetBig    = 580_000
 )
 
 func TestPGNDecode_AllocBudget_BigBig(t *testing.T) {

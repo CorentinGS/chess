@@ -102,7 +102,7 @@ func (m Move) WithTag(tag MoveTag) Move {
 type MoveNode struct {
 	move          Move
 	parent        *MoveNode
-	position      *Position
+	tree          *MoveTree
 	children      []*MoveNode
 	number        uint
 	nags          []string
@@ -275,11 +275,23 @@ func isAncestor(a, b *MoveNode) bool {
 	return false
 }
 
+// Position returns a defensive copy of the position after this move.
+// The tree's active cursor is preserved — callers may read a node's position
+// without disturbing subsequent Position/Current reads on the game.
+// Returns nil if n or its tree is nil.
 func (n *MoveNode) Position() *Position {
-	if n == nil || n.position == nil {
+	if n == nil || n.tree == nil {
 		return nil
 	}
-	return n.position.copy()
+	saved := n.tree.current
+	c := n.tree.Cursor()
+	if !c.Goto(n) {
+		n.tree.setCurrent(saved)
+		return nil
+	}
+	p := c.Position()
+	n.tree.setCurrent(saved)
+	return p
 }
 
 func (n *MoveNode) Children() []*MoveNode {
@@ -317,16 +329,18 @@ func (n *MoveNode) FullMoveNumber() int {
 	return n.Number()
 }
 
-// Ply returns the half-move number (increments every move).
+// Ply returns the half-move number (increments every move). For the synthetic
+// root it returns 0; otherwise it equals the depth of the parent chain from
+// n up to (not including) the synthetic root.
 func (n *MoveNode) Ply() int {
-	if n == nil || n.position == nil {
+	if n == nil || n.parent == nil {
 		return 0
 	}
-	moveNumber := int(n.number)
-	if n.position.turn == Black {
-		return (moveNumber-1)*2 + 1
+	depth := 0
+	for cur := n; cur != nil && cur.parent != nil; cur = cur.parent {
+		depth++
 	}
-	return moveNumber * 2
+	return depth
 }
 
 func (n *MoveNode) addCommentBlock(block CommentBlock) {
@@ -346,7 +360,6 @@ func (n *MoveNode) clone() *MoveNode {
 	}
 	ret := &MoveNode{
 		move:          n.move,
-		position:      n.position.copy(),
 		number:        n.number,
 		nags:          append([]string(nil), n.nags...),
 		commentBlocks: copyCommentBlocks(n.commentBlocks),

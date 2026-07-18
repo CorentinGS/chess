@@ -66,15 +66,24 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 
 	needTrailingSpace := false
 	if g.tree != nil && g.tree.Root() != nil {
+		// Rendering reads pre-move positions via MoveNode.Position(), which
+		// drives the tree's single active cursor (ADR-016). Save the cursor
+		// node here and restore it after the render so the tree's active
+		// position is left where the caller left it.
+		savedCursor := g.tree.Current()
 		root := g.tree.Root()
 		if len(root.children) > 0 {
+			// Root position is always available via tree.rootPos — no
+			// cursor navigation needed for the move count / side to move
+			// at the start of the game.
 			writeMoves(root,
-				root.position.moveCount,
-				root.position.turn == White, &sb, false, false, true)
+				g.tree.rootPos.moveCount,
+				g.tree.rootPos.turn == White, &sb, false, false, true)
 			needTrailingSpace = true
 		} else if root.hasAnnotations() {
 			writeAnnotations(root, &sb)
 		}
+		g.tree.setCurrent(savedCursor)
 	}
 
 	if needTrailingSpace {
@@ -232,16 +241,20 @@ func writeMoveNumber(moveNum int, isWhite bool, subVariation, closedVariation,
 	}
 }
 
-func writeMoveEncoding(node *MoveNode, currentMove *MoveNode, subVariation bool, sb *strings.Builder) {
-	var (
-		moveStr string
-		err     error
-	)
-	if subVariation && node.parent != nil {
-		moveStr, err = SAN().Encode(node.parent.position, currentMove.move)
-	} else {
-		moveStr, err = SAN().Encode(node.position, currentMove.move)
+func writeMoveEncoding(_ *MoveNode, currentMove *MoveNode, subVariation bool, sb *strings.Builder) {
+	_ = subVariation // historical artifact; both branches share pre-position logic
+	if currentMove == nil || currentMove.parent == nil || currentMove.tree == nil {
+		return
 	}
+	// Look up the pre-move position via the tree cursor (defensive copy;
+	// SAN().Encode reads only). The synthetic root carries rootPos.
+	var prePos *Position
+	if currentMove.parent == currentMove.tree.Root() {
+		prePos = currentMove.tree.rootPos
+	} else {
+		prePos = currentMove.parent.Position()
+	}
+	moveStr, err := SAN().Encode(prePos, currentMove.move)
 	if err == nil {
 		sb.WriteString(moveStr)
 	}

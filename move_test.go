@@ -518,10 +518,10 @@ func moveIsValid(pos *Position, m *Move, useTags bool) bool {
 }
 
 func assertMoveNodesAreEqual(t *testing.T, m1, m2 *MoveNode) {
-	if m1.parent != m2.parent {
-		t.Fatalf("cloned mv %v parent is not the same", m1)
+	if (m1.parent == nil) != (m2.parent == nil) {
+		t.Fatalf("cloned mv %v parent presence differs (%v vs %v)", m1, m1.parent, m2.parent)
 	}
-	if m1.position.String() != m2.position.String() {
+	if m1.Position().String() != m2.Position().String() {
 		t.Fatalf("cloned mv %v position is not the same", m1)
 	}
 	if !reflect.DeepEqual(m1.NAGs(), m2.NAGs()) {
@@ -561,11 +561,27 @@ func assertMoveNodesAreEqual(t *testing.T, m1, m2 *MoveNode) {
 
 func TestMoveNodeClone(t *testing.T) {
 	for _, mt := range validMoves {
-		node := &MoveNode{move: *mt.m, position: mt.pos, number: 1, nags: []string{"$1"}}
+		// Build a single-move tree so Position() resolves via the cursor
+		// (ADR-016). The cloned node must produce the same position.
+		tree := newMoveTree(mt.pos.copy())
+		node, err := tree.addMove(*mt.m, nil)
+		if err != nil {
+			t.Fatalf("addMove: %v", err)
+		}
+		node.nags = []string{"$1"}
 		clonedM1 := node.clone()
+		// Patch tree pointer so Position() resolves on the clone side.
+		tree2 := newMoveTree(mt.pos.copy())
+		tree2.root.children = []*MoveNode{clonedM1}
+		clonedM1.parent = tree2.root
+		tree2.setTree(clonedM1)
 		assertMoveNodesAreEqual(t, node, clonedM1)
 		clonedM1.SetCommand("foo", "bar")
 		clonedM2 := clonedM1.clone()
+		tree3 := newMoveTree(mt.pos.copy())
+		tree3.root.children = []*MoveNode{clonedM2}
+		clonedM2.parent = tree3.root
+		tree3.setTree(clonedM2)
 		assertMoveNodesAreEqual(t, clonedM1, clonedM2)
 		clonedM1.SetCommand("foo", "bar modified")
 		fooVal, ok := clonedM2.GetCommand("foo")

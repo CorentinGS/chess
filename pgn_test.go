@@ -80,10 +80,10 @@ func BenchmarkPGN(b *testing.B) {
 
 func TestNewParserSharesStartingPosition(t *testing.T) {
 	parser := NewParser(nil)
-	// The cursor's current position is a defensive copy of the root position
-	// once the tree owns its own cursor (ADR-016). They must be value-equal,
-	// not pointer-identical.
-	got, want := parser.game.currentPosition(), parser.game.MoveTree().Root().position
+	// The cursor's current position and the synthetic root's resolved
+	// position both point at the starting board. With the tree-owned cursor
+	// (ADR-016) they are value-equal but independent defensive copies.
+	got, want := parser.game.currentPosition(), parser.game.MoveTree().Root().Position()
 	if got == nil || want == nil {
 		t.Fatalf("nil position: got=%v want=%v", got, want)
 	}

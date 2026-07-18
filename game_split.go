@@ -15,13 +15,13 @@ func (g *Game) Split() []*Game {
 }
 
 func (g *Game) buildOneGameFromPath(path []*MoveNode) *Game {
-	rootMove := &MoveNode{position: g.tree.Root().position.copy()}
+	rootPos := g.tree.rootPos.copy()
+	rootMove := &MoveNode{}
 	cur := rootMove
 
 	for _, m := range path {
 		child := &MoveNode{
 			move:          m.move,
-			position:      m.position.copy(),
 			number:        m.number,
 			nags:          append([]string(nil), m.nags...),
 			commentBlocks: copyCommentBlocks(m.commentBlocks),
@@ -39,12 +39,12 @@ func (g *Game) buildOneGameFromPath(path []*MoveNode) *Game {
 	// so pos / undos / current are all consistent with the leaf cursor.
 	// current is left on root so setCurrent's "node == current" early-return
 	// does not skip the replay.
-	rootPos := g.tree.Root().position.copy()
 	newG.tree = &MoveTree{
 		root:    rootMove,
 		rootPos: rootPos,
 		pos:     rootPos.copy(),
 	}
+	newG.tree.setTree(rootMove)
 	newG.tree.setCurrent(cur)
 
 	// Discard any manual outcome inherited from the parent game and recompute

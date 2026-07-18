@@ -2416,13 +2416,13 @@ func TestMoveHistoryMainLine(t *testing.T) {
 	if history[0].Move.String() != "e2e4" {
 		t.Fatalf("expected first move e2e4, got %s", history[0].Move)
 	}
-	if history[0].PrePosition != g.MoveTree().Root().position {
+	if history[0].PrePosition.String() != g.MoveTree().Root().Position().String() {
 		t.Fatalf("expected first pre-position to be root position")
 	}
-	if history[0].PostPosition != g.MoveTree().MainLine()[0].position {
+	if history[0].PostPosition.String() != g.MoveTree().MainLine()[0].Position().String() {
 		t.Fatalf("expected post-position to match move position")
 	}
-	if history[1].PrePosition != history[0].PostPosition {
+	if history[1].PrePosition.String() != history[0].PostPosition.String() {
 		t.Fatalf("expected second pre-position to match first post-position")
 	}
 }
@@ -2504,7 +2504,7 @@ func TestMoveHistoryFromPGN(t *testing.T) {
 		if h.PostPosition == nil {
 			t.Fatalf("entry %d: PostPosition is nil", i)
 		}
-		if i > 0 && h.PrePosition != history[i-1].PostPosition {
+		if i > 0 && h.PrePosition.String() != history[i-1].PostPosition.String() {
 			t.Fatalf("entry %d: PrePosition should match previous PostPosition", i)
 		}
 	}

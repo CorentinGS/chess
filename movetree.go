@@ -33,13 +33,27 @@ type MoveTree struct {
 }
 
 func newMoveTree(pos *Position) *MoveTree {
-	root := &MoveNode{position: pos}
-	return &MoveTree{
+	root := &MoveNode{}
+	t := &MoveTree{
 		root:    root,
 		current: root,
 		rootPos: pos,
 		pos:     pos.copy(),
 		undos:   nil,
+	}
+	t.setTree(root)
+	return t
+}
+
+// setTree recursively patches n.tree = t on every node reachable from n. Used
+// after Clone / Split where clone() copies topology but not the tree pointer.
+func (t *MoveTree) setTree(n *MoveNode) {
+	if n == nil {
+		return
+	}
+	n.tree = t
+	for _, c := range n.children {
+		t.setTree(c)
 	}
 }
 
@@ -114,13 +128,11 @@ func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, er
 		return existing, nil
 	}
 
-	node := &MoveNode{move: move, parent: t.current}
-	// Advance the cursor in place; t.pos is now post-move.
+	node := &MoveNode{move: move, parent: t.current, tree: t}
+	// Advance the cursor in place; t.pos is now post-move. The node carries
+	// no per-node position — readers route through the cursor via
+	// MoveNode.Position() (ADR-016).
 	t.undos = append(t.undos, t.pos.makeMove(move))
-	// MoveNode.position still carries a copy so external readers (and the
-	// addVariationUnchecked path that calls parent.position.Update) keep
-	// working until ticket 04 removes this field.
-	node.position = t.pos.copy()
 
 	if options.PromoteToMainLine {
 		t.current.children = append(t.current.children, nil)
@@ -133,7 +145,10 @@ func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, er
 	return node, nil
 }
 
-// AddVariation validates and appends move as a variation from parent.
+// AddVariation validates and appends move as a variation from parent. The
+// cursor is left on parent for the duration of the validation lookup; callers
+// that need to preserve cursor state should snapshot and restore via
+// [PositionCursor.Goto] before/after.
 func (t *MoveTree) AddVariation(parent *MoveNode, move Move) (*MoveNode, error) {
 	if t == nil || t.root == nil {
 		return nil, errors.New("chess: move tree has no root position")
@@ -141,13 +156,24 @@ func (t *MoveTree) AddVariation(parent *MoveNode, move Move) (*MoveNode, error) 
 	if parent == nil {
 		parent = t.root
 	}
-	if parent.position == nil {
+	// Resolve parent's position via the cursor — variations attach to an
+	// arbitrary node, not the cursor's current node, so we navigate. Save
+	// and restore the cursor so the caller's active position is unchanged.
+	saved := t.current
+	c := t.Cursor()
+	if !c.Goto(parent) {
+		return nil, errors.New("chess: variation parent is not reachable from cursor")
+	}
+	if c.Peek() == nil {
+		t.setCurrent(saved)
 		return nil, errors.New("chess: variation parent has no position")
 	}
-	if err := validatePositionMove(parent.position, move); err != nil {
+	if err := validatePositionMove(c.Peek(), move); err != nil {
+		t.setCurrent(saved)
 		return nil, err
 	}
 	node := t.addVariationUnchecked(parent, move)
+	t.setCurrent(saved)
 	return node, nil
 }
 
@@ -155,10 +181,7 @@ func (t *MoveTree) addVariationUnchecked(parent *MoveNode, move Move) *MoveNode 
 	if parent == nil {
 		parent = t.root
 	}
-	node := &MoveNode{move: move, parent: parent}
-	if parent != nil && parent.position != nil {
-		node.position = parent.position.Update(move)
-	}
+	node := &MoveNode{move: move, parent: parent, tree: t}
 	parent.children = append(parent.children, node)
 	return node
 }
@@ -223,6 +246,8 @@ func (t *MoveTree) Clone() *MoveTree {
 		root:    t.root.clone(),
 		rootPos: t.rootPos.copy(),
 	}
+	// Patch tree back-pointers on the freshly cloned topology.
+	ret.setTree(ret.root)
 	ret.pos = ret.rootPos.copy()
 	ret.undos = nil
 	ret.current = ret.root
@@ -253,7 +278,6 @@ func (t *MoveTree) setRootPosition(pos *Position) {
 		return
 	}
 	t.rootPos = pos
-	t.root.position = pos
 	t.resetCursor()
 }
 

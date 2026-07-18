@@ -142,26 +142,34 @@ func (g *Game) MoveHistory() []*MoveHistory {
 		return []*MoveHistory{}
 	}
 
-	history := make([]*MoveHistory, 0)
-	current := root
+	// Walk the main line via the tree cursor — positions are read in place
+	// (Peek, no alloc) and defensive-copied only at the history boundary.
+	c := g.tree.Cursor()
+	c.Reset()
+	history := make([]*MoveHistory, 0, len(root.children))
 
-	for current != nil && len(current.children) > 0 {
-		move := current.children[0]
-		if move == nil {
+	for {
+		// Peek returns the live cursor position; copy NOW before
+		// ForwardMain mutates it in place.
+		prePos := c.Peek().copy()
+		if !c.ForwardMain() {
 			break
 		}
+		postPos := c.Peek().copy()
+		// Find the move node matching this step so we can pull comments.
+		// The cursor advances to the post-move position; its target node
+		// is the tree's current node.
+		node := g.tree.Current()
 		comments := []string(nil)
-		if move.Comments() != "" {
-			comments = []string{move.Comments()}
+		if node != nil && node.Comments() != "" {
+			comments = []string{node.Comments()}
 		}
-
 		history = append(history, &MoveHistory{
-			PrePosition:  current.position,
-			PostPosition: move.position,
-			Move:         move.move,
+			PrePosition:  prePos,
+			PostPosition: postPos,
+			Move:         node.move,
 			Comments:     comments,
 		})
-		current = move
 	}
 
 	return history
@@ -285,33 +293,40 @@ func (g *Game) Clone() *Game {
 // Positions returns all positions in the game in the main line.
 // This includes the starting position and all positions after each move.
 func (g *Game) Positions() []*Position {
-	positions := make([]*Position, 0)
-	current := g.tree.Root()
-
-	for current != nil {
-		if current.position != nil {
-			positions = append(positions, current.position)
-		}
-		if len(current.children) == 0 {
-			break
-		}
-		current = current.children[0]
+	root := g.tree.Root()
+	if root == nil || len(root.children) == 0 {
+		return []*Position{}
 	}
-
+	c := g.tree.Cursor()
+	c.Reset()
+	positions := make([]*Position, 0, len(root.children)+1)
+	if c.Peek() != nil {
+		positions = append(positions, c.Peek().copy())
+	}
+	for c.ForwardMain() {
+		if c.Peek() != nil {
+			positions = append(positions, c.Peek().copy())
+		}
+	}
 	return positions
 }
 
 func (g *Game) numOfRepetitions() int {
 	count := 0
-	pos := g.currentPosition()
-	for current := g.tree.Root(); current != nil; {
-		if current.position != nil && pos.SamePosition(current.position) {
+	target := g.currentPosition()
+	// numOfRepetitions walks the cursor through the main line; save and
+	// restore so callers see an unchanged active position.
+	saved := g.tree.Current()
+	c := g.tree.Cursor()
+	c.Reset()
+	for {
+		if c.Peek() != nil && target.SamePosition(c.Peek()) {
 			count++
 		}
-		if len(current.children) == 0 {
+		if !c.ForwardMain() {
 			break
 		}
-		current = current.children[0]
 	}
+	g.tree.setCurrent(saved)
 	return count
 }

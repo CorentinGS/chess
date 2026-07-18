@@ -26,9 +26,6 @@ func assertGameTreeCurrentPositionInvariant(t *testing.T, g *Game) {
 	if g.MoveTree().Current().Position().String() != g.currentPosition().String() {
 		t.Fatalf("MoveTree().Current().Position() = %q, want tree current position %q", g.MoveTree().Current().Position(), g.currentPosition())
 	}
-	if g.MoveTree().Current() != nil && g.MoveTree().Current().position != nil && g.MoveTree().Current().position.String() != g.currentPosition().String() {
-		t.Fatalf("current move position = %q, want tree current position %q", g.MoveTree().Current().position, g.currentPosition())
-	}
 }
 
 func TestGameTreeCurrentPositionInvariantAfterClonePreservesCursor(t *testing.T) {
@@ -88,7 +85,7 @@ func TestPositionReturnsDefensiveCopyAfterGoForward(t *testing.T) {
 	if !g.MoveTree().GoForward() {
 		t.Fatal("expected to navigate forward")
 	}
-	if g.Position() == g.MoveTree().Current().position {
+	if g.Position() == g.MoveTree().Current().Position() {
 		t.Fatal("Position shared current position pointer with move node")
 	}
 	assertGameTreeCurrentPositionInvariant(t, g)

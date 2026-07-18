@@ -709,13 +709,7 @@ func outcomeFromResultString(s string) Outcome {
 
 func (p *Parser) addMove(move Move, number uint) {
 	parent := p.currentMove()
-	node := &MoveNode{move: move, parent: parent, number: number}
+	node := &MoveNode{move: move, parent: parent, tree: p.game.tree, number: number}
 	parent.children = append(parent.children, node)
-
-	// Update position
-	if newPos := p.game.currentPosition().Update(move); newPos != nil {
-		node.position = newPos
-	}
-
 	p.game.tree.setCurrent(node)
 }
