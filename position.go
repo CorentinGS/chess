@@ -135,10 +135,12 @@ func (pos *Position) Update(m Move) *Position {
 		return pos.nullUpdate()
 	}
 
-	// Seed a fresh position with the pre-move scalars so applyMove can mutate
-	// it in one place. applyMove overwrites every field it owns, so the seed
-	// is read by applyMove (via updateCastleRights/updateEnPassantSquare)
-	// before being overwritten.
+	// Seed a fresh position with the pre-move scalars (including the pre-move
+	// hash) so applyMove can mutate it in one place. applyMove overwrites
+	// every field it owns — board, hash, turn, castleRights, enPassantSquare,
+	// halfMoveClock, moveCount — and reads the seed for the pre-move state
+	// that updateCastleRights, updateEnPassantSquare, and updateHash need
+	// before overwriting.
 	newPos := &Position{
 		board:           pos.board,
 		turn:            pos.turn,
@@ -146,12 +148,9 @@ func (pos *Position) Update(m Move) *Position {
 		enPassantSquare: pos.enPassantSquare,
 		halfMoveClock:   pos.halfMoveClock,
 		moveCount:       pos.moveCount,
+		hash:            pos.hash,
 	}
-	eff := newPos.applyMove(m)
-	// updateHash reads the pre-move board and hash on the original position,
-	// and consumes the moveEffect that drove the board mutation so the hash
-	// delta and the board read one interpretation of the move's physical facts.
-	newPos.hash = pos.updateHash(m, newPos.castleRights, newPos.enPassantSquare, eff)
+	newPos.applyMove(m)
 	return newPos
 }
 

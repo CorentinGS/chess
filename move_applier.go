@@ -2,24 +2,25 @@ package chess
 
 // This file is the single source of truth for "what changes about a Position
 // when a non-null Move is played": the incremental bookkeeping rule
-// (moveCount, halfMoveClock, castleRights, enPassant, board, turn, inCheck) and
-// the shared physical-fact descriptor (moveEffect) for the board mutation and
-// the Zobrist hash delta. The copy-on-write applier (Position.Update) and the
-// in-place applier (Position.makeMove) both delegate here to applyMove, so the
-// rule cannot drift between them. Update also passes the returned moveEffect to
-// updateHash so the board mutation and the hash delta read one interpretation
-// of en-passant squares, castle rook squares, and capture targets.
+// (moveCount, halfMoveClock, castleRights, enPassant, board, turn, inCheck,
+// hash) and the shared physical-fact descriptor (moveEffect) for the board
+// mutation and the Zobrist hash delta. The copy-on-write applier
+// (Position.Update) and the in-place applier (Position.makeMove) both delegate
+// here to applyMove, so the rule cannot drift between them. applyMove also
+// computes the post-move Zobrist hash from the pre-move state via updateHash,
+// so the board mutation and the hash delta read one interpretation of
+// en-passant squares, castle rook squares, and capture targets.
 //
 // Null moves are a separate concern (nullUpdate) and intentionally do not share
 // the applyMove body: a null move never touches the board, castling rights, or
 // pieces, so folding it in would force applyMove to skip a board copy it can
 // otherwise avoid. They share only the moveCount rule via nextMoveCount.
 //
-// The Zobrist hash is still deliberately NOT computed by applyMove: Update
-// computes it incrementally off the returned moveEffect, and makeMove skips it
-// entirely. Perft never inspects intermediate hashes; unmakeMove restores the
-// original from the positionUndo record. See docs/adr/0001-single-move-application-core.md
-// and docs/adr/0017-zobrist-hash-consolidation.md.
+// updateHash is called while pos still holds pre-move state, so its reads of
+// pos.board / pos.hash / pos.castleRights / pos.enPassantSquare are the
+// pre-move values; ncr, ep, and eff carry the post-move bookkeeping and the
+// physical descriptor. See docs/adr/0001-single-move-application-core.md and
+// docs/adr/0017-zobrist-hash-consolidation.md.
 
 // nullUpdate returns a new position that is identical to the receiver except
 // for the side to move, the half-move clock, the full-move clock, and the
@@ -141,23 +142,20 @@ func castleRookMove(m Move, c Color) (Square, Square) {
 
 // applyMove applies the non-null bookkeeping rule to pos in place. It updates
 // the board, side to move, castling rights, en-passant square, half-move clock,
-// full-move number, the in-check flag, and invalidates the cached legal-move
-// and status values.
+// full-move number, the in-check flag, the Zobrist hash, and invalidates the
+// cached legal-move and status values.
 //
-// The hash is intentionally left untouched: callers own the hash. Update
-// computes it from the pre-move state via updateHash; makeMove leaves it stale
-// and restores the original on unmakeMove.
-//
-// applyMove returns the moveEffect that drove the board mutation. Update
-// reuses the same instance to update the Zobrist hash, so the board and the
-// hash consume one interpretation of the move's physical facts (en-passant
-// square, castle rook squares, capture target) instead of re-reading tags.
+// updateHash is called while pos still holds pre-move state, so its reads of
+// pos.board / pos.hash / pos.castleRights / pos.enPassantSquare are the
+// pre-move values; ncr, ep, and eff carry the post-move bookkeeping and the
+// physical descriptor. The new hash is assigned alongside the other post-move
+// fields after the board mutation.
 //
 // Pre-move-derived values (castle rights, en passant, half-move clock) are
 // computed before board.update mutates the board, since updateCastleRights and
 // updateEnPassantSquare both inspect the origin square on the pre-move board.
 // isInCheck is computed after, once the new side to move and board are in place.
-func (pos *Position) applyMove(m Move) moveEffect {
+func (pos *Position) applyMove(m Move) {
 	eff := computeMoveEffect(&pos.board, m)
 	moveCount := pos.nextMoveCount()
 	ncr := pos.updateCastleRights(m)
@@ -168,12 +166,18 @@ func (pos *Position) applyMove(m Move) moveEffect {
 	}
 	ep := pos.updateEnPassantSquare(m)
 
+	// Compute the hash delta while pos still holds pre-move state. updateHash
+	// reads pos.board / pos.hash / pos.castleRights / pos.enPassantSquare as
+	// the pre-move values; ncr, ep, and eff describe the post-move state.
+	newHash := pos.updateHash(m, ncr, ep, eff)
+
 	pos.board.update(m, eff)
 	pos.turn = pos.turn.Other()
 	pos.castleRights = ncr
 	pos.enPassantSquare = ep
 	pos.halfMoveClock = halfMove
 	pos.moveCount = moveCount
+	pos.hash = newHash
 	pos.validMoves = nil
 	pos.statusCached = false
 	if m.HasTag(Check) {
@@ -181,7 +185,6 @@ func (pos *Position) applyMove(m Move) moveEffect {
 	} else {
 		pos.inCheck = isInCheck(pos)
 	}
-	return eff
 }
 
 // updateCastleRights returns the castling rights after m is played. It inspects

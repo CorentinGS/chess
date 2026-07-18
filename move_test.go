@@ -436,6 +436,49 @@ func TestPlyNilAndMissingPosition(t *testing.T) {
 	}
 }
 
+// TestIsAncestor pins down the strict-ancestor helper the cursor uses to pick
+// its fast path: walk back via undo when target is a strict ancestor of
+// current, otherwise reset to root and replay forward.
+//
+// "Strict" matters: the synthetic root has parent == nil, so a helper that
+// walks past root runs off the chain. isAncestor must report false for
+// either node being the root, and false for the same node, so the cursor
+// never tries to undo its way onto or past the root.
+func TestIsAncestor(t *testing.T) {
+	// Build root <- a <- b <- c, plus an unrelated subtree root <- x.
+	root := &MoveNode{}
+	a := &MoveNode{parent: root}
+	b := &MoveNode{parent: a}
+	c := &MoveNode{parent: b}
+	x := &MoveNode{parent: root}
+	root.children = []*MoveNode{a, x}
+	a.children = []*MoveNode{b}
+	b.children = []*MoveNode{c}
+
+	cases := []struct {
+		name   string
+		a, b   *MoveNode
+		expect bool
+	}{
+		{"parent of child", a, c, true},
+		{"grandparent of grandchild", root, c, false}, // root is never an ancestor
+		{"self", b, b, false},
+		{"child of parent (reversed)", c, a, false},
+		{"root as candidate ancestor", root, a, false},
+		{"root against root", root, root, false},
+		{"unrelated subtrees", x, c, false},
+		{"nil a", nil, c, false},
+		{"nil b", a, nil, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isAncestor(tc.a, tc.b); got != tc.expect {
+				t.Fatalf("isAncestor(%v, %v) = %v, want %v", tc.a, tc.b, got, tc.expect)
+			}
+		})
+	}
+}
+
 func BenchmarkValidMoves(b *testing.B) {
 	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 	b.ResetTimer()

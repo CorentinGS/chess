@@ -292,8 +292,8 @@ func TestUnsafeTransitionConsistency(t *testing.T) {
 // the in-place applier (Position.makeMove) in lockstep over the canonical perft
 // positions and asserts:
 //   - the two paths reach byte-identical FENs after every move, and
-//   - on the copy-on-write path, the incremental Zobrist hash equals a full
-//     recompute at every node walked.
+//   - on both paths, the incremental Zobrist hash equals a full recompute at
+//     every node walked.
 //
 // The hash guard is the depth-multiplied form of TestZobristHashIncrementalCorrectness:
 // now that Board.update and updateHash share the moveEffect descriptor, this
@@ -306,6 +306,11 @@ func TestUnsafeTransitionConsistency(t *testing.T) {
 // counts yet would corrupt the 50/75-move draw rules. Position.String emits
 // the full FEN, which includes both counters, so this comparison is the guard
 // against that drift class.
+//
+// The hash comparison now runs on both paths: applyMove computes the
+// post-move hash itself so the in-place path (used by the lazy position
+// cursor in ADR-016) carries a correct hash for repetition detection
+// (numOfRepetitions) the same way Update does.
 func TestApplyMoveDifferential(t *testing.T) {
 	const depth = 3
 	fens := []struct{ name, fen string }{
@@ -349,11 +354,18 @@ func walkLockstep(t *testing.T, cow, inplace *Position, depth int) {
 			return true // stop iterating this node
 		}
 
-		// On the copy-on-write path, the incremental hash from updateHash
-		// must equal the full recompute at every node. The inplace path
-		// leaves the hash stale by design, so we only check the cow side.
+		// The incremental hash must equal a full recompute on both paths:
+		// Update via applyMove (which now computes the hash itself), and
+		// makeMove via the same applyMove. A drift here would corrupt
+		// repetition detection downstream.
 		if got, want := nextCow.ZobristHash(), nextCow.computeHash(); got != want {
-			t.Errorf("hash drift after %s at remaining depth %d: incremental=%x recompute=%x",
+			t.Errorf("cow hash drift after %s at remaining depth %d: incremental=%x recompute=%x",
+				m, depth, got, want)
+			inplace.unmakeMove(undo)
+			return true
+		}
+		if got, want := inplace.ZobristHash(), inplace.computeHash(); got != want {
+			t.Errorf("inplace hash drift after %s at remaining depth %d: incremental=%x recompute=%x",
 				m, depth, got, want)
 			inplace.unmakeMove(undo)
 			return true
@@ -385,5 +397,41 @@ func TestUpdatePreservesCastleRightsWithoutAllocating(t *testing.T) {
 	})
 	if allocs != 1 {
 		t.Fatalf("Update allocated %.0f times, want 1", allocs)
+	}
+}
+
+// TestApplyMoveUpdatesHashIncrementally pins down the invariant the cursor
+// path (makeMove / unmakeMove) relies on: after applyMove mutates pos in
+// place, pos.hash must equal a full recompute. Without this, any caller that
+// advances a Position via makeMove instead of Update observes a stale hash,
+// which silently breaks repetition detection (numOfRepetitions walks the
+// history and compares ZobristHash values).
+//
+// The check runs on every legal move from a varied set of positions so a
+// regression in any hash-affecting branch (castle rights, en passant,
+// capture, promotion, check) fails loudly here.
+func TestApplyMoveUpdatesHashIncrementally(t *testing.T) {
+	fens := []string{
+		"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+		"r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+		"8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+		"r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+		"rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
+	}
+	for _, fen := range fens {
+		opt, err := FEN(fen)
+		if err != nil {
+			t.Fatalf("FEN decode %q: %v", fen, err)
+		}
+		root := NewGame(opt).Position()
+		visitLegalMoves(root, generateLegalOnly, func(m Move) bool {
+			pos := root.copy()
+			pos.makeMove(m)
+			if got, want := pos.ZobristHash(), pos.computeHash(); got != want {
+				t.Errorf("hash drift after %s from %q: incremental=%x recompute=%x",
+					m, fen, got, want)
+			}
+			return false
+		})
 	}
 }
