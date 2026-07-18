@@ -76,9 +76,9 @@ func (c *PositionCursor) Forward(idx int) bool {
 	if idx < 0 || idx >= len(c.tree.current.children) {
 		return false
 	}
-	child := c.tree.current.children[idx]
-	c.tree.undos = append(c.tree.undos, c.tree.pos.makeMove(child.move))
-	c.tree.current = child
+	// Route through setCurrent so the direct-child fast path owns the
+	// makeMove/undo append invariant. Forward(0) then matches ForwardMain.
+	c.tree.setCurrent(c.tree.current.children[idx])
 	return true
 }
 

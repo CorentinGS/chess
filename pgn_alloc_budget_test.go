@@ -7,12 +7,18 @@ import (
 	"testing"
 )
 
-// Alloc-budget ratchet: ceilings sit ~5% above the post-ticket-04 baseline
-// (per-node Position dropped; positions resolved lazily via the cursor).
+// Alloc-budget ratchet: ceilings sit ~5% above the post-ticket-06 baseline.
+// Baseline observed (AllocsPerRun, 10 iterations):
+//   - big.pgn:     ~544,000 allocs/run
+//   - big_big.pgn: ~1,925,000 allocs/run
+//
+// Compared to the pre-cursor baseline (~690k / ~2.86M) this is a 21-33%
+// reduction from dropping per-node *Position and per-MoveHistory position
+// caches; positions are now resolved lazily via the MoveTree cursor.
 // Lower as fixes land; never raise without confirming the alloc growth is real.
 const (
-	pgnAllocBudgetBigBig = 2_100_000
-	pgnAllocBudgetBig    = 580_000
+	pgnAllocBudgetBigBig = 2_050_000
+	pgnAllocBudgetBig    = 575_000
 )
 
 func TestPGNDecode_AllocBudget_BigBig(t *testing.T) {

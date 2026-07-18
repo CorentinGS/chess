@@ -198,7 +198,7 @@ func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
 	writeMoveNumber(moveNum, isWhite, subVariation, closedVariation, isRoot, sb)
 
 	// Encode the move using your algebraicNotation.
-	writeMoveEncoding(node, currentMove, subVariation, sb)
+	writeMoveEncoding(currentMove, sb)
 
 	writeAnnotations(currentMove, sb)
 
@@ -241,18 +241,21 @@ func writeMoveNumber(moveNum int, isWhite bool, subVariation, closedVariation,
 	}
 }
 
-func writeMoveEncoding(_ *MoveNode, currentMove *MoveNode, subVariation bool, sb *strings.Builder) {
-	_ = subVariation // historical artifact; both branches share pre-position logic
+func writeMoveEncoding(currentMove *MoveNode, sb *strings.Builder) {
 	if currentMove == nil || currentMove.parent == nil || currentMove.tree == nil {
 		return
 	}
-	// Look up the pre-move position via the tree cursor (defensive copy;
-	// SAN().Encode reads only). The synthetic root carries rootPos.
+	// Look up the pre-move position via the tree cursor (Peek is no-copy;
+	// renderTo saves/restores the active cursor for us). The synthetic root
+	// carries rootPos.
 	var prePos *Position
 	if currentMove.parent == currentMove.tree.Root() {
 		prePos = currentMove.tree.rootPos
 	} else {
-		prePos = currentMove.parent.Position()
+		// Navigate the cursor to the parent and Peek (no alloc). SAN().Encode
+		// reads only, so we can safely alias the live cursor position.
+		currentMove.tree.setCurrent(currentMove.parent)
+		prePos = currentMove.tree.Cursor().Peek()
 	}
 	moveStr, err := SAN().Encode(prePos, currentMove.move)
 	if err == nil {
