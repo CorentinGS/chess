@@ -124,55 +124,48 @@ func (g *Game) Moves() []Move {
 	return moves
 }
 
-// MoveHistory is a move's result from Game's MoveHistory method.
-// It contains the move itself, any comments, and the pre and post positions.
-type MoveHistory struct {
-	PrePosition  *Position
-	PostPosition *Position
-	Move         Move
-	Comments     []string
+// MoveListEntry is a single move in a [MoveList]: the move itself plus any
+// comments attached to it. Positions are not cached here — callers that need
+// the pre/post position replay it via [Game.MoveTree] and the cursor API.
+type MoveListEntry struct {
+	Move     Move
+	Comments []string
 }
 
-// MoveHistory returns the main-line moves in order along with the pre and post
-// positions and any comments. Variations are not included.
+// MoveList is the main-line move sequence of a game. Variations are not
+// included. The zero value is an empty list; use [Game.MoveList] to obtain one.
+type MoveList []MoveListEntry
+
+// MoveList returns the main-line moves in order with any comments.
+// Variations are not included. The returned slice is safe to retain: it holds
+// no references to the game's live cursor state.
 // Returns an empty slice for games with no moves.
-func (g *Game) MoveHistory() []*MoveHistory {
+func (g *Game) MoveList() MoveList {
 	root := g.tree.Root()
 	if root == nil || len(root.children) == 0 {
-		return []*MoveHistory{}
+		return MoveList{}
 	}
 
-	// Walk the main line via the tree cursor — positions are read in place
-	// (Peek, no alloc) and defensive-copied only at the history boundary.
+	// Walk the cursor along the main line; capture the move + comments only.
+	saved := g.tree.Current()
 	c := g.tree.Cursor()
 	c.Reset()
-	history := make([]*MoveHistory, 0, len(root.children))
+	list := make(MoveList, 0, len(root.children))
 
-	for {
-		// Peek returns the live cursor position; copy NOW before
-		// ForwardMain mutates it in place.
-		prePos := c.Peek().copy()
-		if !c.ForwardMain() {
-			break
-		}
-		postPos := c.Peek().copy()
-		// Find the move node matching this step so we can pull comments.
-		// The cursor advances to the post-move position; its target node
-		// is the tree's current node.
+	for c.ForwardMain() {
 		node := g.tree.Current()
-		comments := []string(nil)
+		var comments []string
 		if node != nil && node.Comments() != "" {
 			comments = []string{node.Comments()}
 		}
-		history = append(history, &MoveHistory{
-			PrePosition:  prePos,
-			PostPosition: postPos,
-			Move:         node.move,
-			Comments:     comments,
+		list = append(list, MoveListEntry{
+			Move:     node.move,
+			Comments: comments,
 		})
 	}
 
-	return history
+	g.tree.setCurrent(saved)
+	return list
 }
 
 // Position returns the game's current position.

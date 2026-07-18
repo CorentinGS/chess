@@ -305,17 +305,17 @@ func TestNullMove_GameNullMoveMethod(t *testing.T) {
 	}
 }
 
-func TestNullMove_AppearsInMoveHistory(t *testing.T) {
+func TestNullMove_AppearsInMoveList(t *testing.T) {
 	g := chess.NewGame()
 	if _, err := g.NullMove(); err != nil {
 		t.Fatalf("Game.NullMove: %v", err)
 	}
-	history := g.MoveHistory()
-	if len(history) != 1 {
-		t.Fatalf("len(MoveHistory)=%d, want 1", len(history))
+	list := g.MoveList()
+	if len(list) != 1 {
+		t.Fatalf("len(MoveList)=%d, want 1", len(list))
 	}
-	if !history[0].Move.HasTag(chess.Null) {
-		t.Fatal("MoveHistory entry must carry Null tag")
+	if !list[0].Move.HasTag(chess.Null) {
+		t.Fatal("MoveList entry must carry Null tag")
 	}
 }
 

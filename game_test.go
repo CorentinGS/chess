@@ -2394,66 +2394,57 @@ func TestCastlingInteractions(t *testing.T) {
 	}
 }
 
-func TestMoveHistoryEmptyGame(t *testing.T) {
+func TestMoveListEmptyGame(t *testing.T) {
 	g := NewGame()
-	history := g.MoveHistory()
-	if len(history) != 0 {
-		t.Fatalf("expected empty move history, got %d", len(history))
+	list := g.MoveList()
+	if len(list) != 0 {
+		t.Fatalf("expected empty move list, got %d", len(list))
 	}
 }
 
-func TestMoveHistoryMainLine(t *testing.T) {
+func TestMoveListMainLine(t *testing.T) {
 	g := NewGame()
 	for _, m := range []string{"e4", "e5", "Nf3"} {
 		if _, err := g.PushMove(m, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	history := g.MoveHistory()
-	if len(history) != 3 {
-		t.Fatalf("expected 3 move history entries, got %d", len(history))
+	list := g.MoveList()
+	if len(list) != 3 {
+		t.Fatalf("expected 3 move list entries, got %d", len(list))
 	}
-	if history[0].Move.String() != "e2e4" {
-		t.Fatalf("expected first move e2e4, got %s", history[0].Move)
-	}
-	if history[0].PrePosition.String() != g.MoveTree().Root().Position().String() {
-		t.Fatalf("expected first pre-position to be root position")
-	}
-	if history[0].PostPosition.String() != g.MoveTree().MainLine()[0].Position().String() {
-		t.Fatalf("expected post-position to match move position")
-	}
-	if history[1].PrePosition.String() != history[0].PostPosition.String() {
-		t.Fatalf("expected second pre-position to match first post-position")
+	if list[0].Move.String() != "e2e4" {
+		t.Fatalf("expected first move e2e4, got %s", list[0].Move)
 	}
 }
 
-func TestMoveHistoryComments(t *testing.T) {
+func TestMoveListComments(t *testing.T) {
 	g := NewGame()
 	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
 	g.MoveTree().Current().SetComment("good move")
-	history := g.MoveHistory()
-	if len(history) != 1 {
-		t.Fatalf("expected 1 move history entry, got %d", len(history))
+	list := g.MoveList()
+	if len(list) != 1 {
+		t.Fatalf("expected 1 move list entry, got %d", len(list))
 	}
-	if len(history[0].Comments) != 1 || history[0].Comments[0] != "good move" {
-		t.Fatalf("expected comment %q, got %v", "good move", history[0].Comments)
+	if len(list[0].Comments) != 1 || list[0].Comments[0] != "good move" {
+		t.Fatalf("expected comment %q, got %v", "good move", list[0].Comments)
 	}
 }
 
-func TestMoveHistoryNoComments(t *testing.T) {
+func TestMoveListNoComments(t *testing.T) {
 	g := NewGame()
 	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
 	}
-	history := g.MoveHistory()
-	if len(history[0].Comments) != 0 {
-		t.Fatalf("expected no comments, got %v", history[0].Comments)
+	list := g.MoveList()
+	if len(list[0].Comments) != 0 {
+		t.Fatalf("expected no comments, got %v", list[0].Comments)
 	}
 }
 
-func TestMoveHistoryWithVariations(t *testing.T) {
+func TestMoveListWithVariations(t *testing.T) {
 	g := NewGame()
 	if _, err := g.PushMove("e4", nil); err != nil {
 		t.Fatal(err)
@@ -2463,13 +2454,13 @@ func TestMoveHistoryWithVariations(t *testing.T) {
 	}
 	variationMove := Move{}
 	g.MoveTree().AddVariation(g.MoveTree().Root().children[0], variationMove)
-	history := g.MoveHistory()
-	if len(history) != 2 {
-		t.Fatalf("expected 2 main line entries (variations excluded), got %d", len(history))
+	list := g.MoveList()
+	if len(list) != 2 {
+		t.Fatalf("expected 2 main line entries (variations excluded), got %d", len(list))
 	}
 }
 
-func TestMoveHistoryMatchesMovesLength(t *testing.T) {
+func TestMoveListMatchesMovesLength(t *testing.T) {
 	g := NewGame()
 	for _, m := range []string{"e4", "e5", "Nf3", "Nc6", "Bb5"} {
 		if _, err := g.PushMove(m, nil); err != nil {
@@ -2477,13 +2468,13 @@ func TestMoveHistoryMatchesMovesLength(t *testing.T) {
 		}
 	}
 	moves := g.Moves()
-	history := g.MoveHistory()
-	if len(history) != len(moves) {
-		t.Fatalf("expected history length %d to match moves length %d", len(history), len(moves))
+	list := g.MoveList()
+	if len(list) != len(moves) {
+		t.Fatalf("expected list length %d to match moves length %d", len(list), len(moves))
 	}
 }
 
-func TestMoveHistoryFromPGN(t *testing.T) {
+func TestMoveListFromPGN(t *testing.T) {
 	pgnData := mustParsePGN("fixtures/pgns/single_game.pgn")
 	r := strings.NewReader(pgnData)
 	opt, err := PGN(r)
@@ -2492,21 +2483,9 @@ func TestMoveHistoryFromPGN(t *testing.T) {
 	}
 	game := NewGame(opt)
 
-	history := game.MoveHistory()
-	if len(history) == 0 {
-		t.Fatal("expected move history from PGN game")
-	}
-
-	for i, h := range history {
-		if h.PrePosition == nil {
-			t.Fatalf("entry %d: PrePosition is nil", i)
-		}
-		if h.PostPosition == nil {
-			t.Fatalf("entry %d: PostPosition is nil", i)
-		}
-		if i > 0 && h.PrePosition.String() != history[i-1].PostPosition.String() {
-			t.Fatalf("entry %d: PrePosition should match previous PostPosition", i)
-		}
+	list := game.MoveList()
+	if len(list) == 0 {
+		t.Fatal("expected move list from PGN game")
 	}
 }
 

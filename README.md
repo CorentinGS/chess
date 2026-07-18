@@ -746,7 +746,8 @@ fmt.Println(game.Position().Board().Draw())
 
 ### Moves
 
-MoveHistory is a convenient API for accessing aligned positions, moves, and comments. MoveHistory is useful when trying to understand detailed information about a game. Below is an
+MoveList is a convenient API for accessing the main-line moves and their
+comments. MoveList is useful when iterating the moves of a game. Below is an
 example showing how to see which side castled first.
 
 ```go
@@ -771,11 +772,16 @@ func main() {
 	}
 	game := chess.NewGame(pgn)
 	color := chess.NoColor
-	for _, mh := range game.MoveHistory() {
-		if mh.Move.HasTag(chess.KingSideCastle) || mh.Move.HasTag(chess.QueenSideCastle) {
-			color = mh.PrePosition.Turn()
+	// Replay positions alongside the moves via the cursor.
+	cursor := game.MoveTree().Cursor()
+	cursor.Reset()
+	for _, entry := range game.MoveList() {
+		preTurn := cursor.Peek().Turn()
+		if entry.Move.HasTag(chess.KingSideCastle) || entry.Move.HasTag(chess.QueenSideCastle) {
+			color = preTurn
 			break
 		}
+		cursor.ForwardMain()
 	}
 	switch color {
 	case chess.White:
