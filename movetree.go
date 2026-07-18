@@ -17,19 +17,16 @@ type MoveInsertOptions struct {
 // The root is a synthetic position node, not a move occurrence. The cursor's
 // current position is tracked in pos alongside current: every navigation
 // (addMove, GoForward, GoBack, setCurrent) advances pos via the in-place
-// makeMove / unmakeMove pair (perft.go), with one entry in undos per level
-// between root and current. rootPos holds the starting position so the cursor
-// can be reset without re-deriving it from the synthetic root MoveNode.
-//
-// Per-node MoveNode.position is still populated from t.pos.copy() during
-// addMove so external readers keep working; ticket 04 removes that field and
-// forces everyone through the cursor.
+// makeMoveCursor / unmakeMoveCursor pair (move_applier.go), with one entry
+// in undos per level between root and current. rootPos holds the starting
+// position so the cursor can be reset without re-deriving it from the
+// synthetic root MoveNode.
 type MoveTree struct {
 	root    *MoveNode
 	current *MoveNode
 	rootPos *Position
 	pos     *Position
-	undos   []positionUndo
+	undos   []cursorUndo
 }
 
 func newMoveTree(pos *Position) *MoveTree {
@@ -123,7 +120,7 @@ func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, er
 		// Advance the cursor in place rather than re-deriving the post-move
 		// position from existing.position. The undo record keeps undos in
 		// sync with the depth between root and current.
-		t.undos = append(t.undos, t.pos.makeMove(existing.move))
+		t.undos = append(t.undos, t.pos.makeMoveCursor(existing.move))
 		t.current = existing
 		return existing, nil
 	}
@@ -132,7 +129,7 @@ func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, er
 	// Advance the cursor in place; t.pos is now post-move. The node carries
 	// no per-node position — readers route through the cursor via
 	// MoveNode.Position() (ADR-016).
-	t.undos = append(t.undos, t.pos.makeMove(move))
+	t.undos = append(t.undos, t.pos.makeMoveCursor(move))
 
 	if options.PromoteToMainLine {
 		t.current.children = append(t.current.children, nil)
@@ -197,7 +194,9 @@ func (t *MoveTree) GoBack() bool {
 	}
 	undo := t.undos[len(t.undos)-1]
 	t.undos = t.undos[:len(t.undos)-1]
-	t.pos.unmakeMove(undo)
+	// The undo at the top of the stack reverses the move that led to
+	// current; read it before current retreats.
+	t.pos.unmakeMoveCursor(t.current.move, undo)
 	t.current = t.current.parent
 	return true
 }
@@ -208,7 +207,7 @@ func (t *MoveTree) GoForward() bool {
 		return false
 	}
 	child := t.current.children[0]
-	t.undos = append(t.undos, t.pos.makeMove(child.move))
+	t.undos = append(t.undos, t.pos.makeMoveCursor(child.move))
 	t.current = child
 	return true
 }
@@ -305,39 +304,63 @@ func (t *MoveTree) setCurrent(node *MoveNode) {
 	// Direct child of current: advance one step. This is the hot path for
 	// linear parsing (PGN addMove, GoForward after a findExisting).
 	if node.parent == t.current {
-		t.undos = append(t.undos, t.pos.makeMove(node.move))
+		t.undos = append(t.undos, t.pos.makeMoveCursor(node.move))
 		t.current = node
 		return
 	}
-	// Strict ancestor of current: pop undos back without re-deriving.
-	if isAncestor(node, t.current) {
-		for t.current != node {
-			if !t.GoBack() {
-				break
-			}
+	// Anything else — ancestor, sibling subtree, root: retreat to the lowest
+	// common ancestor by popping undos, then advance along node's chain.
+	// This is the variation-entry/exit hot path in PGN parsing; the LCA turns
+	// an O(root-depth) reset+replay (with a rootPos.copy allocation) into an
+	// O(distance) walk with no allocation.
+	ancestor := lcaNode(t.current, node)
+	for t.current != ancestor {
+		if !t.GoBack() {
+			break
 		}
-		return
 	}
-	// Different subtree: reset and replay the root-to-target chain. Walk
-	// recursively so the chain lives on the call stack instead of a heap
-	// slice — this is the variation-entry/exit hot path in PGN parsing.
-	t.resetCursor()
-	if node == t.root {
-		return
-	}
-	t.replayTo(node)
+	t.replayToFrom(node, ancestor)
 	t.current = node
 }
 
-// replayTo advances pos from rootPos to node's position, pushing one undo per
-// move along the root-to-node chain. Recursive so the chain stays on the call
-// stack (no heap alloc per variation).
-func (t *MoveTree) replayTo(node *MoveNode) {
-	if node == nil || node == t.root {
+// replayToFrom advances pos from stop's position to node's, pushing one undo
+// per move along the stop-to-node chain. Recursive so the chain stays on the
+// call stack (no heap alloc per variation).
+func (t *MoveTree) replayToFrom(node, stop *MoveNode) {
+	if node == nil || node == stop {
 		return
 	}
-	t.replayTo(node.parent)
-	t.undos = append(t.undos, t.pos.makeMove(node.move))
+	t.replayToFrom(node.parent, stop)
+	t.undos = append(t.undos, t.pos.makeMoveCursor(node.move))
+}
+
+// nodeDepth returns the number of moves between the synthetic root and n.
+func nodeDepth(n *MoveNode) int {
+	d := 0
+	for cur := n; cur != nil && cur.parent != nil; cur = cur.parent {
+		d++
+	}
+	return d
+}
+
+// lcaNode returns the lowest common ancestor of a and b — the root at worst
+// for same-tree nodes (the only kind setCurrent mixes, per ADR-016).
+// Pointer-walk only: no position mutation, no allocation.
+func lcaNode(a, b *MoveNode) *MoveNode {
+	da, db := nodeDepth(a), nodeDepth(b)
+	for da > db {
+		a = a.parent
+		da--
+	}
+	for db > da {
+		b = b.parent
+		db--
+	}
+	for a != nil && b != nil && a != b {
+		a = a.parent
+		b = b.parent
+	}
+	return a
 }
 
 func (t *MoveTree) findExistingMove(move Move) *MoveNode {

@@ -433,6 +433,86 @@ func (b *Board) update(m Move, eff moveEffect) {
 	}
 }
 
+// unapply reverses update: it removes the landing piece from s2, restores the
+// moving piece on s1, puts any captured piece back, and unmoves a castled
+// rook. eff must be the same descriptor update was called with. Used by the
+// MoveTree cursor's slim undo (cursorUndo); perft keeps the full-state copy.
+func (b *Board) unapply(m Move, eff moveEffect) {
+	if eff.moving == NoPiece {
+		return
+	}
+	p1 := eff.moving
+	s1BB := bbForSquare(m.s1)
+	s2BB := bbForSquare(m.s2)
+
+	whiteSqs := b.whiteSqs
+	blackSqs := b.blackSqs
+
+	b.unmoveRookForCastle(eff, &whiteSqs, &blackSqs)
+
+	// Remove the landing piece from s2 and put the moving piece back on s1.
+	// For a promotion (landing != moving) the promo piece leaves s2 and the
+	// original pawn returns to s1.
+	if eff.landing != p1 {
+		b.setPieceBB(eff.landing, b.bbForPiece(eff.landing)&^s2BB)
+	} else {
+		b.setPieceBB(p1, b.bbForPiece(p1)&^s2BB)
+	}
+	b.setPieceBB(p1, b.bbForPiece(p1)|s1BB)
+	if p1.Color() == White {
+		whiteSqs = (whiteSqs &^ s2BB) | s1BB
+	} else {
+		blackSqs = (blackSqs &^ s2BB) | s1BB
+	}
+	b.mailbox[m.s1] = p1
+	b.mailbox[m.s2] = NoPiece
+
+	// Restore the captured piece. For en passant capSq trails s2; for a
+	// capture promotion capSq == s2 and runs after the s2 mailbox clear above.
+	if eff.capPiece != NoPiece {
+		capSqBB := bbForSquare(eff.capSq)
+		b.setPieceBB(eff.capPiece, b.bbForPiece(eff.capPiece)|capSqBB)
+		if eff.capPiece.Color() == White {
+			whiteSqs |= capSqBB
+		} else {
+			blackSqs |= capSqBB
+		}
+		b.mailbox[eff.capSq] = eff.capPiece
+	}
+
+	b.whiteSqs = whiteSqs
+	b.blackSqs = blackSqs
+	b.emptySqs = ^(whiteSqs | blackSqs)
+
+	switch {
+	case p1 == WhiteKing:
+		b.whiteKingSq = m.s1
+	case p1 == BlackKing:
+		b.blackKingSq = m.s1
+	case eff.capPiece == WhiteKing:
+		b.whiteKingSq = eff.capSq
+	case eff.capPiece == BlackKing:
+		b.blackKingSq = eff.capSq
+	}
+}
+
+func (b *Board) unmoveRookForCastle(eff moveEffect, whiteSqs, blackSqs *bitboard) {
+	if eff.rookFrom == NoSquare {
+		return
+	}
+	rookPiece := NewPiece(Rook, eff.moving.Color())
+	fromBB := bbForSquare(eff.rookFrom)
+	toBB := bbForSquare(eff.rookTo)
+	b.setPieceBB(rookPiece, b.bbForPiece(rookPiece)&^toBB|fromBB)
+	b.mailbox[eff.rookFrom] = rookPiece
+	b.mailbox[eff.rookTo] = NoPiece
+	if eff.moving.Color() == White {
+		*whiteSqs = (*whiteSqs &^ toBB) | fromBB
+	} else {
+		*blackSqs = (*blackSqs &^ toBB) | fromBB
+	}
+}
+
 func (b *Board) setPieceBB(p Piece, bb bitboard) {
 	if err := b.setBBForPiece(p, bb); err != nil {
 		panic(fmt.Sprintf("chess: invariant violation in board update: %v", err))

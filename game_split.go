@@ -41,6 +41,7 @@ func (g *Game) buildOneGameFromPath(path []*MoveNode) *Game {
 	// does not skip the replay.
 	newG.tree = &MoveTree{
 		root:    rootMove,
+		current: rootMove,
 		rootPos: rootPos,
 		pos:     rootPos.copy(),
 	}

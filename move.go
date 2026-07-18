@@ -251,34 +251,6 @@ func (n *MoveNode) Parent() *MoveNode {
 	return n.parent
 }
 
-// isAncestor reports whether a is a strict ancestor of b: a lies somewhere on
-// b's parent chain, but a != b and a is not the synthetic root. The root
-// (parent == nil) is excluded because the cursor's undo-based fast path can
-// never advance onto or past it — root.parent is nil and walking past it
-// would either panic or read unrelated memory. A nil a is never an ancestor.
-//
-// The cursor uses this to choose between undo-back-to-target (when target is
-// an ancestor of current) and reset-to-root-replay-forward (otherwise).
-func isAncestor(a, b *MoveNode) bool {
-	if a == nil || b == nil {
-		return false
-	}
-	// Walk b's strict ancestor chain, stopping before the synthetic root.
-	// The condition `cur.parent != nil` keeps root out of the candidate set
-	// even when a == root, and naturally rejects a == b because we start at
-	// b.parent.
-	for cur := b.parent; cur != nil && cur.parent != nil; cur = cur.parent {
-		if cur == a {
-			return true
-		}
-	}
-	return false
-}
-
-// Position returns a defensive copy of the position after this move.
-// The tree's active cursor is preserved — callers may read a node's position
-// without disturbing subsequent Position/Current reads on the game.
-// Returns nil if n or its tree is nil.
 func (n *MoveNode) Position() *Position {
 	if n == nil || n.tree == nil {
 		return nil

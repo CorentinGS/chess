@@ -154,8 +154,11 @@ func castleRookMove(m Move, c Color) (Square, Square) {
 // Pre-move-derived values (castle rights, en passant, half-move clock) are
 // computed before board.update mutates the board, since updateCastleRights and
 // updateEnPassantSquare both inspect the origin square on the pre-move board.
-// isInCheck is computed after, once the new side to move and board are in place.
-func (pos *Position) applyMove(m Move) {
+// isInCheck is computed after, once the new side to move and board are in
+// place. The computed effect is returned so undo-style callers (the MoveTree
+// cursor's makeMoveCursor) can record the inverse without recomputing it;
+// statement-style callers (perft's makeMove) simply ignore it.
+func (pos *Position) applyMove(m Move) moveEffect {
 	eff := computeMoveEffect(&pos.board, m)
 	moveCount := pos.nextMoveCount()
 	ncr := pos.updateCastleRights(m)
@@ -185,6 +188,61 @@ func (pos *Position) applyMove(m Move) {
 	} else {
 		pos.inCheck = isInCheck(pos)
 	}
+	return eff
+}
+
+// cursorUndo is the MoveTree cursor's slim undo record: the inverse of the
+// move plus scalar state, ~56 bytes versus ~264 for perft's full-state
+// positionUndo. The tree retains one entry per played level for the game's
+// lifetime, so size matters here; perft's undo is stack-allocated on a hot
+// path and stays untouched (ADR-0001). validMoves/status caches are not
+// captured: applyMove invalidates both on the forward path, so restoring
+// them as invalid matches the forward state exactly.
+type cursorUndo struct {
+	hash            uint64
+	moveCount       int
+	halfMoveClock   int
+	castleRights    CastleRights
+	eff             moveEffect
+	enPassantSquare Square
+	turn            Color
+	inCheck         bool
+}
+
+// makeMoveCursor applies m in place and returns a slim undo record.
+func (pos *Position) makeMoveCursor(m Move) cursorUndo {
+	u := cursorUndo{
+		hash:            pos.hash,
+		moveCount:       pos.moveCount,
+		halfMoveClock:   pos.halfMoveClock,
+		castleRights:    pos.castleRights,
+		enPassantSquare: pos.enPassantSquare,
+		turn:            pos.turn,
+		inCheck:         pos.inCheck,
+	}
+	if m.HasTag(Null) {
+		next := pos.nullUpdate()
+		*pos = *next
+		return u
+	}
+	u.eff = pos.applyMove(m)
+	return u
+}
+
+// unmakeMoveCursor restores the pre-move position captured by makeMoveCursor.
+// m must be the move that produced u. eff.moving == NoPiece (null move)
+// makes board.unapply a no-op, leaving only the scalar restore.
+func (pos *Position) unmakeMoveCursor(m Move, u cursorUndo) {
+	pos.board.unapply(m, u.eff)
+	pos.hash = u.hash
+	pos.moveCount = u.moveCount
+	pos.halfMoveClock = u.halfMoveClock
+	pos.castleRights = u.castleRights
+	pos.enPassantSquare = u.enPassantSquare
+	pos.turn = u.turn
+	pos.inCheck = u.inCheck
+	pos.validMoves = nil
+	pos.statusCached = false
 }
 
 // updateCastleRights returns the castling rights after m is played. It inspects

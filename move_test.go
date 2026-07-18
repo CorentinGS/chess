@@ -436,15 +436,11 @@ func TestPlyNilAndMissingPosition(t *testing.T) {
 	}
 }
 
-// TestIsAncestor pins down the strict-ancestor helper the cursor uses to pick
-// its fast path: walk back via undo when target is a strict ancestor of
-// current, otherwise reset to root and replay forward.
-//
-// "Strict" matters: the synthetic root has parent == nil, so a helper that
-// walks past root runs off the chain. isAncestor must report false for
-// either node being the root, and false for the same node, so the cursor
-// never tries to undo its way onto or past the root.
-func TestIsAncestor(t *testing.T) {
+// TestLCANode pins down the lowest-common-ancestor helper the cursor's
+// setCurrent slow path retreats through: ancestor pairs resolve to the
+// ancestor, siblings resolve to the shared parent, unrelated subtrees
+// resolve to the root, and root pairs resolve to root itself.
+func TestLCANode(t *testing.T) {
 	// Build root <- a <- b <- c, plus an unrelated subtree root <- x.
 	root := &MoveNode{}
 	a := &MoveNode{parent: root}
@@ -456,24 +452,22 @@ func TestIsAncestor(t *testing.T) {
 	b.children = []*MoveNode{c}
 
 	cases := []struct {
-		name   string
-		a, b   *MoveNode
-		expect bool
+		name string
+		a, b *MoveNode
+		want *MoveNode
 	}{
-		{"parent of child", a, c, true},
-		{"grandparent of grandchild", root, c, false}, // root is never an ancestor
-		{"self", b, b, false},
-		{"child of parent (reversed)", c, a, false},
-		{"root as candidate ancestor", root, a, false},
-		{"root against root", root, root, false},
-		{"unrelated subtrees", x, c, false},
-		{"nil a", nil, c, false},
-		{"nil b", a, nil, false},
+		{"parent of child", a, c, a},
+		{"root of descendant", root, c, root},
+		{"self", b, b, b},
+		{"child of parent (reversed)", c, a, a},
+		{"siblings", a, x, root},
+		{"cousins via root", x, c, root},
+		{"root against root", root, root, root},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := isAncestor(tc.a, tc.b); got != tc.expect {
-				t.Fatalf("isAncestor(%v, %v) = %v, want %v", tc.a, tc.b, got, tc.expect)
+			if got := lcaNode(tc.a, tc.b); got != tc.want {
+				t.Fatalf("lcaNode(%v, %v) = %v, want %v", tc.a, tc.b, got, tc.want)
 			}
 		})
 	}
