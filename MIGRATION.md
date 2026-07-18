@@ -63,7 +63,7 @@ for _, m := range game.Moves() {
 
 // v3
 for _, node := range game.MoveTree().MainLine() {
-    fmt.Println(node.Position().Turn()) // position is on MoveNode
+    fmt.Println(node.Position().Turn()) // Position() replays via tree cursor (ADR-018)
 }
 ```
 

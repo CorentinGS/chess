@@ -70,7 +70,7 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 		// drives the tree's single active cursor (ADR-016). Save the cursor
 		// node here and restore it after the render so the tree's active
 		// position is left where the caller left it.
-		savedCursor := g.tree.Current()
+		defer g.tree.setCurrent(g.tree.Current())
 		root := g.tree.Root()
 		if len(root.children) > 0 {
 			// Root position is always available via tree.rootPos — no
@@ -83,7 +83,6 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 		} else if root.hasAnnotations() {
 			writeAnnotations(root, &sb)
 		}
-		g.tree.setCurrent(savedCursor)
 	}
 
 	if needTrailingSpace {

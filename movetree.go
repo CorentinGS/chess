@@ -156,21 +156,18 @@ func (t *MoveTree) AddVariation(parent *MoveNode, move Move) (*MoveNode, error) 
 	// Resolve parent's position via the cursor — variations attach to an
 	// arbitrary node, not the cursor's current node, so we navigate. Save
 	// and restore the cursor so the caller's active position is unchanged.
-	saved := t.current
+	defer t.setCurrent(t.current)
 	c := t.Cursor()
 	if !c.Goto(parent) {
 		return nil, errors.New("chess: variation parent is not reachable from cursor")
 	}
 	if c.Peek() == nil {
-		t.setCurrent(saved)
 		return nil, errors.New("chess: variation parent has no position")
 	}
 	if err := validatePositionMove(c.Peek(), move); err != nil {
-		t.setCurrent(saved)
 		return nil, err
 	}
 	node := t.addVariationUnchecked(parent, move)
-	t.setCurrent(saved)
 	return node, nil
 }
 

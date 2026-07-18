@@ -147,7 +147,7 @@ func (g *Game) MoveList() MoveList {
 	}
 
 	// Walk the cursor along the main line; capture the move + comments only.
-	saved := g.tree.Current()
+	defer g.tree.setCurrent(g.tree.Current())
 	c := g.tree.Cursor()
 	c.Reset()
 	list := make(MoveList, 0, len(root.children))
@@ -164,7 +164,6 @@ func (g *Game) MoveList() MoveList {
 		})
 	}
 
-	g.tree.setCurrent(saved)
 	return list
 }
 
@@ -291,7 +290,7 @@ func (g *Game) Positions() []*Position {
 	if root == nil || len(root.children) == 0 {
 		return []*Position{}
 	}
-	saved := g.tree.Current()
+	defer g.tree.setCurrent(g.tree.Current())
 	c := g.tree.Cursor()
 	c.Reset()
 	positions := make([]*Position, 0, len(root.children)+1)
@@ -303,7 +302,6 @@ func (g *Game) Positions() []*Position {
 			positions = append(positions, c.Peek().copy())
 		}
 	}
-	g.tree.setCurrent(saved)
 	return positions
 }
 
@@ -322,7 +320,7 @@ func (g *Game) numOfRepetitions() int {
 	target := g.currentPosition()
 	// numOfRepetitions walks the cursor through the main line; save and
 	// restore so callers see an unchanged active position.
-	saved := g.tree.Current()
+	defer g.tree.setCurrent(g.tree.Current())
 	c := g.tree.Cursor()
 	c.Reset()
 	for {
@@ -333,6 +331,5 @@ func (g *Game) numOfRepetitions() int {
 			break
 		}
 	}
-	g.tree.setCurrent(saved)
 	return count
 }

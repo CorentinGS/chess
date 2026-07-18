@@ -158,6 +158,9 @@ func castleRookMove(m Move, c Color) (Square, Square) {
 // place. The computed effect is returned so undo-style callers (the MoveTree
 // cursor's makeMoveCursor) can record the inverse without recomputing it;
 // statement-style callers (perft's makeMove) simply ignore it.
+// applyMove serves both COW callers (Position.Update) and in-place
+// callers (the cursor's makeMoveCursor). See ADR-016 for the
+// single-active-cursor reasoning.
 func (pos *Position) applyMove(m Move) moveEffect {
 	eff := computeMoveEffect(&pos.board, m)
 	moveCount := pos.nextMoveCount()
