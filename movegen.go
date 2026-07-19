@@ -1,7 +1,6 @@
 package chess
 
 import (
-	"math/bits"
 	"sync"
 )
 
@@ -103,7 +102,7 @@ func visitLegalMoves(pos *Position, mode moveGenerationMode, visit func(Move) bo
 
 func visitStandardMoves(pos *Position, mode moveGenerationMode, visit func(Move) bool) bool {
 	var m Move
-	ctx := legalMoveContextFor(pos, mode)
+	lg := newLegality(pos, mode)
 
 	bbAllowed := ^pos.board.whiteSqs
 	if pos.Turn() == Black {
@@ -121,9 +120,7 @@ func visitStandardMoves(pos *Position, mode moveGenerationMode, visit func(Move)
 		for s1Bits := s1BB; s1Bits != 0; s1Bits &= s1Bits - 1 {
 			s1 := squareFromBit(s1Bits & -s1Bits)
 			s2BB := bbForPossibleMoves(pos, p.Type(), s1) & bbAllowed
-			if ctx.enabled {
-				s2BB = ctx.filter(pos, p, s1, s2BB)
-			}
+			s2BB = lg.filter(p, s1, s2BB)
 			if s2BB == 0 {
 				continue
 			}
@@ -132,22 +129,21 @@ func visitStandardMoves(pos *Position, mode moveGenerationMode, visit func(Move)
 
 				m.s1 = s1
 				m.s2 = s2
-				kingSafe := mode == generateLegalOnly && ctx.provesOwnKingSafe(p, s2)
 
 				if (p == WhitePawn && s2.Rank() == Rank8) || (p == BlackPawn && s2.Rank() == Rank1) {
 					for _, pt := range promoPieceTypes {
 						m.promo = pt
-						var ownKingInCheck bool
-						m.tags, ownKingInCheck = moveTagsForPiece(m, pos, mode, p, kingSafe)
-						if moveMatchesMode(ownKingInCheck, mode) && visit(m) {
+						tag, ok := lg.legal(m)
+						m.tags = tag
+						if ok == (mode != generateUnsafeOnly) && visit(m) {
 							return true
 						}
 					}
 				} else {
 					m.promo = 0
-					var ownKingInCheck bool
-					m.tags, ownKingInCheck = moveTagsForPiece(m, pos, mode, p, kingSafe)
-					if moveMatchesMode(ownKingInCheck, mode) && visit(m) {
+					tag, ok := lg.legal(m)
+					m.tags = tag
+					if ok == (mode != generateUnsafeOnly) && visit(m) {
 						return true
 					}
 				}
@@ -156,97 +152,6 @@ func visitStandardMoves(pos *Position, mode moveGenerationMode, visit func(Move)
 	}
 
 	return false
-}
-
-func moveMatchesMode(ownKingInCheck bool, mode moveGenerationMode) bool {
-	if mode == generateUnsafeOnly {
-		return ownKingInCheck
-	}
-	return !ownKingInCheck
-}
-
-type legalMoveContext struct {
-	enabled    bool
-	enPassant  Square
-	checkCount int
-	checkMask  bitboard
-}
-
-func legalMoveContextFor(pos *Position, mode moveGenerationMode) legalMoveContext {
-	if mode == generateUnsafeOnly {
-		return legalMoveContext{}
-	}
-	kingSq := pos.board.kingSquare(pos.turn)
-	if kingSq == NoSquare {
-		return legalMoveContext{}
-	}
-	queenBB, rookBB, bishopBB := sliderBitboards(&pos.board, pos.turn.Other())
-	if !pos.inCheck && alignedMasks[kingSq]&(queenBB|rookBB|bishopBB) == 0 {
-		return legalMoveContext{}
-	}
-	ctx := legalMoveContext{
-		enabled:   true,
-		enPassant: pos.enPassantSquare,
-		checkMask: ^bitboard(0),
-	}
-	if pos.inCheck {
-		setChecks(&ctx, pos, kingSq)
-	}
-	return ctx
-}
-
-func (ctx legalMoveContext) filter(pos *Position, p Piece, s1 Square, moves bitboard) bitboard {
-	if p.Type() == King {
-		return moves
-	}
-	if ctx.enPassant != NoSquare && p.Type() == Pawn {
-		return moves
-	}
-	if ctx.checkCount > 1 {
-		return 0
-	}
-	if ctx.checkCount == 1 {
-		moves &= ctx.checkMask
-	}
-	if pinRay := pinnedRayForPiece(pos, s1); pinRay != 0 {
-		moves &= pinRay
-	}
-	return moves
-}
-
-func (ctx legalMoveContext) provesOwnKingSafe(p Piece, _ Square) bool {
-	if p.Type() == King {
-		return false
-	}
-	if !ctx.enabled {
-		return false
-	}
-	if p.Type() == Pawn && ctx.enPassant != NoSquare {
-		return false
-	}
-	return true
-}
-
-func setChecks(ctx *legalMoveContext, pos *Position, kingSq Square) {
-	board := pos.board
-	attacker := pos.turn.Other()
-	occ := ^board.emptySqs
-	queenBB, rookBB, bishopBB := sliderBitboards(&board, attacker)
-
-	checkers := (hvAttack(occ, kingSq) & (queenBB | rookBB)) |
-		(diaAttack(occ, kingSq) & (queenBB | bishopBB)) |
-		(bbKnightMoves[kingSq] & board.bbForPiece(NewPiece(Knight, attacker))) |
-		(bbKingMoves[kingSq] & board.bbForPiece(NewPiece(King, attacker))) |
-		pawnCheckers(&board, kingSq, attacker)
-
-	ctx.checkCount = bits.OnesCount64(uint64(checkers))
-	if ctx.checkCount == 1 {
-		checkerSq := squareFromBit(checkers)
-		ctx.checkMask = bbForSquare(checkerSq)
-		if squaresAligned(kingSq, checkerSq) {
-			ctx.checkMask |= squaresBetween(kingSq, checkerSq)
-		}
-	}
 }
 
 // promoPieceTypes is an immutable array of promotion piece types.
