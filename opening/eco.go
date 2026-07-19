@@ -7,24 +7,25 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"github.com/corentings/chess/v3"
 )
 
-var defaultBook = mustBook(bytes.NewReader(ecoData))
+var (
+	errDefaultBook  error
+	defaultBook     *BookECO
+	defaultBookOnce sync.Once
+)
 
 // DefaultBook returns the standard ECO opening book.
+// The book is parsed lazily on first call and cached for subsequent calls.
 // It is safe for concurrent use.
 func DefaultBook() (*BookECO, error) {
-	return defaultBook, nil
-}
-
-func mustBook(r io.Reader) *BookECO {
-	book, err := NewBook(r)
-	if err != nil {
-		panic(fmt.Errorf("opening: invalid embedded ECO data: %w", err))
-	}
-	return book
+	defaultBookOnce.Do(func() {
+		defaultBook, errDefaultBook = NewBook(bytes.NewReader(ecoData))
+	})
+	return defaultBook, errDefaultBook
 }
 
 // BookECO represents the Encyclopedia of Chess Openings https://en.wikipedia.org/wiki/Encyclopaedia_of_Chess_Openings

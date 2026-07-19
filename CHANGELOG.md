@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file. See [conven
 - consolidate PGN parse locality: `parsePGNText` and `lexerTokenSource` move from `framer.go` to `pgn.go`, next to the `Parser` they feed; `framer.go` is now honestly framing + the tokenize bridge.
 - relabel the move-text notation layer as codec internals: header comments on `notation.go` and `notation_resolver.go` (renamed from `san_resolver.go`); no behaviour change (ADR-013, ADR-016).
 - fix a cursor leak in PGN variation parsing on err returns: `parseVariation` (pgn.go) now uses `defer` to restore the active cursor so any err path inside a variation no longer strands the cursor inside the abandoned subtree (amends ADR-018).
+- `opening`: `DefaultBook()` initializes the default book lazily via `sync.Once` on first call, honoring ADR-005. Importing the package no longer parses the embedded ECO table or risks a panic at load time; the first call pays the one-time parse cost.
 
 - - -
 
