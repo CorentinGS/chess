@@ -132,8 +132,8 @@ func resolveSANMoveDirect(pos *Position, data sanMoveData) (Move, bool) {
 			continue
 		}
 
-		tags := moveTagsForPiece(m, pos, generateLegalAnnotated, p, false)
-		if tags&inCheck != 0 {
+		tags, ownKingInCheck := moveTagsForPiece(m, pos, generateLegalAnnotated, p, false)
+		if ownKingInCheck {
 			continue
 		}
 		m.tags = tags

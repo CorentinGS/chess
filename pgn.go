@@ -179,7 +179,10 @@ func (p *Parser) Parse() (*Game, error) {
 	if err := p.parseMoveText(); err != nil {
 		return nil, err
 	}
-	p.game.evaluateTerminalPositionStatus()
+	// Terminal-only policy: derive checkmate/stalemate from the final main-line
+	// position but leave automatic draws unset, so the Result tag and movetext
+	// token remain authoritative; resolveOutcome then arbitrates.
+	p.game.outcome, p.game.method = classifyOutcome(p.game.currentPosition(), 0, outcomeRules{})
 
 	if err := p.resolveOutcome(); err != nil {
 		return nil, err
@@ -188,59 +191,13 @@ func (p *Parser) Parse() (*Game, error) {
 }
 
 func (p *Parser) resolveOutcome() error {
-	boardMethod := p.game.method
-	boardOutcome := p.game.outcome
-	tagOutcome := normalizeOutcome(p.tagOutcome)
-	tokenOutcome := normalizeOutcome(p.tokenOutcome)
-
-	boardTerminal := boardMethod == Checkmate || boardMethod == Stalemate
-
-	if boardTerminal {
-		if tokenOutcome != NoOutcome && tokenOutcome != boardOutcome {
-			return &ParserError{
-				Message:  "movetext result token conflicts with board-derivable outcome",
-				Position: p.position,
-			}
-		}
-		if tagOutcome != NoOutcome && tagOutcome != boardOutcome {
-			return &ParserError{
-				Message:  "Result tag conflicts with board-derivable outcome",
-				Position: p.position,
-			}
-		}
-		p.game.outcome = boardOutcome
-		p.game.method = boardMethod
-		return nil
+	outcome, method, err := arbitratePGNOutcome(p.game.outcome, p.game.method, p.tagOutcome, p.tokenOutcome)
+	if err != nil {
+		return &ParserError{Message: err.Error(), Position: p.position}
 	}
-
-	if tokenOutcome != NoOutcome {
-		if tagOutcome != NoOutcome && tagOutcome != tokenOutcome {
-			return &ParserError{
-				Message:  "movetext result token conflicts with Result tag",
-				Position: p.position,
-			}
-		}
-		p.game.outcome = tokenOutcome
-		p.game.method = NoMethod
-		return nil
-	}
-
-	if tagOutcome != NoOutcome {
-		p.game.outcome = tagOutcome
-		p.game.method = NoMethod
-		return nil
-	}
-
-	p.game.outcome = NoOutcome
-	p.game.method = NoMethod
+	p.game.outcome = outcome
+	p.game.method = method
 	return nil
-}
-
-func normalizeOutcome(o Outcome) Outcome {
-	if o == UnknownOutcome {
-		return NoOutcome
-	}
-	return o
 }
 
 func (p *Parser) parseHeader() error {

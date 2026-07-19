@@ -137,15 +137,17 @@ func visitStandardMoves(pos *Position, mode moveGenerationMode, visit func(Move)
 				if (p == WhitePawn && s2.Rank() == Rank8) || (p == BlackPawn && s2.Rank() == Rank1) {
 					for _, pt := range promoPieceTypes {
 						m.promo = pt
-						m.tags = moveTagsForPiece(m, pos, mode, p, kingSafe)
-						if moveMatchesMode(m, mode) && visit(m) {
+						var ownKingInCheck bool
+						m.tags, ownKingInCheck = moveTagsForPiece(m, pos, mode, p, kingSafe)
+						if moveMatchesMode(ownKingInCheck, mode) && visit(m) {
 							return true
 						}
 					}
 				} else {
 					m.promo = 0
-					m.tags = moveTagsForPiece(m, pos, mode, p, kingSafe)
-					if moveMatchesMode(m, mode) && visit(m) {
+					var ownKingInCheck bool
+					m.tags, ownKingInCheck = moveTagsForPiece(m, pos, mode, p, kingSafe)
+					if moveMatchesMode(ownKingInCheck, mode) && visit(m) {
 						return true
 					}
 				}
@@ -156,11 +158,11 @@ func visitStandardMoves(pos *Position, mode moveGenerationMode, visit func(Move)
 	return false
 }
 
-func moveMatchesMode(m Move, mode moveGenerationMode) bool {
+func moveMatchesMode(ownKingInCheck bool, mode moveGenerationMode) bool {
 	if mode == generateUnsafeOnly {
-		return m.HasTag(inCheck)
+		return ownKingInCheck
 	}
-	return !m.HasTag(inCheck)
+	return !ownKingInCheck
 }
 
 type legalMoveContext struct {

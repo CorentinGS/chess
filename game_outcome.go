@@ -126,15 +126,6 @@ func (g *Game) evaluatePositionStatus() {
 	g.outcome, g.method = classifyOutcome(g.currentPosition(), g.numOfRepetitions(), fullOutcomeRules(g))
 }
 
-// evaluateTerminalPositionStatus updates only board-derived terminal outcomes.
-// PGN parsing calls this once on the final main-line position with the
-// Terminal-only policy (mate/stalemate only, no automatic draws) so that the
-// Result tag and movetext token remain authoritative; resolveOutcome then
-// arbitrates between board, tag and token.
-func (g *Game) evaluateTerminalPositionStatus() {
-	g.outcome, g.method = classifyOutcome(g.currentPosition(), 0, outcomeRules{})
-}
-
 // IgnoreFivefoldRepetitionDraw returns a Game option that disables automatic draws
 // caused by the fivefold repetition rule. When applied, the game will not
 // automatically end in a draw if the same position occurs five times.

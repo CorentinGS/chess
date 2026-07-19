@@ -1,5 +1,7 @@
 package chess
 
+import "errors"
+
 // outcomeRules configures classifyOutcome. The zero value is Terminal-only:
 // only checkmate and stalemate are detected and the auto-draw fields are
 // ignored. Populate includeAutoDraws to enable the automatic draw rules,
@@ -67,4 +69,53 @@ func fullOutcomeRules(g *Game) outcomeRules {
 		ignoreSeventyFiveMove: g.ignoreSeventyFiveMoveRuleDraw,
 		ignoreInsufficient:    g.ignoreInsufficientMaterialDraw,
 	}
+}
+
+// arbitratePGNOutcome reconciles the three outcome sources visible during PGN
+// parsing: the board-derived terminal outcome (checkmate/stalemate only, since
+// PGN parsing uses the Terminal-only classifyOutcome policy), the Result tag,
+// and the movetext result token (1-0 / 0-1 / 1/2-1/2 / *).
+//
+// Precedence: a board-terminal outcome wins and conflicts with tag/token are
+// errors; otherwise the movetext token wins; otherwise the Result tag wins;
+// otherwise NoOutcome. UnknownOutcome (the empty Result spelling) is treated
+// as NoOutcome. The returned error's message is preserved verbatim by the
+// parser when it wraps the error into *ParserError.
+//
+// Pure: no Game state, no allocation on the success path. The parser owns the
+// side effect of writing the result back onto the Game.
+func arbitratePGNOutcome(boardOutcome Outcome, boardMethod Method, tagOutcome, tokenOutcome Outcome) (Outcome, Method, error) {
+	normalize := func(o Outcome) Outcome {
+		if o == UnknownOutcome {
+			return NoOutcome
+		}
+		return o
+	}
+	tagOutcome = normalize(tagOutcome)
+	tokenOutcome = normalize(tokenOutcome)
+
+	boardTerminal := boardMethod == Checkmate || boardMethod == Stalemate
+
+	if boardTerminal {
+		if tokenOutcome != NoOutcome && tokenOutcome != boardOutcome {
+			return NoOutcome, NoMethod, errors.New("movetext result token conflicts with board-derivable outcome")
+		}
+		if tagOutcome != NoOutcome && tagOutcome != boardOutcome {
+			return NoOutcome, NoMethod, errors.New("Result tag conflicts with board-derivable outcome")
+		}
+		return boardOutcome, boardMethod, nil
+	}
+
+	if tokenOutcome != NoOutcome {
+		if tagOutcome != NoOutcome && tagOutcome != tokenOutcome {
+			return NoOutcome, NoMethod, errors.New("movetext result token conflicts with Result tag")
+		}
+		return tokenOutcome, NoMethod, nil
+	}
+
+	if tagOutcome != NoOutcome {
+		return tagOutcome, NoMethod, nil
+	}
+
+	return NoOutcome, NoMethod, nil
 }

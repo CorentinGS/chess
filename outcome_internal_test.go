@@ -1,6 +1,9 @@
 package chess
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestClassifyOutcome(t *testing.T) {
 	mateBlackMated := "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4" // Qxf7#, black mated -> WhiteWon
@@ -69,6 +72,81 @@ func TestClassifyOutcome(t *testing.T) {
 			gotOutcome, gotMethod := classifyOutcome(pos, tt.repetitions, tt.rules)
 			if gotOutcome != tt.wantOutcome || gotMethod != tt.wantMethod {
 				t.Errorf("classifyOutcome = (%s, %s), want (%s, %s)", gotOutcome, gotMethod, tt.wantOutcome, tt.wantMethod)
+			}
+		})
+	}
+}
+
+func TestArbitratePGNOutcome(t *testing.T) {
+	tests := []struct {
+		name               string
+		boardOutcome       Outcome
+		boardMethod        Method
+		tagOutcome         Outcome
+		tokenOutcome       Outcome
+		wantOutcome        Outcome
+		wantMethod         Method
+		wantConflict       bool
+		wantConflictSubstr string
+	}{
+		// No sources: NoOutcome / NoMethod.
+		{"all empty", NoOutcome, NoMethod, NoOutcome, NoOutcome, NoOutcome, NoMethod, false, ""},
+
+		// UnknownOutcome spelling normalised to NoOutcome (no conflict).
+		{"unknown tag normalised", NoOutcome, NoMethod, UnknownOutcome, NoOutcome, NoOutcome, NoMethod, false, ""},
+		{"unknown token normalised", NoOutcome, NoMethod, NoOutcome, UnknownOutcome, NoOutcome, NoMethod, false, ""},
+
+		// Tag only.
+		{"tag white wins", NoOutcome, NoMethod, WhiteWon, NoOutcome, WhiteWon, NoMethod, false, ""},
+		{"tag draw", NoOutcome, NoMethod, Draw, NoOutcome, Draw, NoMethod, false, ""},
+		{"tag black wins", NoOutcome, NoMethod, BlackWon, NoOutcome, BlackWon, NoMethod, false, ""},
+
+		// Token only.
+		{"token white wins", NoOutcome, NoMethod, NoOutcome, WhiteWon, WhiteWon, NoMethod, false, ""},
+		{"token draw", NoOutcome, NoMethod, NoOutcome, Draw, Draw, NoMethod, false, ""},
+
+		// Token beats tag when they agree.
+		{"tag and token agree", NoOutcome, NoMethod, WhiteWon, WhiteWon, WhiteWon, NoMethod, false, ""},
+
+		// Token and tag conflict (no board).
+		{"token conflicts with tag", NoOutcome, NoMethod, BlackWon, WhiteWon, NoOutcome, NoMethod, true, "movetext result token conflicts with Result tag"},
+
+		// Board-terminal wins over tag/token.
+		{"board checkmate beats agreeing tag and token", WhiteWon, Checkmate, WhiteWon, WhiteWon, WhiteWon, Checkmate, false, ""},
+		{"board stalemate beats agreeing tag and token", Draw, Stalemate, Draw, Draw, Draw, Stalemate, false, ""},
+		{"board terminal tag omitted token omitted", WhiteWon, Checkmate, NoOutcome, NoOutcome, WhiteWon, Checkmate, false, ""},
+
+		// Board-terminal conflict with token.
+		{"board checkmate conflicts with token", WhiteWon, Checkmate, NoOutcome, BlackWon, NoOutcome, NoMethod, true, "movetext result token conflicts with board-derivable outcome"},
+		// Board-terminal conflict with tag (token agrees).
+		{"board checkmate conflicts with tag", WhiteWon, Checkmate, BlackWon, WhiteWon, NoOutcome, NoMethod, true, "Result tag conflicts with board-derivable outcome"},
+
+		// Non-terminal board method (e.g. Resignation carried on a FEN-rooted
+		// game — shouldn't normally happen at PGN parse since the policy is
+		// Terminal-only, but the function must not treat it as terminal).
+		{"non-terminal board method ignored", NoOutcome, Resignation, NoOutcome, WhiteWon, WhiteWon, NoMethod, false, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotOutcome, gotMethod, err := arbitratePGNOutcome(tt.boardOutcome, tt.boardMethod, tt.tagOutcome, tt.tokenOutcome)
+			if tt.wantConflict {
+				if err == nil {
+					t.Fatalf("expected conflict error, got nil")
+				}
+				if !strings.Contains(err.Error(), tt.wantConflictSubstr) {
+					t.Errorf("error = %q, want substring %q", err.Error(), tt.wantConflictSubstr)
+				}
+				if gotOutcome != NoOutcome || gotMethod != NoMethod {
+					t.Errorf("conflict returned (%s, %s), want (NoOutcome, NoMethod)", gotOutcome, gotMethod)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if gotOutcome != tt.wantOutcome || gotMethod != tt.wantMethod {
+				t.Errorf("arbitratePGNOutcome = (%s, %s), want (%s, %s)", gotOutcome, gotMethod, tt.wantOutcome, tt.wantMethod)
 			}
 		})
 	}

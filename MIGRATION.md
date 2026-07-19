@@ -213,3 +213,20 @@ r.RenderGameTo(game, w)             // write to an io.Writer
 - `Position.ValidMovesUnsafe()` and `Position.ValidMovesIter()` —
   allocation-sensitive access for hot paths; see package docs for safety notes.
 - `Board.Piece()` uses an internal mailbox for O(1) lookup.
+
+## Polyglot book loading
+
+The `BookSource` interface and the `ReaderBookSource`, `BytesBookSource`, and
+`FileBookSource` adapter types are removed. `LoadFromSource` is removed. Use
+`LoadFromReader(io.Reader)` or `LoadFromBytes([]byte)` directly:
+
+```go
+// v2
+book, err := chess.LoadFromSource(chess.NewBytesBookSource(data))
+
+// v3
+book, err := chess.LoadFromBytes(data)
+```
+
+Both entry points read into memory; there is no streaming loader. Add one when
+a caller needs it.

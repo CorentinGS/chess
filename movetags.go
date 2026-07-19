@@ -5,7 +5,6 @@ package chess
 //   - Capture: The move captures an opponent's piece
 //   - EnPassant: The move is an en passant capture
 //   - Check: The move puts the opponent in check
-//   - inCheck: The move leaves the moving side's king in check (illegal)
 //   - KingSideCastle: The move is a king-side castle
 //   - QueenSideCastle: The move is a queen-side castle
 func moveTags(m Move, pos *Position) MoveTag {
@@ -17,11 +16,18 @@ func moveTags(m Move, pos *Position) MoveTag {
 // existence checks only need enough information to reject moves that leave the
 // moving side in check, so they skip the opponent-check test.
 func moveTagsForMode(m Move, pos *Position, mode moveGenerationMode) MoveTag {
-	return moveTagsForPiece(m, pos, mode, pos.board.Piece(m.s1), false)
+	tags, _ := moveTagsForPiece(m, pos, mode, pos.board.Piece(m.s1), false)
+	return tags
 }
 
-func moveTagsForPiece(m Move, pos *Position, mode moveGenerationMode, p Piece, ownKingSafe bool) MoveTag {
+// moveTagsForPiece computes the public tags for a candidate move and reports
+// whether the move leaves the moving side's own king in check. The
+// ownKingInCheck flag is a transient legality signal consumed by callers to
+// keep or drop the candidate; it is not stored on MoveTag, whose bit set is
+// fully public.
+func moveTagsForPiece(m Move, pos *Position, mode moveGenerationMode, p Piece, ownKingSafe bool) (MoveTag, bool) {
 	var tags MoveTag
+	var ownKingInCheck bool
 	if pos.board.isOccupied(m.s2) {
 		tags |= Capture
 	} else if m.s2 == pos.enPassantSquare && p.Type() == Pawn {
@@ -38,19 +44,19 @@ func moveTagsForPiece(m Move, pos *Position, mode moveGenerationMode, p Piece, o
 	}
 	if mode == generateLegalOnly || mode == generateUnsafeOnly {
 		if ownKingSafe {
-			return tags
+			return tags, false
 		}
 		if !pos.inCheck && p.Type() != King && tags&EnPassant == 0 {
 			if moveFromAlignedWithOwnKing(m, pos) {
 				if exposesOwnKingToSlider(m, pos) {
-					tags |= inCheck
+					ownKingInCheck = true
 				}
-				return tags
+				return tags, ownKingInCheck
 			}
-			return tags
+			return tags, false
 		}
 		if !requiresOwnKingCheckSimulation(m, pos, p, tags) {
-			return tags
+			return tags, false
 		}
 	}
 	// apply preliminary tags to a local copy so board.update reads them correctly
@@ -63,11 +69,11 @@ func moveTagsForPiece(m Move, pos *Position, mode moveGenerationMode, p Piece, o
 	tempBoard.update(local, computeMoveEffect(&pos.board, local))
 	if !ownKingSafe && tempBoard.kingSquare(pos.turn) != NoSquare {
 		if isSquareAttackedBy(&tempBoard, tempBoard.kingSquare(pos.turn), pos.turn.Other()) {
-			tags |= inCheck
+			ownKingInCheck = true
 		}
 	}
 	if mode == generateLegalOnly || mode == generateUnsafeOnly {
-		return tags
+		return tags, ownKingInCheck
 	}
 	// determine if opponent in check after move
 	if tempBoard.kingSquare(pos.turn.Other()) != NoSquare {
@@ -75,7 +81,7 @@ func moveTagsForPiece(m Move, pos *Position, mode moveGenerationMode, p Piece, o
 			tags |= Check
 		}
 	}
-	return tags
+	return tags, ownKingInCheck
 }
 
 func requiresOwnKingCheckSimulation(m Move, pos *Position, p Piece, tags MoveTag) bool {

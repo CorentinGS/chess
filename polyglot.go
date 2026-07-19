@@ -1,7 +1,6 @@
 package chess
 
 import (
-	"bytes"
 	"cmp"
 	"encoding/binary"
 	"errors"
@@ -129,138 +128,6 @@ func (pm PolyglotMove) ToMove() Move {
 	return decode
 }
 
-// BookSource defines the interface for reading polyglot book data.
-// This interface allows for different source implementations (file, memory, etc.)
-// while maintaining consistent access patterns.
-type BookSource interface {
-	// Read reads exactly len(p) bytes into p or returns an error
-	Read(p []byte) (n int, err error)
-	// Size returns the total size of the book data
-	Size() (int64, error)
-}
-
-// ReaderBookSource implements BookSource for io.Reader.
-type ReaderBookSource struct {
-	reader    io.Reader
-	data      []byte // Buffered data for Size() implementation
-	readIndex int64
-}
-
-// NewReaderBookSource creates a new reader-based book source
-// Note: This will read the entire input into memory to support Size() and multiple reads.
-func NewReaderBookSource(reader io.Reader) (*ReaderBookSource, error) {
-	// Read all data into memory
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ReaderBookSource{
-		reader:    bytes.NewReader(data),
-		data:      data,
-		readIndex: 0,
-	}, nil
-}
-
-// Read implements BookSource for ReaderBookSource.
-func (r *ReaderBookSource) Read(p []byte) (int, error) {
-	if r.readIndex >= int64(len(r.data)) {
-		return 0, io.EOF
-	}
-
-	n := copy(p, r.data[r.readIndex:])
-	r.readIndex += int64(n)
-
-	if n < len(p) {
-		return n, io.EOF
-	}
-	return n, nil
-}
-
-// Size implements BookSource for ReaderBookSource.
-func (r *ReaderBookSource) Size() (int64, error) {
-	return int64(len(r.data)), nil
-}
-
-// FileBookSource implements BookSource for files.
-type FileBookSource struct {
-	path string
-}
-
-// BytesBookSource implements BookSource for byte slices.
-type BytesBookSource struct {
-	data  []byte
-	index int64
-}
-
-// NewBytesBookSource creates a new memory-based book source.
-func NewBytesBookSource(data []byte) *BytesBookSource {
-	return &BytesBookSource{
-		data:  data,
-		index: 0,
-	}
-}
-
-// Read implements BookSource for BytesBookSource.
-func (b *BytesBookSource) Read(p []byte) (int, error) {
-	if b.index >= int64(len(b.data)) {
-		return 0, io.EOF
-	}
-
-	n := copy(p, b.data[b.index:])
-	b.index += int64(n)
-
-	if n < len(p) {
-		return n, io.EOF
-	}
-	return n, nil
-}
-
-// Size implements BookSource for BytesBookSource.
-func (b *BytesBookSource) Size() (int64, error) {
-	return int64(len(b.data)), nil
-}
-
-// LoadFromSource loads a polyglot book from any BookSource.
-func LoadFromSource(source BookSource) (*PolyglotBook, error) {
-	size, err := source.Size()
-	if err != nil {
-		return nil, err
-	}
-
-	if size%16 != 0 {
-		return nil, errors.New("invalid polyglot book data size")
-	}
-
-	numEntries := size / 16
-	entries := make([]PolyglotEntry, 0, numEntries)
-
-	buf := make([]byte, 16)
-	for {
-		_, readErr := source.Read(buf)
-		if errors.Is(readErr, io.EOF) {
-			break
-		}
-		if readErr != nil {
-			return nil, readErr
-		}
-
-		entry := PolyglotEntry{
-			Key:    binary.BigEndian.Uint64(buf[0:8]),
-			Move:   binary.BigEndian.Uint16(buf[8:10]),
-			Weight: binary.BigEndian.Uint16(buf[10:12]),
-			Learn:  binary.BigEndian.Uint32(buf[12:16]),
-		}
-		entries = append(entries, entry)
-	}
-
-	slices.SortFunc(entries, func(a, b PolyglotEntry) int {
-		return cmp.Compare(a.Key, b.Key)
-	})
-
-	return &PolyglotBook{entries: entries}, nil
-}
-
 // LoadFromReader loads a polyglot book from an io.Reader.
 // Note that this will read the entire input into memory.
 //
@@ -277,11 +144,11 @@ func LoadFromSource(source BookSource) (*PolyglotBook, error) {
 //	    log.Fatal(err)
 //	}
 func LoadFromReader(reader io.Reader) (*PolyglotBook, error) {
-	source, err := NewReaderBookSource(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}
-	return LoadFromSource(source)
+	return parseBookData(data)
 }
 
 // LoadFromBytes loads a polyglot book from a byte slice.
@@ -295,8 +162,32 @@ func LoadFromReader(reader io.Reader) (*PolyglotBook, error) {
 //	    log.Fatal(err)
 //	}
 func LoadFromBytes(data []byte) (*PolyglotBook, error) {
-	source := NewBytesBookSource(data)
-	return LoadFromSource(source)
+	return parseBookData(data)
+}
+
+// ponytail: parseBookData is the single entry for both readers and bytes —
+// one shape per loader, no BookSource adapter layer. Add a streaming loader
+// here if a future caller needs to feed a polyglot book without buffering.
+func parseBookData(data []byte) (*PolyglotBook, error) {
+	if len(data)%16 != 0 {
+		return nil, errors.New("invalid polyglot book data size")
+	}
+
+	entries := make([]PolyglotEntry, 0, len(data)/16)
+	for i := 0; i < len(data); i += 16 {
+		entries = append(entries, PolyglotEntry{
+			Key:    binary.BigEndian.Uint64(data[i : i+8]),
+			Move:   binary.BigEndian.Uint16(data[i+8 : i+10]),
+			Weight: binary.BigEndian.Uint16(data[i+10 : i+12]),
+			Learn:  binary.BigEndian.Uint32(data[i+12 : i+16]),
+		})
+	}
+
+	slices.SortFunc(entries, func(a, b PolyglotEntry) int {
+		return cmp.Compare(a.Key, b.Key)
+	})
+
+	return &PolyglotBook{entries: entries}, nil
 }
 
 // FindMoves looks up all moves for a given position hash.
