@@ -13,7 +13,7 @@ import (
 //   - big_big.pgn: ~1,925,000 allocs/run
 //
 // Compared to the pre-cursor baseline (~690k / ~2.86M) this is a 21-33%
-// reduction from dropping per-node *Position and per-MoveHistory position
+// reduction from dropping per-node *Position and per-MoveList position
 // caches; positions are now resolved lazily via the MoveTree cursor.
 // Lower as fixes land; never raise without confirming the alloc growth is real.
 const (

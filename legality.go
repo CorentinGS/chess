@@ -1,8 +1,44 @@
 package chess
 
 import (
+	"errors"
+	"fmt"
 	"math/bits"
 )
+
+// ErrIllegalMove is returned by resolveCanonicalMove when the supplied
+// coordinates do not match any legal move from the given Position.
+var ErrIllegalMove = errors.New("chess: illegal move")
+
+// resolveCanonicalMove validates a caller-supplied Move against the legal
+// moves of pos and returns the canonical generated Move with position-derived
+// tags (capture, en passant, castling, check). A Null-tagged Move returns
+// NewNullMove regardless of origin, destination, or promotion.
+//
+// The returned Move is what safe insertion should store, encode, and apply:
+// its identity (origin, destination, promotion) and its tags both reflect the
+// position. A caller who supplied partial or stale tags therefore benefits
+// from repair: the Move tree keeps the canonical value, and downstream
+// cursor application, repetition detection, and PGN encoding see one
+// interpretation.
+//
+// Errors:
+//   - ErrIllegalMove if no legal move matches the supplied coordinates.
+//   - "chess: position required" if pos is nil and the Move is not Null.
+func resolveCanonicalMove(pos *Position, m Move) (Move, error) {
+	if m.HasTag(Null) {
+		return NewNullMove(), nil
+	}
+	if pos == nil {
+		return Move{}, errors.New("chess: position required")
+	}
+	for _, v := range pos.ValidMovesUnsafe() {
+		if v.s1 == m.s1 && v.s2 == m.s2 && v.promo == m.promo {
+			return v, nil
+		}
+	}
+	return Move{}, fmt.Errorf("%w %s", ErrIllegalMove, m.String())
+}
 
 // legality owns the king-safety policy for one position. Construct one per
 // position with newLegality and call legal on every candidate move.

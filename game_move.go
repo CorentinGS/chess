@@ -19,14 +19,34 @@ func (g *Game) PushMove(algebraicMove string, options *MoveInsertOptions) (*Move
 
 // PushMoveText adds a move to the game using an explicit move text codec.
 // It decodes against the current position so the inserted move carries
-// position-derived tags.
+// position-derived tags. The decoded Move is canonical (codec.Decode resolves
+// legal moves), so it crosses the trusted fast path: no extra legal-move
+// lookup is needed before insertion.
 func (g *Game) PushMoveText(moveText string, codec MoveTextCodec, options *MoveInsertOptions) (*MoveNode, error) {
 	move, err := codec.Decode(g.currentPosition(), moveText)
 	if err != nil {
 		return nil, fmt.Errorf("chess: decode %s move text %q: %w", codec, moveText, err)
 	}
 
-	return g.Move(move, options)
+	return g.insertCanonical(canonicalMoveFromCodec(move), options)
+}
+
+// canonicalMoveFromCodec returns the codec-decoded Move, normalising any
+// stray Null-tagged value through NewNullMove so the Move tree only ever
+// stores the canonical Null shape.
+func canonicalMoveFromCodec(m Move) Move {
+	if m.HasTag(Null) {
+		return NewNullMove()
+	}
+	return m
+}
+
+// insertCanonical inserts an already-resolved canonical Move without
+// re-running the legal-move scan. Move tree repair-or-reject semantics still
+// apply for existing Move occurrences with stale tags.
+func (g *Game) insertCanonical(canonical Move, options *MoveInsertOptions) (*MoveNode, error) {
+	options = cmp.Or(options, &MoveInsertOptions{})
+	return g.moveUnchecked(canonical, options)
 }
 
 // UnsafePushMoveText adds fully specified move text without legal move
@@ -59,6 +79,10 @@ func (g *Game) UnsafePushMoveText(moveText string, codec MoveTextCodec, options 
 // This method validates the move before adding it to ensure game correctness.
 // For high-performance scenarios where moves are pre-validated, use UnsafeMove.
 //
+// Null moves are rejected here: they are never part of ValidMovesUnsafe, so
+// callers wanting to pass the side must use [Game.NullMove] or
+// [Game.UnsafeMove] explicitly.
+//
 // Example:
 //
 //	possibleMove := game.ValidMoves()[0]
@@ -70,12 +94,16 @@ func (g *Game) UnsafePushMoveText(moveText string, codec MoveTextCodec, options 
 func (g *Game) Move(move Move, options *MoveInsertOptions) (*MoveNode, error) {
 	options = cmp.Or(options, &MoveInsertOptions{})
 
-	// Validate the move before adding it
-	if err := g.validateMove(move); err != nil {
+	if move.HasTag(Null) {
+		return nil, errors.New("chess: null move is not valid for the current position")
+	}
+
+	canonical, err := resolveCanonicalMove(g.currentPosition(), move)
+	if err != nil {
 		return nil, err
 	}
 
-	return g.moveUnchecked(move, options)
+	return g.moveUnchecked(canonical, options)
 }
 
 // UnsafeMove adds a move to the game without validation.
@@ -135,31 +163,6 @@ func (g *Game) NullMove(options ...*MoveInsertOptions) (*MoveNode, error) {
 func (g *Game) insertByMove(move Move, options *MoveInsertOptions) (*MoveNode, error) {
 	options = cmp.Or(options, &MoveInsertOptions{})
 	return g.moveUnchecked(move, options)
-}
-
-// validateMove checks if the given move is valid for the current position.
-// It returns an error if the move is invalid.
-func (g *Game) validateMove(move Move) error {
-	pos := g.currentPosition()
-	if pos == nil {
-		return errors.New("no current position")
-	}
-
-	// Null moves are never part of a position's legal moves; they must
-	// be inserted via UnsafeMove or NullMove.
-	if move.HasTag(Null) {
-		return fmt.Errorf("null move %s is not valid for the current position", move.String())
-	}
-
-	// Check if the move exists in the list of valid moves for the current position
-	validMoves := pos.ValidMovesUnsafe()
-	for _, validMove := range validMoves {
-		if validMove.s1 == move.s1 && validMove.s2 == move.s2 && validMove.promo == move.promo {
-			return nil // Move is valid
-		}
-	}
-
-	return fmt.Errorf("move %s is not valid for the current position", move.String())
 }
 
 // ValidateSAN checks if a string is valid Standard Algebraic notation (SAN) syntax.

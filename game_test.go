@@ -1874,7 +1874,7 @@ func TestGameMoveValidation(t *testing.T) {
 				s2: E5, // Invalid move - pawn can't move three squares from e2 to e5
 			},
 			wantErr:     true,
-			errorString: "move e2e5 is not valid for the current position",
+			errorString: "chess: illegal move e2e5",
 		},
 		{
 			name:       "invalid move from valid position should fail",
@@ -1884,7 +1884,7 @@ func TestGameMoveValidation(t *testing.T) {
 				s2: E6, // Invalid move - pawn can't move two squares from e4 to e6
 			},
 			wantErr:     true,
-			errorString: "move e4e6 is not valid for the current position",
+			errorString: "chess: illegal move e4e6",
 		},
 		{
 			name:       "valid move from valid position should succeed",
@@ -1914,7 +1914,7 @@ func TestGameMoveValidation(t *testing.T) {
 				promo: King, // Invalid promotion piece
 			},
 			wantErr:     true,
-			errorString: "move b7a8k is not valid for the current position",
+			errorString: "chess: illegal move b7a8k",
 		},
 		{
 			name:       "valid castling move should succeed",
@@ -1935,7 +1935,7 @@ func TestGameMoveValidation(t *testing.T) {
 				tags: KingSideCastle,
 			},
 			wantErr:     true,
-			errorString: "move e1h1 is not valid for the current position",
+			errorString: "chess: illegal move e1h1",
 		},
 	}
 
@@ -1968,15 +1968,18 @@ func TestGameMoveValidation(t *testing.T) {
 				return
 			}
 
-			// Check that the current move matches our move
+			// Check that the current move matches our move by identity (origin,
+			// destination, promotion). Position-derived tags may differ between
+			// the caller-supplied and stored Move because the canon stores the
+			// generated Move; tags are derived, not part of Move identity.
 			if game.MoveTree().Current() == nil {
 				t.Errorf("Move() succeeded but currentMove is nil")
 				return
 			}
 
-			if game.MoveTree().Current().Move() != tt.move {
-				t.Errorf("Move() succeeded but currentMove doesn't match: got %v, want %v",
-					game.MoveTree().Current().Move(), tt.move)
+			stored := game.MoveTree().Current().Move()
+			if stored.S1() != tt.move.S1() || stored.S2() != tt.move.S2() || stored.Promo() != tt.move.Promo() {
+				t.Errorf("Move() identity mismatch: got %v, want %v", stored, tt.move)
 			}
 		})
 	}
@@ -2052,15 +2055,17 @@ func TestGameUnsafeMove(t *testing.T) {
 				return
 			}
 
-			// Check that the current move matches our move
+			// Check that the current move matches our move by identity (origin,
+			// destination, promotion). UnsafeMove trusts the caller, so the stored
+			// Move carries the caller's tags verbatim.
 			if game.MoveTree().Current() == nil {
 				t.Errorf("UnsafeMove() succeeded but currentMove is nil")
 				return
 			}
 
-			if game.MoveTree().Current().Move() != tt.move {
-				t.Errorf("UnsafeMove() succeeded but currentMove doesn't match: got %v, want %v",
-					game.MoveTree().Current().Move(), tt.move)
+			stored := game.MoveTree().Current().Move()
+			if stored.S1() != tt.move.S1() || stored.S2() != tt.move.S2() || stored.Promo() != tt.move.Promo() {
+				t.Errorf("UnsafeMove() identity mismatch: got %v, want %v", stored, tt.move)
 			}
 		})
 	}

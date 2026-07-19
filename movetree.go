@@ -117,6 +117,19 @@ func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, er
 		if options.PromoteToMainLine {
 			t.promoteToMainLine(existing)
 		}
+		// If the existing Move occurrence was placed via an unsafe path that
+		// supplied stale tags, canonicalise the stored Move in place. The
+		// incoming move has the canonical tags from resolveCanonicalMove (or
+		// from a trusted codec on the PushMoveText fast path). When the
+		// existing occurrence already has continuations the subtree was
+		// computed against the old Move's position-derived state, so repair
+		// is unsafe; refuse and leave the tree unchanged.
+		if existing.move.tags != move.tags {
+			if len(existing.children) > 0 {
+				return nil, errors.New("chess: cannot canonicalise existing Move occurrence with continuations")
+			}
+			existing.move = move
+		}
 		// Advance the cursor in place rather than re-deriving the post-move
 		// position from existing.position. The undo record keeps undos in
 		// sync with the depth between root and current.
@@ -161,11 +174,23 @@ func (t *MoveTree) AddVariation(parent *MoveNode, move Move) (*MoveNode, error) 
 	if t.pos == nil {
 		return nil, errors.New("chess: variation parent has no position")
 	}
-	if err := validatePositionMove(t.pos, move); err != nil {
+	canonical, err := resolveCanonicalMove(t.pos, move)
+	if err != nil {
 		return nil, err
 	}
-	node := t.addVariationUnchecked(parent, move)
-	return node, nil
+	for _, sibling := range parent.children {
+		if !sameMove(sibling.move, canonical) {
+			continue
+		}
+		if sibling.move.tags != canonical.tags {
+			if len(sibling.children) > 0 {
+				return nil, errors.New("chess: cannot canonicalise existing Move occurrence with continuations")
+			}
+			sibling.move = canonical
+		}
+		return sibling, nil
+	}
+	return t.addVariationUnchecked(parent, canonical), nil
 }
 
 func (t *MoveTree) addVariationUnchecked(parent *MoveNode, move Move) *MoveNode {
