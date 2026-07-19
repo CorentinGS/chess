@@ -254,6 +254,19 @@ func TestPGNRenderer_IsIdempotentOnAnnotations(t *testing.T) {
 	}
 }
 
+func TestPGNRenderer_RenderGameToStringsBuilderFastPath(t *testing.T) {
+	pgn := withMinimalTags("1. e4 {main} e5 (1...c5 {sicilian} 2. Nf3) 2. Nf3 *")
+	g := mustParseSingleGame(t, pgn)
+
+	var sb strings.Builder
+	if err := chess.DefaultPGNRenderer.RenderGameTo(g, &sb); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := sb.String(), chess.DefaultPGNRenderer.Render(g); got != want {
+		t.Errorf("RenderGameTo(*strings.Builder) and Render disagree:\n%s\nvs\n%s", got, want)
+	}
+}
+
 func TestPGNRenderer_WritesNAGsBeforeComments(t *testing.T) {
 	g := chess.NewGame()
 	if _, err := g.PushMove("e4", nil); err != nil {

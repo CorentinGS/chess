@@ -21,23 +21,44 @@ type PGNRenderer struct{}
 // Game.String and Game.WritePGN.
 var DefaultPGNRenderer = &PGNRenderer{}
 
+// pgnRender holds the state for a single render pass. A fresh instance is
+// created per Render/RenderGameTo call; PGNRenderer itself stays stateless.
+//
+// Cursor invariant: run() navigates the MoveTree's single active cursor
+// (ADR-016) to read pre-move positions. It saves the caller's cursor on
+// entry and restores it via defer, inside the tree != nil guard. Not safe
+// for concurrent use on one Game; same constraint as the v3 slice.
+type pgnRender struct {
+	g  *Game
+	sb *strings.Builder
+}
+
 // Render returns the PGN text for g.
 func (r *PGNRenderer) Render(g *Game) string {
 	var sb strings.Builder
-	if err := r.renderTo(g, &sb); err != nil {
-		return ""
-	}
+	// strings.Builder.Write never fails; the error is unreachable here.
+	_ = r.RenderGameTo(g, &sb)
 	return sb.String()
 }
 
 // RenderGameTo writes the PGN text for g to w. It returns any
 // write error from w.
 func (r *PGNRenderer) RenderGameTo(g *Game, w io.Writer) error {
-	return r.renderTo(g, w)
+	sb, ok := w.(*strings.Builder)
+	if !ok {
+		sb = &strings.Builder{}
+	}
+	(&pgnRender{g: g, sb: sb}).run()
+	if ok {
+		return nil
+	}
+	_, err := io.WriteString(w, sb.String())
+	return err
 }
 
-func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
-	var sb strings.Builder
+func (p *pgnRender) run() {
+	g := p.g
+	sb := p.sb
 
 	tagPairList := make([]sortableTagPair, len(g.tagPairs))
 
@@ -76,12 +97,12 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 			// Root position is always available via tree.rootPos — no
 			// cursor navigation needed for the move count / side to move
 			// at the start of the game.
-			writeMoves(root,
+			p.writeMoves(root,
 				g.tree.rootPos.moveCount,
-				g.tree.rootPos.turn == White, &sb, false, false, true)
+				g.tree.rootPos.turn == White, false, false, true)
 			needTrailingSpace = true
 		} else if root.hasAnnotations() {
-			writeAnnotations(root, &sb)
+			p.writeAnnotations(root)
 		}
 	}
 
@@ -89,9 +110,6 @@ func (r *PGNRenderer) renderTo(g *Game, w io.Writer) error {
 		sb.WriteString(" ")
 	}
 	sb.WriteString(g.Outcome().String())
-
-	_, err := io.WriteString(w, sb.String())
-	return err
 }
 
 // sortableTagPair is the key/value row used to sort a Game's tag pairs into
@@ -152,24 +170,20 @@ func escapeTagValue(v string) string {
 	return sb.String()
 }
 
-// writeMoves recursively writes the PGN-formatted move sequence starting from the given move node into the provided strings.Builder.
-// It handles move numbering for white and black moves, encodes moves using algebraic notation based on the appropriate position,
-// and appends comments and command annotations if present. The function distinguishes between main line moves and sub-variations;
-// when processing a sub-variation, moves are enclosed in parentheses.
+// writeMoves recursively writes the PGN-formatted move sequence starting from
+// the given move node. It handles move numbering for white and black moves,
+// encodes moves using algebraic notation based on the appropriate position,
+// and appends comments and command annotations if present. The function
+// distinguishes between main line moves and sub-variations; when processing a
+// sub-variation, moves are enclosed in parentheses.
 //
-// Parameters:
+// The function recurses through the move tree, writing the main line first
+// and then processing any additional variations, ensuring that the output
+// adheres to standard PGN conventions.
 //
-//	node - pointer to the current move node from which to write moves.
-//	moveNum - the current move number corresponding to white’s moves.
-//	isWhite - true if it is white’s move, false if it is black’s move.
-//	sb - pointer to a strings.Builder where the formatted move notation is appended.
-//	subVariation - true if the current call is within a sub-variation, affecting formatting details.
-//	closedVariation - true if the prior call closed a sub-variation, affecting formatting details.
-//	isRoot - true if the current move is the root move of a game, affecting formatting details.
-//
-// The function recurses through the move tree, writing the main line first and then processing any additional variations,
-// ensuring that the output adheres to standard PGN conventions. Future enhancements may include support for all NAG values.
-func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
+// ponytail: subVariation/closedVariation/isRoot stay per-frame locals;
+// a named-context cleanup is a separate follow-up, not this refactor.
+func (p *pgnRender) writeMoves(node *MoveNode, moveNum int, isWhite bool,
 	subVariation, closedVariation, isRoot bool,
 ) {
 	// If no moves remain, stop.
@@ -179,7 +193,7 @@ func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
 
 	// Handle root move comments before processing children
 	if isRoot && node.hasAnnotations() {
-		writeAnnotations(node, sb)
+		p.writeAnnotations(node)
 	}
 
 	var currentMove *MoveNode
@@ -194,19 +208,19 @@ func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
 		currentMove = node.children[0]
 	}
 
-	writeMoveNumber(moveNum, isWhite, subVariation, closedVariation, isRoot, sb)
+	p.writeMoveNumber(moveNum, isWhite, subVariation, closedVariation, isRoot)
 
 	// Encode the move using your algebraicNotation.
-	writeMoveEncoding(currentMove, sb)
+	p.writeMoveEncoding(currentMove)
 
-	writeAnnotations(currentMove, sb)
+	p.writeAnnotations(currentMove)
 
 	if len(node.children) > 1 || len(currentMove.children) > 0 {
-		sb.WriteString(" ")
+		p.sb.WriteString(" ")
 	}
 	// Process any variations (children beyond the first).
 	// In PGN, variations are enclosed in parentheses.
-	closedVar := writeVariations(node, moveNum, isWhite, sb)
+	closedVar := p.writeVariations(node, moveNum, isWhite)
 
 	if len(currentMove.children) > 0 {
 		var nextMoveNum int
@@ -220,32 +234,32 @@ func writeMoves(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder,
 			nextMoveNum = moveNum + 1
 			nextIsWhite = true
 		}
-		writeMoves(currentMove, nextMoveNum, nextIsWhite, sb, false, closedVar,
+		p.writeMoves(currentMove, nextMoveNum, nextIsWhite, false, closedVar,
 			false)
 	}
 }
 
-func writeMoveNumber(moveNum int, isWhite bool, subVariation, closedVariation,
-	isRoot bool, sb *strings.Builder,
+func (p *pgnRender) writeMoveNumber(moveNum int, isWhite bool,
+	subVariation, closedVariation, isRoot bool,
 ) {
 	if closedVariation {
-		sb.WriteString(" ")
+		p.sb.WriteString(" ")
 	}
 	if isWhite {
-		sb.WriteString(strconv.Itoa(moveNum))
-		sb.WriteString(". ")
+		p.sb.WriteString(strconv.Itoa(moveNum))
+		p.sb.WriteString(". ")
 	} else if subVariation || closedVariation || isRoot {
-		sb.WriteString(strconv.Itoa(moveNum))
-		sb.WriteString("... ")
+		p.sb.WriteString(strconv.Itoa(moveNum))
+		p.sb.WriteString("... ")
 	}
 }
 
-func writeMoveEncoding(currentMove *MoveNode, sb *strings.Builder) {
+func (p *pgnRender) writeMoveEncoding(currentMove *MoveNode) {
 	if currentMove == nil || currentMove.parent == nil || currentMove.tree == nil {
 		return
 	}
 	// Look up the pre-move position via the tree cursor (Peek is no-copy;
-	// renderTo saves/restores the active cursor for us). The synthetic root
+	// run saves/restores the active cursor for us). The synthetic root
 	// carries rootPos.
 	var prePos *Position
 	if currentMove.parent == currentMove.tree.Root() {
@@ -253,29 +267,32 @@ func writeMoveEncoding(currentMove *MoveNode, sb *strings.Builder) {
 	} else {
 		// Navigate the cursor to the parent and read the live position
 		// (no alloc). SAN().Encode reads only, so we can safely alias the
-		// live cursor position. Relies on renderTo's outer defer at
-		// pgn_renderer.go to restore the active cursor when this returns.
+		// live cursor position. Relies on run's outer defer to restore the
+		// active cursor when the render returns.
 		currentMove.tree.setCurrent(currentMove.parent)
 		prePos = currentMove.tree.pos
 	}
 	moveStr, err := SAN().Encode(prePos, currentMove.move)
+	// ponytail: SAN encode errors are dropped silently. The only realistic
+	// cause is prePos == nil from tree corruption, which yields malformed
+	// PGN that downstream parsers reject — not silently-corrupt games.
 	if err == nil {
-		sb.WriteString(moveStr)
+		p.sb.WriteString(moveStr)
 	}
 }
 
-func writeAnnotations(move *MoveNode, sb *strings.Builder) {
+func (p *pgnRender) writeAnnotations(move *MoveNode) {
 	if move == nil {
 		return
 	}
 
 	for _, nag := range move.nags {
-		sb.WriteByte(' ')
-		sb.WriteString(nag)
+		p.sb.WriteByte(' ')
+		p.sb.WriteString(nag)
 	}
 
 	if len(move.commentBlocks) > 0 {
-		writeCommentBlocks(move.commentBlocks, sb)
+		writeCommentBlocks(move.commentBlocks, p.sb)
 	}
 }
 
@@ -322,20 +339,20 @@ func needsCommandSeparator(lastByte byte) bool {
 	return lastByte != ' '
 }
 
-func writeVariations(node *MoveNode, moveNum int, isWhite bool, sb *strings.Builder) bool {
+func (p *pgnRender) writeVariations(node *MoveNode, moveNum int, isWhite bool) bool {
 	wroteAtLeastOneVar := false
 
 	if len(node.children) > 1 {
 		for i := 1; i < len(node.children); i++ {
 			if wroteAtLeastOneVar {
-				sb.WriteString(" ")
+				p.sb.WriteString(" ")
 			}
 			wroteAtLeastOneVar = true
 
 			variation := node.children[i]
-			sb.WriteString("(")
-			writeMoves(variation, moveNum, isWhite, sb, true, false, false)
-			sb.WriteString(")")
+			p.sb.WriteString("(")
+			p.writeMoves(variation, moveNum, isWhite, true, false, false)
+			p.sb.WriteString(")")
 		}
 	}
 
