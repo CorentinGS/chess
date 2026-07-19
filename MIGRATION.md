@@ -175,6 +175,25 @@ reached a terminal outcome and return `chess.ErrGameAlreadyEnded`. Call
 set an outcome explicitly with validation. `Split()` now recomputes each line's
 outcome from its leaf position instead of copying the parent outcome.
 
+## Cursor → MoveTree
+
+`PositionCursor` is removed; `Game.Cursor()` and `MoveTree.Cursor()` are
+removed. Navigate the tree directly:
+
+```go
+t := game.MoveTree()
+t.Reset()
+for t.GoForward() {
+    // … reads via t.Peek() (zero-copy alias — MUST NOT mutate)
+    // or via game.Position() / node.Position() (defensive copies)
+}
+```
+
+`MoveTree` gains `Peek`, `Forward(idx)`, `Goto(node)`, and `Reset` as public
+methods. `Peek` returns the live cursor position without copying; the pointer
+is invalidated by any navigation. `Goto` rejects nodes from a different tree
+with `false`.
+
 ## Null moves
 
 v3 adds explicit null move support. A null move flips the side to move without

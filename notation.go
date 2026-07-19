@@ -184,7 +184,8 @@ func (uciNotation) Decode(pos *Position, s string) (Move, error) {
 		return m, nil
 	}
 
-	m.tags = moveTags(m, pos)
+	tag, _ := newLegality(pos, generateLegalAnnotated).legal(m)
+	m.tags = tag
 
 	return m, nil
 }

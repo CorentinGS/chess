@@ -1,15 +1,19 @@
 /*
-Package chess provides PGN (Portable Game Notation) parsing functionality,
-supporting standard chess notation including moves, variations, comments,
-annotations, and game metadata.
-Example usage:
+Package chess provides PGN (Portable Game Notation) parsing, including
+moves, variations, comments, annotations, and game metadata.
 
-	// Create parser from tokens
-	tokens := TokenizeGame(game)
-	parser := newParser(tokens)
+Production PGN entry points:
 
-	// Parse complete game
-	game, err := parser.Parse()
+	// Decode one game from an io.Reader.
+	g, err := chess.ParsePGN(r)
+
+	// Iterate every game in an io.Reader, with indices and offsets.
+	for rec, err := range chess.PGNRecords(ctx, r) {
+	    if err != nil {
+	        // handle err
+	    }
+	    g, err := rec.Decode()
+	}
 */
 package chess
 
@@ -67,13 +71,8 @@ func parsePGNText(raw string, options pgnOptions) (*Game, error) {
 	return newParserFromSource(&lexerTokenSource{lexer: NewLexer(raw)}, options).Parse()
 }
 
-// newParser creates a new parser instance initialized with the given tokens.
-// The parser starts with a root move containing the starting position.
-//
-// Example:
-//
-//	tokens := TokenizeGame(game)
-//	parser := newParser(tokens)
+// newParser creates a parser from a pre-built token slice. This is the test
+// seam for parser state-machine unit tests in pgn_test.go.
 func newParser(tokens []Token) *Parser {
 	return newParserFromSource(&sliceTokenSource{tokens: tokens}, defaultPGNOptions())
 }
@@ -116,6 +115,9 @@ func (p *Parser) currentToken() Token {
 }
 
 // advance moves to the next token.
+// ponytail: dual branch skips one interface call on the hot lexer path; the
+// slice branch is test-only and uncovered by the unit suite (pgn_test.go:878).
+// Unify on p.tokens.NextToken() — interface cost (~1-2 ns) is parse-noise.
 func (p *Parser) advance() {
 	p.position++
 	if p.lexer != nil {
@@ -541,6 +543,12 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	parentMove := p.currentMove()
 	oldCurrent := p.game.tree.Current()
 
+	// Restore the active cursor when this function returns, including on
+	// every err path between here and the end. Previously the restore was
+	// open-coded at the success branch only, leaking the cursor into the
+	// abandoned variation subtree on any error.
+	defer p.game.tree.setCurrent(oldCurrent)
+
 	// For variations at game start, we attach to root
 	variationParent := p.game.tree.Root()
 
@@ -640,8 +648,6 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	}
 
 	p.advance() // consume )
-
-	p.game.tree.setCurrent(oldCurrent)
 
 	return nil
 }

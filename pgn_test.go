@@ -254,13 +254,7 @@ func TestBigPgn(t *testing.T) {
 			}
 
 			raw := record.Raw
-			tokens, err := TokenizeGame(&GameScanned{Raw: raw})
-			if err != nil {
-				t.Fatalf("fail to tokenize game from valid pgn: %s", err.Error())
-			}
-
-			parser := NewParser(tokens)
-			game, err := parser.Parse()
+			game, err := parsePGNText(raw, defaultPGNOptions())
 			if err != nil {
 				if isKnownInconsistentPgn(err) {
 					t.Skipf("skipping inconsistent real-world PGN: %s", err.Error())

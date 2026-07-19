@@ -251,10 +251,12 @@ func writeMoveEncoding(currentMove *MoveNode, sb *strings.Builder) {
 	if currentMove.parent == currentMove.tree.Root() {
 		prePos = currentMove.tree.rootPos
 	} else {
-		// Navigate the cursor to the parent and Peek (no alloc). SAN().Encode
-		// reads only, so we can safely alias the live cursor position.
+		// Navigate the cursor to the parent and read the live position
+		// (no alloc). SAN().Encode reads only, so we can safely alias the
+		// live cursor position. Relies on renderTo's outer defer at
+		// pgn_renderer.go to restore the active cursor when this returns.
 		currentMove.tree.setCurrent(currentMove.parent)
-		prePos = currentMove.tree.Cursor().Peek()
+		prePos = currentMove.tree.pos
 	}
 	moveStr, err := SAN().Encode(prePos, currentMove.move)
 	if err == nil {

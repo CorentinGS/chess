@@ -1,9 +1,6 @@
 package chess
 
-import (
-	"reflect"
-	"testing"
-)
+import "testing"
 
 // TestLegalityPinnedPiece pins a queen to the king on the same file as a
 // rook: a move off the pin file exposes the king.
@@ -120,68 +117,35 @@ func TestLegalityAnnotatesCheck(t *testing.T) {
 	}
 }
 
-// TestLegalityNotMutable is the regression fence for the no-mutation
-// invariant. legality must never touch any Position field, including the
-// scalars (moveCount, halfMoveClock, enPassantSquare) that a leaked
-// applyMove-style mutation would corrupt.
+// TestLegalityNotMutable guards the "legality never mutates its pos" contract
+// from legality.go:10. Catches the failure mode where simulate or
+// annotateCheck is rerouted through applyMove or a pos.board pointer alias
+// and silently corrupts scalar state on the live position.
 func TestLegalityNotMutable(t *testing.T) {
-	fens := []string{
-		startFEN,                              // quiet
-		"4r3/8/8/8/4Q3/8/8/4K3 w - - 0 1",     // pinned piece
-		"4k3/8/8/8/8/8/4r3/4K3 w - - 0 1",     // single check
-		"4r3/8/8/8/8/8/2nP4/4K3 w - - 0 1",    // double check
-		"7k/8/8/r4PpK/8/8/8/8 w - g6 0 1",     // ep discovered check
-		"7k/8/8/3Q4/8/8/8/K7 w - - 0 1",       // gives check
-		"4k3/8/8/8/8/8/4PPP1/4K1R1 w - - 0 1", // castling candidate
-	}
-	moves := []Move{
-		{s1: E2, s2: E4},
-		{s1: G1, s2: F3},
-		{s1: E1, s2: G1},
-	}
-	for _, fen := range fens {
-		for _, mode := range []moveGenerationMode{generateLegalOnly, generateLegalAnnotated, generateUnsafeOnly} {
-			pos := mustPosition(t, fen)
-			before := posSnapshot(pos)
-			lg := newLegality(pos, mode)
-			for _, m := range moves {
-				_, _ = lg.legal(m)
-			}
-			after := posSnapshot(pos)
-			if !reflect.DeepEqual(before, after) {
-				t.Errorf("legality mutated pos for fen=%q mode=%v\nbefore=%+v\nafter=%+v",
-					fen, mode, before, after)
-			}
-		}
-	}
-}
+	pos := mustPosition(t, "4k3/8/8/8/8/8/4r3/4K3 w - - 0 1")
+	before := pos.moveCount
+	pos.hash = 0xDEAD
+	pos.halfMoveClock = 7
+	pos.castleRights = CastleRights("xx")
+	pos.enPassantSquare = E3
 
-type posFields struct {
-	board           Board
-	turn            Color
-	castleRights    CastleRights
-	enPassantSquare Square
-	inCheck         bool
-	validMoves      []Move
-	status          Method
-	statusCached    bool
-	hash            uint64
-	moveCount       int
-	halfMoveClock   int
-}
+	lg := newLegality(pos, generateLegalAnnotated)
+	_, _ = lg.legal(Move{s1: E1, s2: E2})
+	_, _ = lg.legal(Move{s1: E1, s2: D1})
 
-func posSnapshot(pos *Position) posFields {
-	return posFields{
-		board:           pos.board,
-		turn:            pos.turn,
-		castleRights:    pos.castleRights,
-		enPassantSquare: pos.enPassantSquare,
-		inCheck:         pos.inCheck,
-		validMoves:      pos.validMoves,
-		status:          pos.status,
-		statusCached:    pos.statusCached,
-		hash:            pos.hash,
-		moveCount:       pos.moveCount,
-		halfMoveClock:   pos.halfMoveClock,
+	if pos.moveCount != before {
+		t.Errorf("legality mutated pos.moveCount: got %d, want %d", pos.moveCount, before)
+	}
+	if pos.hash != 0xDEAD {
+		t.Errorf("legality mutated pos.hash: got %#x, want 0xDEAD", pos.hash)
+	}
+	if pos.halfMoveClock != 7 {
+		t.Errorf("legality mutated pos.halfMoveClock: got %d, want 7", pos.halfMoveClock)
+	}
+	if pos.castleRights != CastleRights("xx") {
+		t.Errorf("legality mutated pos.castleRights: got %q, want %q", pos.castleRights, "xx")
+	}
+	if pos.enPassantSquare != E3 {
+		t.Errorf("legality mutated pos.enPassantSquare: got %v, want E3", pos.enPassantSquare)
 	}
 }

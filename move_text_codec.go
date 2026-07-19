@@ -154,7 +154,8 @@ func (c MoveTextCodec) Encode(pos *Position, m Move) (string, error) {
 		if pos == nil {
 			return "", ErrMoveTextMissingPosition
 		}
-		m.tags = moveTags(m, pos)
+		tag, _ := newLegality(pos, generateLegalAnnotated).legal(m)
+		m.tags = tag
 		return algebraicNotation{}.Encode(pos, m), nil
 	case MoveTextFormatLongAlgebraic:
 		if m.HasTag(Null) {
@@ -163,7 +164,8 @@ func (c MoveTextCodec) Encode(pos *Position, m Move) (string, error) {
 		if pos == nil {
 			return "", ErrMoveTextMissingPosition
 		}
-		m.tags = moveTags(m, pos)
+		tag, _ := newLegality(pos, generateLegalAnnotated).legal(m)
+		m.tags = tag
 		return longAlgebraicNotation{}.Encode(pos, m), nil
 	case MoveTextFormatUCI:
 		return uciNotation{}.Encode(pos, m), nil

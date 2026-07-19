@@ -248,21 +248,17 @@ func (n *MoveNode) Parent() *MoveNode {
 	return n.parent
 }
 
-// Position resolves the position associated with this move node by navigating
-// the tree's cursor to the node, reading the position, then restoring the
-// cursor to its original node. The save/restore makes this observationally
-// pure under ADR-016's single-active-cursor invariant. See ADR-018 for the
-// lazy-position design.
+// Position returns the position reached by playing this node's move from
+// its parent's position. It saves and restores the tree's active cursor so
+// the read is observationally pure under ADR-016's single-active-cursor
+// invariant. See ADR-018 for the lazy-position design.
 func (n *MoveNode) Position() *Position {
 	if n == nil || n.tree == nil {
 		return nil
 	}
 	defer n.tree.setCurrent(n.tree.current)
-	c := n.tree.Cursor()
-	if !c.Goto(n) {
-		return nil
-	}
-	return c.Position()
+	n.tree.setCurrent(n)
+	return n.tree.pos.copy()
 }
 
 func (n *MoveNode) Children() []*MoveNode {

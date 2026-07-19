@@ -436,6 +436,20 @@ func TestPlyNilAndMissingPosition(t *testing.T) {
 	}
 }
 
+func TestMoveNodePositionReturnsDefensiveCopy(t *testing.T) {
+	g := newMoveTreeTestGame()
+	node := g.tree.Current()
+	p1 := node.Position()
+	p2 := node.Position()
+	if p1 == p2 {
+		t.Fatal("Position() should return a fresh copy each call")
+	}
+	p1.halfMoveClock = 999
+	if p2.halfMoveClock == 999 {
+		t.Fatal("Position() returned aliased copies")
+	}
+}
+
 // TestLCANode pins down the lowest-common-ancestor helper the cursor's
 // setCurrent slow path retreats through: ancestor pairs resolve to the
 // ancestor, siblings resolve to the shared parent, unrelated subtrees

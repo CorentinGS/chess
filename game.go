@@ -148,11 +148,10 @@ func (g *Game) MoveList() MoveList {
 
 	// Walk the cursor along the main line; capture the move + comments only.
 	defer g.tree.setCurrent(g.tree.Current())
-	c := g.tree.Cursor()
-	c.Reset()
+	g.tree.Reset()
 	list := make(MoveList, 0, len(root.children))
 
-	for c.ForwardMain() {
+	for g.tree.GoForward() {
 		node := g.tree.Current()
 		var comments []string
 		if node != nil && node.Comments() != "" {
@@ -291,28 +290,17 @@ func (g *Game) Positions() []*Position {
 		return []*Position{}
 	}
 	defer g.tree.setCurrent(g.tree.Current())
-	c := g.tree.Cursor()
-	c.Reset()
+	g.tree.Reset()
 	positions := make([]*Position, 0, len(root.children)+1)
-	if c.Peek() != nil {
-		positions = append(positions, c.Peek().copy())
+	if pos := g.tree.Peek(); pos != nil {
+		positions = append(positions, pos.copy())
 	}
-	for c.ForwardMain() {
-		if c.Peek() != nil {
-			positions = append(positions, c.Peek().copy())
+	for g.tree.GoForward() {
+		if pos := g.tree.Peek(); pos != nil {
+			positions = append(positions, pos.copy())
 		}
 	}
 	return positions
-}
-
-// Cursor returns a [PositionCursor] handle onto the game's underlying
-// [MoveTree]. The cursor shares state with the tree — navigation methods
-// mutate the tree's active position.
-func (g *Game) Cursor() *PositionCursor {
-	if g == nil || g.tree == nil {
-		return nil
-	}
-	return g.tree.Cursor()
 }
 
 func (g *Game) numOfRepetitions() int {
@@ -321,13 +309,12 @@ func (g *Game) numOfRepetitions() int {
 	// numOfRepetitions walks the cursor through the main line; save and
 	// restore so callers see an unchanged active position.
 	defer g.tree.setCurrent(g.tree.Current())
-	c := g.tree.Cursor()
-	c.Reset()
+	g.tree.Reset()
 	for {
-		if c.Peek() != nil && target.SamePosition(c.Peek()) {
+		if g.tree.pos != nil && target.SamePosition(g.tree.pos) {
 			count++
 		}
-		if !c.ForwardMain() {
+		if !g.tree.GoForward() {
 			break
 		}
 	}

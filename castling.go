@@ -24,7 +24,8 @@ func castleMovesInto(pos *Position, moves *[2]Move, mode moveGenerationMode) int
 		!squaresAreAttacked(pos, F1, G1) &&
 		!pos.inCheck {
 		m := Move{s1: E1, s2: G1}
-		m.tags = moveTagsForMode(m, pos, mode)
+		tag, _ := newLegality(pos, mode).legal(m)
+		m.tags = tag
 		moves[count] = m
 		count++
 	}
@@ -35,7 +36,8 @@ func castleMovesInto(pos *Position, moves *[2]Move, mode moveGenerationMode) int
 		!squaresAreAttacked(pos, C1, D1) &&
 		!pos.inCheck {
 		m := Move{s1: E1, s2: C1}
-		m.tags = moveTagsForMode(m, pos, mode)
+		tag, _ := newLegality(pos, mode).legal(m)
+		m.tags = tag
 		moves[count] = m
 		count++
 	}
@@ -46,7 +48,8 @@ func castleMovesInto(pos *Position, moves *[2]Move, mode moveGenerationMode) int
 		!squaresAreAttacked(pos, F8, G8) &&
 		!pos.inCheck {
 		m := Move{s1: E8, s2: G8}
-		m.tags = moveTagsForMode(m, pos, mode)
+		tag, _ := newLegality(pos, mode).legal(m)
+		m.tags = tag
 		moves[count] = m
 		count++
 	}
@@ -57,7 +60,8 @@ func castleMovesInto(pos *Position, moves *[2]Move, mode moveGenerationMode) int
 		!squaresAreAttacked(pos, C8, D8) &&
 		!pos.inCheck {
 		m := Move{s1: E8, s2: C8}
-		m.tags = moveTagsForMode(m, pos, mode)
+		tag, _ := newLegality(pos, mode).legal(m)
+		m.tags = tag
 		moves[count] = m
 		count++
 	}

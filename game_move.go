@@ -47,7 +47,8 @@ func (g *Game) UnsafePushMoveText(moveText string, codec MoveTextCodec, options 
 		if pos == nil {
 			return nil, ErrMoveTextMissingPosition
 		}
-		move.tags = moveTags(move, pos)
+		tag, _ := newLegality(pos, generateLegalAnnotated).legal(move)
+		move.tags = tag
 	}
 
 	return g.UnsafeMove(move, options)

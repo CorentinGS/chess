@@ -772,16 +772,16 @@ func main() {
 	}
 	game := chess.NewGame(pgn)
 	color := chess.NoColor
-	// Replay positions alongside the moves via the cursor.
-	cursor := game.MoveTree().Cursor()
-	cursor.Reset()
+	// Replay positions alongside the moves via the tree's cursor.
+	tree := game.MoveTree()
+	tree.Reset()
 	for _, entry := range game.MoveList() {
-		preTurn := cursor.Peek().Turn()
+		preTurn := tree.Peek().Turn()
 		if entry.Move.HasTag(chess.KingSideCastle) || entry.Move.HasTag(chess.QueenSideCastle) {
 			color = preTurn
 			break
 		}
-		cursor.ForwardMain()
+		tree.GoForward()
 	}
 	switch color {
 	case chess.White:

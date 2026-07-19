@@ -16,11 +16,11 @@ type MoveInsertOptions struct {
 //
 // The root is a synthetic position node, not a move occurrence. The cursor's
 // current position is tracked in pos alongside current: every navigation
-// (addMove, GoForward, GoBack, setCurrent) advances pos via the in-place
-// makeMoveCursor / unmakeMoveCursor pair (move_applier.go), with one entry
-// in undos per level between root and current. rootPos holds the starting
-// position so the cursor can be reset without re-deriving it from the
-// synthetic root MoveNode.
+// (addMove, GoForward, GoBack, Forward, Goto, Reset, setCurrent) advances pos
+// via the in-place makeMoveCursor / unmakeMoveCursor pair (move_applier.go),
+// with one entry in undos per level between root and current. rootPos holds
+// the starting position so the cursor can be reset without re-deriving it
+// from the synthetic root MoveNode.
 type MoveTree struct {
 	root    *MoveNode
 	current *MoveNode
@@ -143,9 +143,7 @@ func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, er
 }
 
 // AddVariation validates and appends move as a variation from parent. The
-// cursor is left on parent for the duration of the validation lookup; callers
-// that need to preserve cursor state should snapshot and restore via
-// [PositionCursor.Goto] before/after.
+// cursor is saved and restored so the caller's active position is unchanged.
 func (t *MoveTree) AddVariation(parent *MoveNode, move Move) (*MoveNode, error) {
 	if t == nil || t.root == nil {
 		return nil, errors.New("chess: move tree has no root position")
@@ -157,14 +155,13 @@ func (t *MoveTree) AddVariation(parent *MoveNode, move Move) (*MoveNode, error) 
 	// arbitrary node, not the cursor's current node, so we navigate. Save
 	// and restore the cursor so the caller's active position is unchanged.
 	defer t.setCurrent(t.current)
-	c := t.Cursor()
-	if !c.Goto(parent) {
+	if !t.Goto(parent) {
 		return nil, errors.New("chess: variation parent is not reachable from cursor")
 	}
-	if c.Peek() == nil {
+	if t.pos == nil {
 		return nil, errors.New("chess: variation parent has no position")
 	}
-	if err := validatePositionMove(c.Peek(), move); err != nil {
+	if err := validatePositionMove(t.pos, move); err != nil {
 		return nil, err
 	}
 	node := t.addVariationUnchecked(parent, move)
@@ -219,6 +216,66 @@ func (t *MoveTree) NavigateToMainLine() {
 		return
 	}
 	t.GoForward()
+}
+
+// Peek returns the live [Position] at the tree's active cursor without copying.
+// The returned pointer aliases the tree's internal state and is valid only
+// until the next cursor move (GoForward, GoBack, Forward, Goto, Reset,
+// AddVariation, or any move pushed onto the tree). Callers MUST NOT mutate
+// it; mutation corrupts the cursor and every subsequent read in the library,
+// including legal-move generation and repetition detection.
+//
+// For a snapshot you can retain or mutate, use [MoveNode.Position] (a
+// defensive copy at a node) or [Game.Position] (a defensive copy of the
+// current position). Both copy.
+//
+// Returns nil if t is nil or has no position.
+func (t *MoveTree) Peek() *Position {
+	if t == nil {
+		return nil
+	}
+	return t.pos
+}
+
+// Forward advances the cursor to the idx-th child of the current node.
+// Forward(0) is equivalent to [MoveTree.GoForward] (main-line continuation).
+// Returns true on success; false if t is nil, the current node has no
+// children, or idx is out of range.
+func (t *MoveTree) Forward(idx int) bool {
+	if t == nil || t.current == nil {
+		return false
+	}
+	if idx < 0 || idx >= len(t.current.children) {
+		return false
+	}
+	// Route through setCurrent so the direct-child fast path owns the
+	// makeMove/undo append invariant. Forward(0) then matches GoForward.
+	t.setCurrent(t.current.children[idx])
+	return true
+}
+
+// Goto jumps the cursor to the given node. Returns true if the cursor moved.
+// Returns false if t is nil, node is nil, or node belongs to a different tree.
+// Goto uses the same fast paths as internal cursor navigation: direct child,
+// LCA walk, and full replay-from-root (see [MoveTree.setCurrent]).
+func (t *MoveTree) Goto(node *MoveNode) bool {
+	if t == nil || node == nil {
+		return false
+	}
+	if node.tree != t {
+		return false
+	}
+	t.setCurrent(node)
+	return true
+}
+
+// Reset returns the cursor to the synthetic root, restoring the starting
+// position. Safe to call on a nil tree.
+func (t *MoveTree) Reset() {
+	if t == nil {
+		return
+	}
+	t.resetCursor()
 }
 
 // Lines returns every root-to-leaf line in the tree.

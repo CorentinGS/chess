@@ -1,11 +1,11 @@
-// PGN game framing: splits a byte stream into individual PGN game records and
-// bridges each record to a token stream for the parser.
+// PGN game framing: splits a byte stream into individual PGN game records.
 //
 // The pgnFramer type reads from an io.Reader, buffers data, and uses
 // splitPGNGames to emit complete PGN records as strings. The splitPGNGames
 // function and its helpers handle PGN-specific syntax including game metadata,
-// moves, comments, and variations. GameScanned carries one framed record;
-// TokenizeGame lexes it into tokens. Token -> Game parsing lives in pgn.go.
+// moves, comments, and variations. Token-level parsing is driven lazily from
+// pgn.go via lexerTokenSource; this file does not own any token-shaped public
+// API.
 
 package chess
 
@@ -14,53 +14,6 @@ import (
 	"bytes"
 	"io"
 )
-
-// GameScanned represents a complete chess game in PGN format.
-type GameScanned struct {
-	// Raw contains the complete PGN text of the game
-	Raw string
-}
-
-// TokenizeGame converts a PGN game into a sequence of tokens.
-// Returns nil if the game is nil. Returns an error if tokenization fails.
-//
-// The function handles all PGN elements including moves, comments,
-// annotations, and metadata tags.
-//
-// Example:
-//
-//	tokens, err := TokenizeGame(game)
-//	if err != nil {
-//	    // Handle error
-//	}
-func TokenizeGame(game *GameScanned) ([]Token, error) {
-	if game == nil {
-		return nil, nil
-	}
-	// Preallocate the token slice. Empirically a PGN byte produces ~3 tokens
-	// (move pairs, NAGs, comments, tags), so size to avoid reallocation
-	// during growth. Slice growth from a nil starting point throws away
-	// every prior backing array, which previously dominated allocations.
-	return tokenizeInto(game, make([]Token, 0, len(game.Raw)/3+16))
-}
-
-func tokenizeInto(game *GameScanned, tokens []Token) ([]Token, error) {
-	if game == nil {
-		return nil, nil
-	}
-
-	lexer := NewLexer(game.Raw)
-	tokens = tokens[:0]
-	for {
-		token := lexer.NextToken()
-		if token.Type == EOF {
-			break
-		}
-		tokens = append(tokens, token)
-	}
-
-	return tokens, nil
-}
 
 // Split function for bufio.Scanner to split PGN games.
 func splitPGNGames(data []byte, atEOF bool) (int, []byte, error) {

@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file. See [conven
 #### Breaking Changes
 - remove `Position.ChangeTurn()` (dead: no internal callers; turn mutation is not a public operation).
 - remove `Game.Comments()` and the unexported `Game.comments` field; move annotations live on `MoveNode` (amends ADR-011).
+- remove `GameScanned` and `TokenizeGame`; production PGN decode is lazy via `ParsePGN` / `PGNRecords` (and `parser.Parse` internally), driven by `lexerTokenSource`. The parser's `[]Token` test seam (`newParser`, `sliceTokenSource`, exported via `export_test.go:NewParser`) remains for state-machine unit tests (amends ADR-015).
+- remove `PositionCursor`; promote its methods onto `MoveTree` as `Peek`, `Forward(idx)`, `Goto(node)`, `Reset`. Remove `Game.Cursor()` and `MoveTree.Cursor()`. Position snapshots continue via `MoveNode.Position()` / `Game.Position()`; `MoveTree.Peek()` is a zero-copy alias. `Goto` rejects nodes from a different tree.
 
 #### Removed
 - remove dead internal helper `sortedCommandKeys` (pgn_renderer.go).
@@ -15,6 +17,7 @@ All notable changes to this project will be documented in this file. See [conven
 - `Game.copy()` no longer aliases the move tree; every caller (`Clone`, `UnmarshalText`, `Split`, the test `PGN` option) sets the tree explicitly. Removes a latent shared-tree footgun without changing observable behaviour.
 - consolidate PGN parse locality: `parsePGNText` and `lexerTokenSource` move from `framer.go` to `pgn.go`, next to the `Parser` they feed; `framer.go` is now honestly framing + the tokenize bridge.
 - relabel the move-text notation layer as codec internals: header comments on `notation.go` and `notation_resolver.go` (renamed from `san_resolver.go`); no behaviour change (ADR-013, ADR-016).
+- fix a cursor leak in PGN variation parsing on err returns: `parseVariation` (pgn.go) now uses `defer` to restore the active cursor so any err path inside a variation no longer strands the cursor inside the abandoned subtree (amends ADR-018).
 
 - - -
 
