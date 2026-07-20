@@ -308,6 +308,39 @@ func (b *Board) Piece(sq Square) Piece {
 	return b.mailbox[sq]
 }
 
+// White returns the squares occupied by white pieces.
+func (b *Board) White() Bitboard {
+	return Bitboard(b.whiteSqs)
+}
+
+// Black returns the squares occupied by black pieces.
+func (b *Board) Black() Bitboard {
+	return Bitboard(b.blackSqs)
+}
+
+// Occupied returns all occupied squares.
+func (b *Board) Occupied() Bitboard {
+	return Bitboard(b.whiteSqs | b.blackSqs)
+}
+
+// Empty returns all empty squares.
+func (b *Board) Empty() Bitboard {
+	return Bitboard(b.emptySqs)
+}
+
+// Color returns the squares occupied by pieces of the given color.
+func (b *Board) Color(c Color) Bitboard {
+	if c == White {
+		return Bitboard(b.whiteSqs)
+	}
+	return Bitboard(b.blackSqs)
+}
+
+// Pieces returns the squares occupied by pieces of the given type and color.
+func (b *Board) Pieces(pt PieceType, c Color) Bitboard {
+	return Bitboard(b.bbForPiece(NewPiece(pt, c)))
+}
+
 // MarshalText implements the encoding.TextMarshaler interface and returns
 // a string in the FEN board format: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR.
 func (b *Board) MarshalText() ([]byte, error) {
