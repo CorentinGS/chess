@@ -199,3 +199,37 @@ func squaresAreAttacked(pos *Position, sqs ...Square) bool {
 	}
 	return false
 }
+
+// KnightAttacks returns the set of squares a knight on sq attacks.
+func KnightAttacks(sq Square) Bitboard {
+	return Bitboard(bbKnightMoves[sq])
+}
+
+// KingAttacks returns the set of squares a king on sq attacks.
+func KingAttacks(sq Square) Bitboard {
+	return Bitboard(bbKingMoves[sq])
+}
+
+// PawnAttacks returns the set of squares a pawn of color c on sq attacks.
+func PawnAttacks(sq Square, c Color) Bitboard {
+	return Bitboard(pawnAttacks(c, sq))
+}
+
+// BishopAttacks returns the set of squares a bishop on sq attacks given the
+// supplied occupied squares.
+func BishopAttacks(sq Square, occupied Bitboard) Bitboard {
+	return Bitboard(diaAttack(bitboard(occupied), sq))
+}
+
+// RookAttacks returns the set of squares a rook on sq attacks given the
+// supplied occupied squares.
+func RookAttacks(sq Square, occupied Bitboard) Bitboard {
+	return Bitboard(hvAttack(bitboard(occupied), sq))
+}
+
+// QueenAttacks returns the set of squares a queen on sq attacks given the
+// supplied occupied squares. It is the union of the bishop and rook attacks.
+func QueenAttacks(sq Square, occupied Bitboard) Bitboard {
+	occ := bitboard(occupied)
+	return Bitboard(diaAttack(occ, sq) | hvAttack(occ, sq))
+}
