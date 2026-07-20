@@ -1,5 +1,7 @@
 package chess
 
+import "math/bits"
+
 func pawnCheckers(board *Board, kingSq Square, attacker Color) bitboard {
 	pawns := board.bbForPiece(NewPiece(Pawn, attacker))
 	var checkers bitboard
@@ -70,14 +72,49 @@ func squaresAligned(a Square, b Square) bool {
 	return a.File() == b.File() || a.Rank() == b.Rank() || fileDelta == rankDelta
 }
 
-// isInCheck returns true if the side to move is in check in the given position.
-func isInCheck(pos *Position) bool {
+// checkState returns whether the side to move is in check and a bitboard of
+// the pieces giving check. It reuses the same attack-set walk as isInCheck so
+// the two cannot drift.
+func checkState(pos *Position) (bool, bitboard) {
 	kingSq := pos.board.kingSquare(pos.Turn())
 	// king should only be missing in tests / examples
 	if kingSq == NoSquare {
-		return false
+		return false, 0
 	}
-	return squaresAreAttacked(pos, kingSq)
+	attacker := pos.Turn().Other()
+	board := &pos.board
+	occ := ^board.emptySqs
+	queenBB, rookBB, bishopBB := sliderBitboards(board, attacker)
+
+	checkers := (hvAttack(occ, kingSq) & (queenBB | rookBB)) |
+		(diaAttack(occ, kingSq) & (queenBB | bishopBB)) |
+		(bbKnightMoves[kingSq] & board.bbForPiece(NewPiece(Knight, attacker))) |
+		(bbKingMoves[kingSq] & board.bbForPiece(NewPiece(King, attacker))) |
+		pawnCheckers(board, kingSq, attacker)
+
+	return checkers != 0, checkers
+}
+
+// bitboardSquares returns the occupied squares of bb as a slice in
+// most-significant-bit-first order.
+func bitboardSquares(bb bitboard) []Square {
+	n := bits.OnesCount64(uint64(bb))
+	if n == 0 {
+		return nil
+	}
+	sqs := make([]Square, 0, n)
+	for bb != 0 {
+		lsb := bb & -bb
+		sqs = append(sqs, squareFromBit(lsb))
+		bb &^= lsb
+	}
+	return sqs
+}
+
+// isInCheck returns true if the side to move is in check in the given position.
+func isInCheck(pos *Position) bool {
+	inCheck, _ := checkState(pos)
+	return inCheck
 }
 
 // isSquareAttackedBy returns true if the given square is attacked by the specified color.

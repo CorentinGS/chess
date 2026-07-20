@@ -418,3 +418,39 @@ func TestSamePositionForcedHashEqualSamePosition(t *testing.T) {
 		t.Fatal("SamePosition returned false for structurally identical positions")
 	}
 }
+
+func TestPositionIsCheckAndCheckers(t *testing.T) {
+	pos := StartingPosition()
+	if pos.IsCheck() {
+		t.Fatal("starting position should not be in check")
+	}
+	if checkers := pos.Checkers(); len(checkers) != 0 {
+		t.Fatalf("starting position should have no checkers, got %v", checkers)
+	}
+
+	// Scholar's mate position: black queen on h4 gives check.
+	pos, err := decodeFEN("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pos.IsCheck() {
+		t.Fatal("expected white to be in check from Qh4")
+	}
+	checkers := pos.Checkers()
+	if len(checkers) != 1 || checkers[0] != H4 {
+		t.Fatalf("expected checker on H4, got %v", checkers)
+	}
+
+	// Double check: queen on e2 and bishop on b4 both attack the white king on e1.
+	pos, err = decodeFEN("8/8/8/8/1b6/8/4q3/4K2k w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pos.IsCheck() {
+		t.Fatal("expected double check")
+	}
+	checkers = pos.Checkers()
+	if len(checkers) != 2 {
+		t.Fatalf("expected 2 checkers, got %v", checkers)
+	}
+}

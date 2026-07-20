@@ -57,7 +57,7 @@ func FEN(fen string) (func(*Game), error) {
 		return nil, errors.New("chess: invalid FEN")
 	}
 	return func(g *Game) {
-		pos.inCheck = isInCheck(pos)
+		pos.inCheck, pos.checkers = checkState(pos)
 		g.tree.setRootPosition(pos)
 		g.evaluatePositionStatus()
 	}, nil

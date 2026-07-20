@@ -95,6 +95,7 @@ type positionUndo struct {
 	turn            Color
 	enPassantSquare Square
 	inCheck         bool
+	checkers        bitboard
 	hash            uint64
 	status          Method
 	statusCached    bool
@@ -110,6 +111,7 @@ func (pos *Position) makeMove(m Move) positionUndo {
 		turn:            pos.turn,
 		enPassantSquare: pos.enPassantSquare,
 		inCheck:         pos.inCheck,
+		checkers:        pos.checkers,
 		hash:            pos.hash,
 		status:          pos.status,
 		statusCached:    pos.statusCached,
@@ -137,6 +139,7 @@ func (pos *Position) unmakeMove(undo positionUndo) {
 	pos.turn = undo.turn
 	pos.enPassantSquare = undo.enPassantSquare
 	pos.inCheck = undo.inCheck
+	pos.checkers = undo.checkers
 	pos.hash = undo.hash
 	pos.status = undo.status
 	pos.statusCached = undo.statusCached

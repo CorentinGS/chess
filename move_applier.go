@@ -38,9 +38,9 @@ func (pos *Position) nullUpdate() *Position {
 		moveCount:       pos.nextMoveCount(),
 	}
 
-	// Recompute inCheck for the new side to move. The board is unchanged,
-	// so the new side may now be in check if a piece attacks their king.
-	newPos.inCheck = isInCheck(newPos)
+	// Recompute inCheck and checkers for the new side to move. The board is
+	// unchanged, so the new side may now be in check if a piece attacks their king.
+	newPos.inCheck, newPos.checkers = checkState(newPos)
 	newPos.hash = pos.nullUpdateHash(newPos.enPassantSquare)
 	return newPos
 }
@@ -186,11 +186,7 @@ func (pos *Position) applyMove(m Move) moveEffect {
 	pos.hash = newHash
 	pos.validMoves = nil
 	pos.statusCached = false
-	if m.HasTag(Check) {
-		pos.inCheck = true
-	} else {
-		pos.inCheck = isInCheck(pos)
-	}
+	pos.inCheck, pos.checkers = checkState(pos)
 	return eff
 }
 
@@ -210,6 +206,7 @@ type cursorUndo struct {
 	enPassantSquare Square
 	turn            Color
 	inCheck         bool
+	checkers        bitboard
 }
 
 // makeMoveCursor applies m in place and returns a slim undo record.
@@ -222,6 +219,7 @@ func (pos *Position) makeMoveCursor(m Move) cursorUndo {
 		enPassantSquare: pos.enPassantSquare,
 		turn:            pos.turn,
 		inCheck:         pos.inCheck,
+		checkers:        pos.checkers,
 	}
 	if m.HasTag(Null) {
 		next := pos.nullUpdate()
@@ -244,6 +242,7 @@ func (pos *Position) unmakeMoveCursor(m Move, u cursorUndo) {
 	pos.enPassantSquare = u.enPassantSquare
 	pos.turn = u.turn
 	pos.inCheck = u.inCheck
+	pos.checkers = u.checkers
 	pos.validMoves = nil
 	pos.statusCached = false
 }

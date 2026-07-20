@@ -89,6 +89,7 @@ type Position struct {
 	turn            Color        // Side to move
 	enPassantSquare Square       // En passant target square
 	inCheck         bool         // Whether current side is in check
+	checkers        bitboard     // Bitboard of pieces giving check (zero when not in check)
 	hash            uint64       // Zobrist hash for O(1) position comparison
 	status          Method       // Cached Status result
 	statusCached    bool         // Whether status contains a valid cached value
@@ -297,6 +298,24 @@ func (pos *Position) Turn() Color {
 	return pos.turn
 }
 
+// IsCheck reports whether the side to move is in check.
+func (pos *Position) IsCheck() bool {
+	if pos == nil {
+		return false
+	}
+	return pos.inCheck
+}
+
+// Checkers returns the squares of the pieces currently giving check to the
+// side to move. The returned slice is empty when the position is not in check.
+// It allocates only when called.
+func (pos *Position) Checkers() []Square {
+	if pos == nil {
+		return nil
+	}
+	return bitboardSquares(pos.checkers)
+}
+
 // nullUpdateHash computes the Zobrist hash delta for a null move: the only
 // state that changed is the side to move (always flipped) and the en-passant
 // square (always cleared), so the only XOR is the side-to-move key plus any
@@ -405,7 +424,7 @@ func (pos *Position) UnmarshalText(text []byte) error {
 	pos.enPassantSquare = cp.enPassantSquare
 	pos.halfMoveClock = cp.halfMoveClock
 	pos.moveCount = cp.moveCount
-	pos.inCheck = isInCheck(cp)
+	pos.inCheck, pos.checkers = checkState(cp)
 	pos.hash = cp.hash
 	return nil
 }
@@ -510,7 +529,7 @@ func (pos *Position) UnmarshalBinary(data []byte) error {
 	if b&bitsHasEnPassant == 0 {
 		pos.enPassantSquare = NoSquare
 	}
-	pos.inCheck = isInCheck(pos)
+	pos.inCheck, pos.checkers = checkState(pos)
 	pos.hash = pos.computeHash()
 	return nil
 }
@@ -524,6 +543,7 @@ func (pos *Position) copy() *Position {
 		halfMoveClock:   pos.halfMoveClock,
 		moveCount:       pos.moveCount,
 		inCheck:         pos.inCheck,
+		checkers:        pos.checkers,
 		hash:            pos.hash,
 	}
 }

@@ -51,6 +51,7 @@ func decodeFEN(fen string) (*Position, error) {
 		halfMoveClock:   halfMoveClock,
 		moveCount:       moveCount,
 	}
+	pos.inCheck, pos.checkers = checkState(pos)
 	pos.hash = pos.computeHash()
 	return pos, nil
 }
