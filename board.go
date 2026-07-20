@@ -38,6 +38,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/bits"
 	"strings"
 )
 
@@ -608,6 +609,64 @@ func (b *Board) isOccupied(sq Square) bool {
 	return !b.emptySqs.Occupied(sq)
 }
 
+// HasInsufficientMaterial reports whether color c cannot force checkmate
+// against any opposing material. It returns true for a lone king, king plus
+// a single minor piece, or king plus bishops that are all confined to one
+// square color. It returns false when c has a queen, rook, pawn, knight, or
+// bishops on both square colors.
+func (b *Board) HasInsufficientMaterial(c Color) bool {
+	var qrb, bishops, knights bitboard
+	switch c {
+	case White:
+		qrb = b.bbWhiteQueen | b.bbWhiteRook | b.bbWhitePawn
+		bishops = b.bbWhiteBishop
+		knights = b.bbWhiteKnight
+	case Black:
+		qrb = b.bbBlackQueen | b.bbBlackRook | b.bbBlackPawn
+		bishops = b.bbBlackBishop
+		knights = b.bbBlackKnight
+	default:
+		return true
+	}
+
+	// Queen, rook, or pawn can all deliver mate.
+	if qrb != 0 {
+		return false
+	}
+
+	// Only a king.
+	if bishops == 0 && knights == 0 {
+		return true
+	}
+
+	// King plus a single minor piece cannot force mate.
+	if bits.OnesCount64(uint64(bishops|knights)) == 1 {
+		return true
+	}
+
+	// Multiple minor pieces: insufficient if they are all bishops on the same
+	// square color. Any knight makes the configuration potentially mating.
+	if knights != 0 {
+		return false
+	}
+
+	var whiteSqBishops, blackSqBishops int
+	for bb := bishops; bb != 0; bb &= bb - 1 {
+		sq := squareFromBit(bb & -bb)
+		if sq.color() == White {
+			whiteSqBishops++
+		} else {
+			blackSqBishops++
+		}
+	}
+	return whiteSqBishops == 0 || blackSqBishops == 0
+}
+
+// hasSufficientMaterial reports whether the position has enough material to
+// continue. It is the whole-position auto-draw predicate used by the game
+// outcome classifier and intentionally differs from a simple AND of the
+// per-color query: K+B vs K+B with bishops on opposite colors is not an
+// automatic draw under FIDE rules.
 func (b *Board) hasSufficientMaterial() bool {
 	// queen, rook, or pawn exist
 	if (b.bbWhiteQueen | b.bbWhiteRook | b.bbWhitePawn |
@@ -636,7 +695,7 @@ func (b *Board) hasSufficientMaterial() bool {
 			}
 		}
 	}
-	// 	king versus king
+	// king versus king
 	if count[Bishop] == 0 && count[Knight] == 0 {
 		return false
 	}

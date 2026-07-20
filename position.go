@@ -315,6 +315,15 @@ func (pos *Position) Outcome() Outcome {
 	return outcome
 }
 
+// HasInsufficientMaterial reports whether color c cannot force checkmate with
+// its remaining material against any opposing material.
+func (pos *Position) HasInsufficientMaterial(c Color) bool {
+	if pos == nil {
+		return true
+	}
+	return pos.board.HasInsufficientMaterial(c)
+}
+
 // Board returns the position's board.
 func (pos *Position) Board() *Board {
 	if pos == nil {

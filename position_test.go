@@ -531,3 +531,32 @@ func TestPositionOutcome(t *testing.T) {
 		t.Fatal("Outcome on nil Position should return NoOutcome")
 	}
 }
+
+func TestPositionHasInsufficientMaterial(t *testing.T) {
+	// K vs K.
+	pos, err := decodeFEN("8/2k5/8/8/8/3K4/8/8 w - - 1 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pos.HasInsufficientMaterial(White) || !pos.HasInsufficientMaterial(Black) {
+		t.Fatal("both sides should have insufficient material in K vs K")
+	}
+
+	// K+B vs K with same-color-square bishop.
+	pos, err = decodeFEN("8/2k1b3/8/8/8/3K4/8/8 w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pos.HasInsufficientMaterial(Black) {
+		t.Fatalf("black should be insufficient in K+B vs K")
+	}
+
+	// K+Q vs K.
+	pos, err = decodeFEN("8/2k1q3/8/8/8/3K4/8/8 w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pos.HasInsufficientMaterial(Black) {
+		t.Fatal("black should not be insufficient with a queen")
+	}
+}
