@@ -40,6 +40,27 @@ func decodeFENUnsafe(fen string) (*Position, error) {
 	return pos, nil
 }
 
+// decodeFENForHash parses a FEN string and returns a Position whose Zobrist
+// hash is correct but whose inCheck/checkers fields are not populated. It is
+// used by HashFromFEN to avoid the attack-set scan that full position
+// construction requires.
+func decodeFENForHash(fen string) (*Position, error) {
+	setup, err := decodeFENSetup(fen)
+	if err != nil {
+		return nil, err
+	}
+	pos := &Position{
+		board:           setup.Board,
+		turn:            setup.Turn,
+		castleRights:    setup.CastleRights,
+		enPassantSquare: setup.EnPassant,
+		halfMoveClock:   setup.HalfMoveClock,
+		moveCount:       setup.FullMoveNo,
+	}
+	pos.hash = pos.computeHash()
+	return pos, nil
+}
+
 // decodeFENSetup parses a FEN string into a Setup. It performs only syntactic
 // validation; semantic validation is left to NewPosition.
 func decodeFENSetup(fen string) (Setup, error) {

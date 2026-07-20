@@ -75,23 +75,16 @@ func newLegality(pos *Position, mode moveGenerationMode) legality {
 	lg.enabled = true
 	lg.checkMask = ^bitboard(0)
 	if pos.inCheck {
-		setCheckContext(&lg, kingSq)
+		setCheckContext(&lg, kingSq, pos.checkers)
 	}
 	return lg
 }
 
-func setCheckContext(lg *legality, kingSq Square) {
-	board := lg.pos.board
-	attacker := lg.pos.turn.Other()
-	occ := ^board.emptySqs
-	queenBB, rookBB, bishopBB := sliderBitboards(&board, attacker)
-
-	checkers := (hvAttack(occ, kingSq) & (queenBB | rookBB)) |
-		(diaAttack(occ, kingSq) & (queenBB | bishopBB)) |
-		(bbKnightMoves[kingSq] & board.bbForPiece(NewPiece(Knight, attacker))) |
-		(bbKingMoves[kingSq] & board.bbForPiece(NewPiece(King, attacker))) |
-		pawnCheckers(&board, kingSq, attacker)
-
+// setCheckContext derives the check-count and check-mask from a precomputed
+// bitboard of checking pieces. When the position was constructed through the
+// normal paths (NewPosition, decodeFENUnsafe, applyMove) pos.checkers is
+// already accurate, so this avoids recomputing the full attack set.
+func setCheckContext(lg *legality, kingSq Square, checkers bitboard) {
 	lg.checkCount = bits.OnesCount64(uint64(checkers))
 	if lg.checkCount == 1 {
 		checkerSq := squareFromBit(checkers)

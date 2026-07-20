@@ -320,6 +320,14 @@ func (pos *Position) ValidMovesUnsafe() []Move {
 	return pos.validMoves
 }
 
+// LegalMovesFast returns legal moves in the same stable generation order as
+// ValidMovesUnsafe without computing display-only check annotations. The
+// returned moves remain valid inputs to Position.Update. This is intended for
+// replay/index codecs that need move identity and legality but not SAN tags.
+func (pos *Position) LegalMovesFast() []Move {
+	return legalMovesForMode(pos, generateLegalOnly)
+}
+
 // ValidMovesIter yields all legal moves in the current position.
 // It uses Go 1.23's range-over-func pattern for zero-allocation iteration
 // once the move cache is warm. The first call may allocate if moves have

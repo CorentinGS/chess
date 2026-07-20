@@ -193,6 +193,32 @@ func TestValidMovesUnsafeEquivalence(t *testing.T) {
 	}
 }
 
+func TestLegalMovesFastPreservesMoveIdentityAndOrder(t *testing.T) {
+	t.Parallel()
+	for _, fen := range []string{
+		"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+		"r3k2r/ppp2ppp/2n1bn2/3qp3/3P4/2N1BN2/PPP2PPP/R2Q1RK1 b kq - 4 10",
+		"8/P6k/8/8/8/8/7p/K7 w - - 0 1",
+	} {
+		option, err := FEN(fen)
+		if err != nil {
+			t.Fatalf("FEN(%q): %v", fen, err)
+		}
+		position := NewGame(option).Position()
+		annotated := position.ValidMovesUnsafe()
+		fast := position.LegalMovesFast()
+		if len(fast) != len(annotated) {
+			t.Fatalf("FEN %q fast moves=%d, annotated=%d", fen, len(fast), len(annotated))
+		}
+		for index := range annotated {
+			if fast[index].S1() != annotated[index].S1() || fast[index].S2() != annotated[index].S2() ||
+				fast[index].Promo() != annotated[index].Promo() {
+				t.Fatalf("FEN %q move %d identity/order differs: fast=%v annotated=%v", fen, index, fast[index], annotated[index])
+			}
+		}
+	}
+}
+
 func TestValidMovesUnsafeMutation(t *testing.T) {
 	pos := StartingPosition()
 	unsafe1 := pos.ValidMovesUnsafe()

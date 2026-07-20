@@ -84,10 +84,26 @@ func checkState(pos *Position) (bool, bitboard) {
 	attacker := pos.Turn().Other()
 	board := &pos.board
 	occ := ^board.emptySqs
+
+	// Hot-path filter: if no attacker occupies a square that a queen or knight
+	// could attack the king from, no piece gives check. King and pawn attacks
+	// are subsets of queen-move squares, so this filter is sound.
+	var attackerSqs bitboard
+	if attacker == White {
+		attackerSqs = board.whiteSqs
+	} else {
+		attackerSqs = board.blackSqs
+	}
+	diagAttacks := diaAttack(occ, kingSq)
+	orthogonalAttacks := hvAttack(occ, kingSq)
+	if ((diagAttacks|orthogonalAttacks)&attackerSqs)|(bbKnightMoves[kingSq]&attackerSqs) == 0 {
+		return false, 0
+	}
+
 	queenBB, rookBB, bishopBB := sliderBitboards(board, attacker)
 
-	checkers := (hvAttack(occ, kingSq) & (queenBB | rookBB)) |
-		(diaAttack(occ, kingSq) & (queenBB | bishopBB)) |
+	checkers := (orthogonalAttacks & (queenBB | rookBB)) |
+		(diagAttacks & (queenBB | bishopBB)) |
 		(bbKnightMoves[kingSq] & board.bbForPiece(NewPiece(Knight, attacker))) |
 		(bbKingMoves[kingSq] & board.bbForPiece(NewPiece(King, attacker))) |
 		pawnCheckers(board, kingSq, attacker)
