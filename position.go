@@ -372,9 +372,21 @@ func (pos *Position) HalfMoveClock() int {
 	return pos.halfMoveClock
 }
 
-// EnPassantSquare returns the en-passant square.
+// EnPassantSquare returns the raw en-passant target square set after any
+// double pawn push, even when no enemy pawn can capture it. This is the FEN
+// en-passant field.
 func (pos *Position) EnPassantSquare() Square {
 	return pos.enPassantSquare
+}
+
+// LegalEnPassantSquare returns the en-passant target square only if an enemy
+// pawn can actually capture en passant; otherwise it returns NoSquare. This
+// is the value that feeds the Zobrist hash.
+func (pos *Position) LegalEnPassantSquare() Square {
+	if pos == nil {
+		return NoSquare
+	}
+	return pos.relevantEnPassantSquare()
 }
 
 // CastleRights returns the castling rights of the position.

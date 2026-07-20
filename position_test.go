@@ -560,3 +560,41 @@ func TestPositionHasInsufficientMaterial(t *testing.T) {
 		t.Fatal("black should not be insufficient with a queen")
 	}
 }
+
+func TestPositionEnPassantSquares(t *testing.T) {
+	// Setup a position where black can capture en passant on e3: black pawn on
+	// d4, white just pushed e2-e4.
+	g := NewGame()
+	for _, text := range []string{"Nf3", "d5", "Ng1", "d4", "e4"} {
+		if _, err := g.PushMoveText(text, SAN(), nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pos := g.Position()
+	if pos.EnPassantSquare() != E3 {
+		t.Fatalf("expected raw ep square E3, got %v", pos.EnPassantSquare())
+	}
+	if pos.LegalEnPassantSquare() != E3 {
+		t.Fatalf("expected legal ep square E3, got %v", pos.LegalEnPassantSquare())
+	}
+
+	// After 1. e4, no black pawn is adjacent to E4, so the legal ep square is
+	// NoSquare even though the raw ep square is E3.
+	g = NewGame()
+	if _, err := g.PushMoveText("e4", SAN(), nil); err != nil {
+		t.Fatal(err)
+	}
+	pos = g.Position()
+	if pos.EnPassantSquare() != E3 {
+		t.Fatalf("expected raw ep square E3, got %v", pos.EnPassantSquare())
+	}
+	if pos.LegalEnPassantSquare() != NoSquare {
+		t.Fatalf("expected no legal ep square, got %v", pos.LegalEnPassantSquare())
+	}
+
+	// Nil receiver is safe.
+	var nilPos *Position
+	if nilPos.LegalEnPassantSquare() != NoSquare {
+		t.Fatal("LegalEnPassantSquare on nil Position should return NoSquare")
+	}
+}
