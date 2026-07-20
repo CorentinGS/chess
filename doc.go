@@ -18,7 +18,7 @@ Using Moves
 Using Strict SAN Move Text
 
 	game := chess.NewGame()
-	game.PushMove("e4", nil)
+	game.MoveText("e4", SAN(), nil)
 
 Using PGN
 

@@ -63,7 +63,7 @@ descriptive errors for invalid moves. This ensures consistent game correctness a
 **Performance Options**: Added unsafe variants for high-performance scenarios:
 
 - `UnsafeMove()` - ~1.5x faster than `Move()`
-- `UnsafePushMoveText()` - ~1.1x faster than `PushMoveText()`
+- `UnsafeMoveText()` - ~1.1x faster than `MoveText()`
 
 **API Consistency**: Refactored move methods for clear validation behavior and consistent performance options across all
 move APIs.
@@ -249,22 +249,22 @@ if err != nil {
 }
 ```
 
-**PushMoveText()** - Validates moves using any notation (recommended for general use):
+**MoveText()** - Validates moves using any notation (recommended for general use):
 
 ```go
 game := chess.NewGame()
-err := game.PushMoveText("e4", chess.SAN(), nil)
+err := game.MoveText("e4", chess.SAN(), nil)
 if err != nil {
 // Handle invalid move or notation error
 }
 ```
 
-**UnsafePushMoveText()** - High-performance notation parsing without move validation:
+**UnsafeMoveText()** - High-performance notation parsing without move validation:
 
 ```go
 game := chess.NewGame()
 // Only use when you're certain the move is valid
-err := game.UnsafePushMoveText("e2e4", chess.UCI(), nil)
+err := game.UnsafeMoveText("e2e4", chess.UCI(), nil)
 if err != nil {
 // Handle notation parsing error (should not occur with valid notation)
 }
@@ -272,7 +272,7 @@ if err != nil {
 
 > **Performance Note**:
 > - `UnsafeMove()` provides ~1.5x performance improvement over `Move()` by skipping validation
-> - `UnsafePushMoveText()` provides ~1.1x performance improvement over `PushMoveText()` by skipping move
+> - `UnsafeMoveText()` provides ~1.1x performance improvement over `MoveText()` by skipping move
     validation
 > - Use unsafe variants only when moves are pre-validated or known to be legal
 
@@ -289,11 +289,11 @@ fmt.Println(moves[0]) // b1a3
 
 #### Parse Move Text
 
-PushMoveText method accepts move text using an explicit codec:
+MoveText accepts move text using an explicit codec:
 
 ```go
 game := chess.NewGame()
-if err := game.PushMoveText("e4", chess.SAN(), nil); err != nil {
+if err := game.MoveText("e4", chess.SAN(), nil); err != nil {
 // handle error
 }
 ```
@@ -318,14 +318,14 @@ fmt.Println("Move succeeded")
 }
 
 // Using notation parsing with validation
-if err := game.PushMoveText("e4", chess.SAN(), nil); err != nil {
+if err := game.MoveText("e4", chess.SAN(), nil); err != nil {
 fmt.Println("Move failed:", err)
 } else {
 fmt.Println("e4 move succeeded")
 }
 
 // Invalid notation will be caught
-if err := game.PushMoveText("e5", chess.SAN(), nil); err != nil {
+if err := game.MoveText("e5", chess.SAN(), nil); err != nil {
 fmt.Println("Move failed:", err)
 // Output: Move failed: [invalid move error]
 }
@@ -344,7 +344,7 @@ panic(err) // Should not happen with pre-validated moves
 }
 
 // Option 2: Using notation (~1.1x faster)  
-if err := game.UnsafePushMoveText("e4", chess.SAN(), nil); err != nil {
+if err := game.UnsafeMoveText("e4", chess.SAN(), nil); err != nil {
 panic(err) // Should not happen with valid notation/moves
 }
 ```
@@ -360,10 +360,10 @@ Black wins by checkmate (Fool's Mate):
 
 ```go
 game := chess.NewGame()
-game.PushMoveText("f3", chess.SAN(), nil)
-game.PushMoveText("e6", chess.SAN(), nil)
-game.PushMoveText("g4", chess.SAN(), nil)
-game.PushMoveText("Qh4", chess.SAN(), nil)
+game.MoveText("f3", chess.SAN(), nil)
+game.MoveText("e6", chess.SAN(), nil)
+game.MoveText("g4", chess.SAN(), nil)
+game.MoveText("Qh4", chess.SAN(), nil)
 fmt.Println(game.Outcome()) // 0-1
 fmt.Println(game.Method()) // Checkmate
 /*
@@ -387,7 +387,7 @@ Black king has no safe move:
 fenStr := "k1K5/8/8/8/8/8/8/1Q6 w - - 0 1"
 fen, _ := chess.FEN(fenStr)
 game := chess.NewGame(fen)
-game.PushMoveText("Qb6", chess.SAN(), nil)
+game.MoveText("Qb6", chess.SAN(), nil)
 fmt.Println(game.Outcome()) // 1/2-1/2
 fmt.Println(game.Method()) // Stalemate
 /*
@@ -409,7 +409,7 @@ Black resigns and white wins:
 
 ```go
 game := chess.NewGame()
-game.PushMoveText("f3", chess.SAN(), nil)
+game.MoveText("f3", chess.SAN(), nil)
 if err := game.Resign(chess.Black); err != nil {
 	panic(err)
 }
@@ -438,7 +438,7 @@ until Fivefold Repetition.
 game := chess.NewGame()
 moves := []string{"Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8"}
 for _, m := range moves {
-game.PushMoveText(m, chess.SAN(), nil)
+game.MoveText(m, chess.SAN(), nil)
 }
 fmt.Println(game.EligibleDraws()) //  [DrawOffer ThreefoldRepetition]
 ```
@@ -457,7 +457,7 @@ moves := []string{
 "Nf3", "Nf6", "Ng1", "Ng8",
 }
 for _, m := range moves {
-game.PushMoveText(m, chess.SAN(), nil)
+game.MoveText(m, chess.SAN(), nil)
 }
 fmt.Println(game.Outcome()) // 1/2-1/2
 fmt.Println(game.Method()) // FivefoldRepetition
@@ -485,7 +485,7 @@ checkmate.
 ```go
 fen, _ := chess.FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 149 23")
 game := chess.NewGame(fen)
-game.PushMoveText("Kf8", chess.SAN(), nil)
+game.MoveText("Kf8", chess.SAN(), nil)
 fmt.Println(game.Outcome()) // 1/2-1/2
 fmt.Println(game.Method()) // SeventyFiveMoveRule
 ```  
@@ -548,8 +548,8 @@ Moves and tag pairs added to the PGN output:
 ```go
 game := chess.NewGame()
 game.AddTagPair("Event", "F/S Return Match")
-game.PushMoveText("e4", chess.SAN(), nil)
-game.PushMoveText("e5", chess.SAN(), nil)
+game.MoveText("e4", chess.SAN(), nil)
+game.MoveText("e5", chess.SAN(), nil)
 fmt.Println(game)
 /*
 [Event "F/S Return Match"]
@@ -692,8 +692,8 @@ official chess notation used by FIDE. Examples: e2, e5, O-O (short castling), e8
 
 ```go
 game := chess.NewGame()
-game.PushMoveText("e4", chess.SAN(), nil)
-game.PushMoveText("e5", chess.SAN(), nil)
+game.MoveText("e4", chess.SAN(), nil)
+game.MoveText("e5", chess.SAN(), nil)
 fmt.Println(game) // 1.e4 e5  *
 ```
 
@@ -705,10 +705,10 @@ visible as well as the destination. Examples: Rd1xd8+, Ng8f6.
 
 ```go
 game := chess.NewGame()
-game.PushMoveText("f2f3", chess.LongAlgebraic(), nil)
-game.PushMoveText("e7e5", chess.LongAlgebraic(), nil)
-game.PushMoveText("g2g4", chess.LongAlgebraic(), nil)
-game.PushMoveText("Qd8h4", chess.LongAlgebraic(), nil)
+game.MoveText("f2f3", chess.LongAlgebraic(), nil)
+game.MoveText("e7e5", chess.LongAlgebraic(), nil)
+game.MoveText("g2g4", chess.LongAlgebraic(), nil)
+game.MoveText("Qd8h4", chess.LongAlgebraic(), nil)
 fmt.Println(game) // 1.f2f3 e7e5 2.g2g4 Qd8h4#  0-1
 ```
 
@@ -719,8 +719,8 @@ Interface notation. Examples: e2e4, e7e5, e1g1 (white short castling), e7e8q (fo
 
 ```go
 game := chess.NewGame()
-game.PushMoveText("e2e4", chess.UCI(), nil)
-game.PushMoveText("e7e5", chess.UCI(), nil)
+game.MoveText("e2e4", chess.UCI(), nil)
+game.MoveText("e7e5", chess.UCI(), nil)
 fmt.Println(game) // 1.e4 e5  *
 ```
 
@@ -877,11 +877,15 @@ parent and ordered continuations, plus comments, NAGs, and `[%clk ...]`-style
 command annotations. The first continuation is the main line; later
 continuations are variations.
 
-Use `Game.Move`, `Game.UnsafeMove`, `Game.PushMove`, or
-`Game.PushMoveText` to play moves on the active cursor. Those methods keep
+Use `Game.Move`, `Game.UnsafeMove`, `Game.MoveText`, or
+`Game.UnsafeMoveText` to play moves on the active cursor. Those methods keep
 game legality, terminal outcome guards, and result evaluation in sync with the
 tree. `MoveTree` exposes traversal, cursor navigation, and variation editing;
 it does not expose a public API for advancing the active game state directly.
+
+The older names `Game.PushMove`, `Game.PushMoveText`, and
+`Game.UnsafePushMoveText` are deprecated but remain functional for this major
+version.
 
 ```go
 package main
@@ -894,8 +898,8 @@ import (
 
 func main() {
 	g := chess.NewGame()
-	g.PushMove("e4", nil)
-	g.PushMove("e5", nil)
+	g.MoveText("e4", chess.SAN(), nil)
+	g.MoveText("e5", chess.SAN(), nil)
 
 	// Walk the main line.
 	for _, n := range g.MoveTree().MainLine() {

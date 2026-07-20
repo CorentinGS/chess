@@ -182,7 +182,7 @@ func TestComputeMoveEffect(t *testing.T) {
 }
 
 // TestUnsafeTransitionConsistency guards the two invariants that unsafe moves
-// through Position.Update (and thus Game.UnsafeMove / Game.UnsafePushMoveText)
+// through Position.Update (and thus Game.UnsafeMove / Game.UnsafeMoveText)
 // must still uphold:
 //
 //   - Special-move effects (en-passant captured square, castle rook squares)

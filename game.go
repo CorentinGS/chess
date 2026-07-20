@@ -10,8 +10,8 @@ Example usage:
 	game := NewGame()
 
 	// Make moves
-	game.PushMove("e4", nil)
-	game.PushMove("e5", nil)
+	game.MoveText("e4", SAN(), nil)
+	game.MoveText("e5", SAN(), nil)
 
 	// Check game status
 

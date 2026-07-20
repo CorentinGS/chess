@@ -24,17 +24,17 @@ func assertNoVariations(t *testing.T, g *chess.Game) {
 func TestSplit_DropsManualResignationOnDivergingLine(t *testing.T) {
 	g := chess.NewGame()
 	for _, m := range []string{"e4", "e5", "Nf3", "Nc6"} {
-		if _, err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, chess.SAN(), nil); err != nil {
 			t.Fatalf("push %s: %v", m, err)
 		}
 	}
 	if !g.MoveTree().GoBack() {
 		t.Fatal("GoBack failed")
 	}
-	if _, err := g.PushMove("d6", nil); err != nil {
+	if _, err := g.MoveText("d6", chess.SAN(), nil); err != nil {
 		t.Fatalf("push d6: %v", err)
 	}
-	if _, err := g.PushMove("d4", nil); err != nil {
+	if _, err := g.MoveText("d4", chess.SAN(), nil); err != nil {
 		t.Fatalf("push d4: %v", err)
 	}
 	if err := g.Resign(chess.White); err != nil {
@@ -138,7 +138,7 @@ func TestSplit_HonoursIgnoreFlags(t *testing.T) {
 	}
 	// Split yields a game per line; push a quiet king move (position stays KvK
 	// insufficient) so there is a line to split.
-	if _, err := g.PushMove("Kd2", nil); err != nil {
+	if _, err := g.MoveText("Kd2", chess.SAN(), nil); err != nil {
 		t.Fatalf("push Kd2: %v", err)
 	}
 	if g.Outcome() != chess.NoOutcome {
@@ -173,7 +173,7 @@ func TestSplit_EmitsAutoDraws(t *testing.T) {
 		if g.Outcome() != chess.NoOutcome {
 			t.Fatalf("parent outcome at clock 149 = %s, want NoOutcome", g.Outcome())
 		}
-		if _, err := g.PushMove("Ra2", nil); err != nil {
+		if _, err := g.MoveText("Ra2", chess.SAN(), nil); err != nil {
 			t.Fatalf("push Ra2: %v", err)
 		}
 		if g.Outcome() != chess.Draw || g.Method() != chess.SeventyFiveMoveRule {
@@ -202,7 +202,7 @@ func TestSplit_EmitsAutoDraws(t *testing.T) {
 		cycle := []string{"Nf3", "Nf6", "Ng1", "Ng8"}
 		for range 4 {
 			for _, m := range cycle {
-				if _, err := g.PushMove(m, nil); err != nil {
+				if _, err := g.MoveText(m, chess.SAN(), nil); err != nil {
 					t.Fatalf("push %s: %v", m, err)
 				}
 			}

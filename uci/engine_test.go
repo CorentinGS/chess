@@ -193,7 +193,7 @@ func Test_UCIMovesTags(t *testing.T) {
 					t.Fatal(encodeErr)
 				}
 
-				err = game.PushMove(san, nil)
+				err = game.MoveText(san, chess.SAN(), nil)
 				if err != nil {
 					t.Fatal(fmt.Sprintf("failed to push move %s - %s - %v. Pos: %s", san, move.String(), move.HasTag(chess.Capture), pos.String()), err)
 				}

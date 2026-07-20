@@ -12,22 +12,22 @@ import (
 // unmoved.
 func TestMoveCanonicalizesStalenessForSpecialMove(t *testing.T) {
 	g := NewGame()
-	if _, err := g.PushMoveText("e4", SAN(), nil); err != nil {
+	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
 		t.Fatalf("setup e4: %v", err)
 	}
-	if _, err := g.PushMoveText("e5", SAN(), nil); err != nil {
+	if _, err := g.MoveText("e5", SAN(), nil); err != nil {
 		t.Fatalf("setup e5: %v", err)
 	}
-	if _, err := g.PushMoveText("Nf3", SAN(), nil); err != nil {
+	if _, err := g.MoveText("Nf3", SAN(), nil); err != nil {
 		t.Fatalf("setup Nf3: %v", err)
 	}
-	if _, err := g.PushMoveText("Nc6", SAN(), nil); err != nil {
+	if _, err := g.MoveText("Nc6", SAN(), nil); err != nil {
 		t.Fatalf("setup Nc6: %v", err)
 	}
-	if _, err := g.PushMoveText("Bc4", SAN(), nil); err != nil {
+	if _, err := g.MoveText("Bc4", SAN(), nil); err != nil {
 		t.Fatalf("setup Bc4: %v", err)
 	}
-	if _, err := g.PushMoveText("Bc5", SAN(), nil); err != nil {
+	if _, err := g.MoveText("Bc5", SAN(), nil); err != nil {
 		t.Fatalf("setup Bc5: %v", err)
 	}
 

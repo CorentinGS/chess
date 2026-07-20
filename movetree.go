@@ -120,7 +120,7 @@ func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, er
 		// If the existing Move occurrence was placed via an unsafe path that
 		// supplied stale tags, canonicalise the stored Move in place. The
 		// incoming move has the canonical tags from resolveCanonicalMove (or
-		// from a trusted codec on the PushMoveText fast path). When the
+		// from a trusted codec on the MoveText fast path). When the
 		// existing occurrence already has continuations the subtree was
 		// computed against the old Move's position-derived state, so repair
 		// is unsafe; refuse and leave the tree unchanged.

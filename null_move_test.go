@@ -425,7 +425,7 @@ func TestNullMove_PGNWrite(t *testing.T) {
 	if _, err := g.NullMove(); err != nil {
 		t.Fatalf("NullMove: %v", err)
 	}
-	if _, err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.MoveText("e5", chess.SAN(), nil); err != nil {
 		t.Fatalf("PushMove e5: %v", err)
 	}
 	rendered := g.String()
@@ -439,10 +439,10 @@ func TestNullMove_PGNWriteReadRoundTrip(t *testing.T) {
 	if _, err := g.NullMove(); err != nil {
 		t.Fatalf("NullMove: %v", err)
 	}
-	if _, err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.MoveText("e5", chess.SAN(), nil); err != nil {
 		t.Fatalf("PushMove e5: %v", err)
 	}
-	if _, err := g.PushMove("Nf3", nil); err != nil {
+	if _, err := g.MoveText("Nf3", chess.SAN(), nil); err != nil {
 		t.Fatalf("PushMove Nf3: %v", err)
 	}
 	if _, err := g.NullMove(); err != nil {

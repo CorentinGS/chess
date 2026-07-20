@@ -6,29 +6,43 @@ import (
 	"fmt"
 )
 
-// PushMove adds a move in algebraic notation to the game.
-// Returns an error if the move is invalid.
-// This method now validates moves for consistency with other move methods.
-//
-// Example:
-//
-//	node, err := game.PushMove("e4", &MoveInsertOptions{PromoteToMainLine: true})
-func (g *Game) PushMove(algebraicMove string, options *MoveInsertOptions) (*MoveNode, error) {
-	return g.PushMoveText(algebraicMove, SAN(), options)
-}
-
-// PushMoveText adds a move to the game using an explicit move text codec.
+// MoveText adds a move to the game using an explicit move text codec.
 // It decodes against the current position so the inserted move carries
 // position-derived tags. The decoded Move is canonical (codec.Decode resolves
 // legal moves), so it crosses the trusted fast path: no extra legal-move
 // lookup is needed before insertion.
-func (g *Game) PushMoveText(moveText string, codec MoveTextCodec, options *MoveInsertOptions) (*MoveNode, error) {
+func (g *Game) MoveText(moveText string, codec MoveTextCodec, options *MoveInsertOptions) (*MoveNode, error) {
 	move, err := codec.Decode(g.currentPosition(), moveText)
 	if err != nil {
 		return nil, fmt.Errorf("chess: decode %s move text %q: %w", codec, moveText, err)
 	}
 
 	return g.insertCanonical(canonicalMoveFromCodec(move), options)
+}
+
+// UnsafeMoveText adds fully specified move text without legal move
+// verification. It supports only codecs that can raw-decode a move without SAN
+// resolution.
+func (g *Game) UnsafeMoveText(moveText string, codec MoveTextCodec, options *MoveInsertOptions) (*MoveNode, error) {
+	raw, err := codec.DecodeRaw(moveText)
+	if err != nil {
+		if errors.Is(err, ErrMoveTextUnsupportedRawDecode) {
+			return nil, fmt.Errorf("%w: %s", ErrUnsafeMoveTextUnsupported, codec)
+		}
+		return nil, fmt.Errorf("chess: decode raw %s move text %q: %w", codec, moveText, err)
+	}
+
+	move := raw.Move()
+	if !move.HasTag(Null) {
+		pos := g.currentPosition()
+		if pos == nil {
+			return nil, ErrMoveTextMissingPosition
+		}
+		tag, _ := newLegality(pos, generateLegalAnnotated).legal(move)
+		move.tags = tag
+	}
+
+	return g.UnsafeMove(move, options)
 }
 
 // canonicalMoveFromCodec returns the codec-decoded Move, normalising any
@@ -49,29 +63,27 @@ func (g *Game) insertCanonical(canonical Move, options *MoveInsertOptions) (*Mov
 	return g.moveUnchecked(canonical, options)
 }
 
+// PushMove adds a move in algebraic notation to the game.
+// Returns an error if the move is invalid.
+//
+// Deprecated: use MoveText(algebraicMove, SAN(), options) instead.
+func (g *Game) PushMove(algebraicMove string, options *MoveInsertOptions) (*MoveNode, error) {
+	return g.MoveText(algebraicMove, SAN(), options)
+}
+
+// PushMoveText adds a move to the game using an explicit move text codec.
+//
+// Deprecated: use MoveText instead.
+func (g *Game) PushMoveText(moveText string, codec MoveTextCodec, options *MoveInsertOptions) (*MoveNode, error) {
+	return g.MoveText(moveText, codec, options)
+}
+
 // UnsafePushMoveText adds fully specified move text without legal move
-// verification. It supports only codecs that can raw-decode a move without SAN
-// resolution.
+// verification.
+//
+// Deprecated: use UnsafeMoveText instead.
 func (g *Game) UnsafePushMoveText(moveText string, codec MoveTextCodec, options *MoveInsertOptions) (*MoveNode, error) {
-	raw, err := codec.DecodeRaw(moveText)
-	if err != nil {
-		if errors.Is(err, ErrMoveTextUnsupportedRawDecode) {
-			return nil, fmt.Errorf("%w: %s", ErrUnsafeMoveTextUnsupported, codec)
-		}
-		return nil, fmt.Errorf("chess: decode raw %s move text %q: %w", codec, moveText, err)
-	}
-
-	move := raw.Move()
-	if !move.HasTag(Null) {
-		pos := g.currentPosition()
-		if pos == nil {
-			return nil, ErrMoveTextMissingPosition
-		}
-		tag, _ := newLegality(pos, generateLegalAnnotated).legal(move)
-		move.tags = tag
-	}
-
-	return g.UnsafeMove(move, options)
+	return g.UnsafeMoveText(moveText, codec, options)
 }
 
 // Move method adds a move to the game using a Move struct.

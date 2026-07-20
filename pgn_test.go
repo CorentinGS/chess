@@ -785,7 +785,7 @@ func TestPGNAnnotationFidelityVariationsAndExpansion(t *testing.T) {
 
 func TestPGNAnnotationFidelityLegacyAPIsAndDefensiveCopies(t *testing.T) {
 	game := NewGame()
-	if _, err := game.PushMove("e4", nil); err != nil {
+	if _, err := game.MoveText("e4", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	move := game.MoveTree().MainLine()[0]

@@ -14,9 +14,9 @@ func mustSAN(pos *Position, san string) *Move {
 
 func newMoveTreeTestGame() *Game {
 	g := NewGame()
-	g.PushMove("e4", nil)
-	g.PushMove("e5", nil)
-	g.PushMove("Nf3", nil)
+	g.MoveText("e4", SAN(), nil)
+	g.MoveText("e5", SAN(), nil)
+	g.MoveText("Nf3", SAN(), nil)
 	return g
 }
 

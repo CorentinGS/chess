@@ -111,13 +111,13 @@ func TestTerminalOutcomeGuards(t *testing.T) {
 	}{
 		{"Move", func(g *chess.Game) error { _, err := g.Move(g.ValidMoves()[0], nil); return err }},
 		{"UnsafeMove", func(g *chess.Game) error { _, err := g.UnsafeMove(g.ValidMoves()[0], nil); return err }},
-		{"PushMove", func(g *chess.Game) error { _, err := g.PushMove("e4", nil); return err }},
+		{"PushMove", func(g *chess.Game) error { _, err := g.MoveText("e4", chess.SAN(), nil); return err }},
 		{"PushMoveText", func(g *chess.Game) error {
-			_, err := g.PushMoveText("e4", chess.SAN(), nil)
+			_, err := g.MoveText("e4", chess.SAN(), nil)
 			return err
 		}},
 		{"UnsafePushMoveText", func(g *chess.Game) error {
-			_, err := g.UnsafePushMoveText("e2e4", chess.UCI(), nil)
+			_, err := g.UnsafeMoveText("e2e4", chess.UCI(), nil)
 			return err
 		}},
 		{"Resign", func(g *chess.Game) error { return g.Resign(chess.Black) }},
@@ -165,7 +165,7 @@ func TestResignSetsOpponentWinner(t *testing.T) {
 
 func TestMoveAfterGoBackFromTerminalStillRejected(t *testing.T) {
 	g := chess.NewGame()
-	if _, err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}); err != nil {
@@ -186,7 +186,7 @@ func TestMoveAfterGoBackFromTerminalStillRejected(t *testing.T) {
 
 func TestAddVariationAllowedAfterTerminalOutcome(t *testing.T) {
 	g := chess.NewGame()
-	if _, err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}); err != nil {
@@ -271,7 +271,7 @@ func TestEligibleDraws_FreshGameReturnsOnlyDrawOffer(t *testing.T) {
 func TestEligibleDraws_IncludesThreefoldRepetitionWhenConditionsMet(t *testing.T) {
 	g := chess.NewGame()
 	for _, mv := range []string{"Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8"} {
-		if _, err := g.PushMove(mv, nil); err != nil {
+		if _, err := g.MoveText(mv, chess.SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}

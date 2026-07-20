@@ -36,8 +36,8 @@ func TestGamePushMoveTextWithCodecs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			game := chess.NewGame()
-			if _, err := game.PushMoveText(tt.text, tt.codec, nil); err != nil {
-				t.Fatalf("PushMoveText() error = %v", err)
+			if _, err := game.MoveText(tt.text, tt.codec, nil); err != nil {
+				t.Fatalf("MoveText() error = %v", err)
 			}
 			if got := game.String(); got != tt.want {
 				t.Fatalf("game.String() = %q, want %q", got, tt.want)
@@ -48,15 +48,15 @@ func TestGamePushMoveTextWithCodecs(t *testing.T) {
 
 func TestGamePushMoveTextUsesGeneratedMoveTags(t *testing.T) {
 	game := chess.NewGame()
-	if _, err := game.PushMoveText("e2e4", chess.UCI(), nil); err != nil {
-		t.Fatalf("PushMoveText(e2e4) error = %v", err)
+	if _, err := game.MoveText("e2e4", chess.UCI(), nil); err != nil {
+		t.Fatalf("MoveText(e2e4) error = %v", err)
 	}
-	if _, err := game.PushMoveText("d7d5", chess.UCI(), nil); err != nil {
-		t.Fatalf("PushMoveText(d7d5) error = %v", err)
+	if _, err := game.MoveText("d7d5", chess.UCI(), nil); err != nil {
+		t.Fatalf("MoveText(d7d5) error = %v", err)
 	}
-	node, err := game.PushMoveText("e4d5", chess.UCI(), nil)
+	node, err := game.MoveText("e4d5", chess.UCI(), nil)
 	if err != nil {
-		t.Fatalf("PushMoveText(e4d5) error = %v", err)
+		t.Fatalf("MoveText(e4d5) error = %v", err)
 	}
 	if !node.Move().HasTag(chess.Capture) {
 		t.Fatalf("inserted move missing Capture tag: %v", node.Move())
@@ -72,7 +72,7 @@ func TestGamePushMoveIsStrictSANShorthand(t *testing.T) {
 		t.Fatalf("FEN() error = %v", err)
 	}
 	game := chess.NewGame(opt)
-	if _, err := game.PushMove("e8Q", nil); err == nil {
+	if _, err := game.MoveText("e8Q", chess.SAN(), nil); err == nil {
 		t.Fatalf("PushMove accepted import-only SAN")
 	}
 }

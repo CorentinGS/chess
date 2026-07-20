@@ -31,7 +31,7 @@ func assertGameTreeCurrentPositionInvariant(t *testing.T, g *Game) {
 func TestGameTreeCurrentPositionInvariantAfterClonePreservesCursor(t *testing.T) {
 	g := NewGame()
 	for _, move := range []string{"e4", "e5", "Nf3"} {
-		if _, err := g.PushMove(move, nil); err != nil {
+		if _, err := g.MoveText(move, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -54,7 +54,7 @@ func TestGameTreeCurrentPositionInvariantAfterDirectGameOperations(t *testing.T)
 	assertGameTreeCurrentPositionInvariant(t, g)
 
 	for _, move := range []string{"e4", "e5", "Nf3"} {
-		if _, err := g.PushMove(move, nil); err != nil {
+		if _, err := g.MoveText(move, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 		assertGameTreeCurrentPositionInvariant(t, g)
@@ -74,7 +74,7 @@ func TestGameTreeCurrentPositionInvariantAfterDirectGameOperations(t *testing.T)
 func TestPositionReturnsDefensiveCopyAfterGoForward(t *testing.T) {
 	g := NewGame()
 	for _, move := range []string{"e4", "e5"} {
-		if _, err := g.PushMove(move, nil); err != nil {
+		if _, err := g.MoveText(move, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -148,7 +148,7 @@ func TestGameTreeCurrentPositionInvariantAfterPGNParseWithNestedVariations(t *te
 func TestGameTreeCurrentPositionInvariantAfterSplitUsesLineLeaf(t *testing.T) {
 	g := NewGame()
 	for _, move := range []string{"e4", "e5", "Nf3"} {
-		if _, err := g.PushMove(move, nil); err != nil {
+		if _, err := g.MoveText(move, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -156,7 +156,7 @@ func TestGameTreeCurrentPositionInvariantAfterSplitUsesLineLeaf(t *testing.T) {
 	if !g.MoveTree().GoBack() {
 		t.Fatal("expected to navigate back before adding a variation")
 	}
-	if _, err := g.PushMove("Nc3", nil); err != nil {
+	if _, err := g.MoveText("Nc3", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 

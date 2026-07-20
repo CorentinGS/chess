@@ -490,7 +490,7 @@ func TestPositionOutcome(t *testing.T) {
 	// Fool's mate: white is checkmated, so black wins.
 	g := NewGame()
 	for _, text := range []string{"f3", "e6", "g4", "Qh4"} {
-		if _, err := g.PushMoveText(text, SAN(), nil); err != nil {
+		if _, err := g.MoveText(text, SAN(), nil); err != nil {
 			t.Fatalf("push %s: %v", text, err)
 		}
 	}
@@ -566,7 +566,7 @@ func TestPositionEnPassantSquares(t *testing.T) {
 	// d4, white just pushed e2-e4.
 	g := NewGame()
 	for _, text := range []string{"Nf3", "d5", "Ng1", "d4", "e4"} {
-		if _, err := g.PushMoveText(text, SAN(), nil); err != nil {
+		if _, err := g.MoveText(text, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -581,7 +581,7 @@ func TestPositionEnPassantSquares(t *testing.T) {
 	// After 1. e4, no black pawn is adjacent to E4, so the legal ep square is
 	// NoSquare even though the raw ep square is E3.
 	g = NewGame()
-	if _, err := g.PushMoveText("e4", SAN(), nil); err != nil {
+	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	pos = g.Position()

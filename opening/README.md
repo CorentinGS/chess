@@ -22,8 +22,8 @@ import (
 
 func main(){
     g := chess.NewGame()
-	g.PushMoveText("e4", chess.SAN(), nil)
-	g.PushMoveText("e6", chess.SAN(), nil)
+	g.MoveText("e4", chess.SAN(), nil)
+	g.MoveText("e6", chess.SAN(), nil)
 
 	// print French Defense
 	book := opening.NewBookECO()
