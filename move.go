@@ -55,6 +55,23 @@ func NewNullMove() Move {
 	return Move{tags: Null}
 }
 
+// NewMove returns a Move from origin square s1 to destination square s2.
+// The optional promo argument supplies a promotion piece type; when omitted
+// the move has no promotion. Tags default to none.
+//
+// The constructor does not attempt to infer Capture or Check tags because
+// those depend on the position context (the piece on s1, the occupant of s2,
+// and whether the move leaves the opponent in check). Use Position.IsLegal
+// or Game.Move to obtain a fully tagged canonical Move when the position is
+// known.
+func NewMove(s1, s2 Square, promo ...PieceType) Move {
+	var p PieceType
+	if len(promo) > 0 {
+		p = promo[0]
+	}
+	return Move{s1: s1, s2: s2, promo: p}
+}
+
 // A Move is the movement of a piece from one square to another.
 type Move struct {
 	tags  MoveTag

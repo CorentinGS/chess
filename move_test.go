@@ -598,3 +598,28 @@ func TestMoveNodeClone(t *testing.T) {
 		}
 	}
 }
+
+func TestNewMove(t *testing.T) {
+	m := NewMove(E2, E4)
+	if m.S1() != E2 || m.S2() != E4 || m.Promo() != NoPieceType || m.HasTag(Capture) || m.HasTag(Check) {
+		t.Fatalf("NewMove(E2, E4) = %v, want e2-e4 with no tags", m)
+	}
+
+	promo := NewMove(E7, E8, Queen)
+	if promo.S1() != E7 || promo.S2() != E8 || promo.Promo() != Queen {
+		t.Fatalf("NewMove(E7, E8, Queen) = %v, want e7-e8=Q", promo)
+	}
+
+	// Constructed move should match the generated legal move by identity.
+	pos := StartingPosition()
+	var found bool
+	for _, legal := range pos.ValidMoves() {
+		if legal.S1() == E2 && legal.S2() == E4 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("NewMove(E2, E4) identity did not match any legal move from the starting position")
+	}
+}
