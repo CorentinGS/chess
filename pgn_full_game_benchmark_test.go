@@ -29,36 +29,6 @@ func BenchmarkPGN_FullGameDecode_Big(b *testing.B) {
 	benchFullGameDecodeFixture(b, "big.pgn")
 }
 
-func BenchmarkPGN_FullGameDecode_RecordDecode_BigBig(b *testing.B) {
-	data := readPGNFixture("big_big.pgn")
-	meta := pgnMeta("big_big.pgn")
-	b.SetBytes(meta.size)
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for range b.N {
-		var summary pgnDecodeSummary
-		for record, err := range PGNRecords(context.Background(), bytes.NewReader(data)) {
-			if err != nil {
-				b.Fatalf("record error: %v", err)
-			}
-			game, err := record.Decode()
-			if err != nil {
-				if isKnownInconsistentPgn(err) {
-					summary.errors++
-					continue
-				}
-				b.Fatalf("decode error: %v", err)
-			}
-			accumulatePGNDecodeSummary(&summary, game)
-		}
-		if summary.games+summary.errors != meta.games {
-			b.Fatalf("expected %d games total, parsed %d with %d errors", meta.games, summary.games, summary.errors)
-		}
-		pgnDecodeSummarySink = summary
-	}
-}
-
 func BenchmarkPGN_FullGameDecode_Parallel_BigBig(b *testing.B) {
 	data := readPGNFixture("big_big.pgn")
 	meta := pgnMeta("big_big.pgn")

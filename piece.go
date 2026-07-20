@@ -1,6 +1,9 @@
 package chess
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // Color represents the color of a chess piece.
 type Color int8
@@ -14,14 +17,26 @@ const (
 	Black
 )
 
-func ColorFromString(s string) Color {
+// ParseColor converts a FEN side-to-move character ("w" or "b") to a Color.
+// It returns an error for any other input.
+func ParseColor(s string) (Color, error) {
 	switch strings.ToLower(s) {
 	case "w":
-		return White
+		return White, nil
 	case "b":
-		return Black
+		return Black, nil
 	}
-	return NoColor
+	return NoColor, fmt.Errorf("chess: invalid color %q", s)
+}
+
+// ColorFromString converts a FEN side-to-move character ("w" or "b") to a Color.
+// Returns NoColor for any other input.
+//
+// Deprecated: use ParseColor for new code; it distinguishes parse failures from
+// the NoColor sentinel.
+func ColorFromString(s string) Color {
+	c, _ := ParseColor(s)
+	return c
 }
 
 // Other returns the opposite color of the receiver.
@@ -83,29 +98,54 @@ func PieceTypes() [6]PieceType {
 	return [6]PieceType{King, Queen, Rook, Bishop, Knight, Pawn}
 }
 
-func PieceTypeFromByte(b byte) PieceType {
+// ParsePieceTypeFromByte parses a FEN piece-type character (case-insensitive)
+// into a PieceType. It returns an error for any other byte.
+func ParsePieceTypeFromByte(b byte) (PieceType, error) {
 	switch b {
-	case 'k':
-		return King
-	case 'q':
-		return Queen
-	case 'r':
-		return Rook
-	case 'b':
-		return Bishop
-	case 'n':
-		return Knight
-	case 'p':
-		return Pawn
+	case 'k', 'K':
+		return King, nil
+	case 'q', 'Q':
+		return Queen, nil
+	case 'r', 'R':
+		return Rook, nil
+	case 'b', 'B':
+		return Bishop, nil
+	case 'n', 'N':
+		return Knight, nil
+	case 'p', 'P':
+		return Pawn, nil
 	}
-	return NoPieceType
+	return NoPieceType, fmt.Errorf("chess: invalid piece type byte %q", b)
 }
 
-func PieceTypeFromString(s string) PieceType {
+// PieceTypeFromByte parses a FEN piece-type character (case-insensitive) into a
+// PieceType. Returns NoPieceType for any other byte.
+//
+// Deprecated: use ParsePieceTypeFromByte for new code; it distinguishes parse
+// failures from the NoPieceType sentinel.
+func PieceTypeFromByte(b byte) PieceType {
+	pt, _ := ParsePieceTypeFromByte(b)
+	return pt
+}
+
+// ParsePieceType parses a single-character piece notation into a PieceType.
+// It returns an error if the input is empty or longer than one character, or
+// if the character is not a valid piece type.
+func ParsePieceType(s string) (PieceType, error) {
 	if len(s) != 1 {
-		return NoPieceType
+		return NoPieceType, fmt.Errorf("chess: invalid piece type %q", s)
 	}
-	return PieceTypeFromByte(strings.ToLower(s)[0])
+	return ParsePieceTypeFromByte(strings.ToLower(s)[0])
+}
+
+// PieceTypeFromString parses a single-character piece notation into a
+// PieceType. Returns NoPieceType for invalid input.
+//
+// Deprecated: use ParsePieceType for new code; it distinguishes parse failures
+// from the NoPieceType sentinel.
+func PieceTypeFromString(s string) PieceType {
+	pt, _ := ParsePieceType(s)
+	return pt
 }
 
 func (p PieceType) String() string {

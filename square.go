@@ -1,5 +1,7 @@
 package chess
 
+import "fmt"
+
 const (
 	numOfSquaresInBoard = 64
 	numOfSquaresInRow   = 8
@@ -155,16 +157,26 @@ func (f File) Byte() byte {
 	return fileChars[f]
 }
 
-// SquareFromString converts a 2-character square notation (e.g., "e4") to a Square.
-// Returns NoSquare if the string is not a valid square.
-func SquareFromString(s string) Square {
+// ParseSquare converts a 2-character square notation (e.g., "e4") to a Square.
+// It returns an error if the input is not a valid square.
+func ParseSquare(s string) (Square, error) {
 	if len(s) != 2 {
-		return NoSquare
+		return NoSquare, fmt.Errorf("chess: invalid square %q", s)
 	}
 	f := int(s[0] - 'a')
 	r := int(s[1] - '1')
 	if f < 0 || f > 7 || r < 0 || r > 7 {
-		return NoSquare
+		return NoSquare, fmt.Errorf("chess: invalid square %q", s)
 	}
-	return NewSquare(File(f), Rank(r))
+	return NewSquare(File(f), Rank(r)), nil
+}
+
+// SquareFromString converts a 2-character square notation (e.g., "e4") to a Square.
+// Returns NoSquare if the string is not a valid square.
+//
+// Deprecated: use ParseSquare for new code; it distinguishes parse failures from
+// the NoSquare sentinel.
+func SquareFromString(s string) Square {
+	sq, _ := ParseSquare(s)
+	return sq
 }

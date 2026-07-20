@@ -50,8 +50,12 @@ func TestSquare_StringRoundTrip(t *testing.T) {
 	for _, sq := range allSquares() {
 		t.Run(sq.String(), func(t *testing.T) {
 			t.Parallel()
-			if got := chess.SquareFromString(sq.String()); got != sq {
-				t.Errorf("SquareFromString(%q) = %v, want %v", sq.String(), got, sq)
+			got, err := chess.ParseSquare(sq.String())
+			if err != nil {
+				t.Fatalf("ParseSquare(%q): %v", sq.String(), err)
+			}
+			if got != sq {
+				t.Errorf("ParseSquare(%q) = %v, want %v", sq.String(), got, sq)
 			}
 		})
 	}
@@ -73,7 +77,7 @@ func TestSquare_Bytes(t *testing.T) {
 	}
 }
 
-func TestSquareFromString(t *testing.T) {
+func TestParseSquare(t *testing.T) {
 	t.Parallel()
 	valid := []struct {
 		in   string
@@ -90,8 +94,12 @@ func TestSquareFromString(t *testing.T) {
 	for _, tt := range valid {
 		t.Run("valid/"+tt.in, func(t *testing.T) {
 			t.Parallel()
-			if got := chess.SquareFromString(tt.in); got != tt.want {
-				t.Errorf("SquareFromString(%q) = %v, want %v", tt.in, got, tt.want)
+			got, err := chess.ParseSquare(tt.in)
+			if err != nil {
+				t.Fatalf("ParseSquare(%q): %v", tt.in, err)
+			}
+			if got != tt.want {
+				t.Errorf("ParseSquare(%q) = %v, want %v", tt.in, got, tt.want)
 			}
 		})
 	}
@@ -99,8 +107,8 @@ func TestSquareFromString(t *testing.T) {
 	for _, in := range invalid {
 		t.Run("invalid/"+in, func(t *testing.T) {
 			t.Parallel()
-			if got := chess.SquareFromString(in); got != chess.NoSquare {
-				t.Errorf("SquareFromString(%q) = %v, want NoSquare", in, got)
+			if got, err := chess.ParseSquare(in); err == nil {
+				t.Errorf("ParseSquare(%q) = %v, want error", in, got)
 			}
 		})
 	}
@@ -170,8 +178,8 @@ func TestNoSquare_IsMinusOne(t *testing.T) {
 	if chess.NoSquare != -1 {
 		t.Errorf("NoSquare = %d, want -1", chess.NoSquare)
 	}
-	if got := chess.SquareFromString("not-a-square"); got != chess.NoSquare {
-		t.Errorf("SquareFromString(invalid) = %v, want NoSquare", got)
+	if got, err := chess.ParseSquare("not-a-square"); err == nil {
+		t.Errorf("ParseSquare(invalid) = %v, want error", got)
 	}
 }
 

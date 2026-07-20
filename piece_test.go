@@ -2,6 +2,7 @@ package chess_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/corentings/chess/v3"
@@ -87,19 +88,19 @@ func TestPieceType_StringRoundTrip(t *testing.T) {
 	for _, pt := range chess.PieceTypes() {
 		t.Run(pt.String(), func(t *testing.T) {
 			t.Parallel()
-			if got := chess.PieceTypeFromString(pt.String()); got != pt {
-				t.Errorf("PieceTypeFromString(%q) = %v, want %v", pt.String(), got, pt)
+			if got, err := chess.ParsePieceType(pt.String()); err != nil || got != pt {
+				t.Errorf("ParsePieceType(%q) = %v, %v, want %v, nil", pt.String(), got, err, pt)
 			}
-			if got := chess.PieceTypeFromByte(pt.Bytes()[0]); got != pt {
-				t.Errorf("PieceTypeFromByte(%q) = %v, want %v", pt.Bytes(), got, pt)
+			if got, err := chess.ParsePieceTypeFromByte(pt.Bytes()[0]); err != nil || got != pt {
+				t.Errorf("ParsePieceTypeFromByte(%q) = %v, %v, want %v, nil", pt.Bytes(), got, err, pt)
 			}
 		})
 	}
 }
 
-func TestPieceTypeFromByte(t *testing.T) {
+func TestParsePieceTypeFromByte(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
+	valid := []struct {
 		name string
 		in   byte
 		want chess.PieceType
@@ -110,23 +111,35 @@ func TestPieceTypeFromByte(t *testing.T) {
 		{"lower_b", 'b', chess.Bishop},
 		{"lower_n", 'n', chess.Knight},
 		{"lower_p", 'p', chess.Pawn},
-		{"upper_K", 'K', chess.NoPieceType},
-		{"digit", '1', chess.NoPieceType},
-		{"symbol", '?', chess.NoPieceType},
+		{"upper_K", 'K', chess.King},
+		{"upper_Q", 'Q', chess.Queen},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range valid {
+		t.Run("valid/"+tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := chess.PieceTypeFromByte(tt.in); got != tt.want {
-				t.Errorf("PieceTypeFromByte(%q) = %v, want %v", tt.in, got, tt.want)
+			got, err := chess.ParsePieceTypeFromByte(tt.in)
+			if err != nil {
+				t.Fatalf("ParsePieceTypeFromByte(%q): %v", tt.in, err)
+			}
+			if got != tt.want {
+				t.Errorf("ParsePieceTypeFromByte(%q) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+	invalid := []byte{'1', '?', 'x'}
+	for _, in := range invalid {
+		t.Run(fmt.Sprintf("invalid/%q", in), func(t *testing.T) {
+			t.Parallel()
+			if got, err := chess.ParsePieceTypeFromByte(in); err == nil {
+				t.Errorf("ParsePieceTypeFromByte(%q) = %v, want error", in, got)
 			}
 		})
 	}
 }
 
-func TestPieceTypeFromString(t *testing.T) {
+func TestParsePieceType(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
+	valid := []struct {
 		name string
 		in   string
 		want chess.PieceType
@@ -135,15 +148,25 @@ func TestPieceTypeFromString(t *testing.T) {
 		{"upper_K", "K", chess.King},
 		{"upper_Q", "Q", chess.Queen},
 		{"upper_N", "N", chess.Knight},
-		{"empty", "", chess.NoPieceType},
-		{"multi_char", "kk", chess.NoPieceType},
-		{"invalid", "?", chess.NoPieceType},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range valid {
+		t.Run("valid/"+tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := chess.PieceTypeFromString(tt.in); got != tt.want {
-				t.Errorf("PieceTypeFromString(%q) = %v, want %v", tt.in, got, tt.want)
+			got, err := chess.ParsePieceType(tt.in)
+			if err != nil {
+				t.Fatalf("ParsePieceType(%q): %v", tt.in, err)
+			}
+			if got != tt.want {
+				t.Errorf("ParsePieceType(%q) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+	invalid := []string{"", "kk", "?"}
+	for _, in := range invalid {
+		t.Run("invalid/"+in, func(t *testing.T) {
+			t.Parallel()
+			if got, err := chess.ParsePieceType(in); err == nil {
+				t.Errorf("ParsePieceType(%q) = %v, want error", in, got)
 			}
 		})
 	}
@@ -213,8 +236,8 @@ func TestColor_Other(t *testing.T) {
 	}
 }
 
-func TestColorFromString(t *testing.T) {
-	tests := []struct {
+func TestParseColor(t *testing.T) {
+	valid := []struct {
 		name string
 		in   string
 		want chess.Color
@@ -223,13 +246,23 @@ func TestColorFromString(t *testing.T) {
 		{"lower_b", "b", chess.Black},
 		{"upper_W", "W", chess.White},
 		{"upper_B", "B", chess.Black},
-		{"invalid", "x", chess.NoColor},
-		{"empty", "", chess.NoColor},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := chess.ColorFromString(tt.in); got != tt.want {
-				t.Errorf("ColorFromString(%q) = %v, want %v", tt.in, got, tt.want)
+	for _, tt := range valid {
+		t.Run("valid/"+tt.name, func(t *testing.T) {
+			got, err := chess.ParseColor(tt.in)
+			if err != nil {
+				t.Fatalf("ParseColor(%q): %v", tt.in, err)
+			}
+			if got != tt.want {
+				t.Errorf("ParseColor(%q) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+	invalid := []string{"x", ""}
+	for _, in := range invalid {
+		t.Run("invalid/"+in, func(t *testing.T) {
+			if got, err := chess.ParseColor(in); err == nil {
+				t.Errorf("ParseColor(%q) = %v, want error", in, got)
 			}
 		})
 	}
