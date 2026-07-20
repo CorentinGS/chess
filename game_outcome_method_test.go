@@ -53,7 +53,7 @@ func TestSetOutcomeMethod(t *testing.T) {
 		{"Draw/InsufficientMaterial", chess.OutcomeMethodPair{chess.Draw, chess.InsufficientMaterial}, false},
 		{"Draw/Checkmate", chess.OutcomeMethodPair{chess.Draw, chess.Checkmate}, true},
 		{"Draw/Resignation", chess.OutcomeMethodPair{chess.Draw, chess.Resignation}, true},
-		{"UnknownOutcome/NoMethod", chess.OutcomeMethodPair{chess.UnknownOutcome, chess.NoMethod}, true},
+		{"NoOutcome/NoMethod", chess.OutcomeMethodPair{chess.NoOutcome, chess.NoMethod}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

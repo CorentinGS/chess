@@ -92,9 +92,9 @@ func TestArbitratePGNOutcome(t *testing.T) {
 		// No sources: NoOutcome / NoMethod.
 		{"all empty", NoOutcome, NoMethod, NoOutcome, NoOutcome, NoOutcome, NoMethod, false, ""},
 
-		// UnknownOutcome spelling normalised to NoOutcome (no conflict).
-		{"unknown tag normalised", NoOutcome, NoMethod, UnknownOutcome, NoOutcome, NoOutcome, NoMethod, false, ""},
-		{"unknown token normalised", NoOutcome, NoMethod, NoOutcome, UnknownOutcome, NoOutcome, NoMethod, false, ""},
+		// Empty / unknown result spellings are treated as NoOutcome (no conflict).
+		{"unknown tag normalised", NoOutcome, NoMethod, NoOutcome, NoOutcome, NoOutcome, NoMethod, false, ""},
+		{"unknown token normalised", NoOutcome, NoMethod, NoOutcome, NoOutcome, NoOutcome, NoMethod, false, ""},
 
 		// Tag only.
 		{"tag white wins", NoOutcome, NoMethod, WhiteWon, NoOutcome, WhiteWon, NoMethod, false, ""},

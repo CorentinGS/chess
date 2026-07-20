@@ -658,16 +658,8 @@ func (p *Parser) parseResult() {
 }
 
 func outcomeFromResultString(s string) Outcome {
-	switch s {
-	case string(WhiteWon):
-		return WhiteWon
-	case string(BlackWon):
-		return BlackWon
-	case string(Draw):
-		return Draw
-	default:
-		return NoOutcome
-	}
+	o, _ := ParseOutcome(s)
+	return o
 }
 
 func (p *Parser) addMove(move Move, number uint) {

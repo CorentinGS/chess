@@ -64,5 +64,5 @@ func (g *Game) syncResultTag() {
 		delete(g.tagPairs, "Result")
 		return
 	}
-	g.tagPairs["Result"] = string(g.outcome)
+	g.tagPairs["Result"] = g.outcome.String()
 }

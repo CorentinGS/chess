@@ -1,23 +1,67 @@
 package chess
 
+import "fmt"
+
 // A Outcome is the result of a game.
-type Outcome string
+type Outcome int8
 
 const (
-	UnknownOutcome Outcome = ""
 	// NoOutcome indicates that a game is in progress or ended without a result.
-	NoOutcome Outcome = "*"
+	NoOutcome Outcome = iota
 	// WhiteWon indicates that white won the game.
-	WhiteWon Outcome = "1-0"
+	WhiteWon
 	// BlackWon indicates that black won the game.
-	BlackWon Outcome = "0-1"
+	BlackWon
 	// Draw indicates that game was a draw.
-	Draw Outcome = "1/2-1/2"
+	Draw
 )
 
-// String implements the fmt.Stringer interface.
+// String implements the fmt.Stringer interface and returns the PGN result token.
 func (o Outcome) String() string {
-	return string(o)
+	switch o {
+	case NoOutcome:
+		return "*"
+	case WhiteWon:
+		return "1-0"
+	case BlackWon:
+		return "0-1"
+	case Draw:
+		return "1/2-1/2"
+	}
+	return "*"
+}
+
+// MarshalText implements the encoding.TextMarshaler interface using the PGN
+// result token.
+func (o Outcome) MarshalText() ([]byte, error) {
+	return []byte(o.String()), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface from a PGN
+// result token.
+func (o *Outcome) UnmarshalText(text []byte) error {
+	parsed, err := ParseOutcome(string(text))
+	if err != nil {
+		return err
+	}
+	*o = parsed
+	return nil
+}
+
+// ParseOutcome converts a PGN result token into a typed Outcome. Unknown
+// tokens return an error.
+func ParseOutcome(s string) (Outcome, error) {
+	switch s {
+	case "*", "", "?":
+		return NoOutcome, nil
+	case "1-0":
+		return WhiteWon, nil
+	case "0-1":
+		return BlackWon, nil
+	case "1/2-1/2":
+		return Draw, nil
+	}
+	return NoOutcome, fmt.Errorf("chess: invalid outcome %q", s)
 }
 
 // A Method is the method that generated the outcome.

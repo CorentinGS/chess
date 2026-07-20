@@ -78,22 +78,12 @@ func fullOutcomeRules(g *Game) outcomeRules {
 //
 // Precedence: a board-terminal outcome wins and conflicts with tag/token are
 // errors; otherwise the movetext token wins; otherwise the Result tag wins;
-// otherwise NoOutcome. UnknownOutcome (the empty Result spelling) is treated
-// as NoOutcome. The returned error's message is preserved verbatim by the
-// parser when it wraps the error into *ParserError.
+// otherwise NoOutcome. The returned error's message is preserved verbatim by
+// the parser when it wraps the error into *ParserError.
 //
 // Pure: no Game state, no allocation on the success path. The parser owns the
 // side effect of writing the result back onto the Game.
 func arbitratePGNOutcome(boardOutcome Outcome, boardMethod Method, tagOutcome, tokenOutcome Outcome) (Outcome, Method, error) {
-	normalize := func(o Outcome) Outcome {
-		if o == UnknownOutcome {
-			return NoOutcome
-		}
-		return o
-	}
-	tagOutcome = normalize(tagOutcome)
-	tokenOutcome = normalize(tokenOutcome)
-
 	boardTerminal := boardMethod == Checkmate || boardMethod == Stalemate
 
 	if boardTerminal {

@@ -25,9 +25,6 @@ func (g *Game) SetOutcomeMethod(pair OutcomeMethodPair) error {
 }
 
 func validOutcomeMethodPair(pair OutcomeMethodPair) bool {
-	if pair.Outcome == UnknownOutcome {
-		return false
-	}
 	switch pair.Outcome {
 	case NoOutcome:
 		return pair.Method == NoMethod

@@ -75,7 +75,7 @@ func TestPGNRenderer_RenderGameToPropagatesWriterError(t *testing.T) {
 func TestPGNRenderer_EndsEmptyGameWithNoOutcome(t *testing.T) {
 	g := chess.NewGame()
 	out := chess.DefaultPGNRenderer.Render(g)
-	if !strings.HasSuffix(out, string(chess.NoOutcome)) {
+	if !strings.HasSuffix(out, chess.NoOutcome.String()) {
 		t.Errorf("expected output to end with NoOutcome %q, got %q", chess.NoOutcome, out)
 	}
 }

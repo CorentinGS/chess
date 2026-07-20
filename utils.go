@@ -13,7 +13,7 @@ func isWhitespace(ch byte) bool {
 }
 
 func isResult(s string) bool {
-	return s == string(WhiteWon) || s == string(BlackWon) || s == string(Draw) || s == "*"
+	return s == WhiteWon.String() || s == BlackWon.String() || s == Draw.String() || s == "*"
 }
 
 // Helper function to check if a character is a valid file.
