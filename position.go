@@ -302,6 +302,19 @@ func (pos *Position) Status() Method {
 	return pos.status
 }
 
+// Outcome returns the decisive or draw outcome implied by the position, or
+// NoOutcome if play continues. It considers board-state terminal conditions
+// only: checkmate, stalemate, insufficient material, and the seventy-five
+// move rule. Game-level outcomes such as resignation, draw offer, and the
+// claimable fifty-move rule are not included and must be queried on Game.
+func (pos *Position) Outcome() Outcome {
+	if pos == nil {
+		return NoOutcome
+	}
+	outcome, _ := classifyOutcome(pos, 0, outcomeRules{includeAutoDraws: true})
+	return outcome
+}
+
 // Board returns the position's board.
 func (pos *Position) Board() *Board {
 	if pos == nil {

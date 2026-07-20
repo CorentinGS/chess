@@ -481,3 +481,53 @@ func TestPositionIsLegal(t *testing.T) {
 		t.Fatal("IsLegal on nil Position should return false")
 	}
 }
+
+func TestPositionOutcome(t *testing.T) {
+	if StartingPosition().Outcome() != NoOutcome {
+		t.Fatal("starting position should have no outcome")
+	}
+
+	// Fool's mate: white is checkmated, so black wins.
+	g := NewGame()
+	for _, text := range []string{"f3", "e6", "g4", "Qh4"} {
+		if _, err := g.PushMoveText(text, SAN(), nil); err != nil {
+			t.Fatalf("push %s: %v", text, err)
+		}
+	}
+	if g.Position().Outcome() != BlackWon {
+		t.Fatalf("expected BlackWon after fool's mate, got %s", g.Position().Outcome())
+	}
+
+	// Black is checkmated: white wins.
+	pos, err := decodeFEN("8/8/8/8/8/5K2/6Q1/6k1 b - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pos.Outcome() != WhiteWon {
+		t.Fatalf("expected WhiteWon when black is checkmated, got %s", pos.Outcome())
+	}
+
+	// Stalemate: black king on a8 has no legal moves and is not in check.
+	pos, err = decodeFEN("k1K5/8/1Q6/8/8/8/8/8 b - - 1 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pos.Outcome() != Draw {
+		t.Fatalf("expected Draw in stalemate, got %s", pos.Outcome())
+	}
+
+	// Insufficient material.
+	pos, err = decodeFEN("8/2k5/8/8/8/3K4/8/8 w - - 1 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pos.Outcome() != Draw {
+		t.Fatalf("expected Draw by insufficient material, got %s", pos.Outcome())
+	}
+
+	// Nil receiver is safe.
+	var nilPos *Position
+	if nilPos.Outcome() != NoOutcome {
+		t.Fatal("Outcome on nil Position should return NoOutcome")
+	}
+}
