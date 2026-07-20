@@ -205,20 +205,43 @@ func fenFormRank(rankStr string, m map[File]Piece) error {
 }
 
 func formCastleRights(castleStr string) (CastleRights, error) {
+	if castleStr == "-" {
+		return CastleRights{}, nil
+	}
 	var seen [256]bool
+	var cr CastleRights
 	for i := range castleStr {
 		c := castleStr[i]
 		switch c {
-		case 'K', 'Q', 'k', 'q', '-':
+		case 'K':
 			if seen[c] {
-				return "-", fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
+				return CastleRights{}, fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
 			}
 			seen[c] = true
+			cr.White.KingSide = true
+		case 'Q':
+			if seen[c] {
+				return CastleRights{}, fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
+			}
+			seen[c] = true
+			cr.White.QueenSide = true
+		case 'k':
+			if seen[c] {
+				return CastleRights{}, fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
+			}
+			seen[c] = true
+			cr.Black.KingSide = true
+		case 'q':
+			if seen[c] {
+				return CastleRights{}, fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
+			}
+			seen[c] = true
+			cr.Black.QueenSide = true
 		default:
-			return "-", fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
+			return CastleRights{}, fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
 		}
 	}
-	return CastleRights(castleStr), nil
+	return cr, nil
 }
 
 func formEnPassant(enPassant string) (Square, error) {

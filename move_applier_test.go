@@ -389,7 +389,7 @@ func TestUpdatePreservesCastleRightsWithoutAllocating(t *testing.T) {
 	}
 	e2e4 := Move{s1: E2, s2: E4}
 
-	if got := pos.Update(e2e4).CastleRights(); got != "KQkq" {
+	if got := pos.Update(e2e4).CastleRights().String(); got != "KQkq" {
 		t.Fatalf("post-move rights = %q, want KQkq", got)
 	}
 	allocs := testing.AllocsPerRun(100, func() {

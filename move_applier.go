@@ -251,40 +251,40 @@ func (pos *Position) unmakeMoveCursor(m Move, u cursorUndo) {
 // the origin square on the pre-move board, so it must be called before
 // board.update.
 func (pos *Position) updateCastleRights(m Move) CastleRights {
-	removeK := false
-	removeQ := false
-	removek := false
-	removeq := false
+	removeWK := false
+	removeWQ := false
+	removeBK := false
+	removeBQ := false
 	p := pos.board.Piece(m.s1)
 	if p == WhiteKing || m.s1 == H1 || m.s2 == H1 {
-		removeK = true
+		removeWK = true
 	}
 	if p == WhiteKing || m.s1 == A1 || m.s2 == A1 {
-		removeQ = true
+		removeWQ = true
 	}
 	if p == BlackKing || m.s1 == H8 || m.s2 == H8 {
-		removek = true
+		removeBK = true
 	}
 	if p == BlackKing || m.s1 == A8 || m.s2 == A8 {
-		removeq = true
+		removeBQ = true
 	}
-	if !removeK && !removeQ && !removek && !removeq {
+	if !removeWK && !removeWQ && !removeBK && !removeBQ {
 		return pos.castleRights
 	}
-	var buf [4]byte
-	n := 0
-	for i := range pos.castleRights {
-		c := pos.castleRights[i]
-		if (c == 'K' && removeK) || (c == 'Q' && removeQ) || (c == 'k' && removek) || (c == 'q' && removeq) || c == '-' {
-			continue
-		}
-		buf[n] = c
-		n++
+	ncr := pos.castleRights
+	if removeWK {
+		ncr.White.KingSide = false
 	}
-	if n == 0 {
-		return "-"
+	if removeWQ {
+		ncr.White.QueenSide = false
 	}
-	return CastleRights(string(buf[:n]))
+	if removeBK {
+		ncr.Black.KingSide = false
+	}
+	if removeBQ {
+		ncr.Black.QueenSide = false
+	}
+	return ncr
 }
 
 // updateEnPassantSquare returns the en-passant target square created by m, or

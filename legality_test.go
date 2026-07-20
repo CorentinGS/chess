@@ -126,7 +126,7 @@ func TestLegalityNotMutable(t *testing.T) {
 	before := pos.moveCount
 	pos.hash = 0xDEAD
 	pos.halfMoveClock = 7
-	pos.castleRights = CastleRights("xx")
+	pos.castleRights = NewCastleRights(true, true, false, false)
 	pos.enPassantSquare = E3
 
 	lg := newLegality(pos, generateLegalAnnotated)
@@ -142,8 +142,9 @@ func TestLegalityNotMutable(t *testing.T) {
 	if pos.halfMoveClock != 7 {
 		t.Errorf("legality mutated pos.halfMoveClock: got %d, want 7", pos.halfMoveClock)
 	}
-	if pos.castleRights != CastleRights("xx") {
-		t.Errorf("legality mutated pos.castleRights: got %q, want %q", pos.castleRights, "xx")
+	want := NewCastleRights(true, true, false, false)
+	if pos.castleRights != want {
+		t.Errorf("legality mutated pos.castleRights: got %q, want %q", pos.castleRights, want)
 	}
 	if pos.enPassantSquare != E3 {
 		t.Errorf("legality mutated pos.enPassantSquare: got %v, want E3", pos.enPassantSquare)

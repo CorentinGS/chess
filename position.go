@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"sync"
 )
 
@@ -39,8 +38,27 @@ const (
 	QueenSide
 )
 
+// castleSideRights holds the castling rights for one side.
+type castleSideRights struct {
+	KingSide  bool
+	QueenSide bool
+}
+
 // CastleRights holds the state of both sides castling abilities.
-type CastleRights string
+type CastleRights struct {
+	White castleSideRights
+	Black castleSideRights
+}
+
+// NewCastleRights returns a CastleRights value with the four per-color,
+// per-side flags set explicitly. It is the supported way for callers outside
+// this package to construct a CastleRights value.
+func NewCastleRights(whiteKingSide, whiteQueenSide, blackKingSide, blackQueenSide bool) CastleRights {
+	return CastleRights{
+		White: castleSideRights{KingSide: whiteKingSide, QueenSide: whiteQueenSide},
+		Black: castleSideRights{KingSide: blackKingSide, QueenSide: blackQueenSide},
+	}
+}
 
 // CanCastle returns true if the given color and side combination can castle.
 //
@@ -50,31 +68,67 @@ type CastleRights string
 //	    // White can castle kingside
 //	}
 func (cr CastleRights) CanCastle(c Color, side Side) bool {
-	var want byte
-	switch {
-	case c == White && side == KingSide:
-		want = 'K'
-	case c == White && side == QueenSide:
-		want = 'Q'
-	case c == Black && side == KingSide:
-		want = 'k'
-	case c == Black && side == QueenSide:
-		want = 'q'
-	default:
-		return false
-	}
-	for i := range cr {
-		if cr[i] == want {
-			return true
+	switch c {
+	case White:
+		switch side {
+		case KingSide:
+			return cr.White.KingSide
+		case QueenSide:
+			return cr.White.QueenSide
+		}
+	case Black:
+		switch side {
+		case KingSide:
+			return cr.Black.KingSide
+		case QueenSide:
+			return cr.Black.QueenSide
 		}
 	}
 	return false
 }
 
-// String implements the fmt.Stringer interface and returns
-// a FEN compatible string.  Ex. KQq.
+// String implements the fmt.Stringer interface and returns a FEN compatible
+// string in canonical order (KQkq), or "-" when no side can castle.
 func (cr CastleRights) String() string {
-	return string(cr)
+	var b [4]byte
+	n := 0
+	if cr.White.KingSide {
+		b[n] = 'K'
+		n++
+	}
+	if cr.White.QueenSide {
+		b[n] = 'Q'
+		n++
+	}
+	if cr.Black.KingSide {
+		b[n] = 'k'
+		n++
+	}
+	if cr.Black.QueenSide {
+		b[n] = 'q'
+		n++
+	}
+	if n == 0 {
+		return "-"
+	}
+	return string(b[:n])
+}
+
+// MarshalText implements the encoding.TextMarshaler interface using the FEN
+// representation.
+func (cr CastleRights) MarshalText() ([]byte, error) {
+	return []byte(cr.String()), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface using the FEN
+// representation.
+func (cr *CastleRights) UnmarshalText(text []byte) error {
+	rights, err := formCastleRights(string(text))
+	if err != nil {
+		return err
+	}
+	*cr = rights
+	return nil
 }
 
 // Position represents a complete chess position state.
@@ -557,22 +611,19 @@ func (pos *Position) UnmarshalBinary(data []byte) error {
 	if err := binary.Read(buf, binary.BigEndian, &b); err != nil {
 		return err
 	}
-	pos.castleRights = ""
+	pos.castleRights = CastleRights{}
 	pos.turn = White
 	if b&bitsCastleWhiteKing != 0 {
-		pos.castleRights += "K"
+		pos.castleRights.White.KingSide = true
 	}
 	if b&bitsCastleWhiteQueen != 0 {
-		pos.castleRights += "Q"
+		pos.castleRights.White.QueenSide = true
 	}
 	if b&bitsCastleBlackKing != 0 {
-		pos.castleRights += "k"
+		pos.castleRights.Black.KingSide = true
 	}
 	if b&bitsCastleBlackQueen != 0 {
-		pos.castleRights += "q"
-	}
-	if pos.castleRights == "" {
-		pos.castleRights = "-"
+		pos.castleRights.Black.QueenSide = true
 	}
 	if b&bitsTurn != 0 {
 		pos.turn = Black
@@ -640,17 +691,16 @@ func (pos *Position) computeHash() uint64 {
 		}
 	}
 	// XOR in castling rights
-	cr := pos.castleRights.String()
-	if strings.Contains(cr, "K") {
+	if pos.castleRights.CanCastle(White, KingSide) {
 		hash ^= polyglotHashesUint64[768]
 	}
-	if strings.Contains(cr, "Q") {
+	if pos.castleRights.CanCastle(White, QueenSide) {
 		hash ^= polyglotHashesUint64[769]
 	}
-	if strings.Contains(cr, "k") {
+	if pos.castleRights.CanCastle(Black, KingSide) {
 		hash ^= polyglotHashesUint64[770]
 	}
-	if strings.Contains(cr, "q") {
+	if pos.castleRights.CanCastle(Black, QueenSide) {
 		hash ^= polyglotHashesUint64[771]
 	}
 	// XOR in en passant if a pawn can capture
