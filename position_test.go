@@ -454,3 +454,30 @@ func TestPositionIsCheckAndCheckers(t *testing.T) {
 		t.Fatalf("expected 2 checkers, got %v", checkers)
 	}
 }
+
+func TestPositionIsLegal(t *testing.T) {
+	pos := StartingPosition()
+
+	if !pos.IsLegal(NewMove(E2, E4)) {
+		t.Fatal("NewMove(E2, E4) should be legal from the starting position")
+	}
+	if pos.IsLegal(NewMove(E2, E5)) {
+		t.Fatal("NewMove(E2, E5) should be illegal from the starting position")
+	}
+
+	// Move by the side not to move should return false.
+	if pos.IsLegal(NewMove(E7, E5)) {
+		t.Fatal("black move should be illegal when it is white's turn")
+	}
+
+	// Null moves are never legal.
+	if pos.IsLegal(NewNullMove()) {
+		t.Fatal("null move should not be legal")
+	}
+
+	// Nil receiver should be safe.
+	var nilPos *Position
+	if nilPos.IsLegal(NewMove(E2, E4)) {
+		t.Fatal("IsLegal on nil Position should return false")
+	}
+}

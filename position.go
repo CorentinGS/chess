@@ -122,6 +122,23 @@ func (pos *Position) AnyLegalMove() bool {
 	return hasLegalMove(pos)
 }
 
+// IsLegal reports whether m is a legal move in the current position. It
+// returns false for null moves and for moves whose origin square belongs to
+// the side not to move. The check is a linear scan of the legal move list;
+// callers who need the canonical Move with position-derived tags should use
+// Game.Move or resolveCanonicalMove.
+func (pos *Position) IsLegal(m Move) bool {
+	if pos == nil || m.HasTag(Null) {
+		return false
+	}
+	for _, valid := range pos.ValidMovesUnsafe() {
+		if valid.s1 == m.s1 && valid.s2 == m.s2 && valid.promo == m.promo {
+			return true
+		}
+	}
+	return false
+}
+
 // Update returns a new position resulting from the given move.
 // The move isn't validated - use Game.Move() for validation.
 // This method is optimized for move generation where validation
