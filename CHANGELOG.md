@@ -2,7 +2,7 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
-## Unreleased
+## v3.0.0-beta.3 - 2026-07-20
 
 #### Breaking Changes
 - remove `Position.ChangeTurn()` (dead: no internal callers; turn mutation is not a public operation).
