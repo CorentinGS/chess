@@ -47,7 +47,7 @@ func TestRegressionIssue29_EngineBestMoveHasCastleTag(t *testing.T) {
 	// f8/g8 empty and not attacked. White rook on h1 targets h8 — irrelevant
 	// to castling through g8/f8 because castling rules check attacks on
 	// e8/f8/g8 only.
-	f, err := chess.FEN("r3k2r/8/8/8/8/8/8/4K2R b KQkq - 0 1")
+	f, err := chess.FEN("r3k2r/8/8/8/8/8/8/4K2R b kq - 0 1")
 	if err != nil {
 		t.Fatal(err)
 	}

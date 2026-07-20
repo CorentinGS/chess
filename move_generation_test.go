@@ -175,13 +175,13 @@ func TestUnsafeMoves(t *testing.T) {
 		},
 		{
 			name:  "king_walks_into_check",
-			fen:   "4r3/8/8/8/8/8/8/4K3 w - - 0 1",
+			fen:   "4r2k/8/8/8/8/8/8/4K3 w - - 0 1",
 			want:  []string{"e1e2"},
 			count: 1,
 		},
 		{
 			name:  "king_adjacent_rook_attacks",
-			fen:   "8/8/8/8/8/3r4/8/4K3 w - - 0 1",
+			fen:   "8/8/8/8/8/3r4/8/4K2k w - - 0 1",
 			want:  []string{"e1d1", "e1d2"},
 			count: 2,
 		},
@@ -232,7 +232,7 @@ func TestLegalMovesInCheckScenarios(t *testing.T) {
 	})
 
 	t.Run("king_move_escapes_check", func(t *testing.T) {
-		pos := positionFromFEN(t, "4k3/8/8/8/8/8/8/4R3 b - - 0 1")
+		pos := positionFromFEN(t, "4k3/8/8/8/8/8/8/4R2K b - - 0 1")
 		requireMove(t, pos.ValidMoves(), "e8d8")
 	})
 

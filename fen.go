@@ -12,48 +12,76 @@ import (
 // if there is a parsing error.  FEN notation format:
 // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1.
 func decodeFEN(fen string) (*Position, error) {
+	setup, err := decodeFENSetup(fen)
+	if err != nil {
+		return nil, err
+	}
+	return NewPosition(setup)
+}
+
+// decodeFENUnsafe parses a FEN string and constructs a Position without
+// semantic validation. It exists for internal tests and legacy callers that
+// need to create positions with arbitrary or incomplete board states.
+func decodeFENUnsafe(fen string) (*Position, error) {
+	setup, err := decodeFENSetup(fen)
+	if err != nil {
+		return nil, err
+	}
+	pos := &Position{
+		board:           setup.Board,
+		turn:            setup.Turn,
+		castleRights:    setup.CastleRights,
+		enPassantSquare: setup.EnPassant,
+		halfMoveClock:   setup.HalfMoveClock,
+		moveCount:       setup.FullMoveNo,
+	}
+	pos.inCheck, pos.checkers = checkState(pos)
+	pos.hash = pos.computeHash()
+	return pos, nil
+}
+
+// decodeFENSetup parses a FEN string into a Setup. It performs only syntactic
+// validation; semantic validation is left to NewPosition.
+func decodeFENSetup(fen string) (Setup, error) {
 	const minFENParts = 6
 	fen = strings.TrimSpace(fen)
 	parts := strings.Split(fen, " ")
 
 	if len(parts) != minFENParts {
-		return nil, errors.New("chess: fen invalid format")
+		return Setup{}, errors.New("chess: fen invalid format")
 	}
 	b, err := fenBoard(parts[0])
 	if err != nil {
-		return nil, fmt.Errorf("chess: fen: board: %w", err)
+		return Setup{}, fmt.Errorf("chess: fen: board: %w", err)
 	}
 	turn, ok := fenTurnMap[parts[1]]
 	if !ok {
-		return nil, errors.New("chess: fen invalid turn")
+		return Setup{}, errors.New("chess: fen invalid turn")
 	}
 	rights, err := formCastleRights(parts[2])
 	if err != nil {
-		return nil, fmt.Errorf("chess: fen: castle rights: %w", err)
+		return Setup{}, fmt.Errorf("chess: fen: castle rights: %w", err)
 	}
 	sq, err := formEnPassant(parts[3])
 	if err != nil {
-		return nil, fmt.Errorf("chess: fen: en passant: %w", err)
+		return Setup{}, fmt.Errorf("chess: fen: en passant: %w", err)
 	}
 	halfMoveClock, err := strconv.Atoi(parts[4])
 	if err != nil || halfMoveClock < 0 {
-		return nil, errors.New("chess: fen invalid half move clock")
+		return Setup{}, errors.New("chess: fen invalid half move clock")
 	}
 	moveCount, err := strconv.Atoi(parts[5])
 	if err != nil || moveCount < 1 {
-		return nil, errors.New("chess: fen invalid move count")
+		return Setup{}, errors.New("chess: fen invalid move count")
 	}
-	pos := &Position{
-		board:           *b,
-		turn:            turn,
-		castleRights:    rights,
-		enPassantSquare: sq,
-		halfMoveClock:   halfMoveClock,
-		moveCount:       moveCount,
-	}
-	pos.inCheck, pos.checkers = checkState(pos)
-	pos.hash = pos.computeHash()
-	return pos, nil
+	return Setup{
+		Board:         *b,
+		Turn:          turn,
+		CastleRights:  rights,
+		EnPassant:     sq,
+		HalfMoveClock: halfMoveClock,
+		FullMoveNo:    moveCount,
+	}, nil
 }
 
 const (

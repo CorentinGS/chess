@@ -93,7 +93,7 @@ func TestComputeMoveEffect(t *testing.T) {
 		},
 		{
 			name: "black king-side castle",
-			fen:  "r3k2r/8/8/8/8/8/8/4K3 b KQ - 0 1",
+			fen:  "r3k2r/8/8/8/8/8/8/4K3 b kq - 0 1",
 			m:    Move{s1: E8, s2: G8, tags: KingSideCastle},
 			want: moveEffect{
 				moving:   BlackKing,
@@ -105,7 +105,7 @@ func TestComputeMoveEffect(t *testing.T) {
 		},
 		{
 			name: "black queen-side castle",
-			fen:  "r3k2r/8/8/8/8/8/8/4K3 b KQ - 0 1",
+			fen:  "r3k2r/8/8/8/8/8/8/4K3 b kq - 0 1",
 			m:    Move{s1: E8, s2: C8, tags: QueenSideCastle},
 			want: moveEffect{
 				moving:   BlackKing,
@@ -163,7 +163,7 @@ func TestComputeMoveEffect(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			pos, err := decodeFEN(tc.fen)
+			pos, err := decodeFENUnsafe(tc.fen)
 			if err != nil {
 				t.Fatalf("FEN decode: %v", err)
 			}
@@ -197,7 +197,7 @@ func TestComputeMoveEffect(t *testing.T) {
 //     re-added under the mover's color without an aggregate-occupancy gap.
 func TestUnsafeTransitionConsistency(t *testing.T) {
 	t.Run("black king-side castle with white nominally to move moves H8 rook, not H1", func(t *testing.T) {
-		opt, err := FEN("r3k2r/8/8/8/8/8/8/4K3 w KQkq - 0 1")
+		opt, err := FEN("r3k2r/8/8/8/8/8/8/4K3 w kq - 0 1")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -260,11 +260,14 @@ func TestUnsafeTransitionConsistency(t *testing.T) {
 	})
 
 	t.Run("en passant tag with occupied destination captures the piece on s2, not s2±8", func(t *testing.T) {
-		opt, err := FEN("4k3/8/8/3q4/4P3/8/8/4K3 w - d6 0 1")
+		pos, err := decodeFENUnsafe("4k3/8/8/3q4/4P3/8/8/4K3 w - d6 0 1")
 		if err != nil {
 			t.Fatal(err)
 		}
-		g := NewGame(opt)
+		pos.inCheck, pos.checkers = checkState(pos)
+		g := NewGame()
+		g.tree.setRootPosition(pos)
+		g.evaluatePositionStatus()
 		// White pawn on E4 pushing to D5 (where the black queen sits) but
 		// tagged as en-passant. Real e.p. would clear D5's adjacent square
 		// instead; a misuse of the tag must demote to a normal capture

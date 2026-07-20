@@ -8,7 +8,7 @@ func TestLegalityPinnedPiece(t *testing.T) {
 	// White king on e1, white queen on e4, black rook on e8. The queen
 	// blocks the rook's attack on the e-file. Moving the queen off the
 	// file exposes the king to the rook; capturing the rook is legal.
-	pos := mustPosition(t, "4r3/8/8/8/4Q3/8/8/4K3 w - - 0 1")
+	pos := mustPosition(t, "4r2k/8/8/8/4Q3/8/8/4K3 w - - 0 1")
 
 	lg := newLegality(pos, generateLegalAnnotated)
 
@@ -63,7 +63,7 @@ func TestLegalitySingleCheck(t *testing.T) {
 func TestLegalityDoubleCheck(t *testing.T) {
 	// White king on e1 in double check from a knight on c2 and a rook on e8.
 	// No single interposition can block both — only king moves are legal.
-	pos := mustPosition(t, "4r3/8/8/8/8/8/2nP4/4K3 w - - 0 1")
+	pos := mustPosition(t, "4r2k/8/8/8/8/8/2nP4/4K3 w - - 0 1")
 
 	lg := newLegality(pos, generateLegalOnly)
 
