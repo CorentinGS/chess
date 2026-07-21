@@ -108,7 +108,7 @@ func (uciNotation) String() string {
 }
 
 // Encode implements the encoder interface.
-func (uciNotation) Encode(_ *Position, m Move) string {
+func (uciNotation) Encode(pos *Position, m Move) string {
 	const maxLen = 5
 	// Null move: encode as "0000" (UCI convention).
 	if m.HasTag(Null) {
@@ -123,11 +123,23 @@ func (uciNotation) Encode(_ *Position, m Move) string {
 	sb.Grow(maxLen)
 
 	s1Bytes := m.S1().Bytes()
-	s2Bytes := m.S2().Bytes()
 	sb.WriteByte(s1Bytes[0])
 	sb.WriteByte(s1Bytes[1])
-	sb.WriteByte(s2Bytes[0])
-	sb.WriteByte(s2Bytes[1])
+
+	// Chess960 castling uses the king-to-rook form (e.g. "e1h1") per the
+	// UCI_Chess960 convention, not the standard king-to-destination form
+	// ("e1g1"). The rook origin is the nearest friendly rook on the king's
+	// back rank, derived from the board. Without a position the move falls
+	// back to the king's destination square, matching the standard encoding.
+	to := m.S2()
+	if pos != nil && pos.variant == Chess960 && m.HasTag(KingSideCastle|QueenSideCastle) {
+		if rookFrom, _ := castleRookMove(&pos.board, m, castleKingColor(m.S1())); rookFrom != NoSquare {
+			to = rookFrom
+		}
+	}
+	toBytes := to.Bytes()
+	sb.WriteByte(toBytes[0])
+	sb.WriteByte(toBytes[1])
 	if m.Promo() != NoPieceType {
 		sb.Write(m.Promo().Bytes())
 	}
@@ -180,6 +192,14 @@ func (uciNotation) Decode(pos *Position, s string) (Move, error) {
 		m.promo = promo
 	}
 
+	// Chess960 castling may arrive in the king-to-rook form ("e1h1") from
+	// engines using the UCI_Chess960 option. Resolve it to the canonical
+	// castle, whose destination is the standard king square (g1/c1). Plain
+	// moves and the standard king-to-destination form fall through unchanged.
+	if castle, ok := chess960UCICastleMove(pos, m); ok {
+		return castle, nil
+	}
+
 	if pos == nil {
 		return m, nil
 	}
@@ -188,6 +208,53 @@ func (uciNotation) Decode(pos *Position, s string) (Move, error) {
 	m.tags = tag
 
 	return m, nil
+}
+
+// castleKingColor returns the color of a king making a castle from kingFrom.
+// Legal castles always originate on rank 1 for White or rank 8 for Black.
+func castleKingColor(kingFrom Square) Color {
+	if kingFrom.Rank() == Rank1 {
+		return White
+	}
+	return Black
+}
+
+// chess960UCICastleMove resolves a Chess960 king-to-rook castling candidate
+// such as "e1h1" to its canonical Move. The returned Move carries the castle
+// tag and the standard king destination (g1/c1). A promotion, non-Chess960
+// position, king capture, or plain step never matches a castle. The second
+// result is false when no legal castle matches.
+func chess960UCICastleMove(pos *Position, candidate Move) (Move, bool) {
+	if pos == nil || pos.variant != Chess960 || candidate.promo != NoPieceType {
+		return Move{}, false
+	}
+	kingFrom := candidate.s1
+	rookFrom := candidate.s2
+
+	var found Move
+	match := false
+	visitLegalMoves(pos, generateLegalAnnotated, func(m Move) bool {
+		if !m.HasTag(KingSideCastle) && !m.HasTag(QueenSideCastle) {
+			return false
+		}
+		if m.s1 != kingFrom {
+			return false
+		}
+		rf, _ := castleRookMove(&pos.board, m, castleKingColor(kingFrom))
+		if rf != rookFrom {
+			return false
+		}
+		if m.HasTag(KingSideCastle) && rookFrom.File() <= kingFrom.File() {
+			return false
+		}
+		if m.HasTag(QueenSideCastle) && rookFrom.File() >= kingFrom.File() {
+			return false
+		}
+		found = m
+		match = true
+		return true
+	})
+	return found, match
 }
 
 // algebraicNotation (or Standard Algebraic notation) is the

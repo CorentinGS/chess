@@ -157,6 +157,15 @@ func (p *Parser) Parse() (*Game, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrInvalidFEN, err)
 		}
+		if variantFromTag(p.game.tagPairs["Variant"]) == Chess960 {
+			pos.variant = Chess960
+		}
+		p.game.tree.setRootPosition(pos)
+	} else if variantFromTag(p.game.tagPairs["Variant"]) == Chess960 {
+		// Chess960 declared without a FEN: default to the standard arrangement
+		// (SP-518) treated as a Chess960 position.
+		pos := StartingPosition()
+		pos.variant = Chess960
 		p.game.tree.setRootPosition(pos)
 	}
 
@@ -244,6 +253,17 @@ func (p *Parser) parseTagPair() error {
 	// Store tag pair
 	p.game.tagPairs[key] = value
 	return nil
+}
+
+// variantFromTag maps a PGN Variant tag value to a Variant. Recognised Chess960
+// aliases (case-insensitive) yield Chess960; anything else yields Standard.
+func variantFromTag(s string) Variant {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "chess960", "chess 960", "fischer random", "fischerrandom",
+		"fischerandom", "frc", "960":
+		return Chess960
+	}
+	return Standard
 }
 
 func (p *Parser) parseMoveText() error {

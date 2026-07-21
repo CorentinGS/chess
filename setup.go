@@ -6,6 +6,30 @@ import (
 	"math/bits"
 )
 
+// Variant identifies the starting-position variant of a position. The zero
+// value is Standard. Chess960 (Fischer Random Chess) selects one of 960
+// indexed initial back-rank arrangements; its castling rights and rook origins
+// differ from standard chess but its castling destinations do not.
+type Variant int8
+
+const (
+	// Standard is the standard chess starting position.
+	Standard Variant = iota
+	// Chess960 is the Fischer Random Chess variant (960 indexed starts).
+	Chess960
+)
+
+// String returns the variant's canonical name.
+func (v Variant) String() string {
+	switch v {
+	case Standard:
+		return "Standard"
+	case Chess960:
+		return "Chess960"
+	}
+	return "Standard"
+}
+
 // Setup is an unvalidated description of a chess position. It separates
 // "describing a position" from "playing a position" by letting callers build a
 // complete position representation and then asking NewPosition to validate it.
@@ -16,6 +40,7 @@ type Setup struct {
 	EnPassant     Square
 	HalfMoveClock int
 	FullMoveNo    int
+	Variant       Variant
 }
 
 // EmptySetup returns a Setup representing an empty board: no pieces, White to
@@ -43,6 +68,7 @@ func (s Setup) SwapTurn() Setup {
 		EnPassant:     NoSquare,
 		HalfMoveClock: s.HalfMoveClock,
 		FullMoveNo:    s.FullMoveNo,
+		Variant:       s.Variant,
 	}
 }
 
@@ -88,6 +114,7 @@ func (s Setup) Mirror() Setup {
 		EnPassant:     ep,
 		HalfMoveClock: s.HalfMoveClock,
 		FullMoveNo:    s.FullMoveNo,
+		Variant:       s.Variant,
 	}
 }
 
@@ -131,6 +158,7 @@ func NewPosition(s Setup) (*Position, error) {
 		enPassantSquare: s.EnPassant,
 		halfMoveClock:   s.HalfMoveClock,
 		moveCount:       s.FullMoveNo,
+		variant:         s.Variant,
 	}
 	pos.inCheck, pos.checkers = checkState(pos)
 	pos.hash = pos.computeHash()
@@ -163,21 +191,27 @@ func validateSetup(s *Setup) error {
 		}
 	}
 
-	if s.CastleRights.CanCastle(White, KingSide) &&
-		(s.Board.Piece(E1) != WhiteKing || s.Board.Piece(H1) != WhiteRook) {
-		return errors.New("chess: setup: white kingside castling rights inconsistent with board")
-	}
-	if s.CastleRights.CanCastle(White, QueenSide) &&
-		(s.Board.Piece(E1) != WhiteKing || s.Board.Piece(A1) != WhiteRook) {
-		return errors.New("chess: setup: white queenside castling rights inconsistent with board")
-	}
-	if s.CastleRights.CanCastle(Black, KingSide) &&
-		(s.Board.Piece(E8) != BlackKing || s.Board.Piece(H8) != BlackRook) {
-		return errors.New("chess: setup: black kingside castling rights inconsistent with board")
-	}
-	if s.CastleRights.CanCastle(Black, QueenSide) &&
-		(s.Board.Piece(E8) != BlackKing || s.Board.Piece(A8) != BlackRook) {
-		return errors.New("chess: setup: black queenside castling rights inconsistent with board")
+	if s.Variant == Chess960 {
+		if err := validateChess960CastleRights(s); err != nil {
+			return err
+		}
+	} else {
+		if s.CastleRights.CanCastle(White, KingSide) &&
+			(s.Board.Piece(E1) != WhiteKing || s.Board.Piece(H1) != WhiteRook) {
+			return errors.New("chess: setup: white kingside castling rights inconsistent with board")
+		}
+		if s.CastleRights.CanCastle(White, QueenSide) &&
+			(s.Board.Piece(E1) != WhiteKing || s.Board.Piece(A1) != WhiteRook) {
+			return errors.New("chess: setup: white queenside castling rights inconsistent with board")
+		}
+		if s.CastleRights.CanCastle(Black, KingSide) &&
+			(s.Board.Piece(E8) != BlackKing || s.Board.Piece(H8) != BlackRook) {
+			return errors.New("chess: setup: black kingside castling rights inconsistent with board")
+		}
+		if s.CastleRights.CanCastle(Black, QueenSide) &&
+			(s.Board.Piece(E8) != BlackKing || s.Board.Piece(A8) != BlackRook) {
+			return errors.New("chess: setup: black queenside castling rights inconsistent with board")
+		}
 	}
 
 	if s.EnPassant != NoSquare {
@@ -199,5 +233,179 @@ func validateSetup(s *Setup) error {
 		}
 	}
 
+	return nil
+}
+
+// Chess960Setup returns the Setup for the Chess960 starting position with the
+// given Scharnagl index (0-959). The index selects one of 960 initial back-rank
+// arrangements satisfying the Chess960 constraints: bishops on opposite-colored
+// squares and the king placed between the two rooks. Index 518 is the standard
+// starting position. The returned Setup has Variant Chess960 and full castling
+// rights for both sides.
+func Chess960Setup(index int) (Setup, error) {
+	if index < 0 || index > 959 {
+		return Setup{}, fmt.Errorf("chess: chess960 start index %d out of range [0, 959]", index)
+	}
+
+	// Scharnagl decomposition over the eight files of rank 1.
+	const (
+		lightFiles = "bdfh" // files 1, 3, 5, 7 (opposite color to "aceg")
+		darkFiles  = "aceg" // files 0, 2, 4, 6
+	)
+	var back [8]Piece // white back rank, indexed by file 0..7
+	used := [8]bool{}
+
+	n := index
+
+	// First bishop: one of the four light-square files.
+	b1 := n % 4
+	n /= 4
+	f := int(lightFiles[b1] - 'a')
+	back[f] = WhiteBishop
+	used[f] = true
+
+	// Second bishop: one of the four dark-square files.
+	b2 := n % 4
+	n /= 4
+	f = int(darkFiles[b2] - 'a')
+	back[f] = WhiteBishop
+	used[f] = true
+
+	// Queen: the n%6-th remaining empty file.
+	q := n % 6
+	n /= 6
+	cnt := 0
+	for i := range 8 {
+		if !used[i] {
+			if cnt == q {
+				back[i] = WhiteQueen
+				used[i] = true
+				break
+			}
+			cnt++
+		}
+	}
+
+	// Knights: the n-th pair (0..9) of the five remaining empty files.
+	var rem [5]int
+	ri := 0
+	for i := range 8 {
+		if !used[i] {
+			rem[ri] = i
+			ri++
+		}
+	}
+	pair := 0
+	for i := range 4 {
+		for j := i + 1; j < 5; j++ {
+			if pair == n {
+				back[rem[i]] = WhiteKnight
+				back[rem[j]] = WhiteKnight
+				used[rem[i]] = true
+				used[rem[j]] = true
+			}
+			pair++
+		}
+	}
+
+	// Remaining three files receive Rook, King, Rook in increasing file order,
+	// placing the king between the two rooks.
+	var last [3]int
+	li := 0
+	for i := range 8 {
+		if !used[i] {
+			last[li] = i
+			li++
+		}
+	}
+	back[last[0]] = WhiteRook
+	back[last[1]] = WhiteKing
+	back[last[2]] = WhiteRook
+
+	// Assemble the full board: white back rank on rank 1, black mirrored on
+	// rank 8 (same file, opposite color), pawns on ranks 2 and 7.
+	m := make(map[Square]Piece, 32)
+	for file := range 8 {
+		wp := back[file]
+		m[NewSquare(File(file), Rank1)] = wp
+		m[NewSquare(File(file), Rank8)] = NewPiece(wp.Type(), Black)
+		m[NewSquare(File(file), Rank2)] = WhitePawn
+		m[NewSquare(File(file), Rank7)] = BlackPawn
+	}
+	b, err := NewBoard(m)
+	if err != nil {
+		return Setup{}, fmt.Errorf("chess: chess960 start %d: %w", index, err)
+	}
+
+	return Setup{
+		Board:         *b,
+		Turn:          White,
+		CastleRights:  NewCastleRights(true, true, true, true),
+		EnPassant:     NoSquare,
+		HalfMoveClock: 0,
+		FullMoveNo:    1,
+		Variant:       Chess960,
+	}, nil
+}
+
+// validateChess960CastleRights checks that castling rights are consistent with
+// the board for a Chess960 position. A held right requires the side's king on
+// its back rank and, for the king side, a rook somewhere to the king's right
+// (higher file); for the queen side, a rook to the king's left (lower file).
+// Unlike standard chess the king and rooks need not occupy fixed squares.
+func validateChess960CastleRights(s *Setup) error {
+	for _, c := range []Color{White, Black} {
+		var (
+			rank      Rank
+			kingPiece Piece
+			rookPiece Piece
+		)
+		if c == White {
+			rank, kingPiece, rookPiece = Rank1, WhiteKing, WhiteRook
+		} else {
+			rank, kingPiece, rookPiece = Rank8, BlackKing, BlackRook
+		}
+
+		kingSide := s.CastleRights.CanCastle(c, KingSide)
+		queenSide := s.CastleRights.CanCastle(c, QueenSide)
+		if !kingSide && !queenSide {
+			continue
+		}
+
+		kingFile := -1
+		for f := range 8 {
+			if s.Board.Piece(NewSquare(File(f), rank)) == kingPiece {
+				kingFile = f
+				break
+			}
+		}
+		if kingFile < 0 {
+			return fmt.Errorf("chess: setup: %s castling rights require the %s king on its back rank", c.Name(), c.Name())
+		}
+		if kingSide {
+			ok := false
+			for f := kingFile + 1; f < 8; f++ {
+				if s.Board.Piece(NewSquare(File(f), rank)) == rookPiece {
+					ok = true
+					break
+				}
+			}
+			if !ok {
+				return fmt.Errorf("chess: setup: %s kingside castling rights require a rook to the king's right", c.Name())
+			}
+		}
+		if queenSide {
+			ok := false
+			for f := kingFile - 1; f >= 0; f-- {
+				if s.Board.Piece(NewSquare(File(f), rank)) == rookPiece {
+					ok = true
+					break
+				}
+			}
+			if !ok {
+				return fmt.Errorf("chess: setup: %s queenside castling rights require a rook to the king's left", c.Name())
+			}
+		}
+	}
 	return nil
 }

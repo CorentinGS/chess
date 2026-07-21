@@ -128,6 +128,7 @@ type Position struct {
 	hash            uint64       // Zobrist hash for O(1) position comparison
 	status          Method       // Cached Status result
 	statusCached    bool         // Whether status contains a valid cached value
+	variant         Variant      // Starting-position variant (zero = Standard)
 }
 
 const (
@@ -201,6 +202,7 @@ func (pos *Position) Update(m Move) *Position {
 		enPassantSquare: pos.enPassantSquare,
 		halfMoveClock:   pos.halfMoveClock,
 		moveCount:       pos.moveCount,
+		variant:         pos.variant,
 		hash:            pos.hash,
 	}
 	newPos.applyMove(m)
@@ -437,6 +439,12 @@ func (pos *Position) CastleRights() CastleRights {
 	return pos.castleRights
 }
 
+// Variant returns the starting-position variant of the position. The zero
+// value is Standard.
+func (pos *Position) Variant() Variant {
+	return pos.variant
+}
+
 // Ply returns the half-move number (increments every move).
 func (pos *Position) Ply() int {
 	if pos == nil {
@@ -472,7 +480,7 @@ func (pos *Position) PositionKey() string {
 func (pos *Position) appendPositionKey(buf []byte, enPassantSquare Square) []byte {
 	buf = pos.board.appendFEN(buf)
 	buf = append(buf, ' ', pos.turn.String()[0], ' ')
-	buf = append(buf, pos.castleRights.String()...)
+	buf = appendCastleRights(buf, pos.castleRights, &pos.board, pos.variant)
 	buf = append(buf, ' ')
 	if enPassantSquare == NoSquare {
 		return append(buf, '-')
@@ -480,8 +488,11 @@ func (pos *Position) appendPositionKey(buf []byte, enPassantSquare Square) []byt
 	return append(buf, enPassantSquare.String()...)
 }
 
-// XFENString() is similar to String() except that it returns a string with
-// the X-FEN format.
+// XFENString is similar to String() except it uses the legally-relevant en
+// passant square (the square only when an enemy pawn can actually capture)
+// instead of the raw FEN en passant square. For Chess960 positions the
+// castling-rights field is emitted in Shredder-FEN file-letter form. The name
+// is historical: this is the FEN key with clocks, not a separate notation.
 func (pos *Position) XFENString() string {
 	buf := pos.appendPositionKey(make([]byte, 0, 90), pos.relevantEnPassantSquare())
 	buf = append(buf, ' ')
@@ -530,6 +541,7 @@ const (
 	bitsCastleBlackQueen
 	bitsTurn
 	bitsHasEnPassant
+	bitsChess960
 )
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
@@ -566,6 +578,9 @@ func (pos *Position) MarshalBinary() ([]byte, error) {
 	}
 	if pos.enPassantSquare != NoSquare {
 		b |= bitsHasEnPassant
+	}
+	if pos.variant == Chess960 {
+		b |= bitsChess960
 	}
 	if err = binary.Write(buf, binary.BigEndian, b); err != nil {
 		return nil, err
@@ -620,6 +635,9 @@ func (pos *Position) UnmarshalBinary(data []byte) error {
 	if b&bitsHasEnPassant == 0 {
 		pos.enPassantSquare = NoSquare
 	}
+	if b&bitsChess960 != 0 {
+		pos.variant = Chess960
+	}
 	pos.inCheck, pos.checkers = checkState(pos)
 	pos.hash = pos.computeHash()
 	return nil
@@ -633,6 +651,7 @@ func (pos *Position) copy() *Position {
 		enPassantSquare: pos.enPassantSquare,
 		halfMoveClock:   pos.halfMoveClock,
 		moveCount:       pos.moveCount,
+		variant:         pos.variant,
 		inCheck:         pos.inCheck,
 		checkers:        pos.checkers,
 		hash:            pos.hash,

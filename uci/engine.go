@@ -5,22 +5,25 @@ import (
 	"maps"
 	"os"
 	"sync"
+
+	"github.com/corentings/chess/v3"
 )
 
 // Engine manages communication with a UCI-compatible chess engine such as
 // Stockfish. It sends commands, parses responses, and exposes the engine's
 // reported state (ID, options, search results).
 type Engine struct {
-	adapter  Adapter
-	logger   *log.Logger
-	id       map[string]string
-	options  map[string]Option
-	mu       *sync.RWMutex
-	position CmdPosition
-	hasPos   bool
-	results  SearchResults
-	eval     int
-	debug    bool
+	adapter         Adapter
+	logger          *log.Logger
+	id              map[string]string
+	options         map[string]Option
+	mu              *sync.RWMutex
+	position        CmdPosition
+	hasPos          bool
+	results         SearchResults
+	eval            int
+	debug           bool
+	chess960Enabled bool
 }
 
 // Debug enables debug logging of commands sent to and responses received from
@@ -151,6 +154,11 @@ func (e *Engine) processCommandLocked(cmd Cmd) error {
 }
 
 func (e *Engine) processCommand(cmd Cmd) error {
+	if posCmd, ok := cmd.(CmdPosition); ok {
+		if err := e.ensureChess960(posCmd.Position); err != nil {
+			return err
+		}
+	}
 	if e.debug {
 		e.logger.Println(cmd.String())
 	}
@@ -168,4 +176,32 @@ func (e *Engine) processCommand(cmd Cmd) error {
 		e.hasPos = true
 	}
 	return cmd.Handle(lines, e)
+}
+
+// ensureChess960 keeps the engine's UCI_Chess960 option aligned with the
+// variant of the position about to be sent. A Chess960 position enables the
+// option so the engine accepts the king-to-rook castling encoding; a later
+// standard position disables it again. The option is toggled only when the
+// engine advertises it, and at most once per state change.
+func (e *Engine) ensureChess960(pos *chess.Position) error {
+	want := pos != nil && pos.Variant() == chess.Chess960
+	if want == e.chess960Enabled {
+		return nil
+	}
+	if _, ok := e.options["UCI_Chess960"]; !ok {
+		return nil
+	}
+	value := "false"
+	if want {
+		value = "true"
+	}
+	opt := CmdSetOption{Name: "UCI_Chess960", Value: value}
+	if e.debug {
+		e.logger.Println(opt.String())
+	}
+	if _, err := e.adapter.Exchange(opt); err != nil {
+		return err
+	}
+	e.chess960Enabled = want
+	return nil
 }

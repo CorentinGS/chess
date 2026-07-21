@@ -60,10 +60,14 @@ func (p *pgnRender) run() {
 	g := p.g
 	sb := p.sb
 
-	tagPairList := make([]sortableTagPair, len(g.tagPairs))
+	tags := g.tagPairs
+	if g.tree != nil && g.tree.rootPos != nil && g.tree.rootPos.variant == Chess960 {
+		tags = chess960PGNTags(g.tagPairs, g.tree.rootPos)
+	}
 
+	tagPairList := make([]sortableTagPair, len(tags))
 	var idx uint
-	for tag, value := range g.tagPairs {
+	for tag, value := range tags {
 		tagPairList[idx] = sortableTagPair{
 			Key:   tag,
 			Value: value,
@@ -357,4 +361,25 @@ func (p *pgnRender) writeVariations(node *MoveNode, moveNum int, isWhite bool) b
 	}
 
 	return wroteAtLeastOneVar
+}
+
+// chess960PGNTags returns a copy of tags with the PGN tags required to
+// round-trip a Chess960 game: Variant names the variant, and SetUp/FEN record
+// the starting position. Existing tags are preserved unchanged. The returned
+// map is always a fresh copy, so the game's own tag pairs are not mutated.
+func chess960PGNTags(tags TagPairs, rootPos *Position) TagPairs {
+	out := make(TagPairs, len(tags)+3)
+	for k, v := range tags {
+		out[k] = v
+	}
+	if _, ok := out["Variant"]; !ok {
+		out["Variant"] = "Chess960"
+	}
+	if _, ok := out["SetUp"]; !ok {
+		out["SetUp"] = "1"
+	}
+	if _, ok := out["FEN"]; !ok {
+		out["FEN"] = rootPos.String()
+	}
+	return out
 }

@@ -38,6 +38,7 @@ func decodeFENUnsafe(fen string) (*Position, error) {
 		enPassantSquare: setup.EnPassant,
 		halfMoveClock:   setup.HalfMoveClock,
 		moveCount:       setup.FullMoveNo,
+		variant:         setup.Variant,
 	}
 	pos.inCheck, pos.checkers = checkState(pos)
 	pos.hash = pos.computeHash()
@@ -60,6 +61,7 @@ func decodeFENForHash(fen string) (*Position, error) {
 		enPassantSquare: setup.EnPassant,
 		halfMoveClock:   setup.HalfMoveClock,
 		moveCount:       setup.FullMoveNo,
+		variant:         setup.Variant,
 	}
 	pos.hash = pos.computeHash()
 	return pos, nil
@@ -100,6 +102,7 @@ func decodeFENSetup(fen string) (Setup, error) {
 	sq := NoSquare
 	halfMoveClock := 0
 	moveCount := 1
+	variant := Standard
 
 	if len(parts) > 1 {
 		var ok bool
@@ -109,7 +112,7 @@ func decodeFENSetup(fen string) (Setup, error) {
 		}
 	}
 	if len(parts) > 2 {
-		rights, err = formCastleRights(parts[2])
+		rights, variant, err = formCastleRightsWithVariant(parts[2], b)
 		if err != nil {
 			return Setup{}, fmt.Errorf("chess: fen: castle rights: %w: %w", err, ErrInvalidFEN)
 		}
@@ -143,6 +146,7 @@ func decodeFENSetup(fen string) (Setup, error) {
 		EnPassant:     sq,
 		HalfMoveClock: halfMoveClock,
 		FullMoveNo:    moveCount,
+		Variant:       variant,
 	}, nil
 }
 
@@ -332,6 +336,190 @@ func formCastleRights(castleStr string) (CastleRights, error) {
 		}
 	}
 	return cr, nil
+}
+
+// formCastleRightsWithVariant parses a FEN castling-rights field with
+// Chess960 awareness. It accepts the standard KQkq letters, Shredder-FEN and
+// X-FEN file letters (uppercase A-H = white rook files, lowercase a-h = black
+// rook files), and any X-FEN mix of the two. File letters are mapped to king
+// or queen side using each color's king file on its back rank. The presence of
+// any file letter implies the Chess960 variant; a pure KQkq (or "-") field is
+// Standard. The board is required to resolve file letters.
+func formCastleRightsWithVariant(castleStr string, board *Board) (CastleRights, Variant, error) {
+	if castleStr == "-" {
+		return CastleRights{}, Standard, nil
+	}
+	if len(castleStr) > 8 {
+		return CastleRights{}, Standard, fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
+	}
+	var (
+		cr            CastleRights
+		variant       = Standard
+		seen          = [256]bool{}
+		whiteKingFile = backRankKingFile(board, White)
+		blackKingFile = backRankKingFile(board, Black)
+	)
+	for i := range castleStr {
+		c := castleStr[i]
+		if seen[c] {
+			return CastleRights{}, Standard, fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
+		}
+		seen[c] = true
+		switch {
+		case c == 'K':
+			cr.White.KingSide = true
+		case c == 'Q':
+			cr.White.QueenSide = true
+		case c == 'k':
+			cr.Black.KingSide = true
+		case c == 'q':
+			cr.Black.QueenSide = true
+		case c >= 'A' && c <= 'H':
+			variant = Chess960
+			if err := setRookRight(&cr, board, White, int(c-'A'), whiteKingFile, castleStr); err != nil {
+				return CastleRights{}, Standard, err
+			}
+		case c >= 'a' && c <= 'h':
+			variant = Chess960
+			if err := setRookRight(&cr, board, Black, int(c-'a'), blackKingFile, castleStr); err != nil {
+				return CastleRights{}, Standard, err
+			}
+		default:
+			return CastleRights{}, Standard, fmt.Errorf("chess: fen invalid castle rights %s", castleStr)
+		}
+	}
+	return cr, variant, nil
+}
+
+// backRankKingFile returns the file (0-7) of the given color's king on its back
+// rank, or -1 if it is not there. Chess960 castling rights name rooks by file,
+// so the king's file is needed to decide king side versus queen side.
+func backRankKingFile(board *Board, c Color) int {
+	var rank Rank
+	var king Piece
+	if c == White {
+		rank, king = Rank1, WhiteKing
+	} else {
+		rank, king = Rank8, BlackKing
+	}
+	for f := range 8 {
+		if board.Piece(NewSquare(File(f), rank)) == king {
+			return f
+		}
+	}
+	return -1
+}
+
+// setRookRight maps a Chess960 rook file to the king or queen side based on its
+// position relative to the king's file: a rook to the king's right (higher
+// file) grants the king side; to the left (lower file) grants the queen side.
+// The Shredder letter names a specific rook file, so a friendly rook must
+// actually occupy that file on the back rank; a malformed FEN whose rights
+// claim a file with no rook is rejected here (the alternative — silently
+// dropping the right — would corrupt the position's round-trip).
+func setRookRight(cr *CastleRights, board *Board, c Color, rookFile, kingFile int, src string) error {
+	if kingFile < 0 {
+		return fmt.Errorf("chess: fen castle rights %s: %s king not on back rank", src, c.Name())
+	}
+	if rookFile == kingFile {
+		return fmt.Errorf("chess: fen castle rights %s: rook on king's file", src)
+	}
+	var (
+		rank Rank
+		rook Piece
+	)
+	if c == White {
+		rank, rook = Rank1, WhiteRook
+	} else {
+		rank, rook = Rank8, BlackRook
+	}
+	if board.Piece(NewSquare(File(rookFile), rank)) != rook {
+		return fmt.Errorf("chess: fen castle rights %s: no %s rook on file %d", src, c.Name(), rookFile)
+	}
+	if rookFile > kingFile {
+		if c == White {
+			cr.White.KingSide = true
+		} else {
+			cr.Black.KingSide = true
+		}
+	} else {
+		if c == White {
+			cr.White.QueenSide = true
+		} else {
+			cr.Black.QueenSide = true
+		}
+	}
+	return nil
+}
+
+// appendCastleRights appends the FEN castling-rights field to buf. Standard
+// positions emit the KQkq form; Chess960 positions emit Shredder-FEN file
+// letters (uppercase for white rooks, lowercase for black), one per held
+// right, in the canonical KQkq positional order, or "-" when no side can
+// castle. The board is required to locate each Chess960 rook's file.
+func appendCastleRights(buf []byte, cr CastleRights, board *Board, variant Variant) []byte {
+	if variant == Standard {
+		return append(buf, cr.String()...)
+	}
+	start := len(buf)
+	whiteKing := backRankKingFile(board, White)
+	blackKing := backRankKingFile(board, Black)
+	if cr.CanCastle(White, KingSide) {
+		if f := rookFileForSide(board, White, whiteKing, KingSide); f >= 0 {
+			buf = append(buf, byte('A'+f))
+		}
+	}
+	if cr.CanCastle(White, QueenSide) {
+		if f := rookFileForSide(board, White, whiteKing, QueenSide); f >= 0 {
+			buf = append(buf, byte('A'+f))
+		}
+	}
+	if cr.CanCastle(Black, KingSide) {
+		if f := rookFileForSide(board, Black, blackKing, KingSide); f >= 0 {
+			buf = append(buf, byte('a'+f))
+		}
+	}
+	if cr.CanCastle(Black, QueenSide) {
+		if f := rookFileForSide(board, Black, blackKing, QueenSide); f >= 0 {
+			buf = append(buf, byte('a'+f))
+		}
+	}
+	if len(buf) == start {
+		buf = append(buf, '-')
+	}
+	return buf
+}
+
+// rookFileForSide returns the file (0-7) of the rook that grants the given
+// castling side for color c: the nearest friendly rook on the back rank to the
+// king's right for KingSide, or to the king's left for QueenSide, or -1 if the
+// king is not on its back rank or no such rook exists.
+func rookFileForSide(board *Board, c Color, kingFile int, side Side) int {
+	if kingFile < 0 {
+		return -1
+	}
+	var rank Rank
+	var rook Piece
+	if c == White {
+		rank, rook = Rank1, WhiteRook
+	} else {
+		rank, rook = Rank8, BlackRook
+	}
+	switch side {
+	case KingSide:
+		for f := kingFile + 1; f < 8; f++ {
+			if board.Piece(NewSquare(File(f), rank)) == rook {
+				return f
+			}
+		}
+	case QueenSide:
+		for f := kingFile - 1; f >= 0; f-- {
+			if board.Piece(NewSquare(File(f), rank)) == rook {
+				return f
+			}
+		}
+	}
+	return -1
 }
 
 func formEnPassant(enPassant string) (Square, error) {

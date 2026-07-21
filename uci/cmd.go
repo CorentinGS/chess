@@ -185,12 +185,32 @@ func (cmd CmdPosition) String() string {
 	if len(cmd.Moves) == 0 {
 		return "position fen " + cmd.Position.String()
 	}
-	moveStrs := []string{}
+	moveStrs := make([]string, 0, len(cmd.Moves))
+	// Chess960 castling is encoded king-to-rook ("e1h1"), whose rook origin is
+	// only known from the board at the moment the move is played. Replay the
+	// move list through position copies so each move encodes against its true
+	// pre-move position. Standard chess skips the replay: its castling is a
+	// fixed king-to-destination form that needs no board lookup.
+	cur := cmd.Position
+	chess960 := cur.Variant() == chess.Chess960
 	for _, m := range cmd.Moves {
-		mStr, _ := chess.UCI().Encode(nil, m)
+		mStr := mustEncodeUCI(cur, m)
 		moveStrs = append(moveStrs, mStr)
+		if chess960 {
+			cur = cur.Update(m)
+		}
 	}
 	return fmt.Sprintf("position fen %s moves %s", cmd.Position, strings.Join(moveStrs, " "))
+}
+
+// mustEncodeUCI encodes m with the fixed UCI codec. UCI() always returns a
+// valid codec, so an error indicates a programming invariant violation.
+func mustEncodeUCI(pos *chess.Position, m chess.Move) string {
+	text, err := chess.UCI().Encode(pos, m)
+	if err != nil {
+		panic(fmt.Errorf("uci: encode move: %w", err))
+	}
+	return text
 }
 
 func (CmdPosition) IsDone(_ string) bool { return true }

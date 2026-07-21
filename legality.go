@@ -130,12 +130,27 @@ func (lg legality) legal(m Move) (MoveTag, bool) {
 	} else if m.s2 == lg.pos.enPassantSquare && p.Type() == Pawn {
 		tag |= EnPassant
 	}
-	if (p == WhiteKing && m.s1 == E1) || (p == BlackKing && m.s1 == E8) {
+	if p == WhiteKing && m.s1.Rank() == Rank1 {
 		switch m.s2 {
-		case C1, C8:
-			tag |= QueenSideCastle
-		case G1, G8:
-			tag |= KingSideCastle
+		case G1:
+			if lg.pos.castleRights.CanCastle(White, KingSide) {
+				tag |= KingSideCastle
+			}
+		case C1:
+			if lg.pos.castleRights.CanCastle(White, QueenSide) {
+				tag |= QueenSideCastle
+			}
+		}
+	} else if p == BlackKing && m.s1.Rank() == Rank8 {
+		switch m.s2 {
+		case G8:
+			if lg.pos.castleRights.CanCastle(Black, KingSide) {
+				tag |= KingSideCastle
+			}
+		case C8:
+			if lg.pos.castleRights.CanCastle(Black, QueenSide) {
+				tag |= QueenSideCastle
+			}
 		}
 	}
 

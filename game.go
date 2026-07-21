@@ -154,6 +154,15 @@ func (g *Game) Position() *Position {
 	return pos.copy()
 }
 
+// Variant returns the starting-position variant of the game (Standard or
+// Chess960), derived from the game's root position.
+func (g *Game) Variant() Variant {
+	if g == nil || g.tree == nil || g.tree.rootPos == nil {
+		return Standard
+	}
+	return g.tree.rootPos.variant
+}
+
 func (g *Game) currentPosition() *Position {
 	if g == nil || g.tree == nil {
 		return nil

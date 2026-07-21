@@ -36,6 +36,7 @@ func (pos *Position) nullUpdate() *Position {
 		enPassantSquare: NoSquare,
 		halfMoveClock:   pos.halfMoveClock + 1,
 		moveCount:       pos.nextMoveCount(),
+		variant:         pos.variant,
 	}
 
 	// Recompute inCheck and checkers for the new side to move. The board is
@@ -116,28 +117,58 @@ func computeMoveEffect(b *Board, m Move) moveEffect {
 		eff.capSq = m.s2
 	}
 
-	eff.rookFrom, eff.rookTo = castleRookMove(m, moving.Color())
+	eff.rookFrom, eff.rookTo = castleRookMove(b, m, moving.Color())
 	return eff
 }
 
 // castleRookMove returns the origin and destination squares of the rook in a
 // castling move, or (NoSquare, NoSquare) when m carries no castle tag. The
-// chosen rank is determined by the moving piece's color: white castles along
-// the first rank, black along the eighth.
-func castleRookMove(m Move, c Color) (Square, Square) {
-	switch {
-	case m.HasTag(KingSideCastle):
-		if c == White {
-			return H1, F1
-		}
-		return H8, F8
-	case m.HasTag(QueenSideCastle):
-		if c == White {
-			return A1, D1
-		}
-		return A8, D8
+// destination is always the standard square (f for king side, d for queen
+// side); the origin is derived from the board: the nearest friendly rook to the
+// king's right (king side) or left (queen side) on the back rank. m.s1 is the
+// king's origin in a castling move. This serves both standard chess (rook on
+// a1/h1/a8/h8) and Chess960 (rook anywhere on the back rank).
+func castleRookMove(b *Board, m Move, c Color) (Square, Square) {
+	kingSide := m.HasTag(KingSideCastle)
+	queenSide := m.HasTag(QueenSideCastle)
+	if !kingSide && !queenSide {
+		return NoSquare, NoSquare
 	}
-	return NoSquare, NoSquare
+	var (
+		rank   Rank
+		rook   Piece
+		rookTo Square
+	)
+	if c == White {
+		rank, rook = Rank1, WhiteRook
+		if kingSide {
+			rookTo = F1
+		} else {
+			rookTo = D1
+		}
+	} else {
+		rank, rook = Rank8, BlackRook
+		if kingSide {
+			rookTo = F8
+		} else {
+			rookTo = D8
+		}
+	}
+	kingFile := int(m.s1.File())
+	if kingSide {
+		for f := kingFile + 1; f < 8; f++ {
+			if b.Piece(NewSquare(File(f), rank)) == rook {
+				return NewSquare(File(f), rank), rookTo
+			}
+		}
+	} else {
+		for f := kingFile - 1; f >= 0; f-- {
+			if b.Piece(NewSquare(File(f), rank)) == rook {
+				return NewSquare(File(f), rank), rookTo
+			}
+		}
+	}
+	return NoSquare, rookTo
 }
 
 // applyMove applies the non-null bookkeeping rule to pos in place. It updates
@@ -251,6 +282,9 @@ func (pos *Position) unmakeMoveCursor(m Move, u cursorUndo) {
 // the origin square on the pre-move board, so it must be called before
 // board.update.
 func (pos *Position) updateCastleRights(m Move) CastleRights {
+	if pos.variant == Chess960 {
+		return pos.updateCastleRightsChess960(m)
+	}
 	removeWK := false
 	removeWQ := false
 	removeBK := false
@@ -285,6 +319,48 @@ func (pos *Position) updateCastleRights(m Move) CastleRights {
 		ncr.Black.QueenSide = false
 	}
 	return ncr
+}
+
+// updateCastleRightsChess960 returns the castling rights after m is played in a
+// Chess960 position. A held right is lost when the king moves, or when the rook
+// granting that right moves or is captured. The granting rook is located on the
+// back rank relative to the king, so this must be called before board.update.
+func (pos *Position) updateCastleRightsChess960(m Move) CastleRights {
+	ncr := pos.castleRights
+	if ncr.White.KingSide && pos.chess960RightLost(White, KingSide, m) {
+		ncr.White.KingSide = false
+	}
+	if ncr.White.QueenSide && pos.chess960RightLost(White, QueenSide, m) {
+		ncr.White.QueenSide = false
+	}
+	if ncr.Black.KingSide && pos.chess960RightLost(Black, KingSide, m) {
+		ncr.Black.KingSide = false
+	}
+	if ncr.Black.QueenSide && pos.chess960RightLost(Black, QueenSide, m) {
+		ncr.Black.QueenSide = false
+	}
+	return ncr
+}
+
+// chess960RightLost reports whether the castling right (c, side) is lost by
+// playing m: the king moved off its square, or the granting rook moved or was
+// captured. Returns false if the king or rook cannot be located.
+func (pos *Position) chess960RightLost(c Color, side Side, m Move) bool {
+	kingFile := backRankKingFile(&pos.board, c)
+	if kingFile < 0 {
+		return false
+	}
+	rank := Rank1
+	if c == Black {
+		rank = Rank8
+	}
+	kingSq := NewSquare(File(kingFile), rank)
+	rf := rookFileForSide(&pos.board, c, kingFile, side)
+	if rf < 0 {
+		return false
+	}
+	rookSq := NewSquare(File(rf), rank)
+	return m.s1 == kingSq || m.s1 == rookSq || m.s2 == rookSq
 }
 
 // updateEnPassantSquare returns the en-passant target square created by m, or
