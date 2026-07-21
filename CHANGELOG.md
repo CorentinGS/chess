@@ -1,6 +1,30 @@
 # Changelog
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## Unreleased
+
+- - -
+## v3.0.0-beta.4 - 2026-07-24
+
+#### Features
+- add first-class Chess960 (Fischer Random) support: `Variant`,
+  `Chess960Setup(index)`, all 960 indexed starts, variant-aware legal
+  castling, Shredder-FEN output with Shredder/X-FEN input, Chess960 PGN
+  Variant/SetUp/FEN round-trips, and binary variant persistence (ADR-022).
+- add Chess960 UCI support: `uciNotation` encodes castling in the
+  king-to-rook form (e.g. `e1h1`) and decodes both king-to-rook and
+  king-to-destination forms; the `uci` engine client negotiates
+  `UCI_Chess960` when the engine advertises it (ADR-023).
+- add `EmptySetup`, `InitialSetup`, `Setup.SwapTurn`, and `Setup.Mirror` for
+  explicit position construction and analysis.
+- relax FEN import: accept one to six fields, whitespace separators, and
+  fullmove number zero while preserving canonical output.
+
+#### Fixes
+- add `ErrInvalidFEN` and `ErrInvalidPGN`; FEN/PGN parsing now wraps typed
+  sentinel errors so callers can use `errors.Is`.
+- correct the v3 hash migration documentation: removed hash APIs have no
+  deprecated compatibility path.
 - - -
 ## v3.0.0-beta.3 - 2026-07-20
 
