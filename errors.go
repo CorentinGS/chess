@@ -36,7 +36,18 @@ var (
 	ErrInvalidSquare       = func(pos int) error { return &PGNError{"invalid square", pos} }
 	ErrInvalidRank         = func(pos int) error { return &PGNError{"invalid rank", pos} }
 
-	ErrNoGameFound = errors.New("no game found in PGN data")
+	// ErrInvalidFEN is the sentinel for any FEN parse failure. Specific
+	// causes are wrapped with %w so callers can errors.Is(err, ErrInvalidFEN)
+	// without inspecting message text.
+	ErrInvalidFEN = errors.New("chess: invalid FEN")
+
+	// ErrInvalidPGN is the sentinel for any PGN parse failure, including
+	// empty input. Branch on this for "the PGN did not yield a Game".
+	ErrInvalidPGN = errors.New("chess: invalid PGN")
+
+	// ErrNoGameFound is returned when the PGN input contains no game. It
+	// wraps ErrInvalidPGN so errors.Is(err, ErrInvalidPGN) also matches.
+	ErrNoGameFound = fmt.Errorf("%w: no game found in PGN data", ErrInvalidPGN)
 
 	// ErrGameAlreadyEnded is returned when a move is applied to a Game that
 	// already has a terminal Outcome. Callers must ClearOutcome first.

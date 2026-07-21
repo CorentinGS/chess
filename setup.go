@@ -18,6 +18,79 @@ type Setup struct {
 	FullMoveNo    int
 }
 
+// EmptySetup returns a Setup representing an empty board: no pieces, White to
+// move, no castling rights, no en passant square, halfmove clock 0, fullmove 1.
+// It is the zero position used as a starting point for construction.
+func EmptySetup() Setup {
+	return Setup{Turn: White, EnPassant: NoSquare, FullMoveNo: 1}
+}
+
+// InitialSetup returns a Setup representing the standard chess starting
+// position. The returned value is a copy and safe for callers to mutate.
+func InitialSetup() Setup {
+	return startingSetup
+}
+
+// SwapTurn returns a copy of s with the side to move flipped and the en
+// passant square cleared. Halfmove clock and fullmove number are preserved.
+// This is the FIDE "pass" semantic used for repetition detection: only the
+// side to move and en passant rights change, not the move counters.
+func (s Setup) SwapTurn() Setup {
+	return Setup{
+		Board:         s.Board,
+		Turn:          s.Turn.Other(),
+		CastleRights:  s.CastleRights,
+		EnPassant:     NoSquare,
+		HalfMoveClock: s.HalfMoveClock,
+		FullMoveNo:    s.FullMoveNo,
+	}
+}
+
+// Mirror returns a vertically mirrored copy of s: every piece swaps color and
+// moves to the square on the same file but the opposite rank (rank 1 ↔ rank 8);
+// the side to move flips; castling rights swap color; the en passant square
+// moves to the opposite rank. Halfmove clock and fullmove number are preserved.
+//
+// Useful for opening-book authors who want to reuse one side's analysis for
+// the other, and for symmetric position testing. Mirroring a legal standard
+// position always produces a legal standard position.
+func (s Setup) Mirror() Setup {
+	m := make(map[Square]Piece, numOfSquaresInBoard)
+	for sq := range numOfSquaresInBoard {
+		p := s.Board.Piece(Square(sq))
+		if p == NoPiece {
+			continue
+		}
+		file := Square(sq).File()
+		rank := 7 - Square(sq).Rank()
+		m[NewSquare(file, rank)] = NewPiece(p.Type(), p.Color().Other())
+	}
+	b, err := NewBoard(m)
+	if err != nil {
+		// Mirror of a valid board cannot produce an invalid board: every
+		// occupied square maps to a distinct occupied square.
+		panic(fmt.Sprintf("chess: mirror produced invalid board: %v", err))
+	}
+	cr := NewCastleRights(
+		s.CastleRights.CanCastle(Black, KingSide),
+		s.CastleRights.CanCastle(Black, QueenSide),
+		s.CastleRights.CanCastle(White, KingSide),
+		s.CastleRights.CanCastle(White, QueenSide),
+	)
+	ep := NoSquare
+	if s.EnPassant != NoSquare {
+		ep = NewSquare(s.EnPassant.File(), 7-s.EnPassant.Rank())
+	}
+	return Setup{
+		Board:         *b,
+		Turn:          s.Turn.Other(),
+		CastleRights:  cr,
+		EnPassant:     ep,
+		HalfMoveClock: s.HalfMoveClock,
+		FullMoveNo:    s.FullMoveNo,
+	}
+}
+
 // startingSetup is the setup that corresponds to the standard starting
 // position. It is kept unexported because callers should normally use
 // StartingPosition(); it exists primarily for tests of NewPosition.

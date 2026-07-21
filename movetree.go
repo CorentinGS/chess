@@ -476,7 +476,7 @@ func sameMove(a, b Move) bool {
 
 func validatePositionMove(pos *Position, move Move) error {
 	if pos == nil {
-		return errors.New("no current position")
+		return errors.New("chess: no current position")
 	}
 	if move.HasTag(Null) {
 		return nil

@@ -35,7 +35,7 @@ Random Game
 
 	import (
 	    "fmt"
-	    "math/rand"
+	    "math/rand/v2"
 
 	    "github.com/corentings/chess/v3"
 	)
@@ -46,7 +46,7 @@ Random Game
 	    for game.Outcome() == chess.NoOutcome {
 	        // select a random move
 	        moves := game.ValidMoves()
-	        move := moves[rand.Intn(len(moves))]
+	        move := moves[rand.IntN(len(moves))]
 	        game.Move(move, nil)
 	    }
 	    // print outcome and game PGN

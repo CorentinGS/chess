@@ -50,7 +50,7 @@ type PolyglotMove struct {
 //	moves := book.FindMoves(hash)
 //
 //	// Get a random move weighted by the stored weights
-//	randomMove := book.GetRandomMove(hash)
+//	randomMove := book.RandomMove(hash)
 type PolyglotBook struct {
 	entries []PolyglotEntry
 }
@@ -170,7 +170,7 @@ func LoadFromBytes(data []byte) (*PolyglotBook, error) {
 // here if a future caller needs to feed a polyglot book without buffering.
 func parseBookData(data []byte) (*PolyglotBook, error) {
 	if len(data)%16 != 0 {
-		return nil, errors.New("invalid polyglot book data size")
+		return nil, errors.New("chess: invalid polyglot book data size")
 	}
 
 	entries := make([]PolyglotEntry, 0, len(data)/16)
@@ -264,14 +264,14 @@ func isCastlingMove(fromFile, fromRank, toFile, toRank int) bool {
 		(toFile == 0 || toFile == 7) && toRank == fromRank
 }
 
-// GetRandomMove returns a weighted random move from the available moves for a position.
+// RandomMove returns a weighted random move from the available moves for a position.
 // The probability of selecting a move is proportional to its weight.
 // Returns nil if no moves are available.
 //
 // Example:
 //
 //	hash := uint64(0x463b96181691fc9c) // Starting position
-//	move, err := book.GetRandomMove(hash)
+//	move, err := book.RandomMove(hash)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
@@ -279,7 +279,7 @@ func isCastlingMove(fromFile, fromRank, toFile, toRank int) bool {
 //	    decodedMove := DecodeMove(move.Move)
 //	    fmt.Printf("Selected move: %v\n", decodedMove)
 //	}
-func (book *PolyglotBook) GetRandomMove(positionHash uint64) (*PolyglotEntry, error) {
+func (book *PolyglotBook) RandomMove(positionHash uint64) (*PolyglotEntry, error) {
 	moves := book.FindMoves(positionHash)
 	if len(moves) == 0 {
 		return nil, nil //nolint:nilnil // nil,nil is the documented "no move for this position" signal
@@ -360,7 +360,7 @@ func (book *PolyglotBook) UpdateMove(positionHash uint64, move Move, newWeight u
 		}
 	}
 	if !updated {
-		return errors.New("move not found for update")
+		return errors.New("chess: move not found for update")
 	}
 	return nil
 }
@@ -376,10 +376,10 @@ func (book *PolyglotBook) DeleteMoves(positionHash uint64) {
 	book.entries = newEntries
 }
 
-func (book *PolyglotBook) GetChessMoves(positionHash uint64) ([]Move, error) {
+func (book *PolyglotBook) ChessMoves(positionHash uint64) ([]Move, error) {
 	entries := book.FindMoves(positionHash)
 	if entries == nil {
-		return nil, errors.New("no moves found for the given position")
+		return nil, errors.New("chess: no moves found for the given position")
 	}
 	var moves []Move
 	for _, entry := range entries {

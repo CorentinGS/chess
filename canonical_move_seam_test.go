@@ -128,4 +128,3 @@ func TestSafeMoveRejectsRepairOnExistingSubtree(t *testing.T) {
 		t.Fatal("active cursor mutated on reject")
 	}
 }
-

@@ -1,24 +1,3 @@
-/*
-Package chess provides a complete chess game implementation with support for move
-validation, game tree management, and standard chess formats (PGN, FEN).
-The package manages complete chess games including move history, variations,
-and game outcomes. It supports standard chess rules including all special moves
-(castling, en passant, promotion) and automatic draw detection.
-Example usage:
-
-	// Create new game
-	game := NewGame()
-
-	// Make moves
-	game.MoveText("e4", SAN(), nil)
-	game.MoveText("e5", SAN(), nil)
-
-	// Check game status
-
-	if game.Outcome() != NoOutcome {
-		fmt.Printf("Game ended: %s by %s\n", game.Outcome(), game.Method())
-	}
-*/
 package chess
 
 import (
@@ -192,11 +171,6 @@ func (g *Game) Method() Method {
 	return g.method
 }
 
-// FEN returns the FEN notation of the current position.
-func (g *Game) FEN() string {
-	return g.currentPosition().String()
-}
-
 // String implements the fmt.Stringer interface and returns
 // the game's PGN. It delegates to DefaultPGNRenderer.
 func (g *Game) String() string {
@@ -207,6 +181,16 @@ func (g *Game) String() string {
 // and returns any write error.
 func (g *Game) WritePGN(w io.Writer) error {
 	return DefaultPGNRenderer.RenderGameTo(g, w)
+}
+
+// FEN returns the FEN notation of the current position.
+// Returns "" if the game has no current position.
+func (g *Game) FEN() string {
+	pos := g.currentPosition()
+	if pos == nil {
+		return ""
+	}
+	return pos.String()
 }
 
 // MarshalText implements the encoding.TextMarshaler interface and

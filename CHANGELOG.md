@@ -46,7 +46,9 @@ See [MIGRATION.md](MIGRATION.md) for a detailed guide to upgrading from v2.
 - `Game.Resign(color)` now returns `error`.
 - `Game.Outcome` and `Game.Method` merged into `Outcome` + `OutcomeMethodPair` with `SetOutcomeMethod`/`ClearOutcome`.
 - `Opening.Game()` returns a caller-owned clone of a pre-computed game.
-- `Position.Hash()` (MD5) deprecated in favour of `Position.ZobristHash()` (uint64).
+- `Position.Hash()` (MD5) removed; use `Position.ZobristHash()` (uint64). `ZobristHasher`/`NewChessHasher`/`NewZobristHasher`/`ZobristHashToUint64`/`GetPolyglotHashBytes` also removed; see MIGRATION.md.
+- `opening.Opening` renamed to `opening.Entry` (stuttered at call site).
+- `(*PolyglotBook).GetRandomMove` → `RandomMove`; `GetChessMoves` → `ChessMoves` (no `Get` prefix on non-trivial operations).
 
 #### Features
 - move tree with full variation support (`Variations`, `AddVariation`, `Split`).

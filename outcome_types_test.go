@@ -6,9 +6,9 @@ import (
 
 func TestOutcomeStringAndParse(t *testing.T) {
 	cases := []struct {
-		o      Outcome
-		token  string
-		valid  bool
+		o     Outcome
+		token string
+		valid bool
 	}{
 		{NoOutcome, "*", true},
 		{WhiteWon, "1-0", true},

@@ -1,22 +1,3 @@
-/*
-Package chess provides position representation and manipulation for chess games.
-The package implements complete position tracking including piece placement,
-castling rights, en passant squares, and move counts. It supports standard chess
-formats (FEN) and provides methods for position analysis and move validation.
-Example usage:
-
-	// Create starting position
-	pos := StartingPosition()
-
-	// Check valid moves
-	moves := pos.ValidMoves()
-
-	// Update position with move
-	newPos := pos.Update(move)
-
-	// Get FEN string
-	fen := pos.String()
-*/
 package chess
 
 import (
@@ -524,7 +505,7 @@ func (pos *Position) MarshalText() ([]byte, error) {
 	return []byte(pos.String()), nil
 }
 
-// UnmarshalText implements the encoding.TextUnarshaler interface and
+// UnmarshalText implements the encoding.TextUnmarshaler interface and
 // assumes the data is in the FEN format.
 func (pos *Position) UnmarshalText(text []byte) error {
 	cp, err := decodeFEN(string(text))

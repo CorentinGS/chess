@@ -7,8 +7,8 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-// A Opening represents a specific sequence of moves from the staring position.
-type Opening struct {
+// A Entry represents a specific sequence of moves from the starting position.
+type Entry struct {
 	moveList []string
 	game     *chess.Game
 	code     string
@@ -16,12 +16,12 @@ type Opening struct {
 	pgn      string
 }
 
-func newOpening(code, title, pgn string, moveList []string) (*Opening, error) {
+func newEntry(code, title, pgn string, moveList []string) (*Entry, error) {
 	game, err := buildGame(moveList)
 	if err != nil {
 		return nil, err
 	}
-	return &Opening{
+	return &Entry{
 		moveList: moveList,
 		code:     code,
 		title:    title,
@@ -45,17 +45,17 @@ func buildGame(moveList []string) (*chess.Game, error) {
 }
 
 // Code returns the Encyclopaedia of Chess Openings (ECO) code.
-func (o *Opening) Code() string {
+func (o *Entry) Code() string {
 	return o.code
 }
 
 // Title returns the Encyclopaedia of Chess Openings (ECO) title of the opening.
-func (o *Opening) Title() string {
+func (o *Entry) Title() string {
 	return o.title
 }
 
 // PGN returns the opening in PGN format.
-func (o *Opening) PGN() string {
+func (o *Entry) PGN() string {
 	return o.pgn
 }
 
@@ -64,7 +64,7 @@ func (o *Opening) PGN() string {
 // The game is pre-computed when the opening is constructed (per ADR-005), so
 // Game does not replay UCI moves. Each call returns an independent clone so
 // callers may mutate the returned game without affecting the opening book.
-func (o *Opening) Game() *chess.Game {
+func (o *Entry) Game() *chess.Game {
 	if o.game == nil {
 		return nil
 	}
@@ -75,8 +75,8 @@ func (o *Opening) Game() *chess.Game {
 type Book interface {
 	// Find returns the most specific opening for the list of moves. If no opening is found, Find returns nil.
 	// Use Find for performance-sensitive opening detection paths.
-	Find(moves []chess.Move) *Opening
+	Find(moves []chess.Move) *Entry
 	// Possible returns the possible openings after the moves given. If moves is empty or nil all openings are returned.
 	// Use Possible for performance-sensitive opening exploration paths.
-	Possible(moves []chess.Move) []*Opening
+	Possible(moves []chess.Move) []*Entry
 }

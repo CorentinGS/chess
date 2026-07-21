@@ -36,7 +36,6 @@ func TestHashFromFEN(t *testing.T) {
 			name string
 			fen  string
 		}{
-			{"missing_fields", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"},
 			{"bad_piece_count", "rnbqkbnr/ppppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"},
 			{"bad_ranks_count", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP w KQkq - 0 1"},
 			{"bad_side_to_move", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR x KQkq - 0 1"},

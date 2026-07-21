@@ -37,7 +37,7 @@ func resolveCanonicalMove(pos *Position, m Move) (Move, error) {
 			return v, nil
 		}
 	}
-	return Move{}, fmt.Errorf("%w %s", ErrIllegalMove, m.String())
+	return Move{}, fmt.Errorf("chess: illegal move %s: %w", m.String(), ErrIllegalMove)
 }
 
 // legality owns the king-safety policy for one position. Construct one per

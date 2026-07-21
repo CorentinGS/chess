@@ -30,7 +30,7 @@ var nagSymbolToNumeric = map[string]string{
 // It rejects malformed input such as "", "$", "$x", "$ 1", "!!!", or any other
 // unrecognised spelling.
 //
-// The returned value is always the canonical numeric form and never a symbol.
+// ParseNAG always returns the canonical numeric "$N" form, never a symbol.
 func ParseNAG(s string) (string, error) {
 	if s == "" {
 		return "", errors.New("chess: empty NAG")

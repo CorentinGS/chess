@@ -1126,4 +1126,3 @@ func pgnMeta(name string) pgnFixtureMeta {
 		perGame: len(data) / max(games, 1),
 	}
 }
-

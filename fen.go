@@ -16,7 +16,11 @@ func decodeFEN(fen string) (*Position, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewPosition(setup)
+	pos, err := NewPosition(setup)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidFEN, err)
+	}
+	return pos, nil
 }
 
 // decodeFENUnsafe parses a FEN string and constructs a Position without
@@ -63,38 +67,75 @@ func decodeFENForHash(fen string) (*Position, error) {
 
 // decodeFENSetup parses a FEN string into a Setup. It performs only syntactic
 // validation; semantic validation is left to NewPosition.
+//
+// The parser is relaxed, matching the de-facto behavior of widely deployed
+// FEN producers (shakmaty, lichess, SCID, chess.com):
+//
+//   - Fields may be separated by spaces, tabs, or underscores ('_').
+//   - Missing fields (except the board) are filled with the defaults from
+//     `8/8/8/8/8/8/8/8 w - - 0 1`: White to move, no castling rights, no en
+//     passant square, halfmove clock 0, fullmove number 1.
+//   - A fullmove number of 0 is accepted and treated as 1.
+//
+// Every returned error wraps ErrInvalidFEN so callers can branch with
+// errors.Is without inspecting message text.
 func decodeFENSetup(fen string) (Setup, error) {
-	const minFENParts = 6
+	const maxFENParts = 6
 	fen = strings.TrimSpace(fen)
-	parts := strings.Split(fen, " ")
+	parts := strings.FieldsFunc(fen, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == '_'
+	})
 
-	if len(parts) != minFENParts {
-		return Setup{}, errors.New("chess: fen invalid format")
+	if len(parts) < 1 || len(parts) > maxFENParts {
+		return Setup{}, fmt.Errorf("chess: fen expects 1-6 fields, got %d: %w", len(parts), ErrInvalidFEN)
 	}
 	b, err := fenBoard(parts[0])
 	if err != nil {
-		return Setup{}, fmt.Errorf("chess: fen: board: %w", err)
+		return Setup{}, fmt.Errorf("chess: fen: board: %w: %w", err, ErrInvalidFEN)
 	}
-	turn, ok := fenTurnMap[parts[1]]
-	if !ok {
-		return Setup{}, errors.New("chess: fen invalid turn")
+
+	// Defaults for missing fields, matching shakmaty's `8/8/8/8/8/8/8/8 w - - 0 1`.
+	turn := White
+	rights := CastleRights{}
+	sq := NoSquare
+	halfMoveClock := 0
+	moveCount := 1
+
+	if len(parts) > 1 {
+		var ok bool
+		turn, ok = fenTurnMap[parts[1]]
+		if !ok {
+			return Setup{}, fmt.Errorf("chess: fen invalid turn %q: %w", parts[1], ErrInvalidFEN)
+		}
 	}
-	rights, err := formCastleRights(parts[2])
-	if err != nil {
-		return Setup{}, fmt.Errorf("chess: fen: castle rights: %w", err)
+	if len(parts) > 2 {
+		rights, err = formCastleRights(parts[2])
+		if err != nil {
+			return Setup{}, fmt.Errorf("chess: fen: castle rights: %w: %w", err, ErrInvalidFEN)
+		}
 	}
-	sq, err := formEnPassant(parts[3])
-	if err != nil {
-		return Setup{}, fmt.Errorf("chess: fen: en passant: %w", err)
+	if len(parts) > 3 {
+		sq, err = formEnPassant(parts[3])
+		if err != nil {
+			return Setup{}, fmt.Errorf("chess: fen: en passant: %w: %w", err, ErrInvalidFEN)
+		}
 	}
-	halfMoveClock, err := strconv.Atoi(parts[4])
-	if err != nil || halfMoveClock < 0 {
-		return Setup{}, errors.New("chess: fen invalid half move clock")
+	if len(parts) > 4 {
+		halfMoveClock, err = strconv.Atoi(parts[4])
+		if err != nil || halfMoveClock < 0 {
+			return Setup{}, fmt.Errorf("chess: fen invalid half move clock %q: %w", parts[4], ErrInvalidFEN)
+		}
 	}
-	moveCount, err := strconv.Atoi(parts[5])
-	if err != nil || moveCount < 1 {
-		return Setup{}, errors.New("chess: fen invalid move count")
+	if len(parts) > 5 {
+		moveCount, err = strconv.Atoi(parts[5])
+		if err != nil || moveCount < 0 {
+			return Setup{}, fmt.Errorf("chess: fen invalid move count %q: %w", parts[5], ErrInvalidFEN)
+		}
+		if moveCount == 0 {
+			moveCount = 1
+		}
 	}
+
 	return Setup{
 		Board:         *b,
 		Turn:          turn,

@@ -113,3 +113,107 @@ func TestDecodeFENRoundsThroughNewPosition(t *testing.T) {
 		t.Errorf("error %q does not mention white queenside castling rights", err.Error())
 	}
 }
+
+func TestEmptySetup(t *testing.T) {
+	s := EmptySetup()
+	// EmptySetup is a construction starting point, not a playable position:
+	// it has no kings, so NewPosition must reject it.
+	if _, err := NewPosition(s); err == nil {
+		t.Fatal("NewPosition(EmptySetup()) = nil, want error (no kings)")
+	}
+	if got := s.Board.Piece(A1); got != NoPiece {
+		t.Errorf("EmptySetup().Board.Piece(A1) = %v, want NoPiece", got)
+	}
+	if s.Turn != White {
+		t.Errorf("EmptySetup().Turn = %v, want White", s.Turn)
+	}
+	if s.EnPassant != NoSquare {
+		t.Errorf("EmptySetup().EnPassant = %v, want NoSquare", s.EnPassant)
+	}
+	if s.HalfMoveClock != 0 {
+		t.Errorf("EmptySetup().HalfMoveClock = %d, want 0", s.HalfMoveClock)
+	}
+	if s.FullMoveNo != 1 {
+		t.Errorf("EmptySetup().FullMoveNo = %d, want 1", s.FullMoveNo)
+	}
+}
+
+func TestInitialSetup(t *testing.T) {
+	s := InitialSetup()
+	pos, err := NewPosition(s)
+	if err != nil {
+		t.Fatalf("NewPosition(InitialSetup()): %v", err)
+	}
+	if got, want := pos.String(), StartingPosition().String(); got != want {
+		t.Errorf("InitialSetup() FEN = %q, want %q", got, want)
+	}
+}
+
+func TestSetupSwapTurn(t *testing.T) {
+	s := InitialSetup()
+	swapped := s.SwapTurn()
+	if swapped.Turn != Black {
+		t.Errorf("SwapTurn().Turn = %v, want Black", swapped.Turn)
+	}
+	if swapped.EnPassant != NoSquare {
+		t.Errorf("SwapTurn().EnPassant = %v, want NoSquare", swapped.EnPassant)
+	}
+	// Original is not mutated.
+	if s.Turn != White {
+		t.Errorf("original Setup.Turn mutated: %v", s.Turn)
+	}
+	// SwapTurn is its own inverse for the turn field.
+	if back := swapped.SwapTurn(); back.Turn != White {
+		t.Errorf("SwapTurn().SwapTurn().Turn = %v, want White", back.Turn)
+	}
+}
+
+func TestSetupMirror(t *testing.T) {
+	s := InitialSetup()
+	m := s.Mirror()
+	// The mirrored starting position is still a legal starting position:
+	// pieces are on the same squares but swapped in color, and since the
+	// starting position is color-symmetric, the FEN must round-trip.
+	if m.Turn != Black {
+		t.Errorf("Mirror().Turn = %v, want Black", m.Turn)
+	}
+	pos, err := NewPosition(m)
+	if err != nil {
+		t.Fatalf("NewPosition(Mirror()): %v", err)
+	}
+	// White king on e1 becomes black king on e8 (and vice versa).
+	if got := m.Board.Piece(E8); got.Type() != King || got.Color() != Black {
+		t.Errorf("Mirror().Board.Piece(E8) = %v, want Black King", got)
+	}
+	if got := m.Board.Piece(E1); got.Type() != King || got.Color() != White {
+		t.Errorf("Mirror().Board.Piece(E1) = %v, want White King", got)
+	}
+	_ = pos
+}
+
+func TestSetupMirrorEnPassant(t *testing.T) {
+	// Black just played e7-e5; en passant target is e6.
+	s := Setup{
+		Board:        mustBoard(t, "rnbqkbnr/pppp1ppp/8/4p3/8/8/PPPPPPPP/RNBQKBNR"),
+		Turn:         White,
+		EnPassant:    E6,
+		CastleRights: NewCastleRights(true, true, true, true),
+		FullMoveNo:   1,
+	}
+	m := s.Mirror()
+	if m.EnPassant != E3 {
+		t.Errorf("Mirror().EnPassant = %v, want E3 (e6 mirrored to e3)", m.EnPassant)
+	}
+	if m.Turn != Black {
+		t.Errorf("Mirror().Turn = %v, want Black", m.Turn)
+	}
+}
+
+func mustBoard(t *testing.T, boardFEN string) Board {
+	t.Helper()
+	b, err := fenBoard(boardFEN)
+	if err != nil {
+		t.Fatalf("fenBoard(%q): %v", boardFEN, err)
+	}
+	return *b
+}

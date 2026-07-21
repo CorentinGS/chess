@@ -163,7 +163,7 @@ func TestDecodeMove(t *testing.T) {
 	}
 }
 
-func TestGetRandomMove(t *testing.T) {
+func TestRandomMove(t *testing.T) {
 	book := &PolyglotBook{
 		entries: []PolyglotEntry{
 			{Key: 1, Move: 100, Weight: 10, Learn: 0},
@@ -172,25 +172,25 @@ func TestGetRandomMove(t *testing.T) {
 	}
 
 	// Test with existing position
-	move, err := book.GetRandomMove(1)
+	move, err := book.RandomMove(1)
 	if err != nil {
-		t.Fatalf("GetRandomMove() error = %v", err)
+		t.Fatalf("RandomMove() error = %v", err)
 	}
 	if move == nil {
-		t.Error("GetRandomMove() returned nil for existing position")
+		t.Error("RandomMove() returned nil for existing position")
 	}
 
 	// Test with non-existing position
-	move, err = book.GetRandomMove(999)
+	move, err = book.RandomMove(999)
 	if err != nil {
-		t.Fatalf("GetRandomMove() error = %v", err)
+		t.Fatalf("RandomMove() error = %v", err)
 	}
 	if move != nil {
-		t.Error("GetRandomMove() returned move for non-existing position")
+		t.Error("RandomMove() returned move for non-existing position")
 	}
 }
 
-func TestGetRandomMoveWithZeroTotalWeight(t *testing.T) {
+func TestRandomMoveWithZeroTotalWeight(t *testing.T) {
 	book := &PolyglotBook{
 		entries: []PolyglotEntry{
 			{Key: 1, Move: 100, Weight: 0, Learn: 0},
@@ -198,12 +198,12 @@ func TestGetRandomMoveWithZeroTotalWeight(t *testing.T) {
 		},
 	}
 
-	move, err := book.GetRandomMove(1)
+	move, err := book.RandomMove(1)
 	if err != nil {
-		t.Fatalf("GetRandomMove() error = %v", err)
+		t.Fatalf("RandomMove() error = %v", err)
 	}
 	if move != nil {
-		t.Fatalf("GetRandomMove() = %v, want nil", move)
+		t.Fatalf("RandomMove() = %v, want nil", move)
 	}
 }
 
@@ -603,7 +603,7 @@ func TestDeleteMoves(t *testing.T) {
 	}
 }
 
-func TestGetChessMoves(t *testing.T) {
+func TestChessMoves(t *testing.T) {
 	pos := uint64(50)
 	move1 := Move{
 		s1:    D2,
@@ -621,9 +621,9 @@ func TestGetChessMoves(t *testing.T) {
 			{Key: pos, Move: MoveToPolyglot(move2), Weight: 220, Learn: 0},
 		},
 	}
-	moves, err := book.GetChessMoves(pos)
+	moves, err := book.ChessMoves(pos)
 	if err != nil {
-		t.Fatalf("GetChessMoves returned error: %v", err)
+		t.Fatalf("ChessMoves returned error: %v", err)
 	}
 	if len(moves) != 2 {
 		t.Fatalf("Expected 2 moves, got %d", len(moves))
@@ -638,7 +638,7 @@ func TestGetChessMoves(t *testing.T) {
 	}
 
 	// Test error case: request moves for a non-existent position.
-	_, err = book.GetChessMoves(999)
+	_, err = book.ChessMoves(999)
 	if err == nil {
 		t.Errorf("Expected error for non-existent position, got nil")
 	}

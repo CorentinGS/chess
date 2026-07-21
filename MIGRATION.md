@@ -152,6 +152,20 @@ book, err := opening.DefaultBook()   // *BookECO, error, sync.Once
 book, err := opening.NewBook(r)      // *BookECO, error, from any io.Reader
 ```
 
+## Renamed identifiers
+
+Several v2 identifiers were renamed to follow Go naming conventions. All are
+mechanical renames with no behaviour change; update the symbol at the call site.
+
+| v2 | v3 | Reason |
+|---|---|---|
+| `opening.Opening` | `opening.Entry` | Stuttered at the call site (`opening.Opening{}`). |
+| `chess.GetPolyglotHashBytes` | _(removed)_ | Use `GetPolyglotHashes() []string` or convert a `uint64` via `binary.LittleEndian`. |
+| `(*PolyglotBook).GetRandomMove` | `(*PolyglotBook).RandomMove` | `Get` prefix on a non-trivial operation. |
+| `(*PolyglotBook).GetChessMoves` | `(*PolyglotBook).ChessMoves` | `Get` prefix on a non-trivial operation. |
+
+The unexported `newOpening` constructor is renamed `newEntry` to match.
+
 ## Resign returns an error
 
 `Game.Resign` now validates state and returns an error instead of silently
@@ -224,14 +238,29 @@ r.RenderGameTo(game, w)             // write to an io.Writer
 
 `Game.WritePGN(w)` is also available. The renderer is stateless.
 
-## New position helpers
+## Hashing
 
-- `Position.ZobristHash() uint64` — cached Zobrist hash for O(1) position
-  comparison and repetition detection. The legacy `Position.Hash() [16]byte` is
-  kept as deprecated for compatibility.
-- `Position.ValidMovesUnsafe()` and `Position.ValidMovesIter()` —
-  allocation-sensitive access for hot paths; see package docs for safety notes.
-- `Board.Piece()` uses an internal mailbox for O(1) lookup.
+v3 consolidates position hashing around the cached `Position.ZobristHash() uint64`
+for O(1) comparison and repetition detection. Several v2 hashing APIs are
+removed with no direct replacement:
+
+- `Position.Hash() [16]byte` (MD5) is **removed**, not deprecated. Use
+  `Position.ZobristHash() uint64`.
+- `ZobristHasher`, `NewChessHasher()`, `NewZobristHasher()` are removed. The
+  incremental hasher is now internal to `Position`. Callers who previously
+  hashed FEN strings without instantiating a `Position` should use the free
+  function `HashFromFEN(fen string) (uint64, error)`, which is a direct
+  replacement for `ZobristHasher.HashPosition(fen)`.
+- `ZobristHashToUint64(hash string) uint64` is removed. Convert hex hashes
+  with `strconv.ParseUint(s, 16, 64)`.
+- `GetPolyglotHashBytes(index int) []byte` is removed. Use
+  `GetPolyglotHashes() []string` for hex hashes; for the raw 8-byte
+  little-endian form, convert a `uint64` from `HashFromFEN` via
+  `binary.LittleEndian.PutUint64`.
+
+`Position.ValidMovesUnsafe()` and `Position.ValidMovesIter()` —
+allocation-sensitive access for hot paths; see package docs for safety notes.
+`Board.Piece()` uses an internal mailbox for O(1) lookup.
 
 ## Polyglot book loading
 

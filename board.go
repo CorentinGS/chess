@@ -1,37 +1,3 @@
-/*
-Package chess provides a chess engine implementation using bitboard representation for board state.
-
-The package uses a combination of bitboards for piece positions and convenience lookups,
-allowing for efficient move generation and position analysis.
-
-Board Layout:
-
-	8 | r n b q k b n r
-	7 | p p p p p p p p
-	6 | - - - - - - - -
-	5 | - - - - - - - -
-	4 | - - - - - - - -
-	3 | - - - - - - - -
-	2 | P P P P P P P P
-	1 | R N B Q K B N R
-	  ---------------
-	    A B C D E F G H
-
-Usage:
-
-	// Create a new board with starting position
-	squares := map[Square]Piece{
-	    NewSquare(FileE, Rank1): WhiteKing,
-	    NewSquare(FileD, Rank8): BlackQueen,
-	}
-	board := NewBoard(squares)
-
-	// Check piece at square
-	piece := board.Piece(NewSquare(FileE, Rank1))
-
-	// Get all piece positions.
-	positions := board.SquareMap()
-*/
 package chess
 
 import (
@@ -68,7 +34,7 @@ type Board struct {
 
 // kingSquare returns the cached king square for the given color.
 // Callers must ensure the board's convenience bitboards are up to date
-// (i.e., calcConvienceBBs has been called after any mutation).
+// (i.e., calcConvenienceBBs has been called after any mutation).
 func (b *Board) kingSquare(c Color) Square {
 	if c == White {
 		return b.whiteKingSq
@@ -104,7 +70,7 @@ func NewBoard(m map[Square]Piece) (*Board, error) {
 			return nil, err
 		}
 	}
-	b.calcConvienceBBs(nil)
+	b.calcConvenienceBBs(nil)
 	return b, nil
 }
 
@@ -396,7 +362,7 @@ func (b *Board) UnmarshalBinary(data []byte) error {
 	b.bbBlackBishop = bitboard(binary.BigEndian.Uint64(data[72:80]))
 	b.bbBlackKnight = bitboard(binary.BigEndian.Uint64(data[80:88]))
 	b.bbBlackPawn = bitboard(binary.BigEndian.Uint64(data[88:96]))
-	b.calcConvienceBBs(nil)
+	b.calcConvenienceBBs(nil)
 	b.rebuildMailbox()
 	return nil
 }
@@ -571,7 +537,7 @@ func (b *Board) moveRookForCastle(eff moveEffect, whiteSqs, blackSqs *bitboard) 
 	}
 }
 
-func (b *Board) calcConvienceBBs(m *Move) {
+func (b *Board) calcConvenienceBBs(m *Move) {
 	whiteSqs := b.bbWhiteKing | b.bbWhiteQueen | b.bbWhiteRook | b.bbWhiteBishop | b.bbWhiteKnight | b.bbWhitePawn
 	blackSqs := b.bbBlackKing | b.bbBlackQueen | b.bbBlackRook | b.bbBlackBishop | b.bbBlackKnight | b.bbBlackPawn
 	emptySqs := ^(whiteSqs | blackSqs)

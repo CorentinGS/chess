@@ -1,24 +1,7 @@
-/*
-Package chess provides PGN (Portable Game Notation) parsing, including
-moves, variations, comments, annotations, and game metadata.
-
-Production PGN entry points:
-
-	// Decode one game from an io.Reader.
-	g, err := chess.ParsePGN(r)
-
-	// Iterate every game in an io.Reader, with indices and offsets.
-	for rec, err := range chess.PGNRecords(ctx, r) {
-	    if err != nil {
-	        // handle err
-	    }
-	    g, err := rec.Decode()
-	}
-*/
 package chess
 
 import (
-	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -163,7 +146,7 @@ func (p *Parser) Parse() (*Game, error) {
 
 	// Parse header section (tag pairs)
 	if err := p.parseHeader(); err != nil {
-		return nil, errors.New("chess: parsing header")
+		return nil, fmt.Errorf("%w: parsing header: %w", ErrInvalidPGN, err)
 	}
 
 	p.tagOutcome = outcomeFromResultString(p.game.tagPairs["Result"])
@@ -172,7 +155,7 @@ func (p *Parser) Parse() (*Game, error) {
 	if value, ok := p.game.tagPairs["FEN"]; ok {
 		pos, err := decodeFEN(value)
 		if err != nil {
-			return nil, errors.New("chess: invalid FEN")
+			return nil, fmt.Errorf("%w: %w", ErrInvalidFEN, err)
 		}
 		p.game.tree.setRootPosition(pos)
 	}

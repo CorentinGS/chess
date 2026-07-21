@@ -3,6 +3,7 @@ package chess
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"iter"
 	"runtime"
@@ -83,7 +84,7 @@ func (d *PGNDecoder) Decode() (*Game, error) {
 
 	game, err := parsePGNText(record.Raw, options)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrInvalidPGN, err)
 	}
 
 	if options.expandVariations {
@@ -108,7 +109,9 @@ func (d *PGNDecoder) Offset() int64 {
 	return d.offset
 }
 
-// ParsePGN parses the first Game from r.
+// ParsePGN parses the first Game from r. Any returned error wraps
+// ErrInvalidPGN so callers can errors.Is(err, ErrInvalidPGN) without
+// inspecting message text; io.EOF is returned unchanged when r yields no game.
 func ParsePGN(r io.Reader, opts ...PGNOption) (*Game, error) {
 	return NewPGNDecoder(r, opts...).Decode()
 }

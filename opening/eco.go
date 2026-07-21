@@ -38,7 +38,7 @@ type BookECO struct {
 // NewBook creates a new opening book from an ECO TSV reader.
 // Use this for custom opening data or when you need isolation from the default book.
 // NewBook validates the input during construction so malformed books fail
-// before use. Opening.Game returns a caller-owned clone of the cached game.
+// before use. Entry.Game returns a caller-owned clone of the cached game.
 func NewBook(r io.Reader) (*BookECO, error) {
 	b := &BookECO{
 		root: &node{
@@ -63,9 +63,9 @@ func NewBook(r io.Reader) (*BookECO, error) {
 			return nil, fmt.Errorf("opening: ECO row %d: expected at least 4 columns, got %d", rowNum, len(row))
 		}
 		moveList := parseMoveList(row[3])
-		o, err := newOpening(row[0], row[1], row[3], moveList)
-		if err != nil {
-			return nil, fmt.Errorf("opening: ECO row %d (%s %s): %w", rowNum, row[0], row[1], err)
+		o, oErr := newEntry(row[0], row[1], row[3], moveList)
+		if oErr != nil {
+			return nil, fmt.Errorf("opening: ECO row %d (%s %s): %w", rowNum, row[0], row[1], oErr)
 		}
 		if err = b.insertOpening(o); err != nil {
 			return nil, fmt.Errorf("opening: ECO row %d (%s %s): %w", rowNum, row[0], row[1], err)
@@ -76,7 +76,7 @@ func NewBook(r io.Reader) (*BookECO, error) {
 
 // Find implements the Book interface.
 // Use Find for performance-sensitive opening detection paths.
-func (b *BookECO) Find(moves []chess.Move) *Opening {
+func (b *BookECO) Find(moves []chess.Move) *Entry {
 	for n := b.followPath(b.root, moves); n != nil; n = n.parent {
 		if n.opening != nil {
 			return n.opening
@@ -87,9 +87,9 @@ func (b *BookECO) Find(moves []chess.Move) *Opening {
 
 // Possible implements the Book interface.
 // Use Possible for performance-sensitive opening exploration paths.
-func (b *BookECO) Possible(moves []chess.Move) []*Opening {
+func (b *BookECO) Possible(moves []chess.Move) []*Entry {
 	root := b.followPath(b.root, moves)
-	var openings []*Opening
+	var openings []*Entry
 	b.collectOpenings(root, &openings)
 	return openings
 }
@@ -97,7 +97,7 @@ func (b *BookECO) Possible(moves []chess.Move) []*Opening {
 // collectOpenings walks the subtree rooted at n and appends each node's
 // opening (if any) directly into the result slice, avoiding the intermediate
 // []*node allocation that nodeList/collectNodes used to require.
-func (b *BookECO) collectOpenings(n *node, result *[]*Opening) {
+func (b *BookECO) collectOpenings(n *node, result *[]*Entry) {
 	if n.opening != nil {
 		*result = append(*result, n.opening)
 	}
@@ -117,9 +117,9 @@ func (b *BookECO) followPath(n *node, moves []chess.Move) *node {
 	return b.followPath(c, moves[1:])
 }
 
-func (b *BookECO) insertOpening(o *Opening) error {
+func (b *BookECO) insertOpening(o *Entry) error {
 	if len(o.moveList) == 0 {
-		return errors.New("opening has no moves")
+		return errors.New("chess: opening has no moves")
 	}
 
 	n := b.root
@@ -176,7 +176,7 @@ func moveKey(move chess.Move) uint32 {
 type node struct {
 	parent   *node
 	children map[uint32]*node
-	opening  *Opening
+	opening  *Entry
 	pos      *chess.Position
 }
 

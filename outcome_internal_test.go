@@ -119,7 +119,7 @@ func TestArbitratePGNOutcome(t *testing.T) {
 		// Board-terminal conflict with token.
 		{"board checkmate conflicts with token", WhiteWon, Checkmate, NoOutcome, BlackWon, NoOutcome, NoMethod, true, "movetext result token conflicts with board-derivable outcome"},
 		// Board-terminal conflict with tag (token agrees).
-		{"board checkmate conflicts with tag", WhiteWon, Checkmate, BlackWon, WhiteWon, NoOutcome, NoMethod, true, "Result tag conflicts with board-derivable outcome"},
+		{"board checkmate conflicts with tag", WhiteWon, Checkmate, BlackWon, WhiteWon, NoOutcome, NoMethod, true, "result tag conflicts with board-derivable outcome"},
 
 		// Non-terminal board method (e.g. Resignation carried on a FEN-rooted
 		// game — shouldn't normally happen at PGN parse since the policy is

@@ -91,7 +91,7 @@ func arbitratePGNOutcome(boardOutcome Outcome, boardMethod Method, tagOutcome, t
 			return NoOutcome, NoMethod, errors.New("movetext result token conflicts with board-derivable outcome")
 		}
 		if tagOutcome != NoOutcome && tagOutcome != boardOutcome {
-			return NoOutcome, NoMethod, errors.New("Result tag conflicts with board-derivable outcome")
+			return NoOutcome, NoMethod, errors.New("result tag conflicts with board-derivable outcome")
 		}
 		return boardOutcome, boardMethod, nil
 	}

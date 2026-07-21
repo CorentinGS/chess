@@ -137,7 +137,7 @@ func (CmdEval) Handle(lines []string, e *Engine) error {
 	for _, text := range lines {
 		lower := strings.ToLower(text)
 		if strings.Contains(lower, "error") || strings.Contains(lower, "unknown command") {
-			return errors.New("eval command not supported")
+			return errors.New("uci: eval command not supported")
 		}
 		if strings.HasPrefix(text, "Final evaluation") {
 			parts := strings.Fields(text)

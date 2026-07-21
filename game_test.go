@@ -1962,8 +1962,8 @@ func TestGameMoveValidation(t *testing.T) {
 			}
 
 			if tt.wantErr {
-				if tt.errorString != "" && err.Error() != tt.errorString {
-					t.Errorf("Move() error = %v, want error string %v", err.Error(), tt.errorString)
+				if tt.errorString != "" && !strings.Contains(err.Error(), tt.errorString) {
+					t.Errorf("Move() error = %v, want error string to contain %v", err.Error(), tt.errorString)
 				}
 				return
 			}
