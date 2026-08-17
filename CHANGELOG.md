@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. See [conven
 - - -
 ## Unreleased
 
+## v2.6.0 - 2026-08-17
+#### Features
+- add `Board.AttacksFrom()` for piece attack-map queries (#126).
+
 - - -
 
 ## v2.5.1 - 2026-06-19
