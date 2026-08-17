@@ -209,6 +209,21 @@ func (pos *Position) Update(m Move) *Position {
 	return newPos
 }
 
+// ApplyInPlace applies m to pos, mutating it in place instead of returning a
+// copy. It is the in-place counterpart of Update for callers that replay a
+// single linear line and never need the pre-move position again: the same
+// move effects (board, hash, castle rights, en passant, clocks, check state)
+// are applied without the allocation Update pays for its fresh Position.
+// The receiver must not be shared; after the call the pre-move state is gone.
+func (pos *Position) ApplyInPlace(m Move) {
+	if m.HasTag(Null) {
+		next := pos.nullUpdate()
+		*pos = *next
+		return
+	}
+	pos.applyMove(m)
+}
+
 // updateHash computes the new Zobrist hash incrementally from a move. It
 // consumes the moveEffect that drove the board mutation so the hash delta and
 // the board read one interpretation of the move's physical facts (en-passant
