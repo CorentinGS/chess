@@ -127,6 +127,43 @@ func bitboardSquares(bb bitboard) []Square {
 	return sqs
 }
 
+// AttacksFrom returns the squares attacked by the piece on sq.
+//
+// Attacks are based only on piece movement and board occupancy. They are
+// independent of the side to move, check, pins and other legal-move
+// restrictions. For sliding pieces, the first occupied square in each
+// direction is included, regardless of its color, and squares beyond it are
+// excluded. An empty or invalid source square returns an empty slice.
+func (b *Board) AttacksFrom(sq Square) []Square {
+	if b == nil || sq < A1 || sq > H8 {
+		return nil
+	}
+
+	piece := b.Piece(sq)
+	if piece == NoPiece {
+		return nil
+	}
+
+	occupied := ^b.emptySqs
+	var attacks bitboard
+	switch piece.Type() {
+	case Pawn:
+		attacks = pawnAttacks(piece.Color(), sq)
+	case Knight:
+		attacks = bbKnightMoves[sq]
+	case Bishop:
+		attacks = diaAttack(occupied, sq)
+	case Rook:
+		attacks = hvAttack(occupied, sq)
+	case Queen:
+		attacks = diaAttack(occupied, sq) | hvAttack(occupied, sq)
+	case King:
+		attacks = bbKingMoves[sq]
+	}
+
+	return bitboardSquares(attacks)
+}
+
 // isInCheck returns true if the side to move is in check in the given position.
 func isInCheck(pos *Position) bool {
 	inCheck, _ := checkState(pos)
