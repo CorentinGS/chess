@@ -1,0 +1,385 @@
+package chess
+
+import (
+	"io"
+	"slices"
+	"strconv"
+	"strings"
+)
+
+// PGNRenderer renders a Game into PGN text. It is a stateless
+// function object that reads Game state and writes formatted PGN
+// to a string or io.Writer without mutating the Game.
+//
+// The renderer takes a pointer so callers may extend it in the
+// future (custom tag ordering, value escaping toggles, optional
+// result token, etc.). All such configuration fields are deferred
+// to v3.1; this initial type is a pure extraction with no knobs.
+type PGNRenderer struct{}
+
+// DefaultPGNRenderer is the package-level renderer used by
+// Game.String and Game.WritePGN.
+var DefaultPGNRenderer = &PGNRenderer{}
+
+// pgnRender holds the state for a single render pass. A fresh instance is
+// created per Render/RenderGameTo call; PGNRenderer itself stays stateless.
+//
+// Cursor invariant: run() navigates the MoveTree's single active cursor
+// (ADR-016) to read pre-move positions. It saves the caller's cursor on
+// entry and restores it via defer, inside the tree != nil guard. Not safe
+// for concurrent use on one Game; same constraint as the v3 slice.
+type pgnRender struct {
+	g  *Game
+	sb *strings.Builder
+}
+
+// Render returns the PGN text for g.
+func (r *PGNRenderer) Render(g *Game) string {
+	var sb strings.Builder
+	// strings.Builder.Write never fails; the error is unreachable here.
+	_ = r.RenderGameTo(g, &sb)
+	return sb.String()
+}
+
+// RenderGameTo writes the PGN text for g to w. It returns any
+// write error from w.
+func (r *PGNRenderer) RenderGameTo(g *Game, w io.Writer) error {
+	sb, ok := w.(*strings.Builder)
+	if !ok {
+		sb = &strings.Builder{}
+	}
+	(&pgnRender{g: g, sb: sb}).run()
+	if ok {
+		return nil
+	}
+	_, err := io.WriteString(w, sb.String())
+	return err
+}
+
+func (p *pgnRender) run() {
+	g := p.g
+	sb := p.sb
+
+	tags := g.tagPairs
+	if g.tree != nil && g.tree.rootPos != nil && g.tree.rootPos.variant == Chess960 {
+		tags = chess960PGNTags(g.tagPairs, g.tree.rootPos)
+	}
+
+	tagPairList := make([]sortableTagPair, len(tags))
+	var idx uint
+	for tag, value := range tags {
+		tagPairList[idx] = sortableTagPair{
+			Key:   tag,
+			Value: value,
+		}
+		idx++
+	}
+
+	slices.SortFunc(tagPairList, cmpTags)
+
+	for _, tagPair := range tagPairList {
+		sb.WriteByte('[')
+		sb.WriteString(tagPair.Key)
+		sb.WriteString(" \"")
+		sb.WriteString(escapeTagValue(tagPair.Value))
+		sb.WriteString("\"]\n")
+	}
+
+	if len(g.tagPairs) > 0 {
+		sb.WriteString("\n")
+	}
+
+	needTrailingSpace := false
+	if g.tree != nil && g.tree.Root() != nil {
+		// Rendering reads pre-move positions via MoveNode.Position(), which
+		// drives the tree's single active cursor (ADR-016). Save the cursor
+		// node here and restore it after the render so the tree's active
+		// position is left where the caller left it.
+		defer g.tree.setCurrent(g.tree.Current())
+		root := g.tree.Root()
+		if len(root.children) > 0 {
+			// Root position is always available via tree.rootPos — no
+			// cursor navigation needed for the move count / side to move
+			// at the start of the game.
+			p.writeMoves(root,
+				g.tree.rootPos.moveCount,
+				g.tree.rootPos.turn == White, false, false, true)
+			needTrailingSpace = true
+		} else if root.hasAnnotations() {
+			p.writeAnnotations(root)
+		}
+	}
+
+	if needTrailingSpace {
+		sb.WriteString(" ")
+	}
+	sb.WriteString(g.Outcome().String())
+}
+
+// sortableTagPair is the key/value row used to sort a Game's tag pairs into
+// PGN output order.
+type sortableTagPair struct {
+	Key   string
+	Value string
+}
+
+// cmpTags orders two tag pairs. The Seven Tag Roster (Event, Site, Date,
+// Round, White, Black, Result) takes priority; everything else is sorted
+// ascending by key. Duplicate keys are treated as equal so the sort is
+// stable.
+func cmpTags(a, b sortableTagPair) int {
+	// Don't re-order duplicate keys
+	if a.Key == b.Key {
+		return 0
+	}
+
+	// PGN defined tags take priority
+	for _, req := range []string{
+		"Event",
+		"Site",
+		"Date",
+		"Round",
+		"White",
+		"Black",
+		"Result",
+	} {
+		if a.Key == req {
+			return -1
+		}
+		if b.Key == req {
+			return +1
+		}
+	}
+
+	// Finally compare the keys directly and sort by ascending
+	if a.Key < b.Key {
+		return -1
+	} else if b.Key < a.Key {
+		return +1
+	}
+	return 0
+}
+
+// escapeTagValue escapes backslash and double-quote characters so that the
+// resulting string is safe to embed inside a PGN tag value.
+func escapeTagValue(v string) string {
+	var sb strings.Builder
+	for i := range len(v) {
+		c := v[i]
+		if c == '\\' || c == '"' {
+			sb.WriteByte('\\')
+		}
+		sb.WriteByte(c)
+	}
+	return sb.String()
+}
+
+// writeMoves recursively writes the PGN-formatted move sequence starting from
+// the given move node. It handles move numbering for white and black moves,
+// encodes moves using algebraic notation based on the appropriate position,
+// and appends comments and command annotations if present. The function
+// distinguishes between main line moves and sub-variations; when processing a
+// sub-variation, moves are enclosed in parentheses.
+//
+// The function recurses through the move tree, writing the main line first
+// and then processing any additional variations, ensuring that the output
+// adheres to standard PGN conventions.
+//
+// ponytail: subVariation/closedVariation/isRoot stay per-frame locals;
+// a named-context cleanup is a separate follow-up, not this refactor.
+func (p *pgnRender) writeMoves(node *MoveNode, moveNum int, isWhite bool,
+	subVariation, closedVariation, isRoot bool,
+) {
+	// If no moves remain, stop.
+	if node == nil {
+		return
+	}
+
+	// Handle root move comments before processing children
+	if isRoot && node.hasAnnotations() {
+		p.writeAnnotations(node)
+	}
+
+	var currentMove *MoveNode
+
+	// The main line is the first child.
+	if subVariation {
+		currentMove = node
+	} else {
+		if len(node.children) == 0 {
+			return // nothing to print if no child exists (should not happen for a proper game)
+		}
+		currentMove = node.children[0]
+	}
+
+	p.writeMoveNumber(moveNum, isWhite, subVariation, closedVariation, isRoot)
+
+	// Encode the move using your algebraicNotation.
+	p.writeMoveEncoding(currentMove)
+
+	p.writeAnnotations(currentMove)
+
+	if len(node.children) > 1 || len(currentMove.children) > 0 {
+		p.sb.WriteString(" ")
+	}
+	// Process any variations (children beyond the first).
+	// In PGN, variations are enclosed in parentheses.
+	closedVar := p.writeVariations(node, moveNum, isWhite)
+
+	if len(currentMove.children) > 0 {
+		var nextMoveNum int
+		var nextIsWhite bool
+		if isWhite {
+			// After white's move, black plays using the same move number.
+			nextMoveNum = moveNum
+			nextIsWhite = false
+		} else {
+			// After black's move, increment move number.
+			nextMoveNum = moveNum + 1
+			nextIsWhite = true
+		}
+		p.writeMoves(currentMove, nextMoveNum, nextIsWhite, false, closedVar,
+			false)
+	}
+}
+
+func (p *pgnRender) writeMoveNumber(moveNum int, isWhite bool,
+	subVariation, closedVariation, isRoot bool,
+) {
+	if closedVariation {
+		p.sb.WriteString(" ")
+	}
+	if isWhite {
+		p.sb.WriteString(strconv.Itoa(moveNum))
+		p.sb.WriteString(". ")
+	} else if subVariation || closedVariation || isRoot {
+		p.sb.WriteString(strconv.Itoa(moveNum))
+		p.sb.WriteString("... ")
+	}
+}
+
+func (p *pgnRender) writeMoveEncoding(currentMove *MoveNode) {
+	if currentMove == nil || currentMove.parent == nil || currentMove.tree == nil {
+		return
+	}
+	// Look up the pre-move position via the tree cursor (Peek is no-copy;
+	// run saves/restores the active cursor for us). The synthetic root
+	// carries rootPos.
+	var prePos *Position
+	if currentMove.parent == currentMove.tree.Root() {
+		prePos = currentMove.tree.rootPos
+	} else {
+		// Navigate the cursor to the parent and read the live position
+		// (no alloc). SAN().Encode reads only, so we can safely alias the
+		// live cursor position. Relies on run's outer defer to restore the
+		// active cursor when the render returns.
+		currentMove.tree.setCurrent(currentMove.parent)
+		prePos = currentMove.tree.pos
+	}
+	moveStr, err := SAN().Encode(prePos, currentMove.move)
+	// ponytail: SAN encode errors are dropped silently. The only realistic
+	// cause is prePos == nil from tree corruption, which yields malformed
+	// PGN that downstream parsers reject — not silently-corrupt games.
+	if err == nil {
+		p.sb.WriteString(moveStr)
+	}
+}
+
+func (p *pgnRender) writeAnnotations(move *MoveNode) {
+	if move == nil {
+		return
+	}
+
+	for _, nag := range move.nags {
+		p.sb.WriteByte(' ')
+		p.sb.WriteString(nag)
+	}
+
+	if len(move.commentBlocks) > 0 {
+		writeCommentBlocks(move.commentBlocks, p.sb)
+	}
+}
+
+func writeCommentBlocks(blocks []CommentBlock, sb *strings.Builder) {
+	for _, block := range blocks {
+		if len(block.Items) == 0 {
+			continue
+		}
+
+		sb.WriteString(" {")
+		lastByte := byte('{')
+		for _, item := range block.Items {
+			switch item.Kind {
+			case CommentText:
+				lastByte = writeEscapedCommentText(sb, item.Text, lastByte)
+			case CommentCommand:
+				if needsCommandSeparator(lastByte) {
+					sb.WriteString(" ")
+				}
+				sb.WriteString("[%")
+				sb.WriteString(item.Key)
+				sb.WriteString(" ")
+				sb.WriteString(item.Value)
+				sb.WriteString("]")
+				lastByte = ']'
+			}
+		}
+		sb.WriteString("}")
+	}
+}
+
+func writeEscapedCommentText(sb *strings.Builder, text string, lastByte byte) byte {
+	for i := range len(text) {
+		if text[i] == '}' {
+			sb.WriteByte('\\')
+		}
+		sb.WriteByte(text[i])
+		lastByte = text[i]
+	}
+	return lastByte
+}
+
+func needsCommandSeparator(lastByte byte) bool {
+	return lastByte != ' '
+}
+
+func (p *pgnRender) writeVariations(node *MoveNode, moveNum int, isWhite bool) bool {
+	wroteAtLeastOneVar := false
+
+	if len(node.children) > 1 {
+		for i := 1; i < len(node.children); i++ {
+			if wroteAtLeastOneVar {
+				p.sb.WriteString(" ")
+			}
+			wroteAtLeastOneVar = true
+
+			variation := node.children[i]
+			p.sb.WriteString("(")
+			p.writeMoves(variation, moveNum, isWhite, true, false, false)
+			p.sb.WriteString(")")
+		}
+	}
+
+	return wroteAtLeastOneVar
+}
+
+// chess960PGNTags returns a copy of tags with the PGN tags required to
+// round-trip a Chess960 game: Variant names the variant, and SetUp/FEN record
+// the starting position. Existing tags are preserved unchanged. The returned
+// map is always a fresh copy, so the game's own tag pairs are not mutated.
+func chess960PGNTags(tags TagPairs, rootPos *Position) TagPairs {
+	out := make(TagPairs, len(tags)+3)
+	for k, v := range tags {
+		out[k] = v
+	}
+	if _, ok := out["Variant"]; !ok {
+		out["Variant"] = "Chess960"
+	}
+	if _, ok := out["SetUp"]; !ok {
+		out["SetUp"] = "1"
+	}
+	if _, ok := out["FEN"]; !ok {
+		out["FEN"] = rootPos.String()
+	}
+	return out
+}

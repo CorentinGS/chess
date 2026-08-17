@@ -96,7 +96,7 @@ func TestBitboardOccupied(t *testing.T) {
 }
 
 func BenchmarkBitboardReverse(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		u := uint64(9223372036854775807)
 		bitboard(u).Reverse()
 	}

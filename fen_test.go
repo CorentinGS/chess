@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -54,7 +55,6 @@ var (
 		"rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq c12 1 2",
 		"7k/8/8/8/8/8/8/R6K w - - 0 -1",
 		"7k/8/8/8/8/8/8/2B1KB2 w - - -1 1",
-		"8/8/8/4k3/8/8/8/R3K2R w KQ - 0 0",
 		"8/8/8/8/4k3/8/3KP3/8 c - - 0 1",
 		"8/8/5k2/8/5K2/8/4P3P/8 w - - 0 1",
 		"r4rk1/1b2bppp/ppq1p3/2pp3n/5P2/1P1BP3/PBPPQ1PP/R4RK1 w e4 - 0 1",
@@ -78,11 +78,66 @@ func TestValidFENs(t *testing.T) {
 	}
 }
 
+func TestRelaxedFENParsing(t *testing.T) {
+	tests := []struct {
+		name string
+		fen  string
+		// wantFEN is the canonical re-rendered FEN after parsing.
+		wantFEN string
+	}{
+		{"board only", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1"},
+		{"board and turn", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b - - 0 1"},
+		{"underscore separators", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR_w_KQkq_-_0_1", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"},
+		{"multiple spaces", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR   w   KQkq   -   0   1", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"},
+		{"zero fullmove becomes one", "8/8/8/4k3/8/8/8/R3K2R w KQ - 0 0", "8/8/8/4k3/8/8/8/R3K2R w KQ - 0 1"},
+		{"tab separator", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR\tw\tKQkq\t-\t0\t1", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pos, err := decodeFEN(tt.fen)
+			if err != nil {
+				t.Fatalf("decodeFEN(%q) error = %v; relaxed parser should accept it", tt.fen, err)
+			}
+			if got := pos.String(); got != tt.wantFEN {
+				t.Errorf("decodeFEN(%q).String() = %q, want %q", tt.fen, got, tt.wantFEN)
+			}
+		})
+	}
+}
+
+func TestFENErrorWrapsSentinel(t *testing.T) {
+	for _, fen := range []string{"", "garbage", "8/8/8/8/8/8/8/8 x - 0 1", "8/8/8/8/8/8/8/8 w KQkq - 0 -1", "8/8/8/8/8/8/8/8 w - - 0 1"} {
+		_, err := decodeFEN(fen)
+		if err == nil {
+			t.Fatalf("decodeFEN(%q) expected error", fen)
+		}
+		if !errors.Is(err, ErrInvalidFEN) {
+			t.Errorf("decodeFEN(%q) error = %v, want errors.Is(err, ErrInvalidFEN)", fen, err)
+		}
+	}
+}
+
 func TestInvalidFENs(t *testing.T) {
 	for _, f := range invalidFENs {
 		if _, err := decodeFEN(f); err == nil {
 			t.Fatal("fen expected error from ", f)
 		}
+	}
+}
+
+func TestFenBoardHandlesInvalidPooledMaps(t *testing.T) {
+	pieceMapPool.Put("not a piece map")
+	fileMapPool.Put("not a file map")
+
+	board, err := fenBoard("8/8/8/8/8/8/8/R6K")
+	if err != nil {
+		t.Fatalf("fenBoard returned error: %v", err)
+	}
+	if got := board.Piece(A1); got != WhiteRook {
+		t.Fatalf("A1 = %v, want %v", got, WhiteRook)
+	}
+	if got := board.Piece(H1); got != WhiteKing {
+		t.Fatalf("H1 = %v, want %v", got, WhiteKing)
 	}
 }
 
@@ -120,7 +175,7 @@ func BenchmarkFenBoard(b *testing.B) {
 			b.ResetTimer()
 			b.ReportAllocs()
 			// Run the benchmark
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				board, err := fenBoard(bm.fen)
 				if err != nil {
 					b.Fatal(err)

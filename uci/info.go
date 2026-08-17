@@ -2,24 +2,34 @@ package uci
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v3"
 )
 
-var missingWdlErr = errors.New("uci: wdl unavailable; this is mostly likely because UCI_ShowWDL has not been set")
+var errMissingWdl = errors.New("uci: wdl unavailable; this is mostly likely because UCI_ShowWDL has not been set")
 
 // SearchResults is the result from the most recent CmdGo invocation.  It includes
 // data such as the following:
 // info depth 21 seldepth 31 multipv 1 score cp 39 nodes 862438 nps 860716 hashfull 409 tbhits 0 time 1002 pv e2e4
 // bestmove e2e4 ponder c7c5.
 type SearchResults struct {
-	BestMove    *chess.Move
-	Ponder      *chess.Move
+	BestMove    chess.Move
+	Ponder      chess.Move
 	MultiPVInfo []Info
 	Info        Info
+}
+
+func (r SearchResults) copy() SearchResults {
+	return SearchResults{
+		BestMove:    r.BestMove,
+		Ponder:      r.Ponder,
+		MultiPVInfo: copyInfoSlice(r.MultiPVInfo),
+		Info:        r.Info.copy(),
+	}
 }
 
 // Info corresponds to the "info" engine output:
@@ -89,8 +99,8 @@ type SearchResults struct {
 //     If  is greater than 1, always send all k lines in k strings together.
 //     The engine should only send this if the option "UCI_ShowCurrLine" is set to true.
 type Info struct {
-	CurrentMove       *chess.Move
-	PV                []*chess.Move
+	CurrentMove       chess.Move
+	PV                []chess.Move
 	Score             Score
 	Depth             int
 	Seldepth          int
@@ -102,6 +112,77 @@ type Info struct {
 	NPS               int
 	TBHits            int
 	CPULoad           int
+}
+
+func (info *Info) copy() Info {
+	out := *info
+	out.PV = append([]chess.Move{}, info.PV...)
+	return out
+}
+
+func copyInfoSlice(src []Info) []Info {
+	if src == nil {
+		return []Info{}
+	}
+	out := make([]Info, len(src))
+	for idx, info := range src {
+		out[idx] = info.copy()
+	}
+	return out
+}
+
+func parseInfoInt(field, value string) (int, error) {
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("uci: invalid info %s %q: %w", field, value, err)
+	}
+	return v, nil
+}
+
+// assignIntField parses value as an integer and assigns it to the Info field
+// identified by field. It returns true when the field was recognised.
+func (info *Info) assignIntField(field, value string) (bool, error) {
+	v, err := parseInfoInt(field, value)
+	if err != nil {
+		return false, err
+	}
+	switch field {
+	case "depth":
+		info.Depth = v
+	case "seldepth":
+		info.Seldepth = v
+	case "multipv":
+		info.Multipv = v
+	case "cp":
+		info.Score.CP = v
+	case "nodes":
+		info.Nodes = v
+	case "currmovenumber":
+		info.CurrentMoveNumber = v
+	case "hashfull":
+		info.Hashfull = v
+	case "tbhits":
+		info.TBHits = v
+	case "nps":
+		info.NPS = v
+	case "cpuload":
+		info.CPULoad = v
+	default:
+		return false, nil
+	}
+	return true, nil
+}
+
+func nextInfoToken(s string) (string, string, bool) {
+	s = strings.TrimLeft(s, " ")
+	if s == "" {
+		return "", "", false
+	}
+	token, rest, found := strings.Cut(s, " ")
+	if !found {
+		return s, "", true
+	}
+	return token, rest, true
 }
 
 // Score corresponds to the "info"'s score engine output:
@@ -138,7 +219,7 @@ type Score struct {
 func (score Score) WinPct() (float32, error) {
 	total := score.Win + score.Draw + score.Loss
 	if total == 0 {
-		return 0.0, missingWdlErr
+		return 0.0, errMissingWdl
 	}
 	return float32(score.Win) / float32(total), nil
 }
@@ -150,7 +231,7 @@ func (score Score) WinPct() (float32, error) {
 func (score Score) DrawPct() (float32, error) {
 	total := score.Win + score.Draw + score.Loss
 	if total == 0 {
-		return 0.0, missingWdlErr
+		return 0.0, errMissingWdl
 	}
 	return float32(score.Draw) / float32(total), nil
 }
@@ -162,28 +243,32 @@ func (score Score) DrawPct() (float32, error) {
 func (score Score) LossPct() (float32, error) {
 	total := score.Win + score.Draw + score.Loss
 	if total == 0 {
-		return 0.0, missingWdlErr
+		return 0.0, errMissingWdl
 	}
 	return float32(score.Loss) / float32(total), nil
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface and parses.
 // data like the following:
-// info depth 24 seldepth 32 multipv 1 score cp 29 wdl 791 209 0 nodes 5130101 nps 819897 hashfull 967 tbhits 0 time 6257 pv d2d4
-// TODO: Refactor this function to be shorter.
-//
-//nolint:funlen // This function is long because it has to parse a lot of different fields.
+// info depth 24 seldepth 32 multipv 1 score cp 29 wdl 791 209 0 nodes 5130101 nps 819897 hashfull 967 tbhits 0 time 6257 pv d2d4.
 func (info *Info) UnmarshalText(text []byte) error {
-	parts := strings.Split(string(text), " ")
-	if len(parts) == 0 {
-		return errors.New("uci: invalid info line " + string(text))
-	}
-	if parts[0] != "info" {
-		return errors.New("uci: invalid info line " + string(text))
+	line := string(text)
+	token, rest, ok := nextInfoToken(line)
+	if !ok || token != "info" {
+		return fmt.Errorf("uci: invalid info line %s", line)
 	}
 	ref := ""
-	for i := 1; i < len(parts); i++ {
-		s := parts[i]
+	var (
+		s        string
+		nextRest string
+	)
+	for {
+		s, nextRest, ok = nextInfoToken(rest)
+		if !ok {
+			break
+		}
+		rest = nextRest
+
 		switch s {
 		case "score":
 			continue
@@ -199,105 +284,58 @@ func (info *Info) UnmarshalText(text []byte) error {
 			continue
 		}
 		switch ref {
-		case "depth":
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return err
-			}
-			info.Depth = v
-		case "seldepth":
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return err
-			}
-			info.Seldepth = v
-		case "multipv":
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return err
-			}
-			info.Multipv = v
-		case "cp":
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return err
-			}
-			info.Score.CP = v
 		case "wdl":
+			draw, drawRest, wdlOK := nextInfoToken(rest)
+			if !wdlOK {
+				return fmt.Errorf("uci: truncated wdl score: %s", line)
+			}
+			loss, afterLoss, wdlOK := nextInfoToken(drawRest)
+			if !wdlOK {
+				return fmt.Errorf("uci: truncated wdl score: %s", line)
+			}
+			rest = afterLoss
+
 			var err error
-			info.Score.Win, err = strconv.Atoi(parts[i])
+			info.Score.Win, err = parseInfoInt("wdl win", s)
 			if err != nil {
 				return err
 			}
-			info.Score.Draw, err = strconv.Atoi(parts[i+1])
+			info.Score.Draw, err = parseInfoInt("wdl draw", draw)
 			if err != nil {
 				return err
 			}
-			info.Score.Loss, err = strconv.Atoi(parts[i+2])
+			info.Score.Loss, err = parseInfoInt("wdl loss", loss)
 			if err != nil {
 				return err
 			}
-			i += 2
-		case "nodes":
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return err
-			}
-			info.Nodes = v
 		case "mate":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("mate", s)
 			if err != nil {
 				return err
 			}
 			info.Score.Mate = v
-		case "currmovenumber":
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return err
-			}
-			info.CurrentMoveNumber = v
-		case "currmove":
-			m, err := chess.UCINotation{}.Decode(nil, s)
-			if err != nil {
-				return err
-			}
-			info.CurrentMove = m
-		case "hashfull":
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return err
-			}
-			info.Hashfull = v
-		case "tbhits":
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return err
-			}
-			info.TBHits = v
 		case "time":
-			v, err := strconv.Atoi(s)
+			v, err := parseInfoInt("time", s)
 			if err != nil {
 				return err
 			}
 			info.Time = time.Millisecond * time.Duration(v)
-		case "nps":
-			v, err := strconv.Atoi(s)
+		case "currmove":
+			raw, err := chess.UCI().DecodeRaw(s)
 			if err != nil {
-				return err
+				return fmt.Errorf("uci: invalid info currmove %q: %w", s, err)
 			}
-			info.NPS = v
-		case "cpuload":
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return err
-			}
-			info.CPULoad = v
+			info.CurrentMove = raw.Move()
 		case "pv":
-			m, err := chess.UCINotation{}.Decode(nil, s)
+			raw, err := chess.UCI().DecodeRaw(s)
 			if err != nil {
+				return fmt.Errorf("uci: invalid info pv move %q: %w", s, err)
+			}
+			info.PV = append(info.PV, raw.Move())
+		default:
+			if _, err := info.assignIntField(ref, s); err != nil {
 				return err
 			}
-			info.PV = append(info.PV, m)
 		}
 		if ref != "pv" {
 			ref = ""

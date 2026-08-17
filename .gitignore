@@ -29,6 +29,9 @@ _testmain.go
 
 # Benchmarking
 cpu.out
+
+# Coverage
+coverage.out
 .idea
 stockfish
 .worktrees/
@@ -36,3 +39,5 @@ stockfish
 skills-lock.json
 CONTEXT.md
 docs/
+AGENTS.md
+.scratch/

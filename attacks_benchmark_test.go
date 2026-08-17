@@ -3,9 +3,10 @@ package chess
 import "testing"
 
 func BenchmarkBoardAttacksFrom(b *testing.B) {
-	pos := mustPosition(
-		"r3k2r/ppp2ppp/2n1b3/3q4/3R4/2N1B3/PPP2PPP/R3K2R w KQkq - 0 1",
-	)
+	pos, err := decodeFEN("r3k2r/ppp2ppp/2n1b3/3q4/3R4/2N1B3/PPP2PPP/R3K2R w KQkq - 0 1")
+	if err != nil {
+		b.Fatal(err)
+	}
 	board := pos.Board()
 
 	tests := []struct {

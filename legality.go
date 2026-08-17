@@ -1,0 +1,230 @@
+package chess
+
+import (
+	"errors"
+	"fmt"
+	"math/bits"
+)
+
+// ErrIllegalMove is returned by resolveCanonicalMove when the supplied
+// coordinates do not match any legal move from the given Position.
+var ErrIllegalMove = errors.New("chess: illegal move")
+
+// resolveCanonicalMove validates a caller-supplied Move against the legal
+// moves of pos and returns the canonical generated Move with position-derived
+// tags (capture, en passant, castling, check). A Null-tagged Move returns
+// NewNullMove regardless of origin, destination, or promotion.
+//
+// The returned Move is what safe insertion should store, encode, and apply:
+// its identity (origin, destination, promotion) and its tags both reflect the
+// position. A caller who supplied partial or stale tags therefore benefits
+// from repair: the Move tree keeps the canonical value, and downstream
+// cursor application, repetition detection, and PGN encoding see one
+// interpretation.
+//
+// Errors:
+//   - ErrIllegalMove if no legal move matches the supplied coordinates.
+//   - "chess: position required" if pos is nil and the Move is not Null.
+func resolveCanonicalMove(pos *Position, m Move) (Move, error) {
+	if m.HasTag(Null) {
+		return NewNullMove(), nil
+	}
+	if pos == nil {
+		return Move{}, errors.New("chess: position required")
+	}
+	for _, v := range pos.ValidMovesUnsafe() {
+		if v.s1 == m.s1 && v.s2 == m.s2 && v.promo == m.promo {
+			return v, nil
+		}
+	}
+	return Move{}, fmt.Errorf("chess: illegal move %s: %w", m.String(), ErrIllegalMove)
+}
+
+// legality owns the king-safety policy for one position. Construct one per
+// position with newLegality and call legal on every candidate move.
+//
+// legality never mutates its pos. The slow path (king moves, en passant,
+// in-check, opponent-Check annotation) uses a stack copy of pos.board; the
+// prefilter lives in legality.filter for movegen's hot loop.
+//
+// legal returns (tag, ok). ok is true iff the move leaves the moving side's
+// own king safe. tag always carries the cheap bits (Capture/EnPassant/castle);
+// in mode == generateLegalAnnotated it also carries Check when applicable.
+// Callers must gate on ok before trusting tag for annotation.
+type legality struct {
+	pos        *Position
+	mode       moveGenerationMode
+	enabled    bool
+	checkCount int
+	checkMask  bitboard
+}
+
+func newLegality(pos *Position, mode moveGenerationMode) legality {
+	lg := legality{pos: pos, mode: mode}
+	if mode == generateUnsafeOnly {
+		return lg
+	}
+	kingSq := pos.board.kingSquare(pos.turn)
+	if kingSq == NoSquare {
+		return lg
+	}
+	queenBB, rookBB, bishopBB := sliderBitboards(&pos.board, pos.turn.Other())
+	if !pos.inCheck && alignedMasks[kingSq]&(queenBB|rookBB|bishopBB) == 0 {
+		return lg
+	}
+	lg.enabled = true
+	lg.checkMask = ^bitboard(0)
+	if pos.inCheck {
+		setCheckContext(&lg, kingSq, pos.checkers)
+	}
+	return lg
+}
+
+// setCheckContext derives the check-count and check-mask from a precomputed
+// bitboard of checking pieces. When the position was constructed through the
+// normal paths (NewPosition, decodeFENUnsafe, applyMove) pos.checkers is
+// already accurate, so this avoids recomputing the full attack set.
+func setCheckContext(lg *legality, kingSq Square, checkers bitboard) {
+	lg.checkCount = bits.OnesCount64(uint64(checkers))
+	if lg.checkCount == 1 {
+		checkerSq := squareFromBit(checkers)
+		lg.checkMask = bbForSquare(checkerSq)
+		if squaresAligned(kingSq, checkerSq) {
+			lg.checkMask |= squaresBetween(kingSq, checkerSq)
+		}
+	}
+}
+
+// filter restricts the pseudo-legal destinations for one piece using the
+// precomputed king-safety context. King moves and pawns-with-en-passant
+// always pass through (they need a per-move legality check); in double check,
+// only King moves survive (movegen's non-King loops see s2BB == 0).
+func (lg legality) filter(p Piece, s1 Square, moves bitboard) bitboard {
+	if !lg.enabled {
+		return moves
+	}
+	if p.Type() == King {
+		return moves
+	}
+	if lg.pos.enPassantSquare != NoSquare && p.Type() == Pawn {
+		return moves
+	}
+	if lg.checkCount > 1 {
+		return 0
+	}
+	if lg.checkCount == 1 {
+		moves &= lg.checkMask
+	}
+	if pinRay := pinnedRayForPiece(lg.pos, s1); pinRay != 0 {
+		moves &= pinRay
+	}
+	return moves
+}
+
+func (lg legality) legal(m Move) (MoveTag, bool) {
+	var tag MoveTag
+	p := lg.pos.board.Piece(m.s1)
+
+	if lg.pos.board.isOccupied(m.s2) {
+		tag |= Capture
+	} else if m.s2 == lg.pos.enPassantSquare && p.Type() == Pawn {
+		tag |= EnPassant
+	}
+	if p == WhiteKing && m.s1.Rank() == Rank1 {
+		switch m.s2 {
+		case G1:
+			if lg.pos.castleRights.CanCastle(White, KingSide) {
+				tag |= KingSideCastle
+			}
+		case C1:
+			if lg.pos.castleRights.CanCastle(White, QueenSide) {
+				tag |= QueenSideCastle
+			}
+		}
+	} else if p == BlackKing && m.s1.Rank() == Rank8 {
+		switch m.s2 {
+		case G8:
+			if lg.pos.castleRights.CanCastle(Black, KingSide) {
+				tag |= KingSideCastle
+			}
+		case C8:
+			if lg.pos.castleRights.CanCastle(Black, QueenSide) {
+				tag |= QueenSideCastle
+			}
+		}
+	}
+
+	return lg.kingSafety(m, p, tag)
+}
+
+func (lg legality) kingSafety(m Move, p Piece, tag MoveTag) (MoveTag, bool) {
+	// Fast path: not in check, not King, not en passant. Positions without
+	// aligned enemy slider pressure skip the slider check entirely.
+	if !lg.pos.inCheck && p.Type() != King && tag&EnPassant == 0 {
+		if moveFromAlignedWithOwnKing(m, lg.pos) && exposesOwnKingToSlider(m, lg.pos) {
+			return tag, false
+		}
+		if lg.mode == generateLegalAnnotated {
+			return lg.annotateCheck(m, tag), true
+		}
+		return tag, true
+	}
+	return lg.simulate(m, tag)
+}
+
+func (lg legality) annotateCheck(m Move, tag MoveTag) MoveTag {
+	b := lg.pos.board
+	applied := m
+	applied.tags = tag
+	b.update(applied, computeMoveEffect(&lg.pos.board, applied))
+	if b.kingSquare(lg.pos.turn.Other()) != NoSquare &&
+		isSquareAttackedBy(&b, b.kingSquare(lg.pos.turn.Other()), lg.pos.turn) {
+		tag |= Check
+	}
+	return tag
+}
+
+func (lg legality) simulate(m Move, tag MoveTag) (MoveTag, bool) {
+	// Direct b.update on a stack copy: simulate only needs piece placement
+	// for the attack test; applyMove's scalar state (moveCount, hash,
+	// castleRights, EP) must not change on the live position.
+	b := lg.pos.board
+	applied := m
+	applied.tags = tag
+	b.update(applied, computeMoveEffect(&lg.pos.board, applied))
+	if b.kingSquare(lg.pos.turn) != NoSquare &&
+		isSquareAttackedBy(&b, b.kingSquare(lg.pos.turn), lg.pos.turn.Other()) {
+		return tag, false
+	}
+	if lg.mode == generateLegalAnnotated {
+		if b.kingSquare(lg.pos.turn.Other()) != NoSquare &&
+			isSquareAttackedBy(&b, b.kingSquare(lg.pos.turn.Other()), lg.pos.turn) {
+			tag |= Check
+		}
+	}
+	return tag, true
+}
+
+func moveFromAlignedWithOwnKing(m Move, pos *Position) bool {
+	kingSq := pos.board.kingSquare(pos.turn)
+	if kingSq == NoSquare {
+		return false
+	}
+	return alignedMasks[kingSq]&bbForSquare(m.s1) != 0
+}
+
+func exposesOwnKingToSlider(m Move, pos *Position) bool {
+	kingSq := pos.board.kingSquare(pos.turn)
+	if kingSq == NoSquare {
+		return false
+	}
+	occ := (^pos.board.emptySqs &^ bbForSquare(m.s1)) | bbForSquare(m.s2)
+	attacker := pos.turn.Other()
+	captured := bbForSquare(m.s2)
+	queenBB, rookBB, bishopBB := sliderBitboards(&pos.board, attacker)
+	queenBB &^= captured
+	rookBB &^= captured
+	bishopBB &^= captured
+	return hvAttack(occ, kingSq)&(queenBB|rookBB) != 0 ||
+		diaAttack(occ, kingSq)&(queenBB|bishopBB) != 0
+}

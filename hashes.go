@@ -1,22 +1,9 @@
 package chess
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strconv"
 )
-
-var polyglotHashesBytes = func() [len(polyglotHashes)][8]byte {
-	var hashes [len(polyglotHashes)][8]byte
-	for i, hexStr := range polyglotHashes {
-		b, err := hex.DecodeString(hexStr)
-		if err != nil {
-			panic(fmt.Errorf("invalid polyglot hash at index %d: %w", i, err))
-		}
-		copy(hashes[i][:], b)
-	}
-	return hashes
-}()
 
 // polyglotHashesUint64 provides the same hashes as uint64 values for fast XOR operations.
 var polyglotHashesUint64 = func() [len(polyglotHashes)]uint64 {
@@ -31,15 +18,7 @@ var polyglotHashesUint64 = func() [len(polyglotHashes)]uint64 {
 	return hashes
 }()
 
-// GetPolyglotHashBytes returns a precomputed byte slice for a given index
-func GetPolyglotHashBytes(index int) []byte {
-	if index < 0 || index >= len(polyglotHashesBytes) {
-		return nil
-	}
-	return polyglotHashesBytes[index][:]
-}
-
-// GetPolyglotHashes returns a reference to the static hash array
+// GetPolyglotHashes returns a reference to the static hash array.
 func GetPolyglotHashes() []string {
 	return polyglotHashes[:]
 }

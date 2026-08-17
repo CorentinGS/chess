@@ -1,5 +1,5 @@
-module github.com/corentings/chess/v2
+module github.com/corentings/chess/v3
 
 go 1.25.0
 
-require github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
+require go.uber.org/goleak v1.3.0

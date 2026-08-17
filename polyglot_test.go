@@ -3,10 +3,6 @@ package chess
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
-	"io"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -30,117 +26,44 @@ func createTestBook(entries []PolyglotEntry) []byte {
 	return buf.Bytes()
 }
 
-func TestBytesBookSource(t *testing.T) {
+func TestLoadFromBytes(t *testing.T) {
+	// Unsorted on purpose: parser must sort by Key.
 	testEntries := []PolyglotEntry{
-		{Key: 1, Move: 100, Weight: 10, Learn: 0},
 		{Key: 2, Move: 200, Weight: 20, Learn: 0},
-	}
-	bookData := createTestBook(testEntries)
-
-	source := NewBytesBookSource(bookData)
-
-	// Test Size
-	size, err := source.Size()
-	if err != nil {
-		t.Errorf("Size() error = %v", err)
-	}
-	if size != 32 { // 2 entries * 16 bytes
-		t.Errorf("Size() = %v, want %v", size, 32)
-	}
-
-	// Test Read
-	buf := make([]byte, 16)
-	n, err := source.Read(buf)
-	if err != nil {
-		t.Errorf("Read() error = %v", err)
-	}
-	if n != 16 {
-		t.Errorf("Read() = %v bytes, want %v", n, 16)
-	}
-
-	// Test EOF
-	source.index = 32
-	_, err = source.Read(buf)
-	if !errors.Is(err, io.EOF) {
-		t.Errorf("Read() error = %v, want EOF", err)
-	}
-}
-
-func TestReaderBookSource(t *testing.T) {
-	testEntries := []PolyglotEntry{
-		{Key: 1, Move: 100, Weight: 10, Learn: 0},
-		{Key: 2, Move: 200, Weight: 20, Learn: 0},
-	}
-	bookData := createTestBook(testEntries)
-	reader := bytes.NewReader(bookData)
-
-	source, err := NewReaderBookSource(reader)
-	if err != nil {
-		t.Fatalf("NewReaderBookSource() error = %v", err)
-	}
-
-	size, err := source.Size()
-	if err != nil || size != 32 {
-		t.Errorf("Size() = %v, %v, want 32, nil", size, err)
-	}
-
-	buf := make([]byte, 16)
-	n, err := source.Read(buf)
-	if err != nil || n != 16 {
-		t.Errorf("Read() = %v, %v, want 16, nil", n, err)
-	}
-}
-
-func TestFileBookSource(t *testing.T) {
-	// Create temporary test file
-	testEntries := []PolyglotEntry{
-		{Key: 1, Move: 100, Weight: 10, Learn: 0},
-		{Key: 2, Move: 200, Weight: 20, Learn: 0},
-	}
-	bookData := createTestBook(testEntries)
-
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "test.bin")
-	if err := os.WriteFile(tmpFile, bookData, 0o666); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	osFile, _ := os.Open(tmpFile)
-
-	source, _ := NewReaderBookSource(osFile)
-
-	size, err := source.Size()
-	if err != nil || size != 32 {
-		t.Errorf("Size() = %v, %v, want 32, nil", size, err)
-	}
-
-	buf := make([]byte, 16)
-	n, err := source.Read(buf)
-	if err != nil || n != 16 {
-		t.Errorf("Read() = %v, %v, want 16, nil", n, err)
-	}
-}
-
-func TestLoadFromSource(t *testing.T) {
-	testEntries := []PolyglotEntry{
-		{Key: 2, Move: 200, Weight: 20, Learn: 0}, // Intentionally unsorted
 		{Key: 1, Move: 100, Weight: 10, Learn: 0},
 	}
 	bookData := createTestBook(testEntries)
-	source := NewBytesBookSource(bookData)
 
-	book, err := LoadFromSource(source)
+	book, err := LoadFromBytes(bookData)
 	if err != nil {
-		t.Fatalf("LoadFromSource() error = %v", err)
+		t.Fatalf("LoadFromBytes() error = %v", err)
 	}
 
 	if len(book.entries) != 2 {
-		t.Errorf("LoadFromSource() loaded %v entries, want 2", len(book.entries))
+		t.Fatalf("LoadFromBytes() loaded %v entries, want 2", len(book.entries))
+	}
+	if book.entries[0].Key != 1 || book.entries[1].Key != 2 {
+		t.Error("LoadFromBytes() entries not sorted by Key")
+	}
+}
+
+func TestLoadFromReader(t *testing.T) {
+	testEntries := []PolyglotEntry{
+		{Key: 1, Move: 100, Weight: 10, Learn: 0},
+		{Key: 2, Move: 200, Weight: 20, Learn: 0},
+	}
+	bookData := createTestBook(testEntries)
+
+	book, err := LoadFromReader(bytes.NewReader(bookData))
+	if err != nil {
+		t.Fatalf("LoadFromReader() error = %v", err)
 	}
 
-	// Verify entries are sorted
+	if len(book.entries) != 2 {
+		t.Fatalf("LoadFromReader() loaded %v entries, want 2", len(book.entries))
+	}
 	if book.entries[0].Key != 1 || book.entries[1].Key != 2 {
-		t.Error("LoadFromSource() entries not properly sorted")
+		t.Error("LoadFromReader() entries not sorted by Key")
 	}
 }
 
@@ -240,7 +163,7 @@ func TestDecodeMove(t *testing.T) {
 	}
 }
 
-func TestGetRandomMove(t *testing.T) {
+func TestRandomMove(t *testing.T) {
 	book := &PolyglotBook{
 		entries: []PolyglotEntry{
 			{Key: 1, Move: 100, Weight: 10, Learn: 0},
@@ -249,21 +172,38 @@ func TestGetRandomMove(t *testing.T) {
 	}
 
 	// Test with existing position
-	move, err := book.GetRandomMove(1)
+	move, err := book.RandomMove(1)
 	if err != nil {
-		t.Fatalf("GetRandomMove() error = %v", err)
+		t.Fatalf("RandomMove() error = %v", err)
 	}
 	if move == nil {
-		t.Error("GetRandomMove() returned nil for existing position")
+		t.Error("RandomMove() returned nil for existing position")
 	}
 
 	// Test with non-existing position
-	move, err = book.GetRandomMove(999)
+	move, err = book.RandomMove(999)
 	if err != nil {
-		t.Fatalf("GetRandomMove() error = %v", err)
+		t.Fatalf("RandomMove() error = %v", err)
 	}
 	if move != nil {
-		t.Error("GetRandomMove() returned move for non-existing position")
+		t.Error("RandomMove() returned move for non-existing position")
+	}
+}
+
+func TestRandomMoveWithZeroTotalWeight(t *testing.T) {
+	book := &PolyglotBook{
+		entries: []PolyglotEntry{
+			{Key: 1, Move: 100, Weight: 0, Learn: 0},
+			{Key: 1, Move: 101, Weight: 0, Learn: 0},
+		},
+	}
+
+	move, err := book.RandomMove(1)
+	if err != nil {
+		t.Fatalf("RandomMove() error = %v", err)
+	}
+	if move != nil {
+		t.Fatalf("RandomMove() = %v, want nil", move)
 	}
 }
 
@@ -663,7 +603,7 @@ func TestDeleteMoves(t *testing.T) {
 	}
 }
 
-func TestGetChessMoves(t *testing.T) {
+func TestChessMoves(t *testing.T) {
 	pos := uint64(50)
 	move1 := Move{
 		s1:    D2,
@@ -681,9 +621,9 @@ func TestGetChessMoves(t *testing.T) {
 			{Key: pos, Move: MoveToPolyglot(move2), Weight: 220, Learn: 0},
 		},
 	}
-	moves, err := book.GetChessMoves(pos)
+	moves, err := book.ChessMoves(pos)
 	if err != nil {
-		t.Fatalf("GetChessMoves returned error: %v", err)
+		t.Fatalf("ChessMoves returned error: %v", err)
 	}
 	if len(moves) != 2 {
 		t.Fatalf("Expected 2 moves, got %d", len(moves))
@@ -698,7 +638,7 @@ func TestGetChessMoves(t *testing.T) {
 	}
 
 	// Test error case: request moves for a non-existent position.
-	_, err = book.GetChessMoves(999)
+	_, err = book.ChessMoves(999)
 	if err == nil {
 		t.Errorf("Expected error for non-existent position, got nil")
 	}
@@ -778,7 +718,21 @@ func BenchmarkToMoveMap(b *testing.B) {
 
 	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = book.ToMoveMap()
+	}
+}
+
+func TestFastRandDistribution(t *testing.T) {
+	// fastRand now wraps math/rand/v2.Uint32. We don't test randomness
+	// quality (that's the std lib's job), just that the helper returns
+	// a uint32 without panicking and produces varying values.
+	seen := make(map[uint32]struct{}, 32)
+	for range 32 {
+		v := fastRand()
+		seen[v] = struct{}{}
+	}
+	if len(seen) < 16 {
+		t.Errorf("fastRand produced too few distinct values: %d/32", len(seen))
 	}
 }

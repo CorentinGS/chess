@@ -25,9 +25,9 @@ func (e *PGNError) Is(target error) bool {
 	return e.msg == t.msg
 }
 
-// Custom error types for different PGN errors
-//
-//nolint:gochecknoglobals // this is a custom error type.
+// Package-level error sentinels and constructors used throughout the PGN
+// parser. These are immutable factories, not mutable global state, so the
+// gochecknoglobals warning is a false positive.
 var (
 	ErrUnterminatedComment = func(pos int) error { return &PGNError{"unterminated comment", pos} }
 	ErrUnterminatedQuote   = func(pos int) error { return &PGNError{"unterminated quote", pos} }
@@ -36,7 +36,22 @@ var (
 	ErrInvalidSquare       = func(pos int) error { return &PGNError{"invalid square", pos} }
 	ErrInvalidRank         = func(pos int) error { return &PGNError{"invalid rank", pos} }
 
-	ErrNoGameFound = errors.New("no game found in PGN data")
+	// ErrInvalidFEN is the sentinel for any FEN parse failure. Specific
+	// causes are wrapped with %w so callers can errors.Is(err, ErrInvalidFEN)
+	// without inspecting message text.
+	ErrInvalidFEN = errors.New("chess: invalid FEN")
+
+	// ErrInvalidPGN is the sentinel for any PGN parse failure, including
+	// empty input. Branch on this for "the PGN did not yield a Game".
+	ErrInvalidPGN = errors.New("chess: invalid PGN")
+
+	// ErrNoGameFound is returned when the PGN input contains no game. It
+	// wraps ErrInvalidPGN so errors.Is(err, ErrInvalidPGN) also matches.
+	ErrNoGameFound = fmt.Errorf("%w: no game found in PGN data", ErrInvalidPGN)
+
+	// ErrGameAlreadyEnded is returned when a move is applied to a Game that
+	// already has a terminal Outcome. Callers must ClearOutcome first.
+	ErrGameAlreadyEnded = errors.New("chess: game already ended")
 )
 
 type ParserError struct {
@@ -47,6 +62,6 @@ type ParserError struct {
 }
 
 func (e *ParserError) Error() string {
-	return fmt.Sprintf("Parser error at position %d: %s (Token: %v, Value: %s)",
+	return fmt.Sprintf("parser error at position %d: %s (Token: %v, Value: %s)",
 		e.Position, e.Message, e.TokenType, e.TokenValue)
 }
