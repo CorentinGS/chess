@@ -150,11 +150,3 @@ func (g *Game) insertByMove(move Move, options *MoveInsertOptions) (*MoveNode, e
 	options = cmp.Or(options, &MoveInsertOptions{})
 	return g.moveUnchecked(move, options)
 }
-
-// ValidateSAN checks if a string is valid Standard Algebraic notation (SAN) syntax.
-// This function only validates the syntax, not whether the move is legal in any position.
-// Examples of valid SAN: "e4", "Nf3", "O-O", "Qxd2+", "e8=Q#".
-func ValidateSAN(s string) error {
-	_, err := algebraicNotationParts(s)
-	return err
-}

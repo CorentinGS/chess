@@ -69,9 +69,9 @@ for _, node := range game.MoveTree().MainLine() {
 
 `game.Moves()` still returns `[]Move` (bare values, main line only). Use
 `game.MoveTree()` for tree access: `tree.Root()`, `tree.Current()`,
-`tree.MainLine()`, `tree.Continuations(node)`, `tree.Variations(node)`,
+`tree.MainLine()`, `node.Children()`, `node.MainChild()`, `node.Variations()`,
 `node.Comments()`, `node.SetCommand(key, val)`, `node.SetComment(text)`,
-`node.AddComment(text)`, `node.NAG()`, and `node.Children()` / `node.Parent()`
+`node.AddComment(text)`, `node.NAGs()`, and `node.Parent()`
 for variation traversal.
 
 ## Notation APIs moved to move text codecs
@@ -221,6 +221,11 @@ listed:
 | _(none)_ | `Position.FullMoveNumber()` |
 | `Move.S1()`, `Move.S2()`, `Move.Promo()` | `Move.From()`, `Move.To()`, `Move.Promotion()` |
 | `Position.Status()` | `Position.Method()`, like `Game.Method()` |
+| `Game.SetOutcomeMethod(OutcomeMethodPair{o, m})` | `Game.SetOutcome(o, m)` |
+| `ValidateSAN(s)` | `SAN().ValidateSyntax(s)` |
+| `DecodePGNGamesParallel` | `PGNGamesParallel` |
+| `tree.MainChild(n)`, `tree.Variations(n)`, `tree.Continuations(n)` | `n.MainChild()`, `n.Variations()`, `n.Children()` |
+| `MoveNode.SetComment` dropped `[%cmd]` commands | it keeps them; `SetCommentBlocks` replaces everything |
 | _(none)_ | `Position.Setup()`, to edit a position and rebuild it with `NewPosition` |
 | `Setup.FullMoveNo` | `Setup.FullMoveNumber` |
 | `NewBoard(m) (*Board, error)` | `NewBoard(m) *Board` |
@@ -299,9 +304,9 @@ if err := game.Resign(chess.Black); err != nil {
 
 ## Terminal outcome guards
 
-`Move`, `UnsafeMove`, and `PushMoveText` reject moves once the game has
+`Move`, `UnsafeMove`, `MoveText` and `UnsafeMoveText` reject moves once the game has
 reached a terminal outcome and return `chess.ErrGameAlreadyEnded`. Call
-`Game.ClearOutcome()` to resume, or `Game.SetOutcomeMethod(method, outcome)` to
+`Game.ClearOutcome()` to resume, or `Game.SetOutcome(outcome, method)` to
 set an outcome explicitly with validation. `Split()` now recomputes each line's
 outcome from its leaf position instead of copying the parent outcome.
 

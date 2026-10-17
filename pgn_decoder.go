@@ -203,8 +203,8 @@ type PGNResult struct {
 	Offset int64
 }
 
-// DecodePGNGamesParallel decodes PGN records across worker goroutines.
-func DecodePGNGamesParallel(ctx context.Context, r io.Reader, opts PGNParallelOptions) <-chan PGNResult {
+// PGNGamesParallel decodes PGN records across worker goroutines.
+func PGNGamesParallel(ctx context.Context, r io.Reader, opts PGNParallelOptions) <-chan PGNResult {
 	if opts.Workers <= 0 {
 		opts.Workers = runtime.GOMAXPROCS(0)
 	}

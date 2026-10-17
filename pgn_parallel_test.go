@@ -9,9 +9,9 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-func TestDecodePGNGamesParallelDecodesAllGames(t *testing.T) {
+func TestPGNGamesParallelDecodesAllGames(t *testing.T) {
 	ctx := context.Background()
-	results := chess.DecodePGNGamesParallel(ctx, strings.NewReader(decoderGameOne+"\n"+decoderGameTwo), chess.PGNParallelOptions{
+	results := chess.PGNGamesParallel(ctx, strings.NewReader(decoderGameOne+"\n"+decoderGameTwo), chess.PGNParallelOptions{
 		Workers: 2,
 		Buffer:  1,
 	})
@@ -28,9 +28,9 @@ func TestDecodePGNGamesParallelDecodesAllGames(t *testing.T) {
 	}
 }
 
-func TestDecodePGNGamesParallelOrderedPreservesPGNOrder(t *testing.T) {
+func TestPGNGamesParallelOrderedPreservesPGNOrder(t *testing.T) {
 	ctx := context.Background()
-	results := chess.DecodePGNGamesParallel(ctx, strings.NewReader(decoderGameOne+"\n"+decoderGameTwo), chess.PGNParallelOptions{
+	results := chess.PGNGamesParallel(ctx, strings.NewReader(decoderGameOne+"\n"+decoderGameTwo), chess.PGNParallelOptions{
 		Workers: 2,
 		Buffer:  2,
 		Ordered: true,
@@ -53,14 +53,14 @@ func TestDecodePGNGamesParallelOrderedPreservesPGNOrder(t *testing.T) {
 	}
 }
 
-func TestDecodePGNGamesParallelReportsPerGameErrors(t *testing.T) {
+func TestPGNGamesParallelReportsPerGameErrors(t *testing.T) {
 	bad := `[Event "bad"]
 [Result "*"]
 
 1. NotAMove *
 `
 	ctx := context.Background()
-	results := chess.DecodePGNGamesParallel(ctx, strings.NewReader(decoderGameOne+"\n"+bad+"\n"+decoderGameTwo), chess.PGNParallelOptions{
+	results := chess.PGNGamesParallel(ctx, strings.NewReader(decoderGameOne+"\n"+bad+"\n"+decoderGameTwo), chess.PGNParallelOptions{
 		Workers: 2,
 		Buffer:  2,
 		Ordered: true,
@@ -83,11 +83,11 @@ func TestDecodePGNGamesParallelReportsPerGameErrors(t *testing.T) {
 	}
 }
 
-func TestDecodePGNGamesParallelHonorsCanceledContext(t *testing.T) {
+func TestPGNGamesParallelHonorsCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	results := chess.DecodePGNGamesParallel(ctx, strings.NewReader(decoderGameOne), chess.PGNParallelOptions{Workers: 1, Buffer: 1})
+	results := chess.PGNGamesParallel(ctx, strings.NewReader(decoderGameOne), chess.PGNParallelOptions{Workers: 1, Buffer: 1})
 	result, ok := <-results
 	if !ok {
 		t.Fatal("result channel closed without cancellation result")

@@ -140,7 +140,7 @@ func TestGameTreeCurrentPositionInvariantAfterPGNParseWithNestedVariations(t *te
 	if !g.IsAtEnd() {
 		t.Fatalf("parsed tree current = %s, want main-line leaf", g.MoveTree().Current().Move())
 	}
-	if got, want := len(g.MoveTree().Variations(g.MoveTree().Root())), 1; got != want {
+	if got, want := len(g.MoveTree().Root().Variations()), 1; got != want {
 		t.Fatalf("root variations = %d, want %d", got, want)
 	}
 }

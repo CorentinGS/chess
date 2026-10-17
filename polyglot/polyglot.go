@@ -78,10 +78,10 @@ type WeightedMove struct {
 // EncodeMove returns the Polyglot move code for m.
 func EncodeMove(m chess.Move) uint16 {
 	var encoded uint16
-	encoded |= uint16(int(m.To().File()) & 0x7)                // bits 0-2
-	encoded |= uint16((int(m.To().Rank()) & 0x7) << 3)         // bits 3-5
-	encoded |= uint16((int(m.From().File()) & 0x7) << 6)         // bits 6-8
-	encoded |= uint16((int(m.From().Rank()) & 0x7) << 9)         // bits 9-11
+	encoded |= uint16(int(m.To().File()) & 0x7)                    // bits 0-2
+	encoded |= uint16((int(m.To().Rank()) & 0x7) << 3)             // bits 3-5
+	encoded |= uint16((int(m.From().File()) & 0x7) << 6)           // bits 6-8
+	encoded |= uint16((int(m.From().Rank()) & 0x7) << 9)           // bits 9-11
 	encoded |= uint16((promotionValue(m.Promotion()) & 0x7) << 12) // bits 12-14
 	return encoded
 }

@@ -925,18 +925,18 @@ func main() {
 	))
 
 	tree := g.MoveTree()
-	e4 := tree.MainChild(tree.Root()) // first move of the main line
+	e4 := tree.Root().MainChild() // first move of the main line
 
 	// Walk the main line by following the main continuation at each node.
 	fmt.Print("main: ")
-	for n := e4; n != nil; n = tree.MainChild(n) {
+	for n := e4; n != nil; n = n.MainChild() {
 		fmt.Printf("%s ", n.Move())
 	}
 	fmt.Println()
 
 	// Enumerate sideline variations at e4.
 	fmt.Print("variations at e4: ")
-	for _, v := range tree.Variations(e4) {
+	for _, v := range e4.Variations() {
 		fmt.Printf("%s ", v.Move())
 	}
 	fmt.Println()
@@ -949,9 +949,9 @@ Useful APIs over the tree:
 - `MoveTree.Root() *MoveNode` — root position node.
 - `MoveTree.Current() *MoveNode` — active cursor node.
 - `MoveTree.MainLine() []*MoveNode` — main-line nodes, excluding the root.
-- `MoveTree.MainChild(node *MoveNode) *MoveNode` — main continuation.
-- `MoveTree.Continuations(node *MoveNode) []*MoveNode` — all continuations.
-- `MoveTree.Variations(node *MoveNode) []*MoveNode` — sideline continuations.
+- `MoveNode.MainChild() *MoveNode` — main continuation.
+- `MoveNode.Children() []*MoveNode` — all continuations, main line first.
+- `MoveNode.Variations() []*MoveNode` — sideline continuations.
 - `MoveTree.AddVariation(parent *MoveNode, move Move) (*MoveNode, error)` —
   validate and append a sideline.
 - `MoveTree.GoBack()`, `MoveTree.GoForward()`, and

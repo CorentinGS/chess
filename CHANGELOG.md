@@ -54,6 +54,15 @@ All notable changes to this project will be documented in this file. See [conven
 - in `polyglot`, `RawMove.ToMove` is `ChessMove` and `FindMoves` is `Entries`.
 - rename `Move.S1`, `S2` and `Promo` to `From`, `To` and `Promotion`, like
   `RawMoveText`.
+- replace `Game.SetOutcomeMethod(OutcomeMethodPair)` with
+  `Game.SetOutcome(outcome, method)`; remove `OutcomeMethodPair`.
+- remove `ValidateSAN`; use `SAN().ValidateSyntax`.
+- rename `DecodePGNGamesParallel` to `PGNGamesParallel`.
+- move `MainChild` and `Variations` from `MoveTree` (taking a node) to
+  `MoveNode`; remove `MoveTree.Continuations`, which `MoveNode.Children`
+  already provides.
+- `MoveNode.SetComment` replaces the comment text but keeps commands such as
+  `[%clk]`; it used to delete them.
 - make the lexer diagnostics internal: `PGNError` and the
   `ErrUnterminatedComment`, `ErrUnterminatedQuote`, `ErrInvalidCommand`,
   `ErrInvalidPiece`, `ErrInvalidSquare`, `ErrInvalidRank` constructors never
@@ -62,6 +71,9 @@ All notable changes to this project will be documented in this file. See [conven
   1.e4), matching `MoveNode.Ply()`; it used to be one higher.
 
 #### Fixes
+- PGN framing: a game without tags is no longer dropped when it precedes a
+  tagged game or contains a `[%...]` command, consecutive games without tags
+  are split, and a leading UTF-8 byte order mark is skipped.
 - `Position.Update`, `ApplyInPlace` and `Game.UnsafeMove` infer the en passant
   and standard castling tags of a move built with `NewMove`; before, the rook
   or the captured pawn was left in place.
@@ -77,6 +89,7 @@ All notable changes to this project will be documented in this file. See [conven
 - add `Position.PseudoLegalMoves()`.
 - add `Position.FullMoveNumber()`, the FEN full-move field.
 - add `Position.Setup()`, the inverse of `NewPosition`.
+- add `MoveNode.RemoveCommand` and `MoveNode.SetCommentBlocks`.
 - `ApplyInPlace` is now covered by equivalence tests against `Update`.
 
 ## v2.6.0 - 2026-08-17

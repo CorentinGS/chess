@@ -77,34 +77,10 @@ func (t *MoveTree) MainLine() []*MoveNode {
 	}
 
 	nodes := make([]*MoveNode, 0)
-	for current := t.MainChild(t.root); current != nil; current = t.MainChild(current) {
+	for current := t.root.MainChild(); current != nil; current = current.MainChild() {
 		nodes = append(nodes, current)
 	}
 	return nodes
-}
-
-// MainChild returns the main-line continuation from parent.
-func (t *MoveTree) MainChild(parent *MoveNode) *MoveNode {
-	if parent == nil || len(parent.children) == 0 {
-		return nil
-	}
-	return parent.children[0]
-}
-
-// Continuations returns all continuations from parent.
-func (t *MoveTree) Continuations(parent *MoveNode) []*MoveNode {
-	if parent == nil {
-		return nil
-	}
-	return append([]*MoveNode{}, parent.children...)
-}
-
-// Variations returns all non-main-line continuations from parent.
-func (t *MoveTree) Variations(parent *MoveNode) []*MoveNode {
-	if parent == nil || len(parent.children) <= 1 {
-		return nil
-	}
-	return append([]*MoveNode{}, parent.children[1:]...)
 }
 
 func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, error) {

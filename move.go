@@ -147,6 +147,8 @@ func (n *MoveNode) Command(key string) (string, bool) {
 	return "", false
 }
 
+// SetCommand sets the [%key value] command on n, replacing the value of an
+// existing command with that key or appending a new one.
 func (n *MoveNode) SetCommand(key, value string) {
 	if n == nil {
 		return
@@ -171,17 +173,73 @@ func (n *MoveNode) SetCommand(key, value string) {
 	})
 }
 
+// RemoveCommand removes every [%key ...] command from n and reports whether
+// one was present.
+func (n *MoveNode) RemoveCommand(key string) bool {
+	if n == nil {
+		return false
+	}
+	removed := false
+	n.filterCommentItems(func(item CommentItem) bool {
+		if item.Kind == CommentCommand && item.Key == key {
+			removed = true
+			return false
+		}
+		return true
+	})
+	return removed
+}
+
+// SetComment replaces the text of n's comments with comment, keeping their
+// commands such as [%clk ...]. An empty comment removes the text only.
 func (n *MoveNode) SetComment(comment string) {
 	if n == nil {
 		return
 	}
+	n.filterCommentItems(func(item CommentItem) bool { return item.Kind != CommentText })
 	if comment == "" {
+		return
+	}
+	text := CommentItem{Kind: CommentText, Text: comment}
+	if len(n.commentBlocks) == 0 {
+		n.commentBlocks = []CommentBlock{{Items: []CommentItem{text}}}
+		return
+	}
+	n.commentBlocks[0].Items = append([]CommentItem{text}, n.commentBlocks[0].Items...)
+}
+
+// SetCommentBlocks replaces all of n's comments, text and commands, with a
+// copy of blocks.
+func (n *MoveNode) SetCommentBlocks(blocks []CommentBlock) {
+	if n == nil {
+		return
+	}
+	if len(blocks) == 0 {
 		n.commentBlocks = nil
 		return
 	}
-	n.commentBlocks = []CommentBlock{{Items: []CommentItem{{Kind: CommentText, Text: comment}}}}
+	n.commentBlocks = copyCommentBlocks(blocks)
 }
 
+// filterCommentItems keeps the comment items for which keep returns true and
+// drops blocks left empty.
+func (n *MoveNode) filterCommentItems(keep func(CommentItem) bool) {
+	var blocks []CommentBlock
+	for _, block := range n.commentBlocks {
+		var items []CommentItem
+		for _, item := range block.Items {
+			if keep(item) {
+				items = append(items, item)
+			}
+		}
+		if len(items) > 0 {
+			blocks = append(blocks, CommentBlock{Items: items})
+		}
+	}
+	n.commentBlocks = blocks
+}
+
+// AddComment appends comment to the text of n's last comment block.
 func (n *MoveNode) AddComment(comment string) {
 	if n == nil || comment == "" {
 		return
@@ -201,6 +259,7 @@ func (n *MoveNode) AddComment(comment string) {
 	n.commentBlocks[lastBlock].Items = append(n.commentBlocks[lastBlock].Items, CommentItem{Kind: CommentText, Text: comment})
 }
 
+// Comments returns the text of n's comments, without commands.
 func (n *MoveNode) Comments() string {
 	if n == nil {
 		return ""
@@ -258,6 +317,7 @@ func (n *MoveNode) AddNAG(nag string) error {
 	return nil
 }
 
+// Parent returns the node n continues from; the root's parent is nil.
 func (n *MoveNode) Parent() *MoveNode {
 	if n == nil {
 		return nil
@@ -278,6 +338,24 @@ func (n *MoveNode) Position() *Position {
 	return n.tree.pos.copy()
 }
 
+// MainChild returns the main-line continuation of n, or nil at the end of
+// the line.
+func (n *MoveNode) MainChild() *MoveNode {
+	if n == nil || len(n.children) == 0 {
+		return nil
+	}
+	return n.children[0]
+}
+
+// Variations returns the continuations of n other than the main line.
+func (n *MoveNode) Variations() []*MoveNode {
+	if n == nil || len(n.children) <= 1 {
+		return nil
+	}
+	return append([]*MoveNode{}, n.children[1:]...)
+}
+
+// Children returns every continuation of n, main line first.
 func (n *MoveNode) Children() []*MoveNode {
 	if n == nil {
 		return nil

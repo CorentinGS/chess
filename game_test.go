@@ -21,7 +21,7 @@ func TestGameAccessorsReturnDefensiveCopies(t *testing.T) {
 		t.Fatal("Children returned mutable backing slice")
 	}
 
-	variations := game.MoveTree().Variations(game.MoveTree().Root())
+	variations := game.MoveTree().Root().Variations()
 	variations[0] = nil
 	if game.MoveTree().Root().children[1] == nil {
 		t.Fatal("Variations returned mutable backing slice")
@@ -593,35 +593,31 @@ func TestIsAtEndWhenNotAtLeaf(t *testing.T) {
 }
 
 func TestVariationsWithNoChildren(t *testing.T) {
-	g := NewGame()
 	move := &MoveNode{}
-	variations := g.MoveTree().Variations(move)
+	variations := move.Variations()
 	if variations != nil {
 		t.Fatalf("expected no variations for move with no children")
 	}
 }
 
 func TestVariationsWithOneChild(t *testing.T) {
-	g := NewGame()
 	move := &MoveNode{children: []*MoveNode{{}}}
-	variations := g.MoveTree().Variations(move)
+	variations := move.Variations()
 	if variations != nil {
 		t.Fatalf("expected no variations for move with one child")
 	}
 }
 
 func TestVariationsWithMultipleChildren(t *testing.T) {
-	g := NewGame()
 	move := &MoveNode{children: []*MoveNode{{}, {}}}
-	variations := g.MoveTree().Variations(move)
+	variations := move.Variations()
 	if len(variations) != 1 {
 		t.Fatalf("expected one variation for move with multiple children")
 	}
 }
 
 func TestVariationsWithNilMove(t *testing.T) {
-	g := NewGame()
-	variations := g.MoveTree().Variations(nil)
+	variations := (*MoveNode)(nil).Variations()
 	if variations != nil {
 		t.Fatalf("expected no variations for nil move")
 	}
@@ -1591,7 +1587,7 @@ func TestRootMoveComments(t *testing.T) {
 	})
 }
 
-func TestValidateSAN(t *testing.T) {
+func TestSANValidateSyntax(t *testing.T) {
 	tests := []struct {
 		name    string
 		san     string
@@ -1834,9 +1830,9 @@ func TestValidateSAN(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateSAN(tt.san)
+			err := SAN().ValidateSyntax(tt.san)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateSAN(%q) error = %v, wantErr %v", tt.san, err, tt.wantErr)
+				t.Errorf("SAN().ValidateSyntax(%q) error = %v, wantErr %v", tt.san, err, tt.wantErr)
 			}
 		})
 	}

@@ -3,6 +3,7 @@ package chess
 import (
 	"log"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -621,5 +622,35 @@ func TestNewMove(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("NewMove(E2, E4) identity did not match any legal move from the starting position")
+	}
+}
+
+func TestSetCommentKeepsCommands(t *testing.T) {
+	game, err := ParsePGN(strings.NewReader(`1. e4 {good [%clk 0:01:00] move} *`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := game.MoveTree().MainLine()[0]
+	node.SetComment("best")
+	if got := node.Comments(); got != "best" {
+		t.Errorf("Comments() = %q, want best", got)
+	}
+	if clk, ok := node.Command("clk"); !ok || clk != "0:01:00" {
+		t.Errorf("Command(clk) = %q, %v; want 0:01:00 kept", clk, ok)
+	}
+	node.SetComment("")
+	if node.Comments() != "" {
+		t.Errorf("SetComment(\"\") left text %q", node.Comments())
+	}
+	if !node.RemoveCommand("clk") || node.RemoveCommand("clk") {
+		t.Error("RemoveCommand should report true once, then false")
+	}
+	if len(node.CommentBlocks()) != 0 {
+		t.Errorf("CommentBlocks() = %v, want empty", node.CommentBlocks())
+	}
+
+	node.SetCommentBlocks([]CommentBlock{{Items: []CommentItem{{Kind: CommentCommand, Key: "eval", Value: "0.3"}}}})
+	if v, ok := node.Command("eval"); !ok || v != "0.3" {
+		t.Errorf("after SetCommentBlocks, Command(eval) = %q, %v", v, ok)
 	}
 }

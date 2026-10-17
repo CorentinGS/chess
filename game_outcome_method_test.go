@@ -9,12 +9,9 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-func ExampleGame_SetOutcomeMethod() {
+func ExampleGame_SetOutcome() {
 	g := chess.NewGame()
-	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{
-		Outcome: chess.WhiteWon,
-		Method:  chess.Resignation,
-	}); err != nil {
+	if err := g.SetOutcome(chess.WhiteWon, chess.Resignation); err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
@@ -22,43 +19,44 @@ func ExampleGame_SetOutcomeMethod() {
 	// Output: 1-0 Resignation
 }
 
-func TestSetOutcomeMethod(t *testing.T) {
+func TestSetOutcome(t *testing.T) {
 	tests := []struct {
 		name    string
-		pair    chess.OutcomeMethodPair
+		outcome chess.Outcome
+		method  chess.Method
 		wantErr bool
 	}{
-		{"NoOutcome/NoMethod", chess.OutcomeMethodPair{chess.NoOutcome, chess.NoMethod}, false},
-		{"NoOutcome/Checkmate", chess.OutcomeMethodPair{chess.NoOutcome, chess.Checkmate}, true},
-		{"NoOutcome/Stalemate", chess.OutcomeMethodPair{chess.NoOutcome, chess.Stalemate}, true},
-		{"NoOutcome/Resignation", chess.OutcomeMethodPair{chess.NoOutcome, chess.Resignation}, true},
-		{"WhiteWon/NoMethod", chess.OutcomeMethodPair{chess.WhiteWon, chess.NoMethod}, false},
-		{"WhiteWon/Checkmate", chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}, false},
-		{"WhiteWon/Resignation", chess.OutcomeMethodPair{chess.WhiteWon, chess.Resignation}, false},
-		{"WhiteWon/Stalemate", chess.OutcomeMethodPair{chess.WhiteWon, chess.Stalemate}, true},
-		{"WhiteWon/DrawOffer", chess.OutcomeMethodPair{chess.WhiteWon, chess.DrawOffer}, true},
-		{"WhiteWon/FiftyMoveRule", chess.OutcomeMethodPair{chess.WhiteWon, chess.FiftyMoveRule}, true},
-		{"BlackWon/NoMethod", chess.OutcomeMethodPair{chess.BlackWon, chess.NoMethod}, false},
-		{"BlackWon/Checkmate", chess.OutcomeMethodPair{chess.BlackWon, chess.Checkmate}, false},
-		{"BlackWon/Resignation", chess.OutcomeMethodPair{chess.BlackWon, chess.Resignation}, false},
-		{"BlackWon/Stalemate", chess.OutcomeMethodPair{chess.BlackWon, chess.Stalemate}, true},
-		{"BlackWon/InsufficientMaterial", chess.OutcomeMethodPair{chess.BlackWon, chess.InsufficientMaterial}, true},
-		{"Draw/NoMethod", chess.OutcomeMethodPair{chess.Draw, chess.NoMethod}, false},
-		{"Draw/DrawOffer", chess.OutcomeMethodPair{chess.Draw, chess.DrawOffer}, false},
-		{"Draw/Stalemate", chess.OutcomeMethodPair{chess.Draw, chess.Stalemate}, false},
-		{"Draw/ThreefoldRepetition", chess.OutcomeMethodPair{chess.Draw, chess.ThreefoldRepetition}, false},
-		{"Draw/FivefoldRepetition", chess.OutcomeMethodPair{chess.Draw, chess.FivefoldRepetition}, false},
-		{"Draw/FiftyMoveRule", chess.OutcomeMethodPair{chess.Draw, chess.FiftyMoveRule}, false},
-		{"Draw/SeventyFiveMoveRule", chess.OutcomeMethodPair{chess.Draw, chess.SeventyFiveMoveRule}, false},
-		{"Draw/InsufficientMaterial", chess.OutcomeMethodPair{chess.Draw, chess.InsufficientMaterial}, false},
-		{"Draw/Checkmate", chess.OutcomeMethodPair{chess.Draw, chess.Checkmate}, true},
-		{"Draw/Resignation", chess.OutcomeMethodPair{chess.Draw, chess.Resignation}, true},
-		{"NoOutcome/NoMethod", chess.OutcomeMethodPair{chess.NoOutcome, chess.NoMethod}, false},
+		{"NoOutcome/NoMethod", chess.NoOutcome, chess.NoMethod, false},
+		{"NoOutcome/Checkmate", chess.NoOutcome, chess.Checkmate, true},
+		{"NoOutcome/Stalemate", chess.NoOutcome, chess.Stalemate, true},
+		{"NoOutcome/Resignation", chess.NoOutcome, chess.Resignation, true},
+		{"WhiteWon/NoMethod", chess.WhiteWon, chess.NoMethod, false},
+		{"WhiteWon/Checkmate", chess.WhiteWon, chess.Checkmate, false},
+		{"WhiteWon/Resignation", chess.WhiteWon, chess.Resignation, false},
+		{"WhiteWon/Stalemate", chess.WhiteWon, chess.Stalemate, true},
+		{"WhiteWon/DrawOffer", chess.WhiteWon, chess.DrawOffer, true},
+		{"WhiteWon/FiftyMoveRule", chess.WhiteWon, chess.FiftyMoveRule, true},
+		{"BlackWon/NoMethod", chess.BlackWon, chess.NoMethod, false},
+		{"BlackWon/Checkmate", chess.BlackWon, chess.Checkmate, false},
+		{"BlackWon/Resignation", chess.BlackWon, chess.Resignation, false},
+		{"BlackWon/Stalemate", chess.BlackWon, chess.Stalemate, true},
+		{"BlackWon/InsufficientMaterial", chess.BlackWon, chess.InsufficientMaterial, true},
+		{"Draw/NoMethod", chess.Draw, chess.NoMethod, false},
+		{"Draw/DrawOffer", chess.Draw, chess.DrawOffer, false},
+		{"Draw/Stalemate", chess.Draw, chess.Stalemate, false},
+		{"Draw/ThreefoldRepetition", chess.Draw, chess.ThreefoldRepetition, false},
+		{"Draw/FivefoldRepetition", chess.Draw, chess.FivefoldRepetition, false},
+		{"Draw/FiftyMoveRule", chess.Draw, chess.FiftyMoveRule, false},
+		{"Draw/SeventyFiveMoveRule", chess.Draw, chess.SeventyFiveMoveRule, false},
+		{"Draw/InsufficientMaterial", chess.Draw, chess.InsufficientMaterial, false},
+		{"Draw/Checkmate", chess.Draw, chess.Checkmate, true},
+		{"Draw/Resignation", chess.Draw, chess.Resignation, true},
+		{"NoOutcome/NoMethod", chess.NoOutcome, chess.NoMethod, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := chess.NewGame()
-			err := g.SetOutcomeMethod(tt.pair)
+			err := g.SetOutcome(tt.outcome, tt.method)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
@@ -74,11 +72,11 @@ func TestSetOutcomeMethod(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if g.Outcome() != tt.pair.Outcome {
-				t.Errorf("Outcome = %v, want %v", g.Outcome(), tt.pair.Outcome)
+			if g.Outcome() != tt.outcome {
+				t.Errorf("Outcome = %v, want %v", g.Outcome(), tt.outcome)
 			}
-			if g.Method() != tt.pair.Method {
-				t.Errorf("Method = %v, want %v", g.Method(), tt.pair.Method)
+			if g.Method() != tt.method {
+				t.Errorf("Method = %v, want %v", g.Method(), tt.method)
 			}
 		})
 	}
@@ -86,9 +84,9 @@ func TestSetOutcomeMethod(t *testing.T) {
 
 func TestTerminalOutcomeGuards(t *testing.T) {
 	setups := map[string]func(t *testing.T, g *chess.Game){
-		"via_SetOutcomeMethod": func(t *testing.T, g *chess.Game) {
+		"via_SetOutcome": func(t *testing.T, g *chess.Game) {
 			t.Helper()
-			if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}); err != nil {
+			if err := g.SetOutcome(chess.WhiteWon, chess.Checkmate); err != nil {
 				t.Fatal(err)
 			}
 		},
@@ -167,7 +165,7 @@ func TestMoveAfterGoBackFromTerminalStillRejected(t *testing.T) {
 	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}); err != nil {
+	if err := g.SetOutcome(chess.WhiteWon, chess.Checkmate); err != nil {
 		t.Fatal(err)
 	}
 	if !g.MoveTree().GoBack() {
@@ -188,7 +186,7 @@ func TestAddVariationAllowedAfterTerminalOutcome(t *testing.T) {
 	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}); err != nil {
+	if err := g.SetOutcome(chess.WhiteWon, chess.Checkmate); err != nil {
 		t.Fatal(err)
 	}
 	if !g.MoveTree().GoBack() {
@@ -203,7 +201,7 @@ func TestAddVariationAllowedAfterTerminalOutcome(t *testing.T) {
 
 func TestClearOutcome(t *testing.T) {
 	g := chess.NewGame()
-	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}); err != nil {
+	if err := g.SetOutcome(chess.WhiteWon, chess.Checkmate); err != nil {
 		t.Fatal(err)
 	}
 	g.ClearOutcome()
@@ -222,7 +220,7 @@ func TestClearOutcome(t *testing.T) {
 func TestClearOutcomeDoesNotModifyResultTag(t *testing.T) {
 	g := chess.NewGame()
 	g.SetTag("Result", "1-0")
-	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}); err != nil {
+	if err := g.SetOutcome(chess.WhiteWon, chess.Checkmate); err != nil {
 		t.Fatal(err)
 	}
 	g.ClearOutcome()

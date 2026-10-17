@@ -5,36 +5,30 @@ import (
 	"fmt"
 )
 
-// OutcomeMethodPair pairs an Outcome with the Method that produced it.
-type OutcomeMethodPair struct {
-	Outcome Outcome
-	Method  Method
-}
-
-// SetOutcomeMethod sets the game's outcome and method together after validating
-// that the pair is internally consistent. It returns an error for invalid pairs
-// such as WhiteWon with Stalemate or Draw with Checkmate. It does not modify
-// any Result tag in tagPairs.
-func (g *Game) SetOutcomeMethod(pair OutcomeMethodPair) error {
-	if !validOutcomeMethodPair(pair) {
-		return fmt.Errorf("chess: invalid outcome/method pair: outcome=%s method=%s", pair.Outcome, pair.Method)
+// SetOutcome sets the game's outcome and the method that produced it, after
+// checking that they agree: a win needs Checkmate, Resignation or NoMethod, a
+// draw needs a draw method or NoMethod, and NoOutcome needs NoMethod. It does
+// not change the Result tag.
+func (g *Game) SetOutcome(outcome Outcome, method Method) error {
+	if !validOutcomeMethod(outcome, method) {
+		return fmt.Errorf("chess: invalid outcome/method pair: outcome=%s method=%s", outcome, method)
 	}
-	g.outcome = pair.Outcome
-	g.method = pair.Method
+	g.outcome = outcome
+	g.method = method
 	return nil
 }
 
-func validOutcomeMethodPair(pair OutcomeMethodPair) bool {
-	switch pair.Outcome {
+func validOutcomeMethod(outcome Outcome, method Method) bool {
+	switch outcome {
 	case NoOutcome:
-		return pair.Method == NoMethod
+		return method == NoMethod
 	case WhiteWon, BlackWon:
-		switch pair.Method {
+		switch method {
 		case NoMethod, Checkmate, Resignation:
 			return true
 		}
 	case Draw:
-		switch pair.Method {
+		switch method {
 		case NoMethod, DrawOffer, Stalemate, ThreefoldRepetition,
 			FivefoldRepetition, FiftyMoveRule, SeventyFiveMoveRule, InsufficientMaterial:
 			return true

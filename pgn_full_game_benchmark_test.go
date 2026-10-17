@@ -39,7 +39,7 @@ func BenchmarkPGN_FullGameDecode_Parallel_BigBig(b *testing.B) {
 
 	for range b.N {
 		var summary pgnDecodeSummary
-		results := DecodePGNGamesParallel(context.Background(), bytes.NewReader(data), PGNParallelOptions{
+		results := PGNGamesParallel(context.Background(), bytes.NewReader(data), PGNParallelOptions{
 			Workers: workers,
 			Buffer:  workers * 2,
 		})
