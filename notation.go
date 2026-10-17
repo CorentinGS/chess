@@ -466,7 +466,7 @@ func formS1(pos *Position, m Move) string {
 	sb.Reset()
 	defer stringPool.Put(sb)
 
-	for _, mv := range pos.ValidMovesUnsafe() {
+	for _, mv := range pos.legalMovesCached() {
 		if mv.s1 == m.s1 || mv.s2 != m.s2 {
 			continue
 		}

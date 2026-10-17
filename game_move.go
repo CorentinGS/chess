@@ -68,13 +68,13 @@ func (g *Game) insertCanonical(canonical Move, options *MoveInsertOptions) (*Mov
 // This method validates the move before adding it to ensure game correctness.
 // For high-performance scenarios where moves are pre-validated, use UnsafeMove.
 //
-// Null moves are rejected here: they are never part of ValidMovesUnsafe, so
+// Null moves are rejected here: they are never part of legalMovesCached, so
 // callers wanting to pass the side must use [Game.NullMove] or
 // [Game.UnsafeMove] explicitly.
 //
 // Example:
 //
-//	possibleMove := game.ValidMoves()[0]
+//	possibleMove := game.LegalMoves()[0]
 //
 //	err := game.Move(possibleMove, nil)
 //	if err != nil {
@@ -103,7 +103,7 @@ func (g *Game) Move(move Move, options *MoveInsertOptions) (*MoveNode, error) {
 // Example:
 //
 //	// Only use when you're certain the move is valid
-//	validMoves := game.ValidMoves()
+//	validMoves := game.LegalMoves()
 //	move := validMoves[0] // We know this is valid
 //	err := game.UnsafeMove(move, nil)
 //	if err != nil {
@@ -134,7 +134,7 @@ func (g *Game) moveUnchecked(move Move, options *MoveInsertOptions) (*MoveNode, 
 
 // NullMove appends a null move (a side-to-move flip with no piece movement)
 // to the current position's main line. Null moves are never part of the
-// legal moves returned by ValidMoves, so they cannot be inserted via Game.Move.
+// legal moves returned by LegalMoves, so they cannot be inserted via Game.Move.
 // Use this method or Game.UnsafeMove(NullMove()) to add one explicitly.
 //
 // Pass nil (or no argument) to use default options.

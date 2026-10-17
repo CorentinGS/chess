@@ -105,7 +105,7 @@ func (pos *Position) makeMove(m Move) positionUndo {
 	undo := positionUndo{
 		board:           pos.board,
 		castleRights:    pos.castleRights,
-		validMoves:      pos.validMoves,
+		validMoves:      pos.legalMoves,
 		halfMoveClock:   pos.halfMoveClock,
 		moveCount:       pos.moveCount,
 		turn:            pos.turn,
@@ -133,7 +133,7 @@ func (pos *Position) makeMove(m Move) positionUndo {
 func (pos *Position) unmakeMove(undo positionUndo) {
 	pos.board = undo.board
 	pos.castleRights = undo.castleRights
-	pos.validMoves = undo.validMoves
+	pos.legalMoves = undo.validMoves
 	pos.halfMoveClock = undo.halfMoveClock
 	pos.moveCount = undo.moveCount
 	pos.turn = undo.turn

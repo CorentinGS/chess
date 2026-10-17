@@ -109,8 +109,8 @@ func TestTerminalOutcomeGuards(t *testing.T) {
 		name string
 		call func(g *chess.Game) error
 	}{
-		{"Move", func(g *chess.Game) error { _, err := g.Move(g.ValidMoves()[0], nil); return err }},
-		{"UnsafeMove", func(g *chess.Game) error { _, err := g.UnsafeMove(g.ValidMoves()[0], nil); return err }},
+		{"Move", func(g *chess.Game) error { _, err := g.Move(g.LegalMoves()[0], nil); return err }},
+		{"UnsafeMove", func(g *chess.Game) error { _, err := g.UnsafeMove(g.LegalMoves()[0], nil); return err }},
 		{"MoveText", func(g *chess.Game) error {
 			_, err := g.MoveText("e4", chess.SAN(), nil)
 			return err
@@ -176,7 +176,7 @@ func TestMoveAfterGoBackFromTerminalStillRejected(t *testing.T) {
 	if g.Outcome() != chess.WhiteWon {
 		t.Fatalf("outcome lost after GoBack: %s", g.Outcome())
 	}
-	move := g.ValidMoves()[0]
+	move := g.LegalMoves()[0]
 	_, err := g.Move(move, nil)
 	if !errors.Is(err, chess.ErrGameAlreadyEnded) {
 		t.Errorf("error = %v, want ErrGameAlreadyEnded", err)
@@ -194,7 +194,7 @@ func TestAddVariationAllowedAfterTerminalOutcome(t *testing.T) {
 	if !g.MoveTree().GoBack() {
 		t.Fatal("GoBack failed")
 	}
-	variation := g.ValidMoves()[0]
+	variation := g.LegalMoves()[0]
 	g.MoveTree().AddVariation(g.MoveTree().Root(), variation)
 	if len(g.MoveTree().Root().Children()) == 0 {
 		t.Error("AddVariation did not append child after terminal outcome")

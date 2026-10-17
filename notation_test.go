@@ -107,7 +107,7 @@ func TestAlgebraicNotationDecodeRoundTripsLegalMoves(t *testing.T) {
 	codec := SAN()
 
 	for _, pos := range positions {
-		for _, move := range pos.ValidMovesUnsafe() {
+		for _, move := range pos.legalMovesCached() {
 			encoded, err := codec.Encode(pos, move)
 			if err != nil {
 				t.Fatalf("Encode(%s) from %s: %v", move, pos, err)

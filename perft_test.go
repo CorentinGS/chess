@@ -95,7 +95,7 @@ func TestPerftBaseCases(t *testing.T) {
 
 	t.Run("depth_one_equals_legal_moves", func(t *testing.T) {
 		pos := chess.NewGame().Position()
-		if got, want := pos.Perft(1), uint64(len(pos.ValidMoves())); got != want {
+		if got, want := pos.Perft(1), uint64(len(pos.LegalMoves())); got != want {
 			t.Errorf("Perft(1) = %d, want %d", got, want)
 		}
 	})
@@ -268,13 +268,13 @@ func TestPerftAndDivideDoNotChangePosition(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pos := positionFromFEN(t, tt.fen)
 			beforeFEN := pos.String()
-			beforeMoves := moveStrings(pos.ValidMoves())
+			beforeMoves := moveStrings(pos.LegalMoves())
 
 			_ = pos.Perft(3)
 			if got := pos.String(); got != beforeFEN {
 				t.Fatalf("Perft mutated position: got %q, want %q", got, beforeFEN)
 			}
-			if got := moveStrings(pos.ValidMoves()); !equalStrings(got, beforeMoves) {
+			if got := moveStrings(pos.LegalMoves()); !equalStrings(got, beforeMoves) {
 				t.Fatalf("Perft changed legal moves: got %v, want %v", got, beforeMoves)
 			}
 
@@ -282,7 +282,7 @@ func TestPerftAndDivideDoNotChangePosition(t *testing.T) {
 			if got := pos.String(); got != beforeFEN {
 				t.Fatalf("Divide mutated position: got %q, want %q", got, beforeFEN)
 			}
-			if got := moveStrings(pos.ValidMoves()); !equalStrings(got, beforeMoves) {
+			if got := moveStrings(pos.LegalMoves()); !equalStrings(got, beforeMoves) {
 				t.Fatalf("Divide changed legal moves: got %v, want %v", got, beforeMoves)
 			}
 		})

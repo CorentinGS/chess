@@ -465,7 +465,7 @@ func TestCursorUndoRoundTrip(t *testing.T) {
 			}
 			preFEN := p.String()
 			preHash := p.ZobristHash()
-			for _, m := range p.ValidMoves() {
+			for _, m := range p.LegalMoves() {
 				u := p.makeMoveCursor(m)
 				walk(p, depth-1)
 				p.unmakeMoveCursor(m, u)

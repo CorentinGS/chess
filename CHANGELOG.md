@@ -13,6 +13,12 @@ All notable changes to this project will be documented in this file. See [conven
   static Polyglot table.
 - unexport the PGN `Parser` type; it had no public constructor.
 - move `uci.FakeAdapter` out of the public API into the package tests.
+- use "legal" for every move list: `ValidMoves` becomes `LegalMoves` on
+  `Game` and `Position`, and `Position.ValidMovesIter` becomes
+  `Position.LegalMovesSeq() iter.Seq[Move]`. `Position.ValidMovesUnsafe` is
+  now internal.
+- replace `Position.UnsafeMoves` (only the illegal subset) with
+  `Position.PseudoLegalMoves`; remove `Game.UnsafeMoves`.
 
 ## v2.6.0 - 2026-08-17
 #### Features

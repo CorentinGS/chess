@@ -295,7 +295,7 @@ func TestSufficientMaterial(t *testing.T) {
 
 func TestInitialNumOfValidMoves(t *testing.T) {
 	g := NewGame()
-	if len(g.ValidMoves()) != 20 {
+	if len(g.LegalMoves()) != 20 {
 		t.Fatal("should find 20 valid moves from the initial position")
 	}
 }
@@ -2078,7 +2078,7 @@ func TestMoveVsUnsafeMovePerformance(t *testing.T) {
 	}
 
 	game := NewGame()
-	validMoves := game.ValidMoves()
+	validMoves := game.LegalMoves()
 	if len(validMoves) == 0 {
 		t.Fatal("no valid moves available")
 	}
@@ -2345,7 +2345,7 @@ func TestCastlingInteractions(t *testing.T) {
 			}
 
 			// Check if second move is valid
-			validMoves := g.ValidMoves()
+			validMoves := g.LegalMoves()
 			isAllowed := false
 
 			// Determine expected tag based on second move string
@@ -2462,19 +2462,6 @@ func TestMoveListFromPGN(t *testing.T) {
 	list := game.MoveList()
 	if len(list) == 0 {
 		t.Fatal("expected move list from PGN game")
-	}
-}
-
-func TestGameUnsafeMoves(t *testing.T) {
-	game := NewGame()
-	if len(game.UnsafeMoves()) != 0 {
-		t.Errorf("expected 0 unsafe moves at start, got %d", len(game.UnsafeMoves()))
-	}
-
-	// Verify delegation to Position
-	pos := game.Position()
-	if len(game.UnsafeMoves()) != len(pos.UnsafeMoves()) {
-		t.Errorf("Game.UnsafeMoves() length mismatch with Position.UnsafeMoves()")
 	}
 }
 

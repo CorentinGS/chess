@@ -197,7 +197,7 @@ func TestCmdPositionEncodesChess960CastleKingToRook(t *testing.T) {
 	pos := chess960CastlePosition(t)
 	// The king-side castle from this position: king e1 -> g1, rook h1 -> f1.
 	var castle chess.Move
-	for _, m := range pos.ValidMoves() {
+	for _, m := range pos.LegalMoves() {
 		if m.HasTag(chess.KingSideCastle) {
 			castle = m
 			break
@@ -233,7 +233,7 @@ func TestCmdPositionReplaysChess960MovesBeforeCastle(t *testing.T) {
 	beforeCastle := afterWhite.Update(blackKnight)
 
 	var castle chess.Move
-	for _, m := range beforeCastle.ValidMoves() {
+	for _, m := range beforeCastle.LegalMoves() {
 		if m.HasTag(chess.KingSideCastle) {
 			castle = m
 			break

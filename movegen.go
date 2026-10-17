@@ -56,12 +56,12 @@ func unsafeMoves(pos *Position) []Move {
 //   - Whether the side to move is in check
 //   - Whether any legal moves exist
 //
-// If the position has cached valid moves in pos.validMoves, those will be
+// If the position has cached valid moves in pos.legalMoves, those will be
 // used. Otherwise, moves will be calculated to determine the Method.
 func status(pos *Position) Method {
 	var hasMove bool
-	if pos.validMoves != nil {
-		hasMove = len(pos.validMoves) > 0
+	if pos.legalMoves != nil {
+		hasMove = len(pos.legalMoves) > 0
 	} else {
 		hasMove = hasLegalMove(pos)
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"iter"
 	"strconv"
 	"sync"
 )
@@ -118,7 +119,7 @@ func (cr *CastleRights) UnmarshalText(text []byte) error {
 type Position struct {
 	board           Board        // Current board state
 	castleRights    CastleRights // Available castling options
-	validMoves      []Move       // Cache of legal moves
+	legalMoves      []Move       // Cache of legal moves
 	halfMoveClock   int          // Half-move counter
 	moveCount       int          // Full move counter
 	turn            Color        // Side to move
@@ -167,7 +168,7 @@ func (pos *Position) IsLegal(m Move) bool {
 	if pos == nil || m.HasTag(Null) {
 		return false
 	}
-	for _, valid := range pos.ValidMovesUnsafe() {
+	for _, valid := range pos.legalMovesCached() {
 		if valid.s1 == m.s1 && valid.s2 == m.s2 && valid.promo == m.promo {
 			return true
 		}
@@ -296,59 +297,61 @@ func (pos *Position) updateHash(m Move, newCR CastleRights, newEP Square, eff mo
 	return hash
 }
 
-// ValidMoves returns all legal moves in the current position.
+// LegalMoves returns all legal moves in the current position.
 // The moves are cached for performance. The returned slice is a
 // defensive copy safe for modification by the caller.
-func (pos *Position) ValidMoves() []Move {
-	if pos.validMoves != nil {
-		return append([]Move(nil), pos.validMoves...)
+func (pos *Position) LegalMoves() []Move {
+	if pos.legalMoves != nil {
+		return append([]Move(nil), pos.legalMoves...)
 	}
-	pos.validMoves = calcMoves(pos, false)
-	return append([]Move(nil), pos.validMoves...)
+	pos.legalMoves = calcMoves(pos, false)
+	return append([]Move(nil), pos.legalMoves...)
 }
 
-// ValidMovesUnsafe returns all legal moves in the current position
+// legalMovesCached returns all legal moves in the current position
 // without copying. The caller must not modify the returned slice.
-// This is a zero-allocation alternative to ValidMoves() for hot paths.
-func (pos *Position) ValidMovesUnsafe() []Move {
-	if pos.validMoves != nil {
-		return pos.validMoves
+// This is a zero-allocation alternative to LegalMoves() for hot paths.
+func (pos *Position) legalMovesCached() []Move {
+	if pos.legalMoves != nil {
+		return pos.legalMoves
 	}
-	pos.validMoves = calcMoves(pos, false)
-	return pos.validMoves
+	pos.legalMoves = calcMoves(pos, false)
+	return pos.legalMoves
 }
 
-// LegalMovesFast returns legal moves in the same stable generation order as
-// ValidMovesUnsafe without computing display-only check annotations. The
+// LegalMovesFast returns the legal moves in the same order as LegalMoves but
+// skips computing the Check tag, which only matters for SAN rendering. The
 // returned moves remain valid inputs to Position.Update. This is intended for
 // replay/index codecs that need move identity and legality but not SAN tags.
 func (pos *Position) LegalMovesFast() []Move {
 	return legalMovesForMode(pos, generateLegalOnly)
 }
 
-// ValidMovesIter yields all legal moves in the current position.
-// It uses Go 1.23's range-over-func pattern for zero-allocation iteration
-// once the move cache is warm. The first call may allocate if moves have
-// not been computed yet.
+// LegalMovesSeq returns an iterator over the legal moves in the current
+// position, in the same order and with the same tags as LegalMoves. Iteration
+// does not allocate once the position's move cache is warm; the first call
+// may compute and cache the moves.
 //
-// Example:
-//
-//	for move := range pos.ValidMovesIter {
+//	for move := range pos.LegalMovesSeq() {
 //	    // process move
 //	}
-func (pos *Position) ValidMovesIter(yield func(Move) bool) {
-	moves := pos.ValidMovesUnsafe()
-	for _, m := range moves {
-		if !yield(m) {
-			return
+func (pos *Position) LegalMovesSeq() iter.Seq[Move] {
+	return func(yield func(Move) bool) {
+		for _, m := range pos.legalMovesCached() {
+			if !yield(m) {
+				return
+			}
 		}
 	}
 }
 
-// UnsafeMoves returns all pseudo-legal moves that are illegal because they leave
-// the moving side's king in check. These moves should not be played via Move().
-func (pos *Position) UnsafeMoves() []Move {
-	return unsafeMoves(pos)
+// PseudoLegalMoves returns every move that follows the pieces' movement rules
+// for the side to move, including those that leave its own king in check.
+// Castling is included only when it is fully legal. The moves carry no Check
+// tag. Filter with IsLegal to separate legal from illegal moves; only legal
+// moves may be passed to Update or ApplyInPlace.
+func (pos *Position) PseudoLegalMoves() []Move {
+	return append(legalMovesForMode(pos, generateLegalOnly), unsafeMoves(pos)...)
 }
 
 // Status returns the position's outcome Method (e.g. Checkmate, Stalemate, or

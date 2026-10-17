@@ -32,7 +32,7 @@ func resolveCanonicalMove(pos *Position, m Move) (Move, error) {
 	if pos == nil {
 		return Move{}, errors.New("chess: position required")
 	}
-	for _, v := range pos.ValidMovesUnsafe() {
+	for _, v := range pos.legalMovesCached() {
 		if v.s1 == m.s1 && v.s2 == m.s2 && v.promo == m.promo {
 			return v, nil
 		}

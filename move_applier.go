@@ -215,7 +215,7 @@ func (pos *Position) applyMove(m Move) moveEffect {
 	pos.halfMoveClock = halfMove
 	pos.moveCount = moveCount
 	pos.hash = newHash
-	pos.validMoves = nil
+	pos.legalMoves = nil
 	pos.statusCached = false
 	pos.inCheck, pos.checkers = checkState(pos)
 	return eff
@@ -225,7 +225,7 @@ func (pos *Position) applyMove(m Move) moveEffect {
 // move plus scalar state, ~56 bytes versus ~264 for perft's full-state
 // positionUndo. The tree retains one entry per played level for the game's
 // lifetime, so size matters here; perft's undo is stack-allocated on a hot
-// path and stays untouched (ADR-0001). validMoves/status caches are not
+// path and stays untouched (ADR-0001). legalMoves/status caches are not
 // captured: applyMove invalidates both on the forward path, so restoring
 // them as invalid matches the forward state exactly.
 type cursorUndo struct {
@@ -274,7 +274,7 @@ func (pos *Position) unmakeMoveCursor(m Move, u cursorUndo) {
 	pos.turn = u.turn
 	pos.inCheck = u.inCheck
 	pos.checkers = u.checkers
-	pos.validMoves = nil
+	pos.legalMoves = nil
 	pos.statusCached = false
 }
 

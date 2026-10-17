@@ -53,7 +53,7 @@ func TestPositionUpdate(t *testing.T) {
 		}
 
 		{
-			np := pos.Update(pos.ValidMoves()[0])
+			np := pos.Update(pos.LegalMoves()[0])
 			if pos.Turn().Other() != np.turn {
 				t.Fatal("expected other turn")
 			}
@@ -73,7 +73,7 @@ func TestPositionAnyLegalMove(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got, want := pos.AnyLegalMove(), len(pos.ValidMoves()) > 0; got != want {
+		if got, want := pos.AnyLegalMove(), len(pos.LegalMoves()) > 0; got != want {
 			t.Fatalf("AnyLegalMove(%s) = %v, want %v", fen, got, want)
 		}
 	}
@@ -179,16 +179,16 @@ func TestSamePositionEnPassantFIDECompliance(t *testing.T) {
 	}
 }
 
-func TestValidMovesUnsafeEquivalence(t *testing.T) {
+func TestLegalMovesCachedEquivalence(t *testing.T) {
 	for _, fen := range validFENs {
 		pos, err := decodeFEN(fen)
 		if err != nil {
 			t.Fatal(err)
 		}
-		safe := pos.ValidMoves()
-		unsafe := pos.ValidMovesUnsafe()
+		safe := pos.LegalMoves()
+		unsafe := pos.legalMovesCached()
 		if !reflect.DeepEqual(safe, unsafe) {
-			t.Fatalf("ValidMovesUnsafe() differs from ValidMoves() for FEN %s", fen)
+			t.Fatalf("legalMovesCached() differs from LegalMoves() for FEN %s", fen)
 		}
 	}
 }
@@ -205,7 +205,7 @@ func TestLegalMovesFastPreservesMoveIdentityAndOrder(t *testing.T) {
 			t.Fatalf("FEN(%q): %v", fen, err)
 		}
 		position := NewGame(option).Position()
-		annotated := position.ValidMovesUnsafe()
+		annotated := position.legalMovesCached()
 		fast := position.LegalMovesFast()
 		if len(fast) != len(annotated) {
 			t.Fatalf("FEN %q fast moves=%d, annotated=%d", fen, len(fast), len(annotated))
@@ -219,10 +219,10 @@ func TestLegalMovesFastPreservesMoveIdentityAndOrder(t *testing.T) {
 	}
 }
 
-func TestValidMovesUnsafeMutation(t *testing.T) {
+func TestLegalMovesCachedMutation(t *testing.T) {
 	pos := StartingPosition()
-	unsafe1 := pos.ValidMovesUnsafe()
-	unsafe2 := pos.ValidMovesUnsafe()
+	unsafe1 := pos.legalMovesCached()
+	unsafe2 := pos.legalMovesCached()
 
 	// Modifying the unsafe slice should affect the position's cached moves
 	if len(unsafe1) == 0 {
@@ -231,34 +231,34 @@ func TestValidMovesUnsafeMutation(t *testing.T) {
 	original := unsafe1[0]
 	unsafe1[0] = Move{s1: NoSquare, s2: NoSquare}
 	if unsafe2[0].s1 != NoSquare || unsafe2[0].s2 != NoSquare {
-		t.Error("modifying ValidMovesUnsafe() slice should affect internal cache")
+		t.Error("modifying legalMovesCached() slice should affect internal cache")
 	}
 
 	// Reset for other tests
 	unsafe1[0] = original
 }
 
-func TestValidMovesIter(t *testing.T) {
+func TestLegalMovesSeq(t *testing.T) {
 	for _, fen := range validFENs {
 		pos, err := decodeFEN(fen)
 		if err != nil {
 			t.Fatal(err)
 		}
-		moves := pos.ValidMoves()
+		moves := pos.LegalMoves()
 		var iterMoves []Move
-		for move := range pos.ValidMovesIter {
+		for move := range pos.LegalMovesSeq() {
 			iterMoves = append(iterMoves, move)
 		}
 		if !reflect.DeepEqual(moves, iterMoves) {
-			t.Fatalf("ValidMovesIter() yields different moves than ValidMoves() for FEN %s", fen)
+			t.Fatalf("LegalMovesSeq() yields different moves than LegalMoves() for FEN %s", fen)
 		}
 	}
 }
 
-func TestValidMovesIterEarlyReturn(t *testing.T) {
+func TestLegalMovesSeqEarlyReturn(t *testing.T) {
 	pos := StartingPosition()
 	count := 0
-	for range pos.ValidMovesIter {
+	for range pos.LegalMovesSeq() {
 		count++
 		if count == 5 {
 			break
@@ -269,17 +269,17 @@ func TestValidMovesIterEarlyReturn(t *testing.T) {
 	}
 }
 
-func BenchmarkValidMovesCopy(b *testing.B) {
+func BenchmarkLegalMovesCopy(b *testing.B) {
 	pos := StartingPosition()
 	for range b.N {
-		_ = pos.ValidMoves()
+		_ = pos.LegalMoves()
 	}
 }
 
-func BenchmarkValidMovesUnsafe(b *testing.B) {
+func BenchmarkLegalMovesCached(b *testing.B) {
 	pos := StartingPosition()
 	for range b.N {
-		_ = pos.ValidMovesUnsafe()
+		_ = pos.legalMovesCached()
 	}
 }
 
@@ -306,7 +306,7 @@ func BenchmarkPositionXFENString(b *testing.B) {
 
 func BenchmarkPositionUpdate(b *testing.B) {
 	pos := StartingPosition()
-	move := pos.ValidMovesUnsafe()[0]
+	move := pos.legalMovesCached()[0]
 	for b.Loop() {
 		_ = pos.Update(move)
 	}
@@ -333,7 +333,7 @@ func TestZobristHashIncrementalCorrectness(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		moves := pos.ValidMovesUnsafe()
+		moves := pos.legalMovesCached()
 		if len(moves) == 0 {
 			continue
 		}

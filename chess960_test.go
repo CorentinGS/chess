@@ -301,7 +301,7 @@ func TestChess960CastlingKingSide(t *testing.T) {
 	}
 	var castle Move
 	found := false
-	for _, m := range pos.ValidMoves() {
+	for _, m := range pos.LegalMoves() {
 		if m.HasTag(KingSideCastle) {
 			castle = m
 			found = true
@@ -491,7 +491,7 @@ func TestChess960CastlingEdgeCases(t *testing.T) {
 			}
 			var castle Move
 			seen := false
-			for _, m := range pos.ValidMoves() {
+			for _, m := range pos.LegalMoves() {
 				if m.HasTag(tc.want.side) {
 					castle, seen = m, true
 				}
@@ -504,7 +504,7 @@ func TestChess960CastlingEdgeCases(t *testing.T) {
 			}
 			if !seen {
 				// Fall back: scan for either castle tag.
-				for _, m := range pos.ValidMoves() {
+				for _, m := range pos.LegalMoves() {
 					if m.HasTag(KingSideCastle) || m.HasTag(QueenSideCastle) {
 						castle, seen = m, true
 						break

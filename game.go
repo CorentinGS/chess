@@ -82,15 +82,9 @@ func (g *Game) IsAtEnd() bool {
 	return g.tree != nil && g.tree.Current() != nil && len(g.tree.Current().children) == 0
 }
 
-// ValidMoves returns all legal moves in the current position.
-func (g *Game) ValidMoves() []Move {
-	return g.currentPosition().ValidMoves()
-}
-
-// UnsafeMoves returns all pseudo-legal moves that leave the moving side's king in check.
-// These moves are valid piece movements but illegal because they expose the king.
-func (g *Game) UnsafeMoves() []Move {
-	return g.currentPosition().UnsafeMoves()
+// LegalMoves returns all legal moves in the current position.
+func (g *Game) LegalMoves() []Move {
+	return g.currentPosition().LegalMoves()
 }
 
 // Moves returns the main-line move values of the game.

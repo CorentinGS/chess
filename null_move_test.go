@@ -23,7 +23,7 @@ import (
 //   - UCI decode       : "0000"
 //
 // Validation contract:
-//   - Null moves are never part of a position's legal moves (ValidMoves).
+//   - Null moves are never part of a position's legal moves (LegalMoves).
 //   - Game.Move() rejects a null move.
 //   - Game.UnsafeMove(NullMove()) and Game.NullMove() accept it.
 //
@@ -320,14 +320,14 @@ func TestNullMove_AppearsInMoveList(t *testing.T) {
 }
 
 // ------------------------------------------------------------------
-// ValidMoves contract: a null move is not legal.
+// LegalMoves contract: a null move is not legal.
 // ------------------------------------------------------------------
 
-func TestNullMove_NeverInValidMoves(t *testing.T) {
+func TestNullMove_NeverInLegalMoves(t *testing.T) {
 	g := chess.NewGame()
-	for _, m := range g.ValidMoves() {
+	for _, m := range g.LegalMoves() {
 		if m.HasTag(chess.Null) {
-			t.Fatal("ValidMoves must never return a null move")
+			t.Fatal("LegalMoves must never return a null move")
 		}
 	}
 }

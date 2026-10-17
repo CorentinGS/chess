@@ -22,8 +22,8 @@ Update import paths in every sub-package you use (`/v3/image`, `/v3/opening`,
 ## Move is a value, not a pointer
 
 `Move` is now a 4-field value (`s1`, `s2`, `promo`, `tags`). Tree navigation and
-annotations live on the separate `MoveNode` type. `ValidMoves()` returns `[]Move`
-and the move methods accept `Move` by value.
+annotations live on the separate `MoveNode` type. `LegalMoves()` (formerly
+`ValidMoves()`) returns `[]Move` and the move methods accept `Move` by value.
 
 ```go
 // v2
@@ -31,7 +31,7 @@ moves := game.ValidMoves()
 if err := game.Move(&moves[0], nil); err != nil { /* ... */ }
 
 // v3
-moves := game.ValidMoves()
+moves := game.LegalMoves()
 node, err := game.Move(moves[0], nil)
 if err != nil { /* ... */ }
 _ = node
@@ -168,6 +168,25 @@ mechanical renames with no behaviour change; update the symbol at the call site.
 
 The unexported `newOpening` constructor is renamed `newEntry` to match.
 
+## Move listing uses "legal" everywhere
+
+v3 uses the chess term *legal* for every move list, matching `IsLegal` and
+`AnyLegalMove`:
+
+| v2 | v3 |
+|---|---|
+| `Game.ValidMoves()` / `Position.ValidMoves()` | `LegalMoves()` |
+| _(none)_ | `Position.LegalMovesSeq() iter.Seq[Move]` |
+| _(none)_ | `Position.LegalMovesFast()`, legal moves without the `Check` tag |
+| _(none)_ | `Position.PseudoLegalMoves()`, every pseudo-legal move; filter with `IsLegal` |
+
+```go
+for m := range pos.LegalMovesSeq() {
+	next := pos.Update(m)
+	_ = next
+}
+```
+
 ## Removed APIs
 
 These v2 exports have no direct v3 equivalent under the same name:
@@ -266,7 +285,7 @@ node, err := g.NullMove() // flips turn, serializes as "Z0" in PGN
 ```
 
 `NewNullMove()` returns a `Move` carrying the `Null` tag. Null moves are never
-returned by `ValidMoves()` and are rejected by `Game.Move`. Insert them via
+returned by `LegalMoves()` and are rejected by `Game.Move`. Insert them via
 `Game.NullMove()` or `Game.UnsafeMove(NewNullMove(), nil)`. When reading PGN,
 the parser accepts five spellings: `Z0`, `Z1`, `--`, `@@`, and `0000`. The
 renderer always writes `Z0` (ChessBase/Scid convention).
@@ -305,8 +324,8 @@ removed with no direct replacement:
   `uint64` from `HashFromFEN` or `Position.ZobristHash` via
   `binary.LittleEndian.PutUint64`.
 
-`Position.ValidMovesUnsafe()` and `Position.ValidMovesIter()` —
-allocation-sensitive access for hot paths; see package docs for safety notes.
+`Position.LegalMovesSeq()` (no allocation once cached) and
+`Position.LegalMovesFast()` (skips the `Check` tag) serve hot paths.
 `Board.Piece()` uses an internal mailbox for O(1) lookup.
 
 ## Polyglot book loading

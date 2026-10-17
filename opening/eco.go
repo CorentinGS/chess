@@ -134,7 +134,7 @@ func (b *BookECO) insertOpening(o *Entry) error {
 			continue
 		}
 
-		if !isLegalMove(n.pos, m) {
+		if !n.pos.IsLegal(m) {
 			return fmt.Errorf("apply move %s: move is not valid for the current position", moveStr)
 		}
 
@@ -148,15 +148,6 @@ func (b *BookECO) insertOpening(o *Entry) error {
 	}
 	n.opening = o
 	return nil
-}
-
-func isLegalMove(pos *chess.Position, move chess.Move) bool {
-	for _, validMove := range pos.ValidMovesUnsafe() {
-		if validMove.S1() == move.S1() && validMove.S2() == move.S2() && validMove.Promo() == move.Promo() {
-			return true
-		}
-	}
-	return false
 }
 
 // Bit layout for moveKey: a Square fits in 6 bits (0..63), a PieceType fits

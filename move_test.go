@@ -204,7 +204,7 @@ func TestValidMoves(t *testing.T) {
 		if !moveIsValid(mt.pos, mt.m, false) {
 			log.Println(mt.pos.String())
 			log.Println(mt.pos.board.Draw())
-			log.Println(mt.pos.ValidMoves())
+			log.Println(mt.pos.LegalMoves())
 			log.Println("In Check:", squaresAreAttacked(mt.pos, mt.pos.board.whiteKingSq))
 			// log.Println("In Check:", mt.pos.inCheck())
 			mt.pos.turn = mt.pos.turn.Other()
@@ -228,7 +228,7 @@ func TestPositionUpdates(t *testing.T) {
 		if !moveIsValid(mt.pos, mt.m, true) {
 			log.Println(mt.pos.String())
 			log.Println(mt.pos.board.Draw())
-			log.Println(mt.pos.ValidMoves())
+			log.Println(mt.pos.LegalMoves())
 			t.Fatalf("expected move %s %v to be valid", mt.m, mt.m.tags)
 		}
 
@@ -491,8 +491,8 @@ func BenchmarkValidMoves(b *testing.B) {
 	pos := unsafeFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 	b.ResetTimer()
 	for range b.N {
-		pos.ValidMoves()
-		pos.validMoves = nil
+		pos.LegalMoves()
+		pos.legalMoves = nil
 	}
 }
 
@@ -512,7 +512,7 @@ func BenchmarkMoveNodeChildrenIter(b *testing.B) {
 }
 
 func moveIsValid(pos *Position, m *Move, useTags bool) bool {
-	for _, move := range pos.ValidMoves() {
+	for _, move := range pos.LegalMoves() {
 		if move.s1 == m.s1 && move.s2 == m.s2 && move.promo == m.promo {
 			if useTags {
 				if m.tags != move.tags {
@@ -613,7 +613,7 @@ func TestNewMove(t *testing.T) {
 	// Constructed move should match the generated legal move by identity.
 	pos := StartingPosition()
 	var found bool
-	for _, legal := range pos.ValidMoves() {
+	for _, legal := range pos.LegalMoves() {
 		if legal.S1() == E2 && legal.S2() == E4 {
 			found = true
 			break

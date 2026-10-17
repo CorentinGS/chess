@@ -144,7 +144,7 @@ func main() {
 	// generate moves until game is over
 	for game.Outcome() == chess.NoOutcome {
 		// select a random move
-		moves := game.ValidMoves()
+		moves := game.LegalMoves()
 		move := moves[rand.Intn(len(moves))]
 		if err := game.Move(move, nil); err != nil {
 			panic(err) // Should not happen with valid moves
@@ -230,7 +230,7 @@ The library offers two move execution methods to balance safety and performance:
 
 ```go
 game := chess.NewGame()
-moves := game.ValidMoves()
+moves := game.LegalMoves()
 err := game.Move(moves[0], nil)
 if err != nil {
 // Handle invalid move error
@@ -241,7 +241,7 @@ if err != nil {
 
 ```go
 game := chess.NewGame()
-moves := game.ValidMoves()
+moves := game.LegalMoves()
 // Only use when you're certain the move is valid
 err := game.UnsafeMove(moves[0], nil)
 if err != nil {
@@ -282,7 +282,7 @@ Valid moves generated from the game's current position:
 
 ```go
 game := chess.NewGame()
-moves := game.ValidMoves()
+moves := game.LegalMoves()
 game.Move(moves[0], nil)
 fmt.Println(moves[0]) // b1a3
 ```
@@ -307,10 +307,10 @@ execution and returns descriptive errors for invalid moves:
 game := chess.NewGame()
 
 // Get valid moves from current position
-validMoves := game.ValidMoves()
-if len(validMoves) > 0 {
+legalMoves := game.LegalMoves()
+if len(legalMoves) > 0 {
 // This will succeed - move is known to be valid
-if err := game.Move(validMoves[0], nil); err != nil {
+if err := game.Move(legalMoves[0], nil); err != nil {
 fmt.Println("Move failed:", err)
 } else {
 fmt.Println("Move succeeded")
@@ -337,8 +337,8 @@ For scenarios requiring maximum performance where moves are already validated:
 game := chess.NewGame()
 
 // Option 1: Using Move structs directly (~1.5x faster)
-validMoves := game.ValidMoves()
-selectedMove := validMoves[0] // We know this is valid
+legalMoves := game.LegalMoves()
+selectedMove := legalMoves[0] // We know this is valid
 if err := game.UnsafeMove(selectedMove, nil); err != nil {
 panic(err) // Should not happen with pre-validated moves
 }

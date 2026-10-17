@@ -481,7 +481,7 @@ func validatePositionMove(pos *Position, move Move) error {
 	if move.HasTag(Null) {
 		return nil
 	}
-	for _, validMove := range pos.ValidMovesUnsafe() {
+	for _, validMove := range pos.legalMovesCached() {
 		if sameMove(validMove, move) {
 			return nil
 		}

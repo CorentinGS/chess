@@ -12,7 +12,7 @@ synchronization.
 Using Moves
 
 	game := chess.NewGame()
-	moves := game.ValidMoves()
+	moves := game.LegalMoves()
 	game.Move(moves[0], nil)
 
 Using Strict SAN Move Text
@@ -45,7 +45,7 @@ Random Game
 	    // generate moves until game is over
 	    for game.Outcome() == chess.NoOutcome {
 	        // select a random move
-	        moves := game.ValidMoves()
+	        moves := game.LegalMoves()
 	        move := moves[rand.IntN(len(moves))]
 	        game.Move(move, nil)
 	    }

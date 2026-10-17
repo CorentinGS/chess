@@ -149,7 +149,7 @@ func TestAlgebraicNotation_EncodeDisambiguation(t *testing.T) {
 			pos := chess.NewGame(opt).Position()
 			var target chess.Move
 			found := false
-			for _, m := range pos.ValidMoves() {
+			for _, m := range pos.LegalMoves() {
 				if m.S1() == tc.from && m.S2() == tc.to {
 					target = m
 					found = true
