@@ -63,29 +63,6 @@ func (g *Game) insertCanonical(canonical Move, options *MoveInsertOptions) (*Mov
 	return g.moveUnchecked(canonical, options)
 }
 
-// PushMove adds a move in algebraic notation to the game.
-// Returns an error if the move is invalid.
-//
-// Deprecated: use MoveText(algebraicMove, SAN(), options) instead.
-func (g *Game) PushMove(algebraicMove string, options *MoveInsertOptions) (*MoveNode, error) {
-	return g.MoveText(algebraicMove, SAN(), options)
-}
-
-// PushMoveText adds a move to the game using an explicit move text codec.
-//
-// Deprecated: use MoveText instead.
-func (g *Game) PushMoveText(moveText string, codec MoveTextCodec, options *MoveInsertOptions) (*MoveNode, error) {
-	return g.MoveText(moveText, codec, options)
-}
-
-// UnsafePushMoveText adds fully specified move text without legal move
-// verification.
-//
-// Deprecated: use UnsafeMoveText instead.
-func (g *Game) UnsafePushMoveText(moveText string, codec MoveTextCodec, options *MoveInsertOptions) (*MoveNode, error) {
-	return g.UnsafeMoveText(moveText, codec, options)
-}
-
 // Move method adds a move to the game using a Move struct.
 // It returns an error if the move is invalid.
 // This method validates the move before adding it to ensure game correctness.

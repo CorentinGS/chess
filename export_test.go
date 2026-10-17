@@ -26,6 +26,6 @@ func PGN(r io.Reader) (func(*Game), error) {
 	}, nil
 }
 
-func NewParser(tokens []Token) *Parser {
+func NewParser(tokens []Token) *pgnParser {
 	return newParser(tokens)
 }

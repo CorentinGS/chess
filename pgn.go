@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// Parser holds the state needed during parsing.
-type Parser struct {
+// pgnParser holds the state needed during parsing.
+type pgnParser struct {
 	game         *Game
 	tokens       pgnTokenSource
 	lexer        *Lexer
@@ -56,18 +56,18 @@ func parsePGNText(raw string, options pgnOptions) (*Game, error) {
 
 // newParser creates a parser from a pre-built token slice. This is the test
 // seam for parser state-machine unit tests in pgn_test.go.
-func newParser(tokens []Token) *Parser {
+func newParser(tokens []Token) *pgnParser {
 	return newParserFromSource(&sliceTokenSource{tokens: tokens}, defaultPGNOptions())
 }
 
-func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *Parser {
+func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *pgnParser {
 	options := defaultPGNOptions()
 	if len(opts) > 0 {
 		options = opts[0]
 	}
 	pos := StartingPosition()
 	tree := newMoveTree(pos)
-	parser := &Parser{
+	parser := &pgnParser{
 		tokens: tokens,
 		game: &Game{
 			tagPairs: make(TagPairs),
@@ -93,7 +93,7 @@ func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *Parser {
 }
 
 // currentToken returns the current token being processed.
-func (p *Parser) currentToken() Token {
+func (p *pgnParser) currentToken() Token {
 	return p.token
 }
 
@@ -101,7 +101,7 @@ func (p *Parser) currentToken() Token {
 // ponytail: dual branch skips one interface call on the hot lexer path; the
 // slice branch is test-only and uncovered by the unit suite (pgn_test.go:878).
 // Unify on p.tokens.NextToken() — interface cost (~1-2 ns) is parse-noise.
-func (p *Parser) advance() {
+func (p *pgnParser) advance() {
 	p.position++
 	if p.lexer != nil {
 		p.token = p.lexer.NextToken()
@@ -115,11 +115,11 @@ func (p *Parser) advance() {
 	p.token = token
 }
 
-func (p *Parser) atEnd() bool {
+func (p *pgnParser) atEnd() bool {
 	return p.currentToken().Type == EOF
 }
 
-func (p *Parser) currentMove() *MoveNode {
+func (p *pgnParser) currentMove() *MoveNode {
 	if p == nil || p.game == nil || p.game.tree == nil {
 		return nil
 	}
@@ -139,7 +139,7 @@ func (p *Parser) currentMove() *MoveNode {
 //	    log.Fatal("Error parsing game:", err)
 //	}
 //	fmt.Printf("Event: %s\n", game.GetTagPair("Event"))
-func (p *Parser) Parse() (*Game, error) {
+func (p *pgnParser) Parse() (*Game, error) {
 	if p.initErr != nil {
 		return nil, p.initErr
 	}
@@ -184,7 +184,7 @@ func (p *Parser) Parse() (*Game, error) {
 	return p.game, nil
 }
 
-func (p *Parser) resolveOutcome() error {
+func (p *pgnParser) resolveOutcome() error {
 	outcome, method, err := arbitratePGNOutcome(p.game.outcome, p.game.method, p.tagOutcome, p.tokenOutcome)
 	if err != nil {
 		return &ParserError{Message: err.Error(), Position: p.position}
@@ -194,7 +194,7 @@ func (p *Parser) resolveOutcome() error {
 	return nil
 }
 
-func (p *Parser) parseHeader() error {
+func (p *pgnParser) parseHeader() error {
 	for p.currentToken().Type == TagStart {
 		if err := p.parseTagPair(); err != nil {
 			return err
@@ -203,7 +203,7 @@ func (p *Parser) parseHeader() error {
 	return nil
 }
 
-func (p *Parser) parseTagPair() error {
+func (p *pgnParser) parseTagPair() error {
 	// Expect [
 	if p.currentToken().Type != TagStart {
 		return &ParserError{
@@ -266,7 +266,7 @@ func variantFromTag(s string) Variant {
 	return Standard
 }
 
-func (p *Parser) parseMoveText() error {
+func (p *pgnParser) parseMoveText() error {
 	var moveNumber uint64
 	ply := 1
 	for !p.atEnd() {
@@ -331,7 +331,7 @@ func (p *Parser) parseMoveText() error {
 	return nil
 }
 
-func (p *Parser) parseMove() (Move, error) {
+func (p *pgnParser) parseMove() (Move, error) {
 	data := sanMoveData{
 		piece:     Pawn,
 		canonical: p.moveText.Policy() == MoveTextPolicyStrict,
@@ -425,7 +425,7 @@ func (p *Parser) parseMove() (Move, error) {
 	return move, nil
 }
 
-func (p *Parser) parseComment() (CommentBlock, error) {
+func (p *pgnParser) parseComment() (CommentBlock, error) {
 	p.advance() // Consume "{"
 
 	block := CommentBlock{}
@@ -463,7 +463,7 @@ func (p *Parser) parseComment() (CommentBlock, error) {
 	return block, nil
 }
 
-func (p *Parser) parseCommand() (CommentItem, error) {
+func (p *pgnParser) parseCommand() (CommentItem, error) {
 	var key string
 	var value string
 
@@ -511,7 +511,7 @@ func (p *Parser) parseCommand() (CommentItem, error) {
 
 // collectMoveAnnotations consumes all NAGs and comments immediately following
 // the current move, attaching them to the current move node.
-func (p *Parser) collectMoveAnnotations() error {
+func (p *pgnParser) collectMoveAnnotations() error {
 	for {
 		tok := p.currentToken()
 		switch tok.Type {
@@ -539,7 +539,7 @@ func (p *Parser) collectMoveAnnotations() error {
 	}
 }
 
-func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
+func (p *pgnParser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	p.advance() // consume (
 
 	// Save current state to restore later
@@ -655,7 +655,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	return nil
 }
 
-func (p *Parser) parseResult() {
+func (p *pgnParser) parseResult() {
 	p.tokenOutcome = outcomeFromResultString(p.currentToken().Value)
 	p.advance()
 }
@@ -665,7 +665,7 @@ func outcomeFromResultString(s string) Outcome {
 	return o
 }
 
-func (p *Parser) addMove(move Move, number uint) {
+func (p *pgnParser) addMove(move Move, number uint) {
 	parent := p.currentMove()
 	node := &MoveNode{move: move, parent: parent, tree: p.game.tree, number: number}
 	parent.children = append(parent.children, node)

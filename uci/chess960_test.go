@@ -11,7 +11,7 @@ import (
 )
 
 // recordingAdapter is a test Adapter that both returns canned responses (keyed
-// by the command's first word, like FakeAdapter) and records the exact command
+// by the command's first word, like fakeAdapter) and records the exact command
 // strings sent to the engine, so tests can assert on protocol ordering.
 type recordingAdapter struct {
 	mu        sync.Mutex

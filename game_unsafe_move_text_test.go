@@ -7,14 +7,14 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-func TestGameUnsafePushMoveTextRejectsSAN(t *testing.T) {
+func TestGameUnsafeMoveTextRejectsSAN(t *testing.T) {
 	_, err := chess.NewGame().UnsafeMoveText("e4", chess.SAN(), nil)
 	if !errors.Is(err, chess.ErrUnsafeMoveTextUnsupported) {
 		t.Fatalf("UnsafeMoveText(SAN) error = %v, want ErrUnsafeMoveTextUnsupported", err)
 	}
 }
 
-func TestGameUnsafePushMoveTextAcceptsIllegalCoordinateMove(t *testing.T) {
+func TestGameUnsafeMoveTextAcceptsIllegalCoordinateMove(t *testing.T) {
 	game := chess.NewGame()
 	if _, err := game.UnsafeMoveText("e2e5", chess.UCI(), nil); err != nil {
 		t.Fatalf("UnsafeMoveText() error = %v", err)
@@ -24,7 +24,7 @@ func TestGameUnsafePushMoveTextAcceptsIllegalCoordinateMove(t *testing.T) {
 	}
 }
 
-func TestGameUnsafePushMoveTextClassifiesSpecialMoves(t *testing.T) {
+func TestGameUnsafeMoveTextClassifiesSpecialMoves(t *testing.T) {
 	t.Run("capture from UCI", func(t *testing.T) {
 		game := chess.NewGame()
 		mustUnsafeMoveText(t, game, "e2e4", chess.UCI())

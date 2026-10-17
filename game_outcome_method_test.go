@@ -111,12 +111,11 @@ func TestTerminalOutcomeGuards(t *testing.T) {
 	}{
 		{"Move", func(g *chess.Game) error { _, err := g.Move(g.ValidMoves()[0], nil); return err }},
 		{"UnsafeMove", func(g *chess.Game) error { _, err := g.UnsafeMove(g.ValidMoves()[0], nil); return err }},
-		{"PushMove", func(g *chess.Game) error { _, err := g.MoveText("e4", chess.SAN(), nil); return err }},
-		{"PushMoveText", func(g *chess.Game) error {
+		{"MoveText", func(g *chess.Game) error {
 			_, err := g.MoveText("e4", chess.SAN(), nil)
 			return err
 		}},
-		{"UnsafePushMoveText", func(g *chess.Game) error {
+		{"UnsafeMoveText", func(g *chess.Game) error {
 			_, err := g.UnsafeMoveText("e2e4", chess.UCI(), nil)
 			return err
 		}},

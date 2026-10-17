@@ -12,7 +12,7 @@ import (
 
 func Test_FakeAdapter_ExchangeEmptyCommand(t *testing.T) {
 	emptyCmd := fakeEmptyCmd{}
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"":   {"ignored"},
 			"go": {"bestmove e2e4"},
@@ -28,7 +28,7 @@ func Test_FakeAdapter_ExchangeEmptyCommand(t *testing.T) {
 		}
 	})
 	t.Run("unconfigured empty key returns nil", func(t *testing.T) {
-		fake2 := &uci.FakeAdapter{Responses: map[string][]string{}}
+		fake2 := &fakeAdapter{Responses: map[string][]string{}}
 		lines, err := fake2.Exchange(emptyCmd)
 		if err != nil {
 			t.Fatalf("Exchange returned error: %v", err)
@@ -90,7 +90,7 @@ func Test_InfoUnmarshalText_WDLBounds(t *testing.T) {
 }
 
 func Test_FakeAdapter_CmdUCI(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"uci": {"id name TestEngine", "id author test", "option name Hash type spin default 16 min 1 max 33554432", "uciok"},
 		},
@@ -118,7 +118,7 @@ func Test_FakeAdapter_CmdUCI(t *testing.T) {
 }
 
 func Test_FakeAdapter_CmdGo(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"go": {"info depth 10 score cp 50 nodes 1000 nps 500000 tbhits 0 time 2 pv e2e4", "bestmove e2e4"},
 		},
@@ -146,7 +146,7 @@ func Test_FakeAdapter_CmdGo(t *testing.T) {
 }
 
 func Test_FakeAdapter_CmdEval(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"eval": {"Final evaluation 12.5"},
 		},
@@ -167,7 +167,7 @@ func Test_FakeAdapter_CmdEval(t *testing.T) {
 }
 
 func Test_FakeAdapter_MultiPV(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"go": {
 				"info depth 10 multipv 1 score cp 50 nodes 1000 pv e2e4",
@@ -199,7 +199,7 @@ func Test_FakeAdapter_MultiPV(t *testing.T) {
 }
 
 func Test_EngineSearchResultsReturnsDefensiveCopy(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"go": {
 				"info depth 10 multipv 1 score cp 50 nodes 1000 pv e2e4 e7e5",
@@ -234,7 +234,7 @@ func Test_EngineSearchResultsReturnsDefensiveCopy(t *testing.T) {
 }
 
 func Test_FakeAdapter_CmdIsReady(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"isready": {"readyok"},
 		},
@@ -248,7 +248,7 @@ func Test_FakeAdapter_CmdIsReady(t *testing.T) {
 }
 
 func Test_FakeAdapter_FireAndForgetPassthrough(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{},
 	}
 	eng := uci.NewWithAdapter(fake)
@@ -266,7 +266,7 @@ func Test_FakeAdapter_FireAndForgetPassthrough(t *testing.T) {
 }
 
 func Test_FakeAdapter_CmdPositionStoredOnEngine(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"position": {"readyok"},
 			"go":       {"bestmove e7e5"},
@@ -296,7 +296,7 @@ func Test_FakeAdapter_CmdPositionStoredOnEngine(t *testing.T) {
 }
 
 func Test_EngineIDReturnsDefensiveCopy(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"uci": {"id name TestEngine", "uciok"},
 		},
@@ -322,7 +322,7 @@ func Test_EngineIDReturnsDefensiveCopy(t *testing.T) {
 }
 
 func Test_EngineOptionsReturnsDefensiveCopy(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"uci": {"option name Hash type spin default 16 min 1 max 1024", "uciok"},
 		},
@@ -348,7 +348,7 @@ func Test_EngineOptionsReturnsDefensiveCopy(t *testing.T) {
 }
 
 func Test_FakeAdapter_FireAndForgetNoResponseShortCircuit(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{},
 	}
 	eng := uci.NewWithAdapter(fake)
@@ -366,7 +366,7 @@ func Test_FakeAdapter_FireAndForgetNoResponseShortCircuit(t *testing.T) {
 }
 
 func Test_FakeAdapter_CmdSetOptionRendersCorrectly(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"setoption": {},
 		},
@@ -403,7 +403,7 @@ func Test_InfoUnmarshalTextWDL(t *testing.T) {
 }
 
 func Test_FakeAdapter_FullGame(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"uci":     {"id name FakeFish", "uciok"},
 			"isready": {"readyok"},
@@ -446,7 +446,7 @@ func Test_CmdEval_MalformedReturnsError(t *testing.T) {
 	pos := chess.StartingPosition()
 
 	t.Run("non-numeric value", func(t *testing.T) {
-		fake := &uci.FakeAdapter{
+		fake := &fakeAdapter{
 			Responses: map[string][]string{
 				"eval": {"Final evaluation notanumber"},
 			},
@@ -464,7 +464,7 @@ func Test_CmdEval_MalformedReturnsError(t *testing.T) {
 	})
 
 	t.Run("missing value", func(t *testing.T) {
-		fake := &uci.FakeAdapter{
+		fake := &fakeAdapter{
 			Responses: map[string][]string{
 				"eval": {"Final evaluation"},
 			},
@@ -480,7 +480,7 @@ func Test_CmdEval_MalformedReturnsError(t *testing.T) {
 }
 
 func Test_CmdUCI_MalformedOptionLoggedUnderDebug(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"uci": {
 				"id name TestEngine",
@@ -528,7 +528,7 @@ func Test_CmdUCI_MalformedOptionLoggedUnderDebug(t *testing.T) {
 }
 
 func Test_CmdGo_MalformedInfoLineLoggedUnderDebug(t *testing.T) {
-	fake := &uci.FakeAdapter{
+	fake := &fakeAdapter{
 		Responses: map[string][]string{
 			"go": {
 				"info depth abc",

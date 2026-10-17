@@ -29,16 +29,6 @@ func ParseColor(s string) (Color, error) {
 	return NoColor, fmt.Errorf("chess: invalid color %q", s)
 }
 
-// ColorFromString converts a FEN side-to-move character ("w" or "b") to a Color.
-// Returns NoColor for any other input.
-//
-// Deprecated: use ParseColor for new code; it distinguishes parse failures from
-// the NoColor sentinel.
-func ColorFromString(s string) Color {
-	c, _ := ParseColor(s)
-	return c
-}
-
 // Other returns the opposite color of the receiver.
 func (c Color) Other() Color {
 	switch c {
@@ -118,16 +108,6 @@ func ParsePieceTypeFromByte(b byte) (PieceType, error) {
 	return NoPieceType, fmt.Errorf("chess: invalid piece type byte %q", b)
 }
 
-// PieceTypeFromByte parses a FEN piece-type character (case-insensitive) into a
-// PieceType. Returns NoPieceType for any other byte.
-//
-// Deprecated: use ParsePieceTypeFromByte for new code; it distinguishes parse
-// failures from the NoPieceType sentinel.
-func PieceTypeFromByte(b byte) PieceType {
-	pt, _ := ParsePieceTypeFromByte(b)
-	return pt
-}
-
 // ParsePieceType parses a single-character piece notation into a PieceType.
 // It returns an error if the input is empty or longer than one character, or
 // if the character is not a valid piece type.
@@ -136,16 +116,6 @@ func ParsePieceType(s string) (PieceType, error) {
 		return NoPieceType, fmt.Errorf("chess: invalid piece type %q", s)
 	}
 	return ParsePieceTypeFromByte(strings.ToLower(s)[0])
-}
-
-// PieceTypeFromString parses a single-character piece notation into a
-// PieceType. Returns NoPieceType for invalid input.
-//
-// Deprecated: use ParsePieceType for new code; it distinguishes parse failures
-// from the NoPieceType sentinel.
-func PieceTypeFromString(s string) PieceType {
-	pt, _ := ParsePieceType(s)
-	return pt
 }
 
 func (p PieceType) String() string {

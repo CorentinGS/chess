@@ -6,7 +6,7 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-func TestGamePushMoveTextWithCodecs(t *testing.T) {
+func TestGameMoveTextWithCodecs(t *testing.T) {
 	tests := []struct {
 		name  string
 		codec chess.MoveTextCodec
@@ -46,7 +46,7 @@ func TestGamePushMoveTextWithCodecs(t *testing.T) {
 	}
 }
 
-func TestGamePushMoveTextUsesGeneratedMoveTags(t *testing.T) {
+func TestGameMoveTextUsesGeneratedMoveTags(t *testing.T) {
 	game := chess.NewGame()
 	if _, err := game.MoveText("e2e4", chess.UCI(), nil); err != nil {
 		t.Fatalf("MoveText(e2e4) error = %v", err)
@@ -66,13 +66,13 @@ func TestGamePushMoveTextUsesGeneratedMoveTags(t *testing.T) {
 	}
 }
 
-func TestGamePushMoveIsStrictSANShorthand(t *testing.T) {
+func TestGameMoveTextSANIsStrict(t *testing.T) {
 	opt, err := chess.FEN("6k1/4P3/8/8/8/8/8/4K3 w - - 0 1")
 	if err != nil {
 		t.Fatalf("FEN() error = %v", err)
 	}
 	game := chess.NewGame(opt)
 	if _, err := game.MoveText("e8Q", chess.SAN(), nil); err == nil {
-		t.Fatalf("PushMove accepted import-only SAN")
+		t.Fatalf("MoveText accepted import-only SAN")
 	}
 }

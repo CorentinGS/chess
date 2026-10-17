@@ -170,13 +170,3 @@ func ParseSquare(s string) (Square, error) {
 	}
 	return NewSquare(File(f), Rank(r)), nil
 }
-
-// SquareFromString converts a 2-character square notation (e.g., "e4") to a Square.
-// Returns NoSquare if the string is not a valid square.
-//
-// Deprecated: use ParseSquare for new code; it distinguishes parse failures from
-// the NoSquare sentinel.
-func SquareFromString(s string) Square {
-	sq, _ := ParseSquare(s)
-	return sq
-}

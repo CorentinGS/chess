@@ -627,7 +627,7 @@ func TestVariationsWithNilMove(t *testing.T) {
 	}
 }
 
-func TestPushMove(t *testing.T) {
+func TestMoveTextSAN(t *testing.T) {
 	tests := []struct {
 		name          string
 		setupMoves    []string           // Moves to set up the position
@@ -730,7 +730,7 @@ func TestPushMove(t *testing.T) {
 
 			// Check error expectation
 			if (err != nil) != tt.wantErr {
-				t.Errorf("PushMove() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("MoveText() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -2146,7 +2146,7 @@ func TestUnsafeMoveText(t *testing.T) {
 		{
 			name:       "invalid move should still succeed (no validation)",
 			setupMoves: []string{"e4", "e5"},
-			moveStr:    "e2e3", // This move is illegal but UnsafePushMoveText doesn't validate
+			moveStr:    "e2e3", // This move is illegal but UnsafeMoveText doesn't validate
 			codec:      UCI(),
 			wantErr:    false, // No validation, so no error expected
 		},
@@ -2193,8 +2193,8 @@ func TestUnsafeMoveText(t *testing.T) {
 	}
 }
 
-// TestPushMoveTextVsUnsafePushMoveTextPerformance demonstrates the performance difference.
-func TestPushMoveTextVsUnsafePushMoveTextPerformance(t *testing.T) {
+// TestMoveTextVsUnsafeMoveTextPerformance demonstrates the performance difference.
+func TestMoveTextVsUnsafeMoveTextPerformance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -2205,24 +2205,24 @@ func TestPushMoveTextVsUnsafePushMoveTextPerformance(t *testing.T) {
 	moveStr := "e4"
 	unsafeMoveStr := "e2e4"
 
-	// Test PushMoveText (with validation)
+	// Test MoveText (with validation)
 	start := time.Now()
 	for range 1000 {
 		gameClone := game.Clone()
 		_, err := gameClone.MoveText(moveStr, SAN(), nil)
 		if err != nil {
-			t.Fatalf("PushMoveText failed: %v", err)
+			t.Fatalf("MoveText failed: %v", err)
 		}
 	}
 	pushNotationMoveTime := time.Since(start)
 
-	// Test UnsafePushMoveText (without validation)
+	// Test UnsafeMoveText (without validation)
 	start = time.Now()
 	for range 1000 {
 		gameClone := game.Clone()
 		_, err := gameClone.UnsafeMoveText(unsafeMoveStr, UCI(), nil)
 		if err != nil {
-			t.Fatalf("UnsafePushMoveText failed: %v", err)
+			t.Fatalf("UnsafeMoveText failed: %v", err)
 		}
 	}
 	unsafePushNotationMoveTime := time.Since(start)
@@ -2231,9 +2231,9 @@ func TestPushMoveTextVsUnsafePushMoveTextPerformance(t *testing.T) {
 	t.Logf("UnsafeMoveText() (no validation): %v", unsafePushNotationMoveTime)
 	t.Logf("Performance improvement: %.2fx", float64(pushNotationMoveTime)/float64(unsafePushNotationMoveTime))
 
-	// UnsafePushMoveText should be faster
+	// UnsafeMoveText should be faster
 	if unsafePushNotationMoveTime >= pushNotationMoveTime {
-		t.Logf("Warning: UnsafePushMoveText wasn't faster than PushMoveText - this might be expected for simple positions")
+		t.Logf("Warning: UnsafeMoveText wasn't faster than MoveText - this might be expected for simple positions")
 	}
 }
 

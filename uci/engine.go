@@ -52,8 +52,8 @@ func New(path string, opts ...func(e *Engine)) (*Engine, error) {
 }
 
 // NewWithAdapter creates an Engine that communicates through the provided
-// Adapter instead of spawning a subprocess. This is primarily useful for
-// testing with a FakeAdapter.
+// Adapter instead of spawning a subprocess, for example an in-memory fake in
+// tests or a remote transport.
 func NewWithAdapter(adapter Adapter, opts ...func(e *Engine)) *Engine {
 	e := &Engine{
 		adapter:  adapter,

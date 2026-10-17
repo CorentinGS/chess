@@ -883,9 +883,8 @@ game legality, terminal outcome guards, and result evaluation in sync with the
 tree. `MoveTree` exposes traversal, cursor navigation, and variation editing;
 it does not expose a public API for advancing the active game state directly.
 
-The older names `Game.PushMove`, `Game.PushMoveText`, and
-`Game.UnsafePushMoveText` are deprecated but remain functional for this major
-version.
+The v2 names `Game.PushMove`, `Game.PushNotationMove`, and
+`Game.UnsafePushNotationMove` are gone; see [MIGRATION.md](MIGRATION.md).
 
 ```go
 package main

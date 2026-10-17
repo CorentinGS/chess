@@ -3,6 +3,17 @@ All notable changes to this project will be documented in this file. See [conven
 
 ## Unreleased
 
+#### Breaking Changes
+- remove the deprecated `Game.PushMove`, `Game.PushMoveText`, and
+  `Game.UnsafePushMoveText` wrappers; use `Game.MoveText` /
+  `Game.UnsafeMoveText`.
+- remove the deprecated `ColorFromString`, `SquareFromString`,
+  `PieceTypeFromString`, and `PieceTypeFromByte`; use the `Parse*` helpers.
+- remove `GetPolyglotHashes`, which leaked a mutable slice over the package's
+  static Polyglot table.
+- unexport the PGN `Parser` type; it had no public constructor.
+- move `uci.FakeAdapter` out of the public API into the package tests.
+
 ## v2.6.0 - 2026-08-17
 #### Features
 - add `Board.AttacksFrom()` for piece attack-map queries (#126).

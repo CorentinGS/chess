@@ -37,8 +37,8 @@ if err != nil { /* ... */ }
 _ = node
 ```
 
-The same change applies to `UnsafeMove`, `PushMove`, `PushMoveText`, and
-`UnsafePushMoveText`: they now return `(*MoveNode, error)`. The old
+The same change applies to `UnsafeMove`, `MoveText`, and `UnsafeMoveText`:
+they now return `(*MoveNode, error)`. The old
 `PushMoveOptions` type is replaced by `MoveInsertOptions` with
 `PromoteToMainLine`.
 
@@ -83,19 +83,20 @@ v3 removes the old notation structs and game notation methods. Use
 - PGN import leniency -> `chess.PGNImportSAN()`
 - `LongAlgebraicNotation{}` -> `chess.LongAlgebraic()`
 - `UCINotation{}` -> `chess.UCI()`
-- `Game.PushNotationMove(text, notation, opts)` -> `Game.PushMoveText(text, codec, opts)`
-- `Game.UnsafePushNotationMove(text, notation, opts)` -> `Game.UnsafePushMoveText(text, codec, opts)`
+- `Game.PushMove(san, opts)` -> `Game.MoveText(san, chess.SAN(), opts)`
+- `Game.PushNotationMove(text, notation, opts)` -> `Game.MoveText(text, codec, opts)`
+- `Game.UnsafePushNotationMove(text, notation, opts)` -> `Game.UnsafeMoveText(text, codec, opts)`
 
 ```go
 game := chess.NewGame()
-_, err := game.PushMoveText("e4", chess.SAN(), nil)
-_, err = game.PushMoveText("e2e4", chess.UCI(), nil)
-_, err = game.UnsafePushMoveText("e2e4", chess.UCI(), nil)
+_, err := game.MoveText("e4", chess.SAN(), nil)
+_, err = game.MoveText("e2e4", chess.UCI(), nil)
+_, err = game.UnsafeMoveText("e2e4", chess.UCI(), nil)
 ```
 
-`PushMove` remains a strict SAN shorthand. Unsafe move text supports only fully
-specified formats such as UCI and long algebraic notation; SAN and PGN import
-SAN require legal resolution and are rejected by `UnsafePushMoveText`.
+Unsafe move text supports only fully specified formats such as UCI and long
+algebraic notation; SAN and PGN import SAN require legal resolution and are
+rejected by `UnsafeMoveText`.
 
 ## UCI commands are struct literals
 
@@ -116,8 +117,9 @@ constructed as struct values:
 eng.Run(uci.CmdPosition{Position: game.Position()}, uci.CmdGo{MoveTime: time.Second / 100})
 ```
 
-A new `Adapter` interface (`SubprocessAdapter`, `FakeAdapter`) backs the engine
-and is injectable via `uci.NewWithAdapter`. `eng.SearchResults().BestMove` is now
+A new `Adapter` interface (implemented by `SubprocessAdapter`) backs the engine
+and is injectable via `uci.NewWithAdapter`, e.g. with an in-memory fake in
+tests. `eng.SearchResults().BestMove` is now
 a `chess.Move` value.
 
 ## Image takes a Position and options
@@ -160,11 +162,55 @@ mechanical renames with no behaviour change; update the symbol at the call site.
 | v2 | v3 | Reason |
 |---|---|---|
 | `opening.Opening` | `opening.Entry` | Stuttered at the call site (`opening.Opening{}`). |
-| `chess.GetPolyglotHashBytes` | _(removed)_ | Use `GetPolyglotHashes() []string` or convert a `uint64` via `binary.LittleEndian`. |
+| `chess.GetPolyglotHashBytes` | _(removed)_ | Use `HashFromFEN` / `Position.ZobristHash`; convert a `uint64` via `binary.LittleEndian`. |
 | `(*PolyglotBook).GetRandomMove` | `(*PolyglotBook).RandomMove` | `Get` prefix on a non-trivial operation. |
 | `(*PolyglotBook).GetChessMoves` | `(*PolyglotBook).ChessMoves` | `Get` prefix on a non-trivial operation. |
 
 The unexported `newOpening` constructor is renamed `newEntry` to match.
+
+## Removed APIs
+
+These v2 exports have no direct v3 equivalent under the same name:
+
+| v2 | v3 |
+|---|---|
+| `ColorFromString(s)` | `ParseColor(s) (Color, error)` |
+| `SquareFromString(s)` | `ParseSquare(s) (Square, error)` |
+| `PieceTypeFromString(s)` | `ParsePieceType(s) (PieceType, error)` |
+| `PieceTypeFromByte(b)` | `ParsePieceTypeFromByte(b) (PieceType, error)` |
+| `GetPolyglotHashes()` | _(removed)_; see [Hashing](#hashing) |
+| `NewScanner` / `Scanner.HasNext` / `Scanner.ParseNext` | `PGNGames(r, opts...)`, `NewPGNDecoder(r, opts...).Decode()`, or `ParsePGN(r)` for a single game |
+| `GameScanned`, `TokenizeGame`, `NewParser(tokens).Parse()` | _(removed)_; the PGN parser is internal. Use the decoders above. |
+| `WithExpandVariations()` | `WithPGNExpandVariations()` |
+
+The `Parse*` helpers return an error instead of the `NoColor` / `NoSquare` /
+`NoPieceType` sentinel, so wrap them if you relied on the sentinel:
+
+```go
+// v2
+sq := chess.SquareFromString("e4")
+
+// v3
+sq, err := chess.ParseSquare("e4")
+if err != nil { /* ... */ }
+```
+
+Reading every game of a PGN file:
+
+```go
+// v2
+scanner := chess.NewScanner(f)
+for scanner.HasNext() {
+	game, err := scanner.ParseNext()
+	// ...
+}
+
+// v3
+for game, err := range chess.PGNGames(f) {
+	if err != nil { /* ... */ }
+	// ...
+}
+```
 
 ## Resign returns an error
 
@@ -253,9 +299,10 @@ removed with no direct replacement:
   replacement for `ZobristHasher.HashPosition(fen)`.
 - `ZobristHashToUint64(hash string) uint64` is removed. Convert hex hashes
   with `strconv.ParseUint(s, 16, 64)`.
-- `GetPolyglotHashBytes(index int) []byte` is removed. Use
-  `GetPolyglotHashes() []string` for hex hashes; for the raw 8-byte
-  little-endian form, convert a `uint64` from `HashFromFEN` via
+- `GetPolyglotHashBytes(index int) []byte` and `GetPolyglotHashes() []string`
+  are removed: the Polyglot random table is an implementation detail of the
+  hash. For the raw 8-byte little-endian form of a position key, convert the
+  `uint64` from `HashFromFEN` or `Position.ZobristHash` via
   `binary.LittleEndian.PutUint64`.
 
 `Position.ValidMovesUnsafe()` and `Position.ValidMovesIter()` —

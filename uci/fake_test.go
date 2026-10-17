@@ -1,16 +1,20 @@
-package uci
+package uci_test
 
-import "strings"
+import (
+	"strings"
 
-// FakeAdapter is a test Adapter that returns canned responses keyed by the
+	"github.com/corentings/chess/v3/uci"
+)
+
+// fakeAdapter is a test uci.Adapter that returns canned responses keyed by the
 // first word of each command string (e.g. "uci", "go", "isready").
-type FakeAdapter struct {
+type fakeAdapter struct {
 	Responses map[string][]string
 }
 
 // Exchange returns the canned response lines for the given command, or nil if
 // no response is configured for the command key.
-func (f *FakeAdapter) Exchange(cmd Cmd) ([]string, error) {
+func (f *fakeAdapter) Exchange(cmd uci.Cmd) ([]string, error) {
 	key := strings.SplitN(cmd.String(), " ", 2)[0]
 	responses, ok := f.Responses[key]
 	if !ok {
@@ -29,7 +33,7 @@ func (f *FakeAdapter) Exchange(cmd Cmd) ([]string, error) {
 	return lines, nil
 }
 
-// Close is a no-op for FakeAdapter.
-func (f *FakeAdapter) Close() error {
+// Close is a no-op for fakeAdapter.
+func (f *fakeAdapter) Close() error {
 	return nil
 }
