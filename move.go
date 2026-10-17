@@ -1,6 +1,9 @@
 package chess
 
-import "strings"
+import (
+	"iter"
+	"strings"
+)
 
 // CommentItemKind identifies the kind of item inside a PGN comment block.
 type CommentItemKind int
@@ -287,19 +290,24 @@ func (n *MoveNode) Children() []*MoveNode {
 	return append([]*MoveNode{}, n.children...)
 }
 
-// ChildrenIter returns an allocation-free iterator over the continuations.
-func (n *MoveNode) ChildrenIter(yield func(*MoveNode) bool) {
-	if n == nil {
-		return
-	}
-	for _, continuation := range n.children {
-		if !yield(continuation) {
+// ChildrenSeq returns an iterator over the node's continuations, main line
+// first, in the same order as Children. It does not allocate.
+func (n *MoveNode) ChildrenSeq() iter.Seq[*MoveNode] {
+	return func(yield func(*MoveNode) bool) {
+		if n == nil {
 			return
+		}
+		for _, continuation := range n.children {
+			if !yield(continuation) {
+				return
+			}
 		}
 	}
 }
 
-func (n *MoveNode) Number() int {
+// FullMoveNumber returns the PGN move number of the move: 1 for White's first
+// move and its reply, then incremented after each Black move.
+func (n *MoveNode) FullMoveNumber() int {
 	if n == nil {
 		return 0
 	}
@@ -308,11 +316,6 @@ func (n *MoveNode) Number() int {
 		ret = 1
 	}
 	return ret
-}
-
-// FullMoveNumber returns the full move number (increments after Black's move).
-func (n *MoveNode) FullMoveNumber() int {
-	return n.Number()
 }
 
 // Ply returns the half-move number (increments every move). For the synthetic

@@ -1,58 +1,74 @@
 /*
-Package chess is a go library designed to accomplish the following:
-  - chess game state and move tree management
-  - move validation
-  - PGN encoding / decoding
-  - FEN encoding / decoding
+Package chess implements chess rules, positions, games and PGN/FEN encoding.
 
-Game values are mutable and are not safe for concurrent use by multiple
-goroutines. Callers that share a Game between goroutines must provide their own
-synchronization.
+The API has three layers. Pick the lowest one that does what you need.
 
-Using Moves
+# Game: a played game with history
+
+A Game owns a move tree (main line plus variations), PGN tags and the outcome.
+Its move methods check legality, refuse moves once the game is over and
+update the outcome after every move.
 
 	game := chess.NewGame()
-	moves := game.LegalMoves()
-	game.Move(moves[0], nil)
-
-Using Strict SAN Move Text
-
-	game := chess.NewGame()
-	game.MoveText("e4", SAN(), nil)
-
-Using PGN
-
-	game, _ := chess.ParsePGN(pgnReader)
-
-Using FEN
-
-	fen, _ := chess.FEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-	game := chess.NewGame(fen)
-
-Random Game
-
-	package main
-
-	import (
-	    "fmt"
-	    "math/rand/v2"
-
-	    "github.com/corentings/chess/v3"
-	)
-
-	func main() {
-	    game := chess.NewGame()
-	    // generate moves until game is over
-	    for game.Outcome() == chess.NoOutcome {
-	        // select a random move
-	        moves := game.LegalMoves()
-	        move := moves[rand.IntN(len(moves))]
-	        game.Move(move, nil)
-	    }
-	    // print outcome and game PGN
-	    fmt.Println(game.Position().Board().Draw())
-	    fmt.Printf("Game completed. %s by %s.\n", game.Outcome(), game.Method())
-	    fmt.Println(game.String())
+	if _, err := game.MoveText("e4", chess.SAN(), nil); err != nil {
+	    return err
 	}
+	for _, m := range game.LegalMoves() {
+	    fmt.Println(m)
+	}
+	fmt.Println(game.Outcome(), game.Method())
+	fmt.Println(game.String()) // PGN
+
+Start from another position with the FEN option, and navigate or edit
+variations through Game.MoveTree.
+
+Game values are mutable and not safe for concurrent use; callers sharing a
+Game between goroutines must synchronize.
+
+# Position: rules on a single position
+
+A Position is one board state with side to move, castling rights, en passant
+square and clocks. It generates moves and answers rule questions without
+keeping history. Update returns the next position; ApplyInPlace mutates the
+receiver for tight loops.
+
+	pos, err := chess.ParseFEN("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1")
+	if err != nil {
+	    return err
+	}
+	for m := range pos.LegalMovesSeq() {
+	    next := pos.Update(m)
+	    fmt.Println(m, next.FEN(), next.IsCheck())
+	}
+	fmt.Println(pos.Perft(3), pos.ZobristHash())
+
+Moves carry tags (Capture, Check, KingSideCastle, ...) derived from the
+position. Build positions from scratch with Setup and NewPosition.
+
+# Board and Bitboard: piece placement
+
+Board is the piece placement alone. Bitboard is a set of squares with the
+usual set operations; the attack functions (KnightAttacks, RookAttacks, ...)
+and Board.AttacksFrom return Bitboards.
+
+	board := pos.Board()
+	for sq := range board.Pieces(chess.Knight, chess.White).Squares() {
+	    fmt.Println(sq, chess.KnightAttacks(sq).Popcount())
+	}
+
+# Move text and file formats
+
+MoveTextCodec converts between Move and text: SAN, PGNImportSAN (lenient),
+LongAlgebraic and UCI. FEN is read by ParseFEN and written by Position.FEN.
+PGN is read by ParsePGN (one game), PGNGames (all games), PGNRecords (raw
+records, for filtering on tags before decoding) and PGNEvents (a token-level
+stream), and written by Game.String and Game.WritePGN.
+
+# Sub-packages
+
+  - opening: ECO opening classification.
+  - polyglot: Polyglot opening books, keyed by Position.ZobristHash.
+  - image: SVG board rendering.
+  - uci: driving UCI engines such as Stockfish.
 */
 package chess

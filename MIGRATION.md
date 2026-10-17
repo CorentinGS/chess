@@ -199,6 +199,33 @@ listed:
 | `chess.TagPairs` | _(unexported)_; use `Game.Tags()` |
 | `MoveNode.GetCommand(key)` | `MoveNode.Command(key)` |
 
+## Positions, boards and options
+
+| v2 / v3 beta | v3 |
+|---|---|
+| `Position.String()` | `Position.FEN()` (`String()` still returns the FEN) |
+| `Position.XFENString()` | `Position.CanonicalFEN()` |
+| `Position.PositionKey()` | `Position.FENKey()` |
+| `Position.UnmarshalText` / `NewGame(FEN(s)).Position()` to parse a FEN | `ParseFEN(s) (*Position, error)` |
+| `Position.Checkers() []Square` | `Position.Checkers() Bitboard` |
+| `Board.AttacksFrom(sq) []Square` | `Board.AttacksFrom(sq) Bitboard` |
+| `Board.Draw2(perspective, dark)` | `Board.DrawWith(DrawOptions{Perspective: c, DarkMode: dark})` |
+| `for sq := range bb.Squares` | `for sq := range bb.Squares()` |
+| `MoveNode.ChildrenIter` | `MoveNode.ChildrenSeq()` |
+| `MoveNode.Number()` | `MoveNode.FullMoveNumber()` |
+| `Game.NullMove()` | `Game.NullMove(nil)` |
+| `func(*Game)` options | `GameOption` (`FEN`, `Ignore*Draw` return it) |
+| `func(*Engine)` options, `uci.Debug` | `uci.EngineOption`, `uci.Debug()` |
+| `Engine.Getpid()` | `Engine.Pid()` |
+
+Iterate a Bitboard's squares or an attack set:
+
+```go
+for sq := range pos.Board().AttacksFrom(chess.E4).Squares() {
+	fmt.Println(sq)
+}
+```
+
 ## Removed APIs
 
 These v2 exports have no direct v3 equivalent under the same name:
@@ -295,27 +322,20 @@ annotations to indicate a side passed.
 
 ```go
 g := chess.NewGame()
-node, err := g.NullMove() // flips turn, serializes as "Z0" in PGN
+node, err := g.NullMove(nil) // flips turn, serializes as "Z0" in PGN
 ```
 
 `NewNullMove()` returns a `Move` carrying the `Null` tag. Null moves are never
 returned by `LegalMoves()` and are rejected by `Game.Move`. Insert them via
-`Game.NullMove()` or `Game.UnsafeMove(NewNullMove(), nil)`. When reading PGN,
+`Game.NullMove(nil)` or `Game.UnsafeMove(NewNullMove(), nil)`. When reading PGN,
 the parser accepts five spellings: `Z0`, `Z1`, `--`, `@@`, and `0000`. The
 renderer always writes `Z0` (ChessBase/Scid convention).
 
 ## PGN rendering
 
-`Game.String()` still returns PGN and now delegates to `chess.DefaultPGNRenderer`.
-For custom rendering use the extracted renderer:
-
-```go
-r := &chess.PGNRenderer{}
-fmt.Println(r.Render(game))         // string
-r.RenderGameTo(game, w)             // write to an io.Writer
-```
-
-`Game.WritePGN(w)` is also available. The renderer is stateless.
+`Game.String()` returns the PGN and `Game.WritePGN(w)` writes it to an
+`io.Writer`. There is no separate renderer type; the v3 betas exported
+`PGNRenderer` and `DefaultPGNRenderer`, which are now internal.
 
 ## Hashing
 

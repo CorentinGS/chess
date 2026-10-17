@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"iter"
 	"math/bits"
 	"strconv"
 	"strings"
@@ -76,20 +77,21 @@ func (bb Bitboard) LastSquare() Square {
 	return Square(63 - bits.TrailingZeros64(uint64(bb)))
 }
 
-// Squares yields every set square using Go 1.23's range-over-func pattern.
+// Squares returns an iterator over the set squares, from A1 to H8. It does
+// not allocate.
 //
-// Example:
-//
-//	for sq := range bb.Squares {
+//	for sq := range bb.Squares() {
 //	    // process square
 //	}
-func (bb Bitboard) Squares(yield func(Square) bool) {
-	for bb != 0 {
-		lsb := bb & -bb
-		if !yield(squareFromBit(bitboard(lsb))) {
-			return
+func (bb Bitboard) Squares() iter.Seq[Square] {
+	return func(yield func(Square) bool) {
+		for bb != 0 {
+			lsb := bb & -bb
+			if !yield(squareFromBit(bitboard(lsb))) {
+				return
+			}
+			bb &^= lsb
 		}
-		bb &^= lsb
 	}
 }
 

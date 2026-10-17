@@ -11,7 +11,7 @@ func TestBitboardFromSquares(t *testing.T) {
 		t.Fatalf("expected popcount 2, got %d", bb.Popcount())
 	}
 	var got []Square
-	for sq := range bb.Squares {
+	for sq := range bb.Squares() {
 		got = append(got, sq)
 	}
 	want := []Square{E4, D4}

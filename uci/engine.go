@@ -26,24 +26,27 @@ type Engine struct {
 	chess960Enabled bool
 }
 
-// Debug enables debug logging of commands sent to and responses received from
-// the engine. It is intended to be passed as an option to New.
-func Debug(e *Engine) {
-	e.debug = true
+// EngineOption configures an Engine created by New or NewWithAdapter.
+type EngineOption func(*Engine)
+
+// Debug returns an EngineOption that logs every command sent to the engine and
+// every response line received from it.
+func Debug() EngineOption {
+	return func(e *Engine) {
+		e.debug = true
+	}
 }
 
-// Logger sets the logger the engine uses for debug output. It is intended to be
-// passed as an option to New.
-func Logger(logger *log.Logger) func(e *Engine) {
+// Logger returns an EngineOption that sets the logger used for debug output.
+func Logger(logger *log.Logger) EngineOption {
 	return func(e *Engine) {
 		e.logger = logger
 	}
 }
 
 // New creates an Engine backed by a subprocess started from the executable at
-// the given path. Optional configuration functions (e.g. Debug, Logger) may be
-// passed to customize the engine.
-func New(path string, opts ...func(e *Engine)) (*Engine, error) {
+// path, configured by opts (for example Debug or Logger).
+func New(path string, opts ...EngineOption) (*Engine, error) {
 	adapter, err := NewSubprocessAdapter(path)
 	if err != nil {
 		return nil, err
@@ -54,7 +57,7 @@ func New(path string, opts ...func(e *Engine)) (*Engine, error) {
 // NewWithAdapter creates an Engine that communicates through the provided
 // Adapter instead of spawning a subprocess, for example an in-memory fake in
 // tests or a remote transport.
-func NewWithAdapter(adapter Adapter, opts ...func(e *Engine)) *Engine {
+func NewWithAdapter(adapter Adapter, opts ...EngineOption) *Engine {
 	e := &Engine{
 		adapter:  adapter,
 		logger:   log.New(os.Stdout, "uci", log.LstdFlags),
@@ -127,10 +130,10 @@ func (e *Engine) Run(cmds ...Cmd) error {
 	return nil
 }
 
-// Getpid returns the operating system process ID of the engine subprocess.
+// Pid returns the operating system process ID of the engine subprocess.
 // Returns 0 when the engine is not backed by a subprocess (e.g. when created
 // with NewWithAdapter using a non-subprocess Adapter).
-func (e *Engine) Getpid() int {
+func (e *Engine) Pid() int {
 	if sa, ok := e.adapter.(*SubprocessAdapter); ok {
 		return sa.Pid()
 	}

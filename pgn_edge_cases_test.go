@@ -211,7 +211,7 @@ func TestPGNDecoderVariationExpansionFixtures(t *testing.T) {
 				if lastLine != tt.lastLines[count] {
 					t.Errorf("game output not correct\n\tExpected:'%v'\n\tGot:     '%v'\n", tt.lastLines[count], lastLine)
 				}
-				fen := game.Position().XFENString()
+				fen := game.Position().CanonicalFEN()
 				if fen != tt.finalPos[count] {
 					t.Errorf("game position not correct\n\tExpected:'%v'\n\tGot:     '%v'\n", tt.finalPos[count], fen)
 				}

@@ -30,10 +30,27 @@ All notable changes to this project will be documented in this file. See [conven
 - rename tag accessors to `Game.Tag`, `Game.SetTag` (no return value) and
   `Game.RemoveTag`; unexport `TagPairs`. Rename `MoveNode.GetCommand` to
   `MoveNode.Command`.
+- rename the FEN accessors: `Position.FEN()` is the FEN (`String()` still
+  returns it), `XFENString` becomes `CanonicalFEN`, `PositionKey` becomes
+  `FENKey`.
+- return `Bitboard` from `Board.AttacksFrom` and `Position.Checkers`.
+- iterators return `iter.Seq`: `Bitboard.Squares()`, `MoveNode.ChildrenSeq()`
+  (was `ChildrenIter`), `Position.LegalMovesSeq()`.
+- replace `Board.Draw2(perspective, darkMode)` with
+  `Board.DrawWith(DrawOptions)`.
+- add the `GameOption` and `uci.EngineOption` types; `uci.Debug` becomes the
+  constructor `uci.Debug()`.
+- rename `uci.Engine.Getpid` to `Pid`.
+- `Game.NullMove` takes `*MoveInsertOptions` like the other move methods.
+- remove `MoveNode.Number`, an undocumented alias of `FullMoveNumber`.
+- make `PGNRenderer` and `DefaultPGNRenderer` internal; use `Game.String` and
+  `Game.WritePGN`.
 
 #### Features
 - add `Game.Tags()`, which returns a copy of all PGN tags.
+- add `ParseFEN`, which returns a validated `*Position`.
 - add `Position.PseudoLegalMoves()`.
+- `ApplyInPlace` is now covered by equivalence tests against `Update`.
 
 ## v2.6.0 - 2026-08-17
 #### Features

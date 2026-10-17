@@ -236,7 +236,7 @@ func TestBoard_DrawReturnsASCIIArt(t *testing.T) {
 	}
 }
 
-func TestBoard_Draw2AllPerspectives(t *testing.T) {
+func TestBoard_DrawWithAllPerspectives(t *testing.T) {
 	b := boardFromFEN(t, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
 	for _, tc := range []struct {
 		name     string
@@ -249,12 +249,12 @@ func TestBoard_Draw2AllPerspectives(t *testing.T) {
 		{"black_dark", chess.Black, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := b.Draw2(tc.persp, tc.darkMode)
+			s := b.DrawWith(chess.DrawOptions{Perspective: tc.persp, DarkMode: tc.darkMode})
 			if !strings.Contains(s, "♔") {
-				t.Errorf("Draw2(%v,%v) missing white king glyph, got:\n%s", tc.persp, tc.darkMode, s)
+				t.Errorf("DrawWith(%v,%v) missing white king glyph, got:\n%s", tc.persp, tc.darkMode, s)
 			}
 			if !strings.Contains(s, "-") {
-				t.Errorf("Draw2(%v,%v) missing empty-square marker, got:\n%s", tc.persp, tc.darkMode, s)
+				t.Errorf("DrawWith(%v,%v) missing empty-square marker, got:\n%s", tc.persp, tc.darkMode, s)
 			}
 		})
 	}

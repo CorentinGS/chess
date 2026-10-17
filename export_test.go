@@ -12,7 +12,7 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-func PGN(r io.Reader) (func(*Game), error) {
+func PGN(r io.Reader) (GameOption, error) {
 	game, err := ParsePGN(r)
 	if errors.Is(err, io.EOF) {
 		return nil, ErrNoGameFound

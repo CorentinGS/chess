@@ -33,7 +33,7 @@ func Test_EngineEval(t *testing.T) {
 				t.Fatal("failed to parse FEN", err)
 			}
 
-			eng, err := uci.New(name, uci.Debug)
+			eng, err := uci.New(name, uci.Debug())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -73,7 +73,7 @@ func Test_EngineInfo(t *testing.T) {
 				t.Fatal("failed to parse FEN", err)
 			}
 
-			eng, err := uci.New(name, uci.Debug)
+			eng, err := uci.New(name, uci.Debug())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -118,7 +118,7 @@ func Test_EngineMultiPVInfo(t *testing.T) {
 				t.Fatal("failed to parse FEN", err)
 			}
 
-			eng, err := uci.New(name, uci.Debug)
+			eng, err := uci.New(name, uci.Debug())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -165,7 +165,7 @@ func Test_UCIMovesTags(t *testing.T) {
 				t.Skipf("engine %s not available", name)
 			}
 
-			eng, err := uci.New(name, uci.Debug)
+			eng, err := uci.New(name, uci.Debug())
 			if err != nil {
 				t.Fatal(err)
 			}

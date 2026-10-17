@@ -135,15 +135,10 @@ func (g *Game) moveUnchecked(move Move, options *MoveInsertOptions) (*MoveNode, 
 // NullMove appends a null move (a side-to-move flip with no piece movement)
 // to the current position's main line. Null moves are never part of the
 // legal moves returned by LegalMoves, so they cannot be inserted via Game.Move.
-// Use this method or Game.UnsafeMove(NullMove()) to add one explicitly.
-//
-// Pass nil (or no argument) to use default options.
-func (g *Game) NullMove(options ...*MoveInsertOptions) (*MoveNode, error) {
-	var opts *MoveInsertOptions
-	if len(options) > 0 {
-		opts = options[0]
-	}
-	return g.insertByMove(NewNullMove(), opts)
+// Use this method or Game.UnsafeMove(NewNullMove(), options) to add one
+// explicitly. A nil options uses the defaults.
+func (g *Game) NullMove(options *MoveInsertOptions) (*MoveNode, error) {
+	return g.insertByMove(NewNullMove(), options)
 }
 
 // insertByMove is shared by UnsafeMove and NullMove. It validates only the

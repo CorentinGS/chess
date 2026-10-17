@@ -159,15 +159,22 @@ func (b *Board) Draw() string {
 	return b.drawForWhite(false)
 }
 
-// Draw2 returns visual representation of the board useful for debugging.
-// It is similar to Draw() except allows the caller to specify perspective
-// and dark mode options.
-func (b *Board) Draw2(perspective Color, darkMode bool) string {
-	if perspective == Black {
-		return b.drawForBlack(darkMode)
-	} // else
+// DrawOptions configures Board.DrawWith. The zero value draws from White's
+// side with the default piece letters, like Draw.
+type DrawOptions struct {
+	// Perspective is the side shown at the bottom. Black flips the board;
+	// any other value draws from White's side.
+	Perspective Color
+	// DarkMode swaps the piece glyphs for terminals with a dark background.
+	DarkMode bool
+}
 
-	return b.drawForWhite(darkMode)
+// DrawWith is Draw with a choice of perspective and glyphs.
+func (b *Board) DrawWith(opts DrawOptions) string {
+	if opts.Perspective == Black {
+		return b.drawForBlack(opts.DarkMode)
+	}
+	return b.drawForWhite(opts.DarkMode)
 }
 
 // drawForWhite returns visual representation of the board from white's perspective.

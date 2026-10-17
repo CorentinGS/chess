@@ -126,7 +126,7 @@ func (g *Game) evaluatePositionStatus() {
 // IgnoreFivefoldRepetitionDraw returns a Game option that disables automatic draws
 // caused by the fivefold repetition rule. When applied, the game will not
 // automatically end in a draw if the same position occurs five times.
-func IgnoreFivefoldRepetitionDraw() func(*Game) {
+func IgnoreFivefoldRepetitionDraw() GameOption {
 	return func(g *Game) {
 		g.ignoreFivefoldRepetitionDraw = true
 	}
@@ -135,7 +135,7 @@ func IgnoreFivefoldRepetitionDraw() func(*Game) {
 // IgnoreSeventyFiveMoveRuleDraw returns a Game option that disables automatic draws
 // triggered by the seventy-five move rule. When applied, the game will not
 // automatically end in a draw if one hundred fifty half-moves pass without a pawn move or capture.
-func IgnoreSeventyFiveMoveRuleDraw() func(*Game) {
+func IgnoreSeventyFiveMoveRuleDraw() GameOption {
 	return func(g *Game) {
 		g.ignoreSeventyFiveMoveRuleDraw = true
 	}
@@ -144,7 +144,7 @@ func IgnoreSeventyFiveMoveRuleDraw() func(*Game) {
 // IgnoreInsufficientMaterialDraw returns a Game option that disables automatic draws
 // caused by insufficient material. When applied, the game will not automatically
 // end in a draw even if checkmate is impossible with the remaining pieces.
-func IgnoreInsufficientMaterialDraw() func(*Game) {
+func IgnoreInsufficientMaterialDraw() GameOption {
 	return func(g *Game) {
 		g.ignoreInsufficientMaterialDraw = true
 	}

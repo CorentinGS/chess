@@ -408,14 +408,13 @@ func (pos *Position) IsCheck() bool {
 	return pos.inCheck
 }
 
-// Checkers returns the squares of the pieces currently giving check to the
-// side to move. The returned slice is empty when the position is not in check.
-// It allocates only when called.
-func (pos *Position) Checkers() []Square {
+// Checkers returns the squares of the pieces giving check to the side to
+// move. It is empty when the position is not in check.
+func (pos *Position) Checkers() Bitboard {
 	if pos == nil {
-		return nil
+		return 0
 	}
-	return bitboardSquares(pos.checkers)
+	return Bitboard(pos.checkers)
 }
 
 // nullUpdateHash computes the Zobrist hash delta for a null move: the only
@@ -478,9 +477,12 @@ func (pos *Position) Ply() int {
 	return (pos.moveCount) * 2
 }
 
-// String implements the fmt.Stringer interface and returns a
-// string with the FEN format: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1.
-func (pos *Position) String() string {
+// FEN returns the position in Forsyth-Edwards Notation, for example
+// "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1". The en passant
+// field is kept as set, even when no pawn can capture, so a parsed FEN
+// round-trips exactly. Chess960 castling rights use Shredder-FEN file letters.
+// CanonicalFEN gives the normalised form and FENKey the identity fields.
+func (pos *Position) FEN() string {
 	buf := pos.appendPositionKey(make([]byte, 0, 90), pos.enPassantSquare)
 	buf = append(buf, ' ')
 	buf = strconv.AppendInt(buf, int64(pos.halfMoveClock), 10)
@@ -489,9 +491,9 @@ func (pos *Position) String() string {
 	return string(buf)
 }
 
-// PositionKey returns the four FEN fields that identify a position, without
-// the half-move clock and full-move number.
-func (pos *Position) PositionKey() string {
+// FENKey returns the first four FEN fields (placement, side to move, castling
+// rights, en passant square as set) without the two move clocks.
+func (pos *Position) FENKey() string {
 	return string(pos.appendPositionKey(make([]byte, 0, 86), pos.enPassantSquare))
 }
 
@@ -506,18 +508,22 @@ func (pos *Position) appendPositionKey(buf []byte, enPassantSquare Square) []byt
 	return append(buf, enPassantSquare.String()...)
 }
 
-// XFENString is similar to String() except it uses the legally-relevant en
-// passant square (the square only when an enemy pawn can actually capture)
-// instead of the raw FEN en passant square. For Chess960 positions the
-// castling-rights field is emitted in Shredder-FEN file-letter form. The name
-// is historical: this is the FEN key with clocks, not a separate notation.
-func (pos *Position) XFENString() string {
+// CanonicalFEN is FEN with the en passant square written only when a pawn can
+// actually capture en passant, the form most tools (Lichess, Stockfish) print.
+// Positions that are the same by FIDE rules and share clocks have the same
+// CanonicalFEN.
+func (pos *Position) CanonicalFEN() string {
 	buf := pos.appendPositionKey(make([]byte, 0, 90), pos.relevantEnPassantSquare())
 	buf = append(buf, ' ')
 	buf = strconv.AppendInt(buf, int64(pos.halfMoveClock), 10)
 	buf = append(buf, ' ')
 	buf = strconv.AppendInt(buf, int64(pos.moveCount), 10)
 	return string(buf)
+}
+
+// String returns FEN, so a Position prints as its FEN.
+func (pos *Position) String() string {
+	return pos.FEN()
 }
 
 // ZobristHash returns the Zobrist hash of the position.

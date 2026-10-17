@@ -596,10 +596,10 @@ defer f.Close()
 
 for game, err := range chess.PGNGames(f) {
     if err != nil {
-        log.Fatal("Failed to parse game: %v", err)
+        log.Fatalf("Failed to parse game: %v", err)
     }
     fmt.Println(game.Tag("Site"))
-    // Output &{Site https://lichess.org/8jb5kiqw}
+    // Output: https://lichess.org/8jb5kiqw
 }
 ```
 
@@ -619,7 +619,7 @@ for {
         break
     }
     if err != nil {
-        log.Fatal("Failed to parse game: %v", err)
+        log.Fatalf("Failed to parse game: %v", err)
     }
     fmt.Println(game.Tag("Site"))
 }
@@ -645,10 +645,10 @@ defer f.Close()
 
 for game, err := range chess.PGNGames(f, chess.WithPGNExpandVariations()) {
     if err != nil {
-        log.Fatal("Failed to parse game: %v", err)
+        log.Fatalf("Failed to parse game: %v", err)
     }
     fmt.Println(game.Tag("Site"))
-    // Output &{Site https://lichess.org/8jb5kiqw}
+    // Output: https://lichess.org/8jb5kiqw
 }
 ```
 
@@ -660,24 +660,31 @@ for [50 move rule](https://en.wikipedia.org/wiki/Fifty-move_rule)), and full mov
 
 #### Read FEN
 
-FEN supplied as an optional parameter to the NewGame constructor:
+Parse a FEN into a `Position` with `ParseFEN`, or start a `Game` from one with
+the `FEN` option:
 
 ```go
-fen, err := chess.FEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+pos, err := chess.ParseFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")
 if err != nil {
-// handle error
+	// handle error
 }
-game := chess.NewGame(fen)
+
+opt, err := chess.FEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+if err != nil {
+	// handle error
+}
+game := chess.NewGame(opt)
 ```
 
 #### Write FEN
 
-Game's current position outputted in FEN notation:
+`Position` writes three forms:
 
 ```go
-game := chess.NewGame()
-pos := game.Position()
-fmt.Println(pos.String()) // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+pos.FEN()          // rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1 (as parsed; also String())
+pos.CanonicalFEN() // rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1  (en passant only if capturable)
+pos.FENKey()       // rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3      (no clocks)
+game.FEN()         // FEN of the game's current position
 ```
 
 ### Move Text Codecs

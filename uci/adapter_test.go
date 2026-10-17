@@ -493,7 +493,7 @@ func Test_CmdUCI_MalformedOptionLoggedUnderDebug(t *testing.T) {
 
 	t.Run("logged and non-fatal when debug on", func(t *testing.T) {
 		var buf bytes.Buffer
-		eng := uci.NewWithAdapter(fake, uci.Logger(log.New(&buf, "", 0)), uci.Debug)
+		eng := uci.NewWithAdapter(fake, uci.Logger(log.New(&buf, "", 0)), uci.Debug())
 		defer eng.Close()
 
 		if err := eng.Run(uci.CmdUCI{}); err != nil {
@@ -540,7 +540,7 @@ func Test_CmdGo_MalformedInfoLineLoggedUnderDebug(t *testing.T) {
 
 	t.Run("logged and non-fatal when debug on", func(t *testing.T) {
 		var buf bytes.Buffer
-		eng := uci.NewWithAdapter(fake, uci.Logger(log.New(&buf, "", 0)), uci.Debug)
+		eng := uci.NewWithAdapter(fake, uci.Logger(log.New(&buf, "", 0)), uci.Debug())
 		defer eng.Close()
 
 		pos := chess.StartingPosition()

@@ -221,8 +221,8 @@ func TestSingleGameFromPGN(t *testing.T) {
 		// check move number for each move
 		// Get the full move number
 		fullMoveNumber := (i / 2) + 1
-		if move.Number() != fullMoveNumber {
-			t.Fatalf("game move %d is not correct, expected full move number %d, got %d", i, fullMoveNumber, move.Number())
+		if move.FullMoveNumber() != fullMoveNumber {
+			t.Fatalf("game move %d is not correct, expected full move number %d, got %d", i, fullMoveNumber, move.FullMoveNumber())
 		}
 	}
 
@@ -280,10 +280,10 @@ func TestBigPgn(t *testing.T) {
 				// check move number for each move
 				// Get the full move number
 				fullMoveNumber := (i / 2) + 1
-				if move.Number() != fullMoveNumber {
+				if move.FullMoveNumber() != fullMoveNumber {
 					t.Log(game.Moves())
 					t.Log(game)
-					t.Fatalf("game move %d is not correct, expected full move number %d, got %d", i, fullMoveNumber, move.Number())
+					t.Fatalf("game move %d is not correct, expected full move number %d, got %d", i, fullMoveNumber, move.FullMoveNumber())
 				}
 			}
 		})

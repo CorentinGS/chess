@@ -70,7 +70,7 @@ func TestValidFENs(t *testing.T) {
 		if f != state.String() {
 			t.Fatalf("fen expected board string %s but got %s", f, state.String())
 		}
-		xfen := state.XFENString()
+		xfen := state.CanonicalFEN()
 		if xfen != validXFENs[idx] {
 			t.Fatalf("xfen for fen %v (%v) was %v but expected %v", idx, f,
 				xfen, validXFENs[idx])
@@ -184,5 +184,28 @@ func BenchmarkFenBoard(b *testing.B) {
 				_ = board
 			}
 		})
+	}
+}
+
+func TestParseFENRoundTripsAndNormalises(t *testing.T) {
+	const raw = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+	pos, err := ParseFEN(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := pos.FEN(); got != raw {
+		t.Errorf("FEN() = %q, want %q", got, raw)
+	}
+	if got := pos.String(); got != raw {
+		t.Errorf("String() = %q, want FEN %q", got, raw)
+	}
+	if got, want := pos.CanonicalFEN(), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"; got != want {
+		t.Errorf("CanonicalFEN() = %q, want %q", got, want)
+	}
+	if got, want := pos.FENKey(), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3"; got != want {
+		t.Errorf("FENKey() = %q, want %q", got, want)
+	}
+	if _, err := ParseFEN("not a fen"); !errors.Is(err, ErrInvalidFEN) {
+		t.Errorf("ParseFEN(invalid) error = %v, want ErrInvalidFEN", err)
 	}
 }

@@ -1,7 +1,5 @@
 package chess
 
-import "math/bits"
-
 func pawnCheckers(board *Board, kingSq Square, attacker Color) bitboard {
 	pawns := board.bbForPiece(NewPiece(Pawn, attacker))
 	var checkers bitboard
@@ -111,37 +109,21 @@ func checkState(pos *Position) (bool, bitboard) {
 	return checkers != 0, checkers
 }
 
-// bitboardSquares returns the occupied squares of bb as a slice in
-// most-significant-bit-first order.
-func bitboardSquares(bb bitboard) []Square {
-	n := bits.OnesCount64(uint64(bb))
-	if n == 0 {
-		return nil
-	}
-	sqs := make([]Square, 0, n)
-	for bb != 0 {
-		lsb := bb & -bb
-		sqs = append(sqs, squareFromBit(lsb))
-		bb &^= lsb
-	}
-	return sqs
-}
-
-// AttacksFrom returns the squares attacked by the piece on sq.
+// AttacksFrom returns the set of squares attacked by the piece on sq.
 //
 // Attacks are based only on piece movement and board occupancy. They are
 // independent of the side to move, check, pins and other legal-move
 // restrictions. For sliding pieces, the first occupied square in each
 // direction is included, regardless of its color, and squares beyond it are
-// excluded. An empty or invalid source square returns an empty slice.
-func (b *Board) AttacksFrom(sq Square) []Square {
+// excluded. An empty or invalid source square returns an empty Bitboard.
+func (b *Board) AttacksFrom(sq Square) Bitboard {
 	if b == nil || sq < A1 || sq > H8 {
-		return nil
+		return 0
 	}
 
 	piece := b.Piece(sq)
 	if piece == NoPiece {
-		return nil
+		return 0
 	}
 
 	occupied := ^b.emptySqs
@@ -161,7 +143,7 @@ func (b *Board) AttacksFrom(sq Square) []Square {
 		attacks = bbKingMoves[sq]
 	}
 
-	return bitboardSquares(attacks)
+	return Bitboard(attacks)
 }
 
 // isInCheck returns true if the side to move is in check in the given position.

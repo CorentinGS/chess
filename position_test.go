@@ -293,14 +293,14 @@ func BenchmarkPositionString(b *testing.B) {
 func BenchmarkPositionKey(b *testing.B) {
 	pos := StartingPosition()
 	for b.Loop() {
-		_ = pos.PositionKey()
+		_ = pos.FENKey()
 	}
 }
 
-func BenchmarkPositionXFENString(b *testing.B) {
+func BenchmarkPositionCanonicalFEN(b *testing.B) {
 	pos := StartingPosition()
 	for b.Loop() {
-		_ = pos.XFENString()
+		_ = pos.CanonicalFEN()
 	}
 }
 
@@ -450,7 +450,7 @@ func TestPositionIsCheckAndCheckers(t *testing.T) {
 	if pos.IsCheck() {
 		t.Fatal("starting position should not be in check")
 	}
-	if checkers := pos.Checkers(); len(checkers) != 0 {
+	if checkers := pos.Checkers(); !checkers.IsEmpty() {
 		t.Fatalf("starting position should have no checkers, got %v", checkers)
 	}
 
@@ -463,7 +463,7 @@ func TestPositionIsCheckAndCheckers(t *testing.T) {
 		t.Fatal("expected white to be in check from Qh4")
 	}
 	checkers := pos.Checkers()
-	if len(checkers) != 1 || checkers[0] != H4 {
+	if checkers.Popcount() != 1 || checkers.FirstSquare() != H4 {
 		t.Fatalf("expected checker on H4, got %v", checkers)
 	}
 
@@ -476,7 +476,7 @@ func TestPositionIsCheckAndCheckers(t *testing.T) {
 		t.Fatal("expected double check")
 	}
 	checkers = pos.Checkers()
-	if len(checkers) != 2 {
+	if checkers.Popcount() != 2 {
 		t.Fatalf("expected 2 checkers, got %v", checkers)
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-func TestPGNRenderer_RenderMatchesGameString(t *testing.T) {
+func TestPGNRenderer_WritePGNMatchesString(t *testing.T) {
 	g := chess.NewGame()
 	g.SetTag("Event", "Test Event")
 	g.SetTag("Site", "Test Site")
@@ -28,9 +28,12 @@ func TestPGNRenderer_RenderMatchesGameString(t *testing.T) {
 	}
 
 	got := g.String()
-	rendered := chess.DefaultPGNRenderer.Render(g)
-	if got != rendered {
-		t.Errorf("Game.String() and DefaultPGNRenderer.Render disagree:\n%s\nvs\n%s", got, rendered)
+	var sb strings.Builder
+	if err := g.WritePGN(&sb); err != nil {
+		t.Fatal(err)
+	}
+	if rendered := sb.String(); got != rendered {
+		t.Errorf("Game.String() and Game.WritePGN disagree:\n%s\nvs\n%s", got, rendered)
 	}
 }
 
@@ -61,12 +64,12 @@ func (w *errWriter) Write(_ []byte) (int, error) {
 	return 0, w.err
 }
 
-func TestPGNRenderer_RenderGameToPropagatesWriterError(t *testing.T) {
+func TestPGNRenderer_WritePGNPropagatesWriterError(t *testing.T) {
 	g := chess.NewGame()
 	want := errors.New("disk full")
 	w := &errWriter{err: want}
 
-	err := chess.DefaultPGNRenderer.RenderGameTo(g, w)
+	err := g.WritePGN(w)
 	if !errors.Is(err, want) {
 		t.Errorf("expected error %v, got %v", want, err)
 	}
@@ -74,7 +77,7 @@ func TestPGNRenderer_RenderGameToPropagatesWriterError(t *testing.T) {
 
 func TestPGNRenderer_EndsEmptyGameWithNoOutcome(t *testing.T) {
 	g := chess.NewGame()
-	out := chess.DefaultPGNRenderer.Render(g)
+	out := g.String()
 	if !strings.HasSuffix(out, chess.NoOutcome.String()) {
 		t.Errorf("expected output to end with NoOutcome %q, got %q", chess.NoOutcome, out)
 	}
@@ -92,7 +95,7 @@ func TestPGNRenderer_MoveNumberUsesDotAndSpace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out := chess.DefaultPGNRenderer.Render(g)
+	out := g.String()
 
 	for _, pattern := range []string{`\b1\. e4\b`, ` 2\. Nf3\b`} {
 		re := regexp.MustCompile(pattern)
@@ -113,7 +116,7 @@ func TestPGNRenderer_TrailingSpaceAfterMoves(t *testing.T) {
 	if _, err := g.MoveText("e5", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	out := chess.DefaultPGNRenderer.Render(g)
+	out := g.String()
 	if !strings.HasSuffix(out, " *") {
 		t.Errorf("expected a single trailing space before outcome token in %q", out)
 	}
@@ -121,7 +124,7 @@ func TestPGNRenderer_TrailingSpaceAfterMoves(t *testing.T) {
 
 func TestPGNRenderer_NoTrailingSpaceForEmptyGame(t *testing.T) {
 	g := chess.NewGame()
-	out := chess.DefaultPGNRenderer.Render(g)
+	out := g.String()
 	if strings.HasSuffix(out, " *") {
 		t.Errorf("empty game must not gain a trailing space before outcome: %q", out)
 	}
@@ -134,7 +137,7 @@ func TestPGNRenderer_EscapesCommentEndBrace(t *testing.T) {
 	}
 	g.MoveTree().Root().Children()[0].SetComment("keeps } inside")
 
-	out := chess.DefaultPGNRenderer.Render(g)
+	out := g.String()
 	if !strings.Contains(out, `keeps \} inside`) {
 		t.Fatalf("rendered PGN did not escape comment brace: %q", out)
 	}
@@ -152,7 +155,7 @@ func TestPGNRenderer_EscapesTagValueQuotes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out := chess.DefaultPGNRenderer.Render(g)
+	out := g.String()
 	if !strings.Contains(out, `A \"B\" C`) {
 		t.Fatalf("rendered PGN did not escape tag value quotes: %q", out)
 	}
@@ -165,7 +168,7 @@ func TestPGNRenderer_EmitsCommandAnnotation(t *testing.T) {
 	}
 	g.MoveTree().Root().Children()[0].SetCommand("clk", "0:01:23")
 
-	out := chess.DefaultPGNRenderer.Render(g)
+	out := g.String()
 	if !strings.Contains(out, "[%clk 0:01:23]") {
 		t.Fatalf("rendered PGN did not contain command annotation: %q", out)
 	}
@@ -186,7 +189,7 @@ func TestPGNRenderer_OrdersTagsBySevenTagRosterThenAlpha(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out := chess.DefaultPGNRenderer.Render(g)
+	out := g.String()
 	idx := func(tag string) int { return strings.Index(out, "["+tag+" \"") }
 	order := []string{"Event", "Site", "Date", "Round", "White", "Black", "Result", "Alpha", "Zebra"}
 	for i := 1; i < len(order); i++ {
@@ -206,13 +209,13 @@ func TestPGNRenderer_DoesNotMutateGame(t *testing.T) {
 	g.SetTag("Custom", "value")
 
 	before := g.String()
-	beforePos := g.Position().XFENString()
-	_ = chess.DefaultPGNRenderer.Render(g)
+	beforePos := g.Position().CanonicalFEN()
+	_ = g.String()
 	if g.String() != before {
 		t.Errorf("Render mutated game string:\nbefore:\n%s\nafter:\n%s", before, g.String())
 	}
-	if g.Position().XFENString() != beforePos {
-		t.Errorf("Render mutated position: before %q after %q", beforePos, g.Position().XFENString())
+	if g.Position().CanonicalFEN() != beforePos {
+		t.Errorf("Render mutated position: before %q after %q", beforePos, g.Position().CanonicalFEN())
 	}
 }
 
@@ -220,9 +223,9 @@ func TestPGNRenderer_RoundTripsVariations(t *testing.T) {
 	pgn := withMinimalTags("1. e4 {main} e5 (1...c5 {sicilian} 2. Nf3) 2. Nf3 *")
 	g := mustParseSingleGame(t, pgn)
 
-	first := chess.DefaultPGNRenderer.Render(g)
+	first := g.String()
 	reparsed := mustParseSingleGame(t, first)
-	second := chess.DefaultPGNRenderer.Render(reparsed)
+	second := reparsed.String()
 
 	if first != second {
 		t.Fatalf("render not idempotent for variations:\nfirst:\n%s\nsecond:\n%s", first, second)
@@ -245,9 +248,9 @@ func TestPGNRenderer_IsIdempotentOnAnnotations(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	first := chess.DefaultPGNRenderer.Render(g)
+	first := g.String()
 	reparsed := chess.NewGame(mustPGNOption(t, first))
-	second := chess.DefaultPGNRenderer.Render(reparsed)
+	second := reparsed.String()
 
 	if first != second {
 		t.Fatalf("render not idempotent:\nfirst:\n%s\nsecond:\n%s", first, second)
@@ -259,10 +262,10 @@ func TestPGNRenderer_RenderGameToStringsBuilderFastPath(t *testing.T) {
 	g := mustParseSingleGame(t, pgn)
 
 	var sb strings.Builder
-	if err := chess.DefaultPGNRenderer.RenderGameTo(g, &sb); err != nil {
+	if err := g.WritePGN(&sb); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := sb.String(), chess.DefaultPGNRenderer.Render(g); got != want {
+	if got, want := sb.String(), g.String(); got != want {
 		t.Errorf("RenderGameTo(*strings.Builder) and Render disagree:\n%s\nvs\n%s", got, want)
 	}
 }
@@ -280,7 +283,7 @@ func TestPGNRenderer_WritesNAGsBeforeComments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out := chess.DefaultPGNRenderer.Render(g)
+	out := g.String()
 	if !strings.Contains(out, "e4 $1 $1406 {best move}") {
 		t.Fatalf("expected NAGs before comment, got:\n%s", out)
 	}

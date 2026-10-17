@@ -25,7 +25,7 @@ import (
 // Validation contract:
 //   - Null moves are never part of a position's legal moves (LegalMoves).
 //   - Game.Move() rejects a null move.
-//   - Game.UnsafeMove(NullMove()) and Game.NullMove() accept it.
+//   - Game.UnsafeMove(NullMove()) and Game.NullMove(nil) accept it.
 //
 // State changes after a null move:
 //   - Turn flips.
@@ -39,7 +39,7 @@ import (
 
 func ExampleGame_NullMove() {
 	g := chess.NewGame()
-	if _, err := g.NullMove(); err != nil {
+	if _, err := g.NullMove(nil); err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
@@ -290,7 +290,7 @@ func TestNullMove_UnsafeMoveAcceptsNull(t *testing.T) {
 
 func TestNullMove_GameNullMoveMethod(t *testing.T) {
 	g := chess.NewGame()
-	node, err := g.NullMove()
+	node, err := g.NullMove(nil)
 	if err != nil {
 		t.Fatalf("Game.NullMove error: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestNullMove_GameNullMoveMethod(t *testing.T) {
 
 func TestNullMove_AppearsInMoveList(t *testing.T) {
 	g := chess.NewGame()
-	if _, err := g.NullMove(); err != nil {
+	if _, err := g.NullMove(nil); err != nil {
 		t.Fatalf("Game.NullMove: %v", err)
 	}
 	list := g.MoveList()
@@ -422,7 +422,7 @@ func TestNullMove_PGNRead_TwoConsecutiveNulls(t *testing.T) {
 
 func TestNullMove_PGNWrite(t *testing.T) {
 	g := chess.NewGame()
-	if _, err := g.NullMove(); err != nil {
+	if _, err := g.NullMove(nil); err != nil {
 		t.Fatalf("NullMove: %v", err)
 	}
 	if _, err := g.MoveText("e5", chess.SAN(), nil); err != nil {
@@ -436,7 +436,7 @@ func TestNullMove_PGNWrite(t *testing.T) {
 
 func TestNullMove_PGNWriteReadRoundTrip(t *testing.T) {
 	g := chess.NewGame()
-	if _, err := g.NullMove(); err != nil {
+	if _, err := g.NullMove(nil); err != nil {
 		t.Fatalf("NullMove: %v", err)
 	}
 	if _, err := g.MoveText("e5", chess.SAN(), nil); err != nil {
@@ -445,7 +445,7 @@ func TestNullMove_PGNWriteReadRoundTrip(t *testing.T) {
 	if _, err := g.MoveText("Nf3", chess.SAN(), nil); err != nil {
 		t.Fatalf("MoveText Nf3: %v", err)
 	}
-	if _, err := g.NullMove(); err != nil {
+	if _, err := g.NullMove(nil); err != nil {
 		t.Fatalf("NullMove (tail): %v", err)
 	}
 	rendered := g.String()

@@ -1,5 +1,5 @@
 /*
-Package chess provides a chess engine implementation using bitboard representation.
+The internal bitboard type represents board state with 64-bit integers.
 
 The package uses bitboards (64-bit integers) to represent the chess board state,
 where each bit corresponds to a square on the board. The squares are numbered
@@ -36,6 +36,7 @@ Usage:
 	// Print board representation
 	fmt.Println(bb.Draw())
 */
+
 package chess
 
 import (

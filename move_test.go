@@ -503,10 +503,10 @@ func BenchmarkMoveNodeChildren(b *testing.B) {
 	}
 }
 
-func BenchmarkMoveNodeChildrenIter(b *testing.B) {
+func BenchmarkMoveNodeChildrenSeq(b *testing.B) {
 	node := &MoveNode{children: make([]*MoveNode, 8)}
 	for b.Loop() {
-		for range node.ChildrenIter {
+		for range node.ChildrenSeq() {
 		}
 	}
 }

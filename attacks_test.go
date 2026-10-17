@@ -2,8 +2,13 @@ package chess
 
 import "testing"
 
-func assertSameSquares(t *testing.T, got []Square, want ...Square) {
+func assertSameSquares(t *testing.T, bb Bitboard, want ...Square) {
 	t.Helper()
+
+	var got []Square
+	for sq := range bb.Squares() {
+		got = append(got, sq)
+	}
 
 	if len(got) != len(want) {
 		t.Fatalf("got %v, want %v", got, want)
@@ -73,7 +78,7 @@ func TestBoardAttacksFromEmptySquare(t *testing.T) {
 
 	got := board.AttacksFrom(E4)
 
-	if len(got) != 0 {
+	if !got.IsEmpty() {
 		t.Fatalf("expected no attacks, got %v", got)
 	}
 }
@@ -82,7 +87,7 @@ func TestBoardAttacksFromInvalidSquare(t *testing.T) {
 	board := StartingPosition().Board()
 
 	for _, sq := range []Square{NoSquare, Square(64)} {
-		if got := board.AttacksFrom(sq); len(got) != 0 {
+		if got := board.AttacksFrom(sq); !got.IsEmpty() {
 			t.Errorf("AttacksFrom(%d) = %v, want empty", sq, got)
 		}
 	}
@@ -98,16 +103,8 @@ func TestBoardAttacksFromIgnoresPins(t *testing.T) {
 	// The rook is pinned against the white king, but it still attacks
 	// horizontally for attack-map purposes.
 	for _, expected := range []Square{A2, B2, C2, D2, F2, G2, H2} {
-		found := false
-		for _, actual := range got {
-			if actual == expected {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			t.Errorf("expected pinned rook to attack %s", expected)
+		if !got.Intersects(NewBitboardFromSquares(expected)) {
+			t.Errorf("missing expected attack %s; got %v", expected, got)
 		}
 	}
 }

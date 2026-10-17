@@ -2,7 +2,6 @@ package chess
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -14,7 +13,7 @@ type tagMap map[string]string
 // A Game represents a single chess game.
 type Game struct {
 	outcome                        Outcome   // Game result
-	tagPairs                       tagMap  // PGN tag pairs
+	tagPairs                       tagMap    // PGN tag pairs
 	tree                           *MoveTree // Move tree and active cursor
 	method                         Method    // How the game ended
 	ignoreFivefoldRepetitionDraw   bool      // Flag for automatic FivefoldRepetition draw handling
@@ -22,37 +21,34 @@ type Game struct {
 	ignoreInsufficientMaterialDraw bool      // Flag for automatic InsufficientMaterial draw handling
 }
 
-// FEN takes a string and returns a function that updates
-// the game to reflect the FEN data.  Since FEN doesn't encode
-// prior moves, the move list will be empty.  The returned
-// function is designed to be used in the NewGame constructor.
-// An error is returned if there is a problem parsing the FEN data.
-func FEN(fen string) (func(*Game), error) {
-	pos, err := decodeFEN(fen)
+// GameOption configures a Game created by NewGame.
+type GameOption func(*Game)
+
+// FEN returns a GameOption that starts the game from the position described
+// by fen instead of the standard starting position. The game has no moves.
+// It returns an error wrapping ErrInvalidFEN when fen does not parse.
+func FEN(fen string) (GameOption, error) {
+	pos, err := ParseFEN(fen)
 	if err != nil {
 		return nil, fmt.Errorf("chess: game FEN option: %w", err)
 	}
-	if pos == nil {
-		return nil, errors.New("chess: invalid FEN")
-	}
 	return func(g *Game) {
-		pos.inCheck, pos.checkers = checkState(pos)
 		g.tree.setRootPosition(pos)
 		g.evaluatePositionStatus()
 	}, nil
 }
 
-// NewGame returns a new game in the standard starting position.
-// Optional functions can be provided to configure the initial game state.
+// NewGame returns a new game in the standard starting position, configured by
+// options.
 //
-// Example:
-//
-//	// Standard game
 //	game := NewGame()
 //
-//	// Game from FEN
-//	game := NewGame(FEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"))
-func NewGame(options ...func(*Game)) *Game {
+//	opt, err := FEN("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1")
+//	if err != nil {
+//	    return err
+//	}
+//	game = NewGame(opt, IgnoreFivefoldRepetitionDraw())
+func NewGame(options ...GameOption) *Game {
 	pos := StartingPosition()
 
 	game := &Game{
@@ -175,15 +171,15 @@ func (g *Game) Method() Method {
 }
 
 // String implements the fmt.Stringer interface and returns
-// the game's PGN. It delegates to DefaultPGNRenderer.
+// the game's PGN.
 func (g *Game) String() string {
-	return DefaultPGNRenderer.Render(g)
+	return defaultPGNRenderer.render(g)
 }
 
-// WritePGN writes the game's PGN to w. It delegates to DefaultPGNRenderer
+// WritePGN writes the game's PGN to w
 // and returns any write error.
 func (g *Game) WritePGN(w io.Writer) error {
-	return DefaultPGNRenderer.RenderGameTo(g, w)
+	return defaultPGNRenderer.renderTo(g, w)
 }
 
 // FEN returns the FEN notation of the current position.
@@ -193,7 +189,7 @@ func (g *Game) FEN() string {
 	if pos == nil {
 		return ""
 	}
-	return pos.String()
+	return pos.FEN()
 }
 
 // MarshalText implements the encoding.TextMarshaler interface and

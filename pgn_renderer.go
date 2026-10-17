@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// PGNRenderer renders a Game into PGN text. It is a stateless
+// pgnRenderer renders a Game into PGN text. It is a stateless
 // function object that reads Game state and writes formatted PGN
 // to a string or io.Writer without mutating the Game.
 //
@@ -15,14 +15,14 @@ import (
 // future (custom tag ordering, value escaping toggles, optional
 // result token, etc.). All such configuration fields are deferred
 // to v3.1; this initial type is a pure extraction with no knobs.
-type PGNRenderer struct{}
+type pgnRenderer struct{}
 
-// DefaultPGNRenderer is the package-level renderer used by
+// defaultPGNRenderer is the package-level renderer used by
 // Game.String and Game.WritePGN.
-var DefaultPGNRenderer = &PGNRenderer{}
+var defaultPGNRenderer = &pgnRenderer{}
 
 // pgnRender holds the state for a single render pass. A fresh instance is
-// created per Render/RenderGameTo call; PGNRenderer itself stays stateless.
+// created per render/renderTo call; pgnRenderer itself stays stateless.
 //
 // Cursor invariant: run() navigates the MoveTree's single active cursor
 // (ADR-016) to read pre-move positions. It saves the caller's cursor on
@@ -33,17 +33,17 @@ type pgnRender struct {
 	sb *strings.Builder
 }
 
-// Render returns the PGN text for g.
-func (r *PGNRenderer) Render(g *Game) string {
+// render returns the PGN text for g.
+func (r *pgnRenderer) render(g *Game) string {
 	var sb strings.Builder
 	// strings.Builder.Write never fails; the error is unreachable here.
-	_ = r.RenderGameTo(g, &sb)
+	_ = r.renderTo(g, &sb)
 	return sb.String()
 }
 
-// RenderGameTo writes the PGN text for g to w. It returns any
+// renderTo writes the PGN text for g to w. It returns any
 // write error from w.
-func (r *PGNRenderer) RenderGameTo(g *Game, w io.Writer) error {
+func (r *pgnRenderer) renderTo(g *Game, w io.Writer) error {
 	sb, ok := w.(*strings.Builder)
 	if !ok {
 		sb = &strings.Builder{}

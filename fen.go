@@ -8,9 +8,15 @@ import (
 	"sync"
 )
 
-// Decodes FEN notation into a GameState.  An error is returned
-// if there is a parsing error.  FEN notation format:
-// rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1.
+// ParseFEN parses a position in Forsyth-Edwards Notation and validates it like
+// NewPosition. It accepts one to six fields; missing fields take their
+// defaults. File-letter castling rights (Shredder-FEN, X-FEN) select Chess960.
+// Errors wrap ErrInvalidFEN.
+func ParseFEN(fen string) (*Position, error) {
+	return decodeFEN(fen)
+}
+
+// decodeFEN parses and validates a FEN string into a Position.
 func decodeFEN(fen string) (*Position, error) {
 	setup, err := decodeFENSetup(fen)
 	if err != nil {
