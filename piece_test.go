@@ -58,31 +58,6 @@ func TestPieceType_Bytes(t *testing.T) {
 	}
 }
 
-func TestPieceType_ToPolyglotPromotionValue(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		pt   chess.PieceType
-		want int
-	}{
-		{"knight", chess.Knight, 1},
-		{"bishop", chess.Bishop, 2},
-		{"rook", chess.Rook, 3},
-		{"queen", chess.Queen, 4},
-		{"king_is_zero", chess.King, 0},
-		{"pawn_is_zero", chess.Pawn, 0},
-		{"none_is_zero", chess.NoPieceType, 0},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := tt.pt.ToPolyglotPromotionValue(); got != tt.want {
-				t.Errorf("ToPolyglotPromotionValue() = %d, want %d", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestPieceType_StringRoundTrip(t *testing.T) {
 	t.Parallel()
 	for _, pt := range chess.PieceTypes() {

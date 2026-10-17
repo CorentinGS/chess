@@ -17,7 +17,7 @@ import "github.com/corentings/chess/v3"
 ```
 
 Update import paths in every sub-package you use (`/v3/image`, `/v3/opening`,
-`/v3/uci`).
+`/v3/uci`). Polyglot books moved to the new `/v3/polyglot` package.
 
 ## Move is a value, not a pointer
 
@@ -163,8 +163,6 @@ mechanical renames with no behaviour change; update the symbol at the call site.
 |---|---|---|
 | `opening.Opening` | `opening.Entry` | Stuttered at the call site (`opening.Opening{}`). |
 | `chess.GetPolyglotHashBytes` | _(removed)_ | Use `HashFromFEN` / `Position.ZobristHash`; convert a `uint64` via `binary.LittleEndian`. |
-| `(*PolyglotBook).GetRandomMove` | `(*PolyglotBook).RandomMove` | `Get` prefix on a non-trivial operation. |
-| `(*PolyglotBook).GetChessMoves` | `(*PolyglotBook).ChessMoves` | `Get` prefix on a non-trivial operation. |
 
 The unexported `newOpening` constructor is renamed `newEntry` to match.
 
@@ -330,19 +328,33 @@ removed with no direct replacement:
 `Position.LegalMovesFast()` (skips the `Check` tag) serve hot paths.
 `Board.Piece()` uses an internal mailbox for O(1) lookup.
 
-## Polyglot book loading
+## Polyglot books live in `polyglot`
 
-The `BookSource` interface and the `ReaderBookSource`, `BytesBookSource`, and
-`FileBookSource` adapter types are removed. `LoadFromSource` is removed. Use
-`LoadFromReader(io.Reader)` or `LoadFromBytes([]byte)` directly:
+Polyglot opening books moved from the root package to
+`github.com/corentings/chess/v3/polyglot`, and the names lost their `Polyglot`
+prefix. The `BookSource` adapters and `LoadFromSource` are gone; both loaders
+read the whole book into memory.
+
+| v2 | v3 |
+|---|---|
+| `chess.LoadFromSource(src)` / `chess.LoadFromReader(r)` | `polyglot.Load(r)` |
+| `chess.LoadFromBytes(data)` | `polyglot.LoadBytes(data)` |
+| `chess.NewPolyglotBookFromMap(m)` | `polyglot.NewBook(m)` |
+| `chess.PolyglotBook` | `polyglot.Book` |
+| `chess.PolyglotEntry` | `polyglot.Entry` |
+| `chess.PolyglotMove` | `polyglot.Move` |
+| `chess.MoveWithWeight` | `polyglot.WeightedMove` |
+| `chess.MoveToPolyglot(m)` | `polyglot.EncodeMove(m)` |
+| `chess.DecodeMove(code)` | `polyglot.DecodeMove(code)` |
+| `(*PolyglotBook).GetChessMoves(hash)` | `(*Book).Moves(hash)` |
+| `(*PolyglotBook).GetRandomMove(hash)` | `(*Book).RandomMove(hash)` |
+| `(*PolyglotBook).ToMoveMap()` | `(*Book).WeightedMoves()` |
+| `PieceType.ToPolyglotPromotionValue()` | _(removed)_ |
+
+Books are keyed by `Position.ZobristHash()`, which is the Polyglot key:
 
 ```go
-// v2
-book, err := chess.LoadFromSource(chess.NewBytesBookSource(data))
-
-// v3
-book, err := chess.LoadFromBytes(data)
+book, err := polyglot.Load(f)
+if err != nil { /* ... */ }
+moves, err := book.Moves(game.Position().ZobristHash())
 ```
-
-Both entry points read into memory; there is no streaming loader. Add one when
-a caller needs it.

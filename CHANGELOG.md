@@ -23,6 +23,10 @@ All notable changes to this project will be documented in this file. See [conven
   its 33 constants (`EOF`, `SQUARE`, `CHECKMATE`, `NullMove`, ...) are no
   longer exported. `ParserError` keeps `Message`, `TokenValue` and
   `Position`; its `TokenType` field is now unexported.
+- move Polyglot opening books to the new `polyglot` package: `polyglot.Book`,
+  `Load`, `LoadBytes`, `NewBook`, `Entry`, `Move`, `WeightedMove`,
+  `EncodeMove`, `DecodeMove`; `ChessMoves` becomes `Moves` and `ToMoveMap`
+  becomes `WeightedMoves`. `PieceType.ToPolyglotPromotionValue` is removed.
 
 ## v2.6.0 - 2026-08-17
 #### Features
