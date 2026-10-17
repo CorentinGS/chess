@@ -118,3 +118,89 @@ func TestRegressionIssue34_UCINotationDecodeTagsCastle(t *testing.T) {
 		})
 	}
 }
+
+// #104: Inside a variation, alternatives to the variation's next move were
+// written twice, once before that move with the wrong move number, so
+// String() produced PGN that could not be re-parsed.
+// https://github.com/CorentinGS/chess/issues/104
+func TestRegressionIssue104_NestedVariationRoundTrip(t *testing.T) {
+	tests := []struct {
+		name     string
+		movetext string
+	}{
+		{"alternative to second move of variation", "1. e4 (1. d4 d5 (1... Nf6) 2. c4) 1... e5 *"},
+		{"alternative to second move, deeper", "1. e4 e5 2. Nf3 (2. Nc3 Nf6 (2... Nc6 3. Bc4) 3. f4) 2... Nc6 *"},
+		{"nested at depth two", "1. e4 (1. d4 d5 (1... Nf6 2. c4 (2. Nf3 g6 (2... e6) 3. g3)) 2. c4) 1... e5 *"},
+		{"multiple alternatives", "1. e4 (1. d4 d5 (1... Nf6) (1... f5) 2. c4) 1... e5 *"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := "[Event \"x\"]\n\n" + tt.movetext + "\n"
+			game, err := chess.ParsePGN(strings.NewReader(in))
+			if err != nil {
+				t.Fatalf("parse input: %v", err)
+			}
+
+			out := game.String()
+			gotMovetext := strings.TrimSpace(out[strings.LastIndex(out, "\n\n")+2:])
+			if gotMovetext != tt.movetext {
+				t.Errorf("movetext not preserved\nwant: %s\ngot:  %s", tt.movetext, gotMovetext)
+			}
+
+			if _, err := chess.ParsePGN(strings.NewReader(out)); err != nil {
+				t.Errorf("re-parse output: %v\noutput: %s", err, out)
+			}
+		})
+	}
+}
+
+// #104: The issue's reproducer. A study with comments and nested variations,
+// annotated with SetCommand, must still expand to every variation after a
+// String() round trip.
+// https://github.com/CorentinGS/chess/issues/104
+func TestRegressionIssue104_AnnotatedVariationsRoundTripExpanded(t *testing.T) {
+	const pgn = `[Event "Test"]
+[Site "?"]
+[Date "2024.01.01"]
+[Round "?"]
+[White "White"]
+[Black "Black"]
+[Result "*"]
+
+1. e4 {Best by test.} c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. g3 {A quiet line.} (6. Be3 {Active.} e5 (6... e6) 7. Nf3 (7. Nb3 Be6 8. f3 {English Attack.}) 7... Be7 8. Bc4 O-O 9. O-O Be6) 6... e5 (6... e6 7. Bg2 Be7 8. O-O Qc7 9. Be3 O-O) 7. Nde2 (7. Nb3 Be7 8. Bg2 (8. a4 Nc6) 8... O-O 9. O-O b5) (7. Nf3 Be7 8. Bg2 O-O 9. O-O b5) (7. Nf5 d5) 7... Be7 8. Bg2 (8. a4 Nc6) 8... O-O 9. O-O b5 10. Nd5 Nbd7 11. Nec3 Nb6 *
+`
+
+	countExpanded := func(pgn string) int {
+		n := 0
+		for _, err := range chess.PGNGames(strings.NewReader(pgn), chess.WithPGNExpandVariations()) {
+			if err != nil {
+				t.Fatalf("parse expanded game %d: %v\n%s", n+1, err, pgn)
+			}
+			n++
+		}
+		return n
+	}
+
+	want := countExpanded(pgn)
+	if want != 10 {
+		t.Fatalf("input expands to %d games, want 10", want)
+	}
+
+	game, err := chess.ParsePGN(strings.NewReader(pgn))
+	if err != nil {
+		t.Fatalf("parse input: %v", err)
+	}
+	var annotate func(n *chess.MoveNode)
+	annotate = func(n *chess.MoveNode) {
+		n.SetCommand("eval", "0.25")
+		for _, child := range n.Children() {
+			annotate(child)
+		}
+	}
+	annotate(game.MoveTree().Root())
+
+	if got := countExpanded(game.String()); got != want {
+		t.Errorf("round trip expands to %d games, want %d", got, want)
+	}
+}
