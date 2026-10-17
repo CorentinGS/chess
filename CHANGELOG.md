@@ -63,6 +63,7 @@ All notable changes to this project will be documented in this file. See [conven
   already provides.
 - `MoveNode.SetComment` replaces the comment text but keeps commands such as
   `[%clk]`; it used to delete them.
+- remove `PieceType.Bytes`; `PieceType.String` gives the same letter.
 - make the lexer diagnostics internal: `PGNError` and the
   `ErrUnterminatedComment`, `ErrUnterminatedQuote`, `ErrInvalidCommand`,
   `ErrInvalidPiece`, `ErrInvalidSquare`, `ErrInvalidRank` constructors never

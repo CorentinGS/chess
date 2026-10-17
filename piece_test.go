@@ -1,7 +1,6 @@
 package chess_test
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
@@ -33,31 +32,6 @@ func TestPieceType_FENString(t *testing.T) {
 	}
 }
 
-func TestPieceType_Bytes(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		pt   chess.PieceType
-		want []byte
-	}{
-		{"king", chess.King, []byte{'k'}},
-		{"queen", chess.Queen, []byte{'q'}},
-		{"rook", chess.Rook, []byte{'r'}},
-		{"bishop", chess.Bishop, []byte{'b'}},
-		{"knight", chess.Knight, []byte{'n'}},
-		{"pawn", chess.Pawn, []byte{'p'}},
-		{"none", chess.NoPieceType, []byte{}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if !bytes.Equal(tt.pt.Bytes(), tt.want) {
-				t.Errorf("Bytes() = %v, want %v", tt.pt.Bytes(), tt.want)
-			}
-		})
-	}
-}
-
 func TestPieceType_StringRoundTrip(t *testing.T) {
 	t.Parallel()
 	for _, pt := range chess.PieceTypes() {
@@ -66,8 +40,8 @@ func TestPieceType_StringRoundTrip(t *testing.T) {
 			if got, err := chess.ParsePieceType(pt.String()); err != nil || got != pt {
 				t.Errorf("ParsePieceType(%q) = %v, %v, want %v, nil", pt.String(), got, err, pt)
 			}
-			if got, err := chess.ParsePieceTypeFromByte(pt.Bytes()[0]); err != nil || got != pt {
-				t.Errorf("ParsePieceTypeFromByte(%q) = %v, %v, want %v, nil", pt.Bytes(), got, err, pt)
+			if got, err := chess.ParsePieceTypeFromByte(pt.String()[0]); err != nil || got != pt {
+				t.Errorf("ParsePieceTypeFromByte(%q) = %v, %v, want %v, nil", pt.String(), got, err, pt)
 			}
 		})
 	}

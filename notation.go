@@ -141,7 +141,7 @@ func (uciNotation) Encode(pos *Position, m Move) string {
 	sb.WriteByte(toBytes[0])
 	sb.WriteByte(toBytes[1])
 	if m.Promotion() != NoPieceType {
-		sb.Write(m.Promotion().Bytes())
+		sb.WriteString(m.Promotion().String())
 	}
 
 	return sb.String()

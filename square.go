@@ -24,6 +24,7 @@ func (sq Square) String() string {
 	return sq.File().String() + sq.Rank().String()
 }
 
+// Bytes returns the square's name as two bytes, for example {'e', '4'}.
 func (sq Square) Bytes() [2]byte {
 	return [2]byte{sq.File().Byte(), sq.Rank().Byte()}
 }
@@ -131,6 +132,7 @@ func (r Rank) String() string {
 	return rankChars[r : r+1] // r+1 is exclusive
 }
 
+// Byte returns the rank's digit, '1' to '8'.
 func (r Rank) Byte() byte {
 	return rankChars[r]
 }
@@ -153,6 +155,7 @@ func (f File) String() string {
 	return fileChars[f : f+1]
 }
 
+// Byte returns the file's letter, 'a' to 'h'.
 func (f File) Byte() byte {
 	return fileChars[f]
 }

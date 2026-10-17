@@ -223,6 +223,7 @@ listed:
 | `Position.Status()` | `Position.Method()`, like `Game.Method()` |
 | `Game.SetOutcomeMethod(OutcomeMethodPair{o, m})` | `Game.SetOutcome(o, m)` |
 | `ValidateSAN(s)` | `SAN().ValidateSyntax(s)` |
+| `PieceType.Bytes()` | `PieceType.String()` |
 | `DecodePGNGamesParallel` | `PGNGamesParallel` |
 | `tree.MainChild(n)`, `tree.Variations(n)`, `tree.Continuations(n)` | `n.MainChild()`, `n.Variations()`, `n.Children()` |
 | `MoveNode.SetComment` dropped `[%cmd]` commands | it keeps them; `SetCommentBlocks` replaces everything |
