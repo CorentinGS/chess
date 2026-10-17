@@ -113,11 +113,11 @@ func (e *Engine) Eval() int {
 }
 
 // Run executes the given commands in order, returning the first error
-// encountered. Commands that require exclusive access (LockRequired) are
-// serialized via the engine's mutex.
+// encountered. Commands are serialized on the engine, except stop, ponderhit
+// and setoption, which may be sent while a search is running.
 func (e *Engine) Run(cmds ...Cmd) error {
 	for _, cmd := range cmds {
-		if !cmd.LockRequired() {
+		if u, ok := cmd.(unlockedCmd); ok && !u.lockRequired() {
 			if err := e.processCommand(cmd); err != nil {
 				return err
 			}
@@ -178,7 +178,10 @@ func (e *Engine) processCommand(cmd Cmd) error {
 		e.position = posCmd
 		e.hasPos = true
 	}
-	return cmd.Handle(lines, e)
+	if h, ok := cmd.(responseHandler); ok {
+		return h.handle(lines, e)
+	}
+	return nil
 }
 
 // ensureChess960 keeps the engine's UCI_Chess960 option aligned with the

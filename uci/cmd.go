@@ -11,15 +11,27 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-// Cmd represents a command sent to a UCI engine. Each implementation defines
-// how the command is serialized (String), when the engine's response is
-// complete (IsDone), how to process the response (Handle), and whether the
-// command requires exclusive access to the engine (LockRequired).
+// Cmd is a command sent to a UCI engine. String returns the line written to
+// the engine; IsDone reports whether a response line completes the command
+// (IsDone("") reports a command that expects no response). Adapters rely on
+// both. Any type with these two methods can be passed to Engine.Run, for
+// example a raw "debug on" command; the built-in commands also parse the
+// engine's response into the Engine.
 type Cmd interface {
 	fmt.Stringer
 	IsDone(line string) bool
-	Handle(lines []string, e *Engine) error
-	LockRequired() bool
+}
+
+// responseHandler is implemented by built-in commands that read the engine's
+// response into the Engine.
+type responseHandler interface {
+	handle(lines []string, e *Engine) error
+}
+
+// unlockedCmd is implemented by built-in commands that may run while another
+// command holds the engine, such as stop and ponderhit.
+type unlockedCmd interface {
+	lockRequired() bool
 }
 
 // CmdUCI sends the "uci" command and waits for the "uciok" response. The engine
@@ -30,9 +42,7 @@ func (CmdUCI) String() string { return "uci" }
 
 func (CmdUCI) IsDone(line string) bool { return line == "uciok" }
 
-func (CmdUCI) LockRequired() bool { return true }
-
-func (CmdUCI) Handle(lines []string, e *Engine) error {
+func (CmdUCI) handle(lines []string, e *Engine) error {
 	e.id = map[string]string{}
 	e.options = map[string]Option{}
 	for _, text := range lines {
@@ -67,10 +77,6 @@ func (CmdIsReady) String() string { return "isready" }
 
 func (CmdIsReady) IsDone(line string) bool { return line == "readyok" }
 
-func (CmdIsReady) LockRequired() bool { return true }
-
-func (CmdIsReady) Handle(_ []string, _ *Engine) error { return nil }
-
 // CmdUCINewGame sends the "ucinewgame" command, signaling the engine to clear
 // any state from previous games (e.g. hash tables).
 type CmdUCINewGame struct{}
@@ -78,10 +84,6 @@ type CmdUCINewGame struct{}
 func (CmdUCINewGame) String() string { return "ucinewgame" }
 
 func (CmdUCINewGame) IsDone(_ string) bool { return true }
-
-func (CmdUCINewGame) LockRequired() bool { return true }
-
-func (CmdUCINewGame) Handle(_ []string, _ *Engine) error { return nil }
 
 // CmdPonderHit sends the "ponderhit" command, informing the engine that the
 // opponent has played the move it was pondering.
@@ -91,9 +93,7 @@ func (CmdPonderHit) String() string { return "ponderhit" }
 
 func (CmdPonderHit) IsDone(_ string) bool { return true }
 
-func (CmdPonderHit) LockRequired() bool { return false }
-
-func (CmdPonderHit) Handle(_ []string, _ *Engine) error { return nil }
+func (CmdPonderHit) lockRequired() bool { return false }
 
 // CmdStop sends the "stop" command, instructing the engine to stop calculating
 // and return the best move found so far.
@@ -103,9 +103,7 @@ func (CmdStop) String() string { return "stop" }
 
 func (CmdStop) IsDone(_ string) bool { return true }
 
-func (CmdStop) LockRequired() bool { return false }
-
-func (CmdStop) Handle(_ []string, _ *Engine) error { return nil }
+func (CmdStop) lockRequired() bool { return false }
 
 // CmdQuit sends the "quit" command, instructing the engine to exit.
 type CmdQuit struct{}
@@ -113,10 +111,6 @@ type CmdQuit struct{}
 func (CmdQuit) String() string { return "quit" }
 
 func (CmdQuit) IsDone(_ string) bool { return true }
-
-func (CmdQuit) LockRequired() bool { return true }
-
-func (CmdQuit) Handle(_ []string, _ *Engine) error { return nil }
 
 // CmdEval sends the "eval" command and parses the engine's static evaluation
 // output. Not all engines support this command.
@@ -131,9 +125,7 @@ func (CmdEval) IsDone(line string) bool {
 		strings.Contains(lower, "unknown command")
 }
 
-func (CmdEval) LockRequired() bool { return true }
-
-func (CmdEval) Handle(lines []string, e *Engine) error {
+func (CmdEval) handle(lines []string, e *Engine) error {
 	for _, text := range lines {
 		lower := strings.ToLower(text)
 		if strings.Contains(lower, "error") || strings.Contains(lower, "unknown command") {
@@ -167,9 +159,7 @@ func (cmd CmdSetOption) String() string {
 
 func (CmdSetOption) IsDone(_ string) bool { return true }
 
-func (CmdSetOption) LockRequired() bool { return false }
-
-func (CmdSetOption) Handle(_ []string, _ *Engine) error { return nil }
+func (CmdSetOption) lockRequired() bool { return false }
 
 // CmdPosition sends a "position" command to set the engine's current position,
 // optionally applying a sequence of moves from the starting position or a FEN.
@@ -214,10 +204,6 @@ func mustEncodeUCI(pos *chess.Position, m chess.Move) string {
 }
 
 func (CmdPosition) IsDone(_ string) bool { return true }
-
-func (CmdPosition) LockRequired() bool { return true }
-
-func (CmdPosition) Handle(_ []string, _ *Engine) error { return nil }
 
 // CmdGo sends a "go" command to start the engine's search. The fields control
 // search parameters such as time limits, depth, and node counts.
@@ -285,8 +271,6 @@ func (CmdGo) IsDone(line string) bool {
 	return strings.HasPrefix(line, "bestmove")
 }
 
-func (CmdGo) LockRequired() bool { return true }
-
 func parseBestMoveLine(text string, e *Engine) (chess.Move, chess.Move, error) {
 	const minParts = 2
 	const ponderPartIdx = 3
@@ -313,7 +297,7 @@ func parseBestMoveLine(text string, e *Engine) (chess.Move, chess.Move, error) {
 	return bestMove, ponderMove, nil
 }
 
-func (CmdGo) Handle(lines []string, e *Engine) error {
+func (CmdGo) handle(lines []string, e *Engine) error {
 	results := SearchResults{MultiPVInfo: make([]Info, 1)}
 	for _, text := range lines {
 		if strings.HasPrefix(text, "bestmove") {

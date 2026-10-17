@@ -217,6 +217,7 @@ listed:
 | `func(*Game)` options | `GameOption` (`FEN`, `Ignore*Draw` return it) |
 | `func(*Engine)` options, `uci.Debug` | `uci.EngineOption`, `uci.Debug()` |
 | `Engine.Getpid()` | `Engine.Pid()` |
+| `uci.Cmd` with `Handle` and `LockRequired` | `uci.Cmd` is `String()` + `IsDone(line)`; custom commands need only those |
 | `Position.Ply()` (1 at the start) | `Position.Ply()` (0 at the start, like `MoveNode.Ply()`) |
 | _(none)_ | `Position.FullMoveNumber()` |
 | `Move.S1()`, `Move.S2()`, `Move.Promo()` | `Move.From()`, `Move.To()`, `Move.Promotion()` |

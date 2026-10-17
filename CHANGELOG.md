@@ -67,6 +67,8 @@ All notable changes to this project will be documented in this file. See [conven
 - name the `MoveTree` cursor moves consistently: `Forward(i)` becomes
   `GoToChild(i)`, `Goto` becomes `GoTo`, `Reset` becomes `GoToStart`;
   `NavigateToMainLine` is removed and `GoToEnd` is added.
+- `uci.Cmd` is reduced to `String` and `IsDone`, so any such type can be
+  run (e.g. a raw `debug on`); `Handle` and `LockRequired` are internal.
 - make the lexer diagnostics internal: `PGNError` and the
   `ErrUnterminatedComment`, `ErrUnterminatedQuote`, `ErrInvalidCommand`,
   `ErrInvalidPiece`, `ErrInvalidSquare`, `ErrInvalidRank` constructors never

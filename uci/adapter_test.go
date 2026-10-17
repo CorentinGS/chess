@@ -41,10 +41,8 @@ func Test_FakeAdapter_ExchangeEmptyCommand(t *testing.T) {
 
 type fakeEmptyCmd struct{}
 
-func (fakeEmptyCmd) String() string                         { return "" }
-func (fakeEmptyCmd) IsDone(_ string) bool                   { return false }
-func (fakeEmptyCmd) LockRequired() bool                     { return false }
-func (fakeEmptyCmd) Handle(_ []string, _ *uci.Engine) error { return nil }
+func (fakeEmptyCmd) String() string       { return "" }
+func (fakeEmptyCmd) IsDone(_ string) bool { return false }
 
 func Test_InfoUnmarshalText_WDLBounds(t *testing.T) {
 	tests := []struct {
@@ -574,4 +572,19 @@ func Test_CmdGo_MalformedInfoLineLoggedUnderDebug(t *testing.T) {
 			t.Errorf("expected no logging without debug, got %q", buf.String())
 		}
 	})
+}
+
+// rawCmd is a user-defined command: any type with String and IsDone works.
+type rawCmd string
+
+func (c rawCmd) String() string        { return string(c) }
+func (rawCmd) IsDone(line string) bool { return true }
+
+func Test_CustomCmdRuns(t *testing.T) {
+	fake := &fakeAdapter{Responses: map[string][]string{}}
+	eng := uci.NewWithAdapter(fake)
+	defer eng.Close()
+	if err := eng.Run(rawCmd("debug on"), uci.CmdIsReady{}); err != nil {
+		t.Fatalf("Run(custom command): %v", err)
+	}
 }
