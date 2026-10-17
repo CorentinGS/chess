@@ -6,8 +6,7 @@ The API has three layers. Pick the lowest one that does what you need.
 # Game: a played game with history
 
 A Game owns a move tree (main line plus variations), PGN tags and the outcome.
-Its move methods check legality, refuse moves once the game is over and
-update the outcome after every move.
+Its move methods check legality and keep the outcome up to date.
 
 	game := chess.NewGame()
 	if _, err := game.MoveText("e4", chess.SAN(), nil); err != nil {
@@ -19,8 +18,14 @@ update the outcome after every move.
 	fmt.Println(game.Outcome(), game.Method())
 	fmt.Println(game.String()) // PGN
 
-Start from another position with the FEN option, and navigate or edit
-variations through Game.MoveTree.
+Start from another position with the FEN option. Game.MoveTree holds the
+main line and its variations, plus a cursor that is the game's current
+position: GoBack, GoForward, GoTo, GoToStart and GoToEnd move it, and
+Game.Position, Game.LegalMoves and the move methods act on it. A move played
+from the end of the main line extends it; a move played anywhere else adds
+a variation. The outcome belongs to the main line, so variations never
+change it and a finished game only refuses moves at the end of its main
+line.
 
 Game values are mutable and not safe for concurrent use; callers sharing a
 Game between goroutines must synchronize.
@@ -42,8 +47,21 @@ receiver for tight loops.
 	}
 	fmt.Println(pos.Perft(3), pos.ZobristHash())
 
+Which move list to use:
+
+  - LegalMoves: a copy you may keep or modify; tags include Check.
+  - LegalMovesSeq: the same moves without allocating, for loops.
+  - LegalMovesFast: the same moves without the Check tag, the cheapest when
+    you only need to replay or index moves.
+  - PseudoLegalMoves: every move by piece movement, including those that
+    leave the king in check; filter with IsLegal.
+  - IsLegal: check one move, such as one built with NewMove.
+
 Moves carry tags (Capture, Check, KingSideCastle, ...) derived from the
-position. Build positions from scratch with Setup and NewPosition.
+position. Update and ApplyInPlace accept a move built with NewMove; only
+Chess960 castling must come from LegalMoves or a MoveTextCodec. Build
+positions from scratch with Setup and NewPosition, and read one back with
+Position.Setup.
 
 # Board and Bitboard: piece placement
 
