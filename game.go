@@ -545,7 +545,13 @@ func writeMoves(node *Move, moveNum int, isWhite bool, sb *strings.Builder,
 	}
 	// Process any variations (children beyond the first).
 	// In PGN, variations are enclosed in parentheses.
-	closedVar := writeVariations(node, moveNum, isWhite, sb)
+	// In a sub-variation node is currentMove itself: its siblings were already
+	// written by the caller, and its children are alternatives to the next
+	// move, which the recursive call below writes.
+	closedVar := false
+	if !subVariation {
+		closedVar = writeVariations(node, moveNum, isWhite, sb)
+	}
 
 	if len(currentMove.children) > 0 {
 		var nextMoveNum int
