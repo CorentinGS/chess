@@ -58,17 +58,17 @@ func NewBoard(m map[Square]Piece) *Board {
 	for sq := range numOfSquaresInBoard {
 		b.mailbox[sq] = NoPiece
 	}
-	for _, p1 := range allPieces {
-		var bb uint64
-		for sq := range numOfSquaresInBoard {
-			bb <<= 1
-			if p2, exists := m[Square(sq)]; exists && p1 == p2 {
-				bb |= 1
-				b.mailbox[sq] = p1
-			}
+	var bbs [len(allPieces) + 1]bitboard // indexed by Piece; 0 is NoPiece
+	for sq, p := range m {
+		if sq < A1 || sq > H8 || p <= NoPiece || int(p) > len(allPieces) {
+			continue
 		}
+		bbs[p] |= bitboard(uint64(1) << (63 - uint(sq))) // not bbForSquare: NewBoard runs during package init
+		b.mailbox[sq] = p
+	}
+	for _, p := range allPieces {
 		// allPieces holds only valid pieces, so setBBForPiece cannot fail.
-		_ = b.setBBForPiece(p1, bitboard(bb))
+		_ = b.setBBForPiece(p, bbs[p])
 	}
 	b.calcConvenienceBBs(nil)
 	return b

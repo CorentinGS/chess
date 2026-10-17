@@ -69,12 +69,18 @@ All notable changes to this project will be documented in this file. See [conven
   `NavigateToMainLine` is removed and `GoToEnd` is added.
 - `uci.Cmd` is reduced to `String` and `IsDone`, so any such type can be
   run (e.g. a raw `debug on`); `Handle` and `LockRequired` are internal.
+- remove `HashFromFEN`; use `ParseFEN(fen)` and `ZobristHash()`, which also
+  validates the position.
 - make the lexer diagnostics internal: `PGNError` and the
   `ErrUnterminatedComment`, `ErrUnterminatedQuote`, `ErrInvalidCommand`,
   `ErrInvalidPiece`, `ErrInvalidSquare`, `ErrInvalidRank` constructors never
   reached callers.
 - `Position.Ply()` now counts half-moves played (0 at the start, 1 after
   1.e4), matching `MoveNode.Ply()`; it used to be one higher.
+
+#### Performance
+- `NewBoard` reads its map once instead of once per piece kind, making
+  `ParseFEN` about 6x faster (15 µs to 2.6 µs on the starting position).
 
 #### Fixes
 - a finished game accepts moves played from an earlier node: they become
