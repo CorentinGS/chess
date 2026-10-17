@@ -954,10 +954,12 @@ Useful APIs over the tree:
 - `MoveNode.Variations() []*MoveNode` — sideline continuations.
 - `MoveTree.AddVariation(parent *MoveNode, move Move) (*MoveNode, error)` —
   validate and append a sideline.
-- `MoveTree.GoBack()`, `MoveTree.GoForward()`, and
-  `MoveTree.NavigateToMainLine()` — move the active cursor without changing
-  game outcome metadata.
-- `node.Move()`, `node.Position()`, `node.Comments()`, `node.NAG()`,
+- `MoveTree.GoForward()`, `GoBack()`, `GoToChild(i)`, `GoTo(node)`,
+  `GoToStart()`, `GoToEnd()` — move the cursor. The cursor *is* the game's
+  current position: `Game.Position()`, `Game.LegalMoves()` and the move
+  methods all act on it. Moves played away from the end of the main line add
+  variations; the game's outcome belongs to the main line.
+- `node.Move()`, `node.Position()`, `node.Comments()`, `node.NAGs()`,
   `node.Children()`, and `node.Parent()` — per-node data.
 
 Perft does not store its results in the game tree; it walks a temporary move

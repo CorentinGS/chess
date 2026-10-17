@@ -226,6 +226,8 @@ listed:
 | `PieceType.Bytes()` | `PieceType.String()` |
 | `DecodePGNGamesParallel` | `PGNGamesParallel` |
 | `tree.MainChild(n)`, `tree.Variations(n)`, `tree.Continuations(n)` | `n.MainChild()`, `n.Variations()`, `n.Children()` |
+| `tree.Forward(i)`, `tree.Goto(n)`, `tree.Reset()` | `tree.GoToChild(i)`, `tree.GoTo(n)`, `tree.GoToStart()` |
+| `tree.NavigateToMainLine()` | `tree.GoToStart(); tree.GoForward()`; new `tree.GoToEnd()` |
 | `MoveNode.SetComment` dropped `[%cmd]` commands | it keeps them; `SetCommentBlocks` replaces everything |
 | _(none)_ | `Position.Setup()`, to edit a position and rebuild it with `NewPosition` |
 | `Setup.FullMoveNo` | `Setup.FullMoveNumber` |
@@ -320,7 +322,7 @@ removed. Navigate the tree directly:
 
 ```go
 t := game.MoveTree()
-t.Reset()
+t.GoToStart()
 for t.GoForward() {
     // … reads via t.Peek() (zero-copy alias — MUST NOT mutate)
     // or via game.Position() / node.Position() (defensive copies)

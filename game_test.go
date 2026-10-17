@@ -411,45 +411,45 @@ func TestAddVariationWithNilParent(t *testing.T) {
 	}
 }
 
-func TestNavigateToMainLineFromLeaf(t *testing.T) {
+func TestGoToEndFromStart(t *testing.T) {
 	g := NewGame()
-	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
-	for _, m := range moves {
+	for _, m := range []string{"e4", "e5", "Nf3", "Nc6", "Bb5"} {
 		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	g.MoveTree().NavigateToMainLine()
-	if g.MoveTree().Current() != g.MoveTree().Root().children[0] {
-		t.Fatalf("expected to navigate to main line root move")
+	want := g.FEN()
+	g.MoveTree().GoToStart()
+	g.MoveTree().GoToEnd()
+	if g.FEN() != want || !g.IsAtEnd() {
+		t.Fatalf("GoToEnd: FEN = %s, want %s", g.FEN(), want)
 	}
 }
 
-func TestNavigateToMainLineFromVariation(t *testing.T) {
+func TestGoToEndFromVariation(t *testing.T) {
 	g := NewGame()
-	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
-	for _, m := range moves {
+	for _, m := range []string{"e4", "e5", "Nf3", "Nc6", "Bb5"} {
 		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	variationMove := Move{s1: A7, s2: A6}
-	variationNode, err := g.MoveTree().AddVariation(g.MoveTree().Current(), variationMove)
+	end := g.MoveTree().Current()
+	variationNode, err := g.MoveTree().AddVariation(end.Parent(), Move{s1: F1, s2: C4})
 	if err != nil {
 		t.Fatal(err)
 	}
 	g.tree.setCurrent(variationNode)
-	g.MoveTree().NavigateToMainLine()
-	if g.MoveTree().Current() != g.MoveTree().Root().children[0] {
-		t.Fatalf("expected to navigate to main line root move")
+	g.MoveTree().GoToEnd()
+	if g.MoveTree().Current() != end {
+		t.Fatalf("GoToEnd from a variation should land on the main-line end")
 	}
 }
 
-func TestNavigateToMainLineFromRoot(t *testing.T) {
+func TestGoToEndOnEmptyGame(t *testing.T) {
 	g := NewGame()
-	g.MoveTree().NavigateToMainLine()
+	g.MoveTree().GoToEnd()
 	if g.MoveTree().Current() != g.MoveTree().Root() {
-		t.Fatalf("expected to stay at root move")
+		t.Fatalf("expected to stay at root")
 	}
 }
 

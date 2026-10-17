@@ -154,7 +154,7 @@ func (t *MoveTree) AddVariation(parent *MoveNode, move Move) (*MoveNode, error) 
 	// arbitrary node, not the cursor's current node, so we navigate. Save
 	// and restore the cursor so the caller's active position is unchanged.
 	defer t.setCurrent(t.current)
-	if !t.Goto(parent) {
+	if !t.GoTo(parent) {
 		return nil, errors.New("chess: variation parent is not reachable from cursor")
 	}
 	if t.pos == nil {
@@ -217,16 +217,13 @@ func (t *MoveTree) GoForward() bool {
 	return true
 }
 
-// NavigateToMainLine moves the active cursor to the first main-line move.
-func (t *MoveTree) NavigateToMainLine() {
+// GoToEnd moves the cursor to the last move of the main line, where play
+// continues. Safe to call on a nil tree.
+func (t *MoveTree) GoToEnd() {
 	if t == nil || t.root == nil {
 		return
 	}
-	t.resetCursor()
-	if len(t.root.children) == 0 {
-		return
-	}
-	t.GoForward()
+	t.setCurrent(t.mainLineEnd())
 }
 
 // Peek returns the live [Position] at the tree's active cursor without copying.
@@ -248,11 +245,11 @@ func (t *MoveTree) Peek() *Position {
 	return t.pos
 }
 
-// Forward advances the cursor to the idx-th child of the current node.
-// Forward(0) is equivalent to [MoveTree.GoForward] (main-line continuation).
+// GoToChild advances the cursor to the idx-th child of the current node.
+// GoToChild(0) is equivalent to [MoveTree.GoForward] (main-line continuation).
 // Returns true on success; false if t is nil, the current node has no
 // children, or idx is out of range.
-func (t *MoveTree) Forward(idx int) bool {
+func (t *MoveTree) GoToChild(idx int) bool {
 	if t == nil || t.current == nil {
 		return false
 	}
@@ -265,11 +262,11 @@ func (t *MoveTree) Forward(idx int) bool {
 	return true
 }
 
-// Goto jumps the cursor to the given node. Returns true if the cursor moved.
+// GoTo jumps the cursor to the given node. Returns true if the cursor moved.
 // Returns false if t is nil, node is nil, or node belongs to a different tree.
-// Goto uses the same fast paths as internal cursor navigation: direct child,
+// GoTo uses the same fast paths as internal cursor navigation: direct child,
 // LCA walk, and full replay-from-root (see [MoveTree.setCurrent]).
-func (t *MoveTree) Goto(node *MoveNode) bool {
+func (t *MoveTree) GoTo(node *MoveNode) bool {
 	if t == nil || node == nil {
 		return false
 	}
@@ -280,9 +277,9 @@ func (t *MoveTree) Goto(node *MoveNode) bool {
 	return true
 }
 
-// Reset returns the cursor to the synthetic root, restoring the starting
+// GoToStart returns the cursor to the synthetic root, restoring the starting
 // position. Safe to call on a nil tree.
-func (t *MoveTree) Reset() {
+func (t *MoveTree) GoToStart() {
 	if t == nil {
 		return
 	}

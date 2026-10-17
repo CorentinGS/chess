@@ -228,7 +228,7 @@ func (g *Game) Positions() []*Position {
 		return []*Position{}
 	}
 	defer g.tree.setCurrent(g.tree.Current())
-	g.tree.Reset()
+	g.tree.GoToStart()
 	positions := make([]*Position, 0, len(root.children)+1)
 	if pos := g.tree.Peek(); pos != nil {
 		positions = append(positions, pos.copy())
@@ -247,7 +247,7 @@ func (g *Game) numOfRepetitions() int {
 	// numOfRepetitions walks the cursor through the main line; save and
 	// restore so callers see an unchanged active position.
 	defer g.tree.setCurrent(g.tree.Current())
-	g.tree.Reset()
+	g.tree.GoToStart()
 	for {
 		if g.tree.pos != nil && target.SamePosition(g.tree.pos) {
 			count++

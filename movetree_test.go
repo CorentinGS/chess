@@ -32,7 +32,7 @@ func TestMoveTreePeekReturnsStartingPosition(t *testing.T) {
 
 func TestMoveTreeGoForwardAdvances(t *testing.T) {
 	g := newMoveTreeTestGame()
-	g.tree.Reset()
+	g.tree.GoToStart()
 	if !g.tree.GoForward() {
 		t.Fatal("GoForward from root failed")
 	}
@@ -76,15 +76,15 @@ func TestMoveTreeForwardIndex(t *testing.T) {
 	cc := &MoveNode{move: *mustSAN(StartingPosition(), "Nf3"), parent: root}
 	root.children = []*MoveNode{a, b, cc}
 
-	g.tree.Reset()
+	g.tree.GoToStart()
 
-	if g.tree.Forward(3) {
+	if g.tree.GoToChild(3) {
 		t.Fatal("Forward(3) should fail (out of range)")
 	}
-	if g.tree.Forward(-1) {
+	if g.tree.GoToChild(-1) {
 		t.Fatal("Forward(-1) should fail")
 	}
-	if !g.tree.Forward(1) {
+	if !g.tree.GoToChild(1) {
 		t.Fatal("Forward(1) failed")
 	}
 	want := StartingPosition().Update(b.move).String()
@@ -97,8 +97,8 @@ func TestMoveTreeGotoDeepDescendant(t *testing.T) {
 	g := newMoveTreeTestGame()
 	leaf := g.tree.Current()
 	want := g.tree.pos.String()
-	g.tree.Reset()
-	if !g.tree.Goto(leaf) {
+	g.tree.GoToStart()
+	if !g.tree.GoTo(leaf) {
 		t.Fatal("Goto failed")
 	}
 	if got := g.tree.Peek().String(); got != want {
@@ -108,7 +108,7 @@ func TestMoveTreeGotoDeepDescendant(t *testing.T) {
 
 func TestMoveTreeResetReturnsToRoot(t *testing.T) {
 	g := newMoveTreeTestGame()
-	g.tree.Reset()
+	g.tree.GoToStart()
 	if got := g.tree.Peek().String(); got != StartingPosition().String() {
 		t.Fatalf("after Reset, Peek = %q, want starting position", got)
 	}
@@ -116,7 +116,7 @@ func TestMoveTreeResetReturnsToRoot(t *testing.T) {
 
 func TestMoveTreePeekIsLive(t *testing.T) {
 	g := newMoveTreeTestGame()
-	g.tree.Reset()
+	g.tree.GoToStart()
 	peeked := g.tree.Peek()
 	if peeked != g.tree.Peek() {
 		t.Fatal("Peek should alias the same pointer across reads with no nav")
@@ -131,7 +131,7 @@ func TestMoveTreeGotoCurrentIsNoop(t *testing.T) {
 	g := newMoveTreeTestGame()
 	leaf := g.tree.Current()
 	beforeUndos := len(g.tree.undos)
-	if !g.tree.Goto(leaf) {
+	if !g.tree.GoTo(leaf) {
 		t.Fatal("Goto(current) should succeed")
 	}
 	if len(g.tree.undos) != beforeUndos {
@@ -141,8 +141,8 @@ func TestMoveTreeGotoCurrentIsNoop(t *testing.T) {
 
 func TestMoveTreeGotoRootViaLCA(t *testing.T) {
 	g := newMoveTreeTestGame()
-	g.tree.Reset()
-	if !g.tree.Goto(g.tree.Root()) {
+	g.tree.GoToStart()
+	if !g.tree.GoTo(g.tree.Root()) {
 		t.Fatal("Goto(root) failed")
 	}
 	if len(g.tree.undos) != 0 {
@@ -181,14 +181,14 @@ func TestMoveTreeGotoSiblingSubtree(t *testing.T) {
 	aLeaf := buildSubtree([]string{"e4", "c5", "Nf3"})
 	bLeaf := buildSubtree([]string{"d4", "Nc6"})
 
-	if !g.tree.Goto(aLeaf) {
+	if !g.tree.GoTo(aLeaf) {
 		t.Fatal("Goto(aLeaf) failed")
 	}
 	if len(g.tree.undos) != 3 {
 		t.Fatalf("Goto(aLeaf) undos = %d, want 3", len(g.tree.undos))
 	}
 
-	if !g.tree.Goto(bLeaf) {
+	if !g.tree.GoTo(bLeaf) {
 		t.Fatal("Goto(bLeaf) failed")
 	}
 	if len(g.tree.undos) != 2 {
@@ -206,7 +206,7 @@ func TestMoveTreeGotoRejectsForeignTree(t *testing.T) {
 	foreignNode := g2.tree.Current()
 	before := g1.tree.Current()
 
-	if g1.tree.Goto(foreignNode) {
+	if g1.tree.GoTo(foreignNode) {
 		t.Fatal("Goto with foreign-tree node should return false")
 	}
 	if g1.tree.Current() != before {
@@ -219,16 +219,16 @@ func TestMoveTreeNilSafe(t *testing.T) {
 	if t1.Peek() != nil {
 		t.Fatal("Peek on nil tree should be nil")
 	}
-	if t1.Forward(0) {
+	if t1.GoToChild(0) {
 		t.Fatal("Forward on nil tree should be false")
 	}
-	if t1.Goto(nil) {
+	if t1.GoTo(nil) {
 		t.Fatal("Goto on nil tree should be false")
 	}
-	t1.Reset()
+	t1.GoToStart()
 
 	g := NewGame()
-	if g.tree.Goto(nil) {
+	if g.tree.GoTo(nil) {
 		t.Fatal("Goto(nil) on live tree should be false")
 	}
 }
