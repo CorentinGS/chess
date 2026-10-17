@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. See [conven
 - - -
 ## Unreleased
 
+## v2.6.1 - 2026-10-17
+#### Bug Fixes
+- stop writing alternatives to a variation's next move twice in PGN output, which produced PGN that could not be re-parsed (#104).
+
+- - -
+
 ## v2.6.0 - 2026-08-17
 #### Features
 - add `Board.AttacksFrom()` for piece attack-map queries (#126).
