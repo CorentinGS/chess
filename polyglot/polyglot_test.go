@@ -69,7 +69,7 @@ func TestLoadFromReader(t *testing.T) {
 	}
 }
 
-func TestFindMoves(t *testing.T) {
+func TestEntries(t *testing.T) {
 	book := &Book{
 		entries: []Entry{
 			{Key: 1, Move: 100, Weight: 10, Learn: 0},
@@ -109,12 +109,12 @@ func TestFindMoves(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := book.FindMoves(tt.hash)
+			got := book.Entries(tt.hash)
 			if len(got) != tt.wantLen {
-				t.Errorf("FindMoves() returned %v moves, want %v", len(got), tt.wantLen)
+				t.Errorf("Entries() returned %v moves, want %v", len(got), tt.wantLen)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("FindMoves() = %v, want %v", got, tt.want)
+				t.Errorf("Entries() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -124,12 +124,12 @@ func TestDecodeMove(t *testing.T) {
 	tests := []struct {
 		name string
 		move uint16
-		want Move
+		want RawMove
 	}{
 		{
 			name: "Regular move",
 			move: uint16((1 << 9) | (2 << 6) | (3 << 3) | 4), // from a2 to d3
-			want: Move{
+			want: RawMove{
 				FromFile: 2, FromRank: 1,
 				ToFile: 4, ToRank: 3,
 				Promotion: 0, CastlingMove: false,
@@ -138,7 +138,7 @@ func TestDecodeMove(t *testing.T) {
 		{
 			name: "Castling move white kingside",
 			move: uint16((4 << 6) | (0 << 9) | (7 << 0) | (0 << 3)), // e1h1
-			want: Move{
+			want: RawMove{
 				FromFile: 4, FromRank: 0,
 				ToFile: 7, ToRank: 0,
 				Promotion: 0, CastlingMove: true,
@@ -147,7 +147,7 @@ func TestDecodeMove(t *testing.T) {
 		{
 			name: "Promotion move",
 			move: uint16(((1 << 9) | (6 << 6) | (1 << 3) | 7) | (4 << 12)), // promotion to queen
-			want: Move{
+			want: RawMove{
 				FromFile: 6, FromRank: 1,
 				ToFile: 7, ToRank: 1,
 				Promotion: 4, CastlingMove: false,
@@ -232,12 +232,12 @@ func TestChessMoveToPolyglotTests(t *testing.T) {
 	tests := []struct {
 		name     string
 		move     chess.Move
-		expected Move
+		expected RawMove
 	}{
 		{
 			name: "Valid move",
 			move: chess.NewMove(chess.A1, chess.A2),
-			expected: Move{
+			expected: RawMove{
 				FromFile:     0,
 				FromRank:     0,
 				ToFile:       0,
@@ -249,7 +249,7 @@ func TestChessMoveToPolyglotTests(t *testing.T) {
 		{
 			name: "chess.Move with promotion",
 			move: chess.NewMove(chess.G7, chess.H8, chess.Queen),
-			expected: Move{
+			expected: RawMove{
 				FromFile:  6,
 				FromRank:  6,
 				ToFile:    7,
@@ -260,7 +260,7 @@ func TestChessMoveToPolyglotTests(t *testing.T) {
 		{
 			name: "Castling move",
 			move: chess.NewMove(chess.E1, chess.H1),
-			expected: Move{
+			expected: RawMove{
 				FromFile:     4,
 				FromRank:     0,
 				ToFile:       7,
@@ -285,12 +285,12 @@ func TestChessMoveToPolyglotTests(t *testing.T) {
 func TestPolyglotMoveEncode(t *testing.T) {
 	tests := []struct {
 		name     string
-		move     Move
+		move     RawMove
 		expected uint16
 	}{
 		{
 			name: "Valid move",
-			move: Move{
+			move: RawMove{
 				FromFile:     0,
 				FromRank:     0,
 				ToFile:       0,
@@ -302,7 +302,7 @@ func TestPolyglotMoveEncode(t *testing.T) {
 		},
 		{
 			name: "chess.Move with promotion",
-			move: Move{
+			move: RawMove{
 				FromFile:  6,
 				FromRank:  6,
 				ToFile:    7,
@@ -313,7 +313,7 @@ func TestPolyglotMoveEncode(t *testing.T) {
 		},
 		{
 			name: "Castling move",
-			move: Move{
+			move: RawMove{
 				FromFile:     4,
 				FromRank:     0,
 				ToFile:       7,
@@ -338,12 +338,12 @@ func TestPolyglotMoveEncode(t *testing.T) {
 func TestPolyglotMoveToMoveConversion(t *testing.T) {
 	tests := []struct {
 		name     string
-		polyMove Move
+		polyMove RawMove
 		expected chess.Move
 	}{
 		{
 			name: "Regular move",
-			polyMove: Move{
+			polyMove: RawMove{
 				FromFile: 0, FromRank: 0,
 				ToFile: 0, ToRank: 1,
 				Promotion: 0, CastlingMove: false,
@@ -352,7 +352,7 @@ func TestPolyglotMoveToMoveConversion(t *testing.T) {
 		},
 		{
 			name: "Promotion move",
-			polyMove: Move{
+			polyMove: RawMove{
 				FromFile: 6, FromRank: 6,
 				ToFile: 7, ToRank: 7,
 				Promotion: 4, CastlingMove: false,
@@ -361,7 +361,7 @@ func TestPolyglotMoveToMoveConversion(t *testing.T) {
 		},
 		{
 			name: "Castling move",
-			polyMove: Move{
+			polyMove: RawMove{
 				FromFile: 4, FromRank: 0,
 				ToFile: 7, ToRank: 0,
 				Promotion: 0, CastlingMove: true,
@@ -370,7 +370,7 @@ func TestPolyglotMoveToMoveConversion(t *testing.T) {
 		},
 		{
 			name: "Long castling move",
-			polyMove: Move{
+			polyMove: RawMove{
 				FromFile: 4, FromRank: 0,
 				ToFile: 0, ToRank: 0,
 				Promotion: 0, CastlingMove: true,
@@ -379,7 +379,7 @@ func TestPolyglotMoveToMoveConversion(t *testing.T) {
 		},
 		{
 			name: "Long castling move black",
-			polyMove: Move{
+			polyMove: RawMove{
 				FromFile: 4, FromRank: 7,
 				ToFile: 0, ToRank: 7,
 				Promotion: 0, CastlingMove: true,
@@ -388,7 +388,7 @@ func TestPolyglotMoveToMoveConversion(t *testing.T) {
 		},
 		{
 			name: "castling  move black",
-			polyMove: Move{
+			polyMove: RawMove{
 				FromFile: 4, FromRank: 7,
 				ToFile: 7, ToRank: 7,
 				Promotion: 0, CastlingMove: true,
@@ -399,7 +399,7 @@ func TestPolyglotMoveToMoveConversion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.polyMove.ToMove()
+			result := tt.polyMove.ChessMove()
 			if !reflect.DeepEqual(result, tt.expected) {
 				t.Fatalf("expected %v but got %v", tt.expected, result)
 			}

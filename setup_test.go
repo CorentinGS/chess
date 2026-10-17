@@ -29,7 +29,7 @@ func TestNewPositionRejectsInvalidSetups(t *testing.T) {
 			name: "missing white king",
 			setup: func() Setup {
 				b, _ := fenBoard("4k3/8/8/8/8/8/8/8")
-				return Setup{Board: *b, Turn: White, FullMoveNo: 1}
+				return Setup{Board: *b, Turn: White, FullMoveNumber: 1}
 			}(),
 			wantErr: "white king",
 		},
@@ -37,7 +37,7 @@ func TestNewPositionRejectsInvalidSetups(t *testing.T) {
 			name: "missing black king",
 			setup: func() Setup {
 				b, _ := fenBoard("8/8/8/8/8/8/8/4K3")
-				return Setup{Board: *b, Turn: White, FullMoveNo: 1}
+				return Setup{Board: *b, Turn: White, FullMoveNumber: 1}
 			}(),
 			wantErr: "black king",
 		},
@@ -45,7 +45,7 @@ func TestNewPositionRejectsInvalidSetups(t *testing.T) {
 			name: "pawn on first rank",
 			setup: func() Setup {
 				b, _ := fenBoard("4k3/8/8/8/8/8/8/P3K3")
-				return Setup{Board: *b, Turn: White, FullMoveNo: 1}
+				return Setup{Board: *b, Turn: White, FullMoveNumber: 1}
 			}(),
 			wantErr: "pawn on a1",
 		},
@@ -53,7 +53,7 @@ func TestNewPositionRejectsInvalidSetups(t *testing.T) {
 			name: "pawn on eighth rank",
 			setup: func() Setup {
 				b, _ := fenBoard("4k2p/8/8/8/8/8/8/4K3")
-				return Setup{Board: *b, Turn: White, FullMoveNo: 1}
+				return Setup{Board: *b, Turn: White, FullMoveNumber: 1}
 			}(),
 			wantErr: "pawn on h8",
 		},
@@ -61,7 +61,7 @@ func TestNewPositionRejectsInvalidSetups(t *testing.T) {
 			name: "castling rights without rook",
 			setup: func() Setup {
 				b, _ := fenBoard("4k3/8/8/8/8/8/8/4K3")
-				return Setup{Board: *b, Turn: White, CastleRights: NewCastleRights(true, false, false, false), FullMoveNo: 1}
+				return Setup{Board: *b, Turn: White, CastleRights: NewCastleRights(true, false, false, false), FullMoveNumber: 1}
 			}(),
 			wantErr: "white kingside castling rights",
 		},
@@ -69,7 +69,7 @@ func TestNewPositionRejectsInvalidSetups(t *testing.T) {
 			name: "en passant square without pawn",
 			setup: func() Setup {
 				b, _ := fenBoard("4k3/8/8/8/8/8/8/4K3")
-				return Setup{Board: *b, Turn: Black, EnPassant: D3, FullMoveNo: 1}
+				return Setup{Board: *b, Turn: Black, EnPassant: D3, FullMoveNumber: 1}
 			}(),
 			wantErr: "white pawn on d4",
 		},
@@ -77,7 +77,7 @@ func TestNewPositionRejectsInvalidSetups(t *testing.T) {
 			name: "negative halfmove clock",
 			setup: func() Setup {
 				b, _ := fenBoard("4k3/8/8/8/8/8/8/4K3")
-				return Setup{Board: *b, Turn: White, HalfMoveClock: -1, FullMoveNo: 1}
+				return Setup{Board: *b, Turn: White, HalfMoveClock: -1, FullMoveNumber: 1}
 			}(),
 			wantErr: "halfmove clock",
 		},
@@ -85,7 +85,7 @@ func TestNewPositionRejectsInvalidSetups(t *testing.T) {
 			name: "zero fullmove number",
 			setup: func() Setup {
 				b, _ := fenBoard("4k3/8/8/8/8/8/8/4K3")
-				return Setup{Board: *b, Turn: White, FullMoveNo: 0}
+				return Setup{Board: *b, Turn: White, FullMoveNumber: 0}
 			}(),
 			wantErr: "fullmove number",
 		},
@@ -133,8 +133,8 @@ func TestEmptySetup(t *testing.T) {
 	if s.HalfMoveClock != 0 {
 		t.Errorf("EmptySetup().HalfMoveClock = %d, want 0", s.HalfMoveClock)
 	}
-	if s.FullMoveNo != 1 {
-		t.Errorf("EmptySetup().FullMoveNo = %d, want 1", s.FullMoveNo)
+	if s.FullMoveNumber != 1 {
+		t.Errorf("EmptySetup().FullMoveNumber = %d, want 1", s.FullMoveNumber)
 	}
 }
 
@@ -194,11 +194,11 @@ func TestSetupMirror(t *testing.T) {
 func TestSetupMirrorEnPassant(t *testing.T) {
 	// Black just played e7-e5; en passant target is e6.
 	s := Setup{
-		Board:        mustBoard(t, "rnbqkbnr/pppp1ppp/8/4p3/8/8/PPPPPPPP/RNBQKBNR"),
-		Turn:         White,
-		EnPassant:    E6,
-		CastleRights: NewCastleRights(true, true, true, true),
-		FullMoveNo:   1,
+		Board:          mustBoard(t, "rnbqkbnr/pppp1ppp/8/4p3/8/8/PPPPPPPP/RNBQKBNR"),
+		Turn:           White,
+		EnPassant:      E6,
+		CastleRights:   NewCastleRights(true, true, true, true),
+		FullMoveNumber: 1,
 	}
 	m := s.Mirror()
 	if m.EnPassant != E3 {
@@ -216,4 +216,41 @@ func mustBoard(t *testing.T, boardFEN string) Board {
 		t.Fatalf("fenBoard(%q): %v", boardFEN, err)
 	}
 	return *b
+}
+
+func TestPositionSetupRoundTrip(t *testing.T) {
+	for _, fen := range []string{
+		"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+		"r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 3 17",
+	} {
+		pos, err := ParseFEN(fen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		again, err := NewPosition(pos.Setup())
+		if err != nil {
+			t.Fatalf("NewPosition(%q.Setup()): %v", fen, err)
+		}
+		if again.FEN() != fen || again.ZobristHash() != pos.ZobristHash() {
+			t.Fatalf("Setup round trip = %q, want %q", again.FEN(), fen)
+		}
+	}
+}
+
+func TestPositionSetupRoundTripChess960(t *testing.T) {
+	s, err := Chess960Setup(42)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pos, err := NewPosition(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := NewPosition(pos.Setup())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.FEN() != pos.FEN() || again.Variant() != Chess960 {
+		t.Fatalf("Chess960 Setup round trip = %q (%v), want %q", again.FEN(), again.Variant(), pos.FEN())
+	}
 }

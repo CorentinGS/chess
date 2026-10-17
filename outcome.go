@@ -24,7 +24,7 @@ type outcomeRules struct {
 // historical Move/FEN evaluation so that InsufficientMaterial wins when several
 // rules apply to the same position.
 func classifyOutcome(pos *Position, repetitions int, rules outcomeRules) (Outcome, Method) {
-	switch pos.Status() {
+	switch pos.Method() {
 	case Stalemate:
 		return Draw, Stalemate
 	case Checkmate:

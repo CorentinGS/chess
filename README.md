@@ -531,14 +531,20 @@ Nf2 42. g4 Bd3 43. Re6 1/2-1/2
 
 #### Read PGN
 
-PGN supplied as an optional parameter to the NewGame constructor:
+Read one game with `ParsePGN`, or every game of a file with `PGNGames`:
 
 ```go
-pgn, err := chess.PGN(pgnReader)
+game, err := chess.ParsePGN(pgnReader)
 if err != nil {
-// handle error
+	// handle error
 }
-game := chess.NewGame(pgn)
+
+for game, err := range chess.PGNGames(pgnFile) {
+	if err != nil {
+		// handle error
+	}
+	fmt.Println(game.Tag("White"), "-", game.Tag("Black"))
+}
 ```
 
 #### Write PGN
@@ -753,9 +759,9 @@ fmt.Println(game.Position().Board().Draw())
 
 ### Moves
 
-MoveList is a convenient API for accessing the main-line moves and their
-comments. MoveList is useful when iterating the moves of a game. Below is an
-example showing how to see which side castled first.
+`Game.Moves()` returns the main-line moves. For the moves with their
+comments, NAGs and positions, walk the nodes of `MoveTree().MainLine()`.
+Below is an example showing which side castled first.
 
 ```go
 package main
@@ -773,31 +779,19 @@ func main() {
 		panic(err)
 	}
 	defer f.Close()
-	pgn, err := chess.PGN(f)
+	game, err := chess.ParsePGN(f)
 	if err != nil {
 		panic(err)
 	}
-	game := chess.NewGame(pgn)
-	color := chess.NoColor
-	// Replay positions alongside the moves via the tree's cursor.
-	tree := game.MoveTree()
-	tree.Reset()
-	for _, entry := range game.MoveList() {
-		preTurn := tree.Peek().Turn()
-		if entry.Move.HasTag(chess.KingSideCastle) || entry.Move.HasTag(chess.QueenSideCastle) {
-			color = preTurn
-			break
+	for _, node := range game.MoveTree().MainLine() {
+		m := node.Move()
+		if m.HasTag(chess.KingSideCastle) || m.HasTag(chess.QueenSideCastle) {
+			// The side that castled is the side to move before this node.
+			fmt.Println(node.Parent().Position().Turn().Name(), "castled first")
+			return
 		}
-		tree.GoForward()
 	}
-	switch color {
-	case chess.White:
-		fmt.Println("white castled first")
-	case chess.Black:
-		fmt.Println("black castled first")
-	default:
-		fmt.Println("no side castled")
-	}
+	fmt.Println("no side castled")
 }
 ```
 

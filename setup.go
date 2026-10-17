@@ -34,20 +34,20 @@ func (v Variant) String() string {
 // "describing a position" from "playing a position" by letting callers build a
 // complete position representation and then asking NewPosition to validate it.
 type Setup struct {
-	Board         Board
-	Turn          Color
-	CastleRights  CastleRights
-	EnPassant     Square
-	HalfMoveClock int
-	FullMoveNo    int
-	Variant       Variant
+	Board          Board
+	Turn           Color
+	CastleRights   CastleRights
+	EnPassant      Square
+	HalfMoveClock  int
+	FullMoveNumber int
+	Variant        Variant
 }
 
 // EmptySetup returns a Setup representing an empty board: no pieces, White to
 // move, no castling rights, no en passant square, halfmove clock 0, fullmove 1.
 // It is the zero position used as a starting point for construction.
 func EmptySetup() Setup {
-	return Setup{Turn: White, EnPassant: NoSquare, FullMoveNo: 1}
+	return Setup{Turn: White, EnPassant: NoSquare, FullMoveNumber: 1}
 }
 
 // InitialSetup returns a Setup representing the standard chess starting
@@ -62,13 +62,13 @@ func InitialSetup() Setup {
 // side to move and en passant rights change, not the move counters.
 func (s Setup) SwapTurn() Setup {
 	return Setup{
-		Board:         s.Board,
-		Turn:          s.Turn.Other(),
-		CastleRights:  s.CastleRights,
-		EnPassant:     NoSquare,
-		HalfMoveClock: s.HalfMoveClock,
-		FullMoveNo:    s.FullMoveNo,
-		Variant:       s.Variant,
+		Board:          s.Board,
+		Turn:           s.Turn.Other(),
+		CastleRights:   s.CastleRights,
+		EnPassant:      NoSquare,
+		HalfMoveClock:  s.HalfMoveClock,
+		FullMoveNumber: s.FullMoveNumber,
+		Variant:        s.Variant,
 	}
 }
 
@@ -91,12 +91,7 @@ func (s Setup) Mirror() Setup {
 		rank := 7 - Square(sq).Rank()
 		m[NewSquare(file, rank)] = NewPiece(p.Type(), p.Color().Other())
 	}
-	b, err := NewBoard(m)
-	if err != nil {
-		// Mirror of a valid board cannot produce an invalid board: every
-		// occupied square maps to a distinct occupied square.
-		panic(fmt.Sprintf("chess: mirror produced invalid board: %v", err))
-	}
+	b := NewBoard(m)
 	cr := NewCastleRights(
 		s.CastleRights.CanCastle(Black, KingSide),
 		s.CastleRights.CanCastle(Black, QueenSide),
@@ -108,13 +103,13 @@ func (s Setup) Mirror() Setup {
 		ep = NewSquare(s.EnPassant.File(), 7-s.EnPassant.Rank())
 	}
 	return Setup{
-		Board:         *b,
-		Turn:          s.Turn.Other(),
-		CastleRights:  cr,
-		EnPassant:     ep,
-		HalfMoveClock: s.HalfMoveClock,
-		FullMoveNo:    s.FullMoveNo,
-		Variant:       s.Variant,
+		Board:          *b,
+		Turn:           s.Turn.Other(),
+		CastleRights:   cr,
+		EnPassant:      ep,
+		HalfMoveClock:  s.HalfMoveClock,
+		FullMoveNumber: s.FullMoveNumber,
+		Variant:        s.Variant,
 	}
 }
 
@@ -127,14 +122,32 @@ var startingSetup = func() Setup {
 		panic(err)
 	}
 	return Setup{
-		Board:         *b,
-		Turn:          White,
-		CastleRights:  NewCastleRights(true, true, true, true),
-		EnPassant:     NoSquare,
-		HalfMoveClock: 0,
-		FullMoveNo:    1,
+		Board:          *b,
+		Turn:           White,
+		CastleRights:   NewCastleRights(true, true, true, true),
+		EnPassant:      NoSquare,
+		HalfMoveClock:  0,
+		FullMoveNumber: 1,
 	}
 }()
+
+// Setup returns the position's fields as a Setup, ready to edit and validate
+// again with NewPosition:
+//
+//	s := pos.Setup()
+//	s.Turn = s.Turn.Other()
+//	flipped, err := chess.NewPosition(s)
+func (pos *Position) Setup() Setup {
+	return Setup{
+		Board:          pos.board,
+		Turn:           pos.turn,
+		CastleRights:   pos.castleRights,
+		EnPassant:      pos.enPassantSquare,
+		HalfMoveClock:  pos.halfMoveClock,
+		FullMoveNumber: pos.moveCount,
+		Variant:        pos.variant,
+	}
+}
 
 // NewPosition validates s and constructs a playable Position from it.
 //
@@ -157,7 +170,7 @@ func NewPosition(s Setup) (*Position, error) {
 		castleRights:    s.CastleRights,
 		enPassantSquare: s.EnPassant,
 		halfMoveClock:   s.HalfMoveClock,
-		moveCount:       s.FullMoveNo,
+		moveCount:       s.FullMoveNumber,
 		variant:         s.Variant,
 	}
 	pos.inCheck, pos.checkers = checkState(pos)
@@ -169,7 +182,7 @@ func validateSetup(s *Setup) error {
 	if s.HalfMoveClock < 0 {
 		return errors.New("chess: setup: halfmove clock cannot be negative")
 	}
-	if s.FullMoveNo < 1 {
+	if s.FullMoveNumber < 1 {
 		return errors.New("chess: setup: fullmove number must be at least 1")
 	}
 
@@ -332,19 +345,16 @@ func Chess960Setup(index int) (Setup, error) {
 		m[NewSquare(File(file), Rank2)] = WhitePawn
 		m[NewSquare(File(file), Rank7)] = BlackPawn
 	}
-	b, err := NewBoard(m)
-	if err != nil {
-		return Setup{}, fmt.Errorf("chess: chess960 start %d: %w", index, err)
-	}
+	b := NewBoard(m)
 
 	return Setup{
-		Board:         *b,
-		Turn:          White,
-		CastleRights:  NewCastleRights(true, true, true, true),
-		EnPassant:     NoSquare,
-		HalfMoveClock: 0,
-		FullMoveNo:    1,
-		Variant:       Chess960,
+		Board:          *b,
+		Turn:           White,
+		CastleRights:   NewCastleRights(true, true, true, true),
+		EnPassant:      NoSquare,
+		HalfMoveClock:  0,
+		FullMoveNumber: 1,
+		Variant:        Chess960,
 	}, nil
 }
 

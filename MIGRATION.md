@@ -219,6 +219,12 @@ listed:
 | `Engine.Getpid()` | `Engine.Pid()` |
 | `Position.Ply()` (1 at the start) | `Position.Ply()` (0 at the start, like `MoveNode.Ply()`) |
 | _(none)_ | `Position.FullMoveNumber()` |
+| `Position.Status()` | `Position.Method()`, like `Game.Method()` |
+| _(none)_ | `Position.Setup()`, to edit a position and rebuild it with `NewPosition` |
+| `Setup.FullMoveNo` | `Setup.FullMoveNumber` |
+| `NewBoard(m) (*Board, error)` | `NewBoard(m) *Board` |
+| `Board.Flip`, `Rotate`, `Transpose` returning `(*Board, error)` | return `*Board` |
+| `Game.MoveList()`, `MoveList`, `MoveListEntry` | `Game.Moves()`, or `Game.MoveTree().MainLine()` for nodes with comments and positions |
 
 Iterate a Bitboard's squares or an attack set:
 
@@ -378,10 +384,11 @@ read the whole book into memory.
 | `chess.NewPolyglotBookFromMap(m)` | `polyglot.NewBook(m)` |
 | `chess.PolyglotBook` | `polyglot.Book` |
 | `chess.PolyglotEntry` | `polyglot.Entry` |
-| `chess.PolyglotMove` | `polyglot.Move` |
+| `chess.PolyglotMove` | `polyglot.RawMove` (`ToMove()` → `ChessMove()`) |
 | `chess.MoveWithWeight` | `polyglot.WeightedMove` |
 | `chess.MoveToPolyglot(m)` | `polyglot.EncodeMove(m)` |
 | `chess.DecodeMove(code)` | `polyglot.DecodeMove(code)` |
+| `(*PolyglotBook).FindMoves(hash)` | `(*Book).Entries(hash)` |
 | `(*PolyglotBook).GetChessMoves(hash)` | `(*Book).Moves(hash)` |
 | `(*PolyglotBook).GetRandomMove(hash)` | `(*Book).RandomMove(hash)` |
 | `(*PolyglotBook).ToMoveMap()` | `(*Book).WeightedMoves()` |

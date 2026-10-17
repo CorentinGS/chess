@@ -305,17 +305,17 @@ func TestNullMove_GameNullMoveMethod(t *testing.T) {
 	}
 }
 
-func TestNullMove_AppearsInMoveList(t *testing.T) {
+func TestNullMove_AppearsInMainLine(t *testing.T) {
 	g := chess.NewGame()
 	if _, err := g.NullMove(nil); err != nil {
 		t.Fatalf("Game.NullMove: %v", err)
 	}
-	list := g.MoveList()
-	if len(list) != 1 {
-		t.Fatalf("len(MoveList)=%d, want 1", len(list))
+	line := g.MoveTree().MainLine()
+	if len(line) != 1 {
+		t.Fatalf("len(MainLine)=%d, want 1", len(line))
 	}
-	if !list[0].Move.HasTag(chess.Null) {
-		t.Fatal("MoveList entry must carry Null tag")
+	if !line[0].Move().HasTag(chess.Null) {
+		t.Fatal("main-line node must carry Null tag")
 	}
 }
 

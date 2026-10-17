@@ -43,7 +43,7 @@ func decodeFENUnsafe(fen string) (*Position, error) {
 		castleRights:    setup.CastleRights,
 		enPassantSquare: setup.EnPassant,
 		halfMoveClock:   setup.HalfMoveClock,
-		moveCount:       setup.FullMoveNo,
+		moveCount:       setup.FullMoveNumber,
 		variant:         setup.Variant,
 	}
 	pos.inCheck, pos.checkers = checkState(pos)
@@ -66,7 +66,7 @@ func decodeFENForHash(fen string) (*Position, error) {
 		castleRights:    setup.CastleRights,
 		enPassantSquare: setup.EnPassant,
 		halfMoveClock:   setup.HalfMoveClock,
-		moveCount:       setup.FullMoveNo,
+		moveCount:       setup.FullMoveNumber,
 		variant:         setup.Variant,
 	}
 	pos.hash = pos.computeHash()
@@ -146,13 +146,13 @@ func decodeFENSetup(fen string) (Setup, error) {
 	}
 
 	return Setup{
-		Board:         *b,
-		Turn:          turn,
-		CastleRights:  rights,
-		EnPassant:     sq,
-		HalfMoveClock: halfMoveClock,
-		FullMoveNo:    moveCount,
-		Variant:       variant,
+		Board:          *b,
+		Turn:           turn,
+		CastleRights:   rights,
+		EnPassant:      sq,
+		HalfMoveClock:  halfMoveClock,
+		FullMoveNumber: moveCount,
+		Variant:        variant,
 	}, nil
 }
 
@@ -266,11 +266,7 @@ func fenBoard(boardStr string) (*Board, error) {
 
 	// Create new board with the pooled map
 	// Note: NewBoard must copy the map since we're returning m to the pool
-	board, err := NewBoard(m)
-	if err != nil {
-		return nil, fmt.Errorf("chess: fen: board construction: %w", err)
-	}
-	return board, nil
+	return NewBoard(m), nil
 }
 
 // fenFormRank converts a FEN rank string to a map of pieces, reusing the provided map.

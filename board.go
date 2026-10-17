@@ -42,8 +42,9 @@ func (b *Board) kingSquare(c Color) Square {
 	return b.blackKingSq
 }
 
-// NewBoard returns a board from a square to piece mapping.
-// The map should contain only occupied squares.
+// NewBoard returns a board with the pieces of m. Entries for squares outside
+// A1-H8 or holding NoPiece are ignored. The board is not checked against the
+// rules; NewPosition does that.
 //
 // Example:
 //
@@ -51,8 +52,8 @@ func (b *Board) kingSquare(c Color) Square {
 //	    NewSquare(FileE, Rank1): WhiteKing,
 //	    NewSquare(FileE, Rank8): BlackKing,
 //	}
-//	board, err := NewBoard(squares)
-func NewBoard(m map[Square]Piece) (*Board, error) {
+//	board := NewBoard(squares)
+func NewBoard(m map[Square]Piece) *Board {
 	b := &Board{}
 	for sq := range numOfSquaresInBoard {
 		b.mailbox[sq] = NoPiece
@@ -66,12 +67,11 @@ func NewBoard(m map[Square]Piece) (*Board, error) {
 				b.mailbox[sq] = p1
 			}
 		}
-		if err := b.setBBForPiece(p1, bitboard(bb)); err != nil {
-			return nil, err
-		}
+		// allPieces holds only valid pieces, so setBBForPiece cannot fail.
+		_ = b.setBBForPiece(p1, bitboard(bb))
 	}
 	b.calcConvenienceBBs(nil)
-	return b, nil
+	return b
 }
 
 // SquareMap returns a mapping of squares to pieces.
@@ -88,12 +88,8 @@ func (b *Board) SquareMap() map[Square]Piece {
 }
 
 // Rotate rotates the board 90 degrees clockwise.
-func (b *Board) Rotate() (*Board, error) {
-	flipped, err := b.Flip(UpDown)
-	if err != nil {
-		return nil, err
-	}
-	return flipped.Transpose()
+func (b *Board) Rotate() *Board {
+	return b.Flip(UpDown).Transpose()
 }
 
 // FlipDirection is the direction for the Board.Flip method.
@@ -109,7 +105,7 @@ const (
 // Flip returns a new board flipped over the specified axis.
 // For UpDown, pieces are mirrored across the horizontal center line.
 // For LeftRight, pieces are mirrored across the vertical center line.
-func (b *Board) Flip(fd FlipDirection) (*Board, error) {
+func (b *Board) Flip(fd FlipDirection) *Board {
 	m := make(map[Square]Piece, numOfSquaresInBoard)
 	for sq := range numOfSquaresInBoard {
 		var mv Square
@@ -129,7 +125,7 @@ func (b *Board) Flip(fd FlipDirection) (*Board, error) {
 }
 
 // Transpose flips the board over the A8 to H1 diagonal.
-func (b *Board) Transpose() (*Board, error) {
+func (b *Board) Transpose() *Board {
 	m := make(map[Square]Piece, numOfSquaresInBoard)
 	for sq := range numOfSquaresInBoard {
 		file := File(7 - Square(sq).Rank())

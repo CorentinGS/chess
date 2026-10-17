@@ -79,10 +79,7 @@ func TestMailboxConsistency(t *testing.T) {
 	})
 
 	t.Run("empty_board", func(t *testing.T) {
-		b, err := NewBoard(map[Square]Piece{})
-		if err != nil {
-			t.Fatal(err)
-		}
+		b := NewBoard(map[Square]Piece{})
 		if err := verifyMailboxConsistency(b); err != nil {
 			t.Fatal(err)
 		}
@@ -110,26 +107,17 @@ func TestMailboxConsistency(t *testing.T) {
 	t.Run("transformations", func(t *testing.T) {
 		board := NewGame().Position().Board()
 
-		flipped, err := board.Flip(UpDown)
-		if err != nil {
-			t.Fatal(err)
-		}
+		flipped := board.Flip(UpDown)
 		if err := verifyMailboxConsistency(flipped); err != nil {
 			t.Fatalf("flipped board mailbox inconsistent: %v", err)
 		}
 
-		transposed, err := board.Transpose()
-		if err != nil {
-			t.Fatal(err)
-		}
+		transposed := board.Transpose()
 		if err := verifyMailboxConsistency(transposed); err != nil {
 			t.Fatalf("transposed board mailbox inconsistent: %v", err)
 		}
 
-		rotated, err := board.Rotate()
-		if err != nil {
-			t.Fatal(err)
-		}
+		rotated := board.Rotate()
 		if err := verifyMailboxConsistency(rotated); err != nil {
 			t.Fatalf("rotated board mailbox inconsistent: %v", err)
 		}

@@ -48,7 +48,7 @@ func TestPositionStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pos := positionFromFEN(t, tt.fen)
-			if got := pos.Status(); got != tt.want {
+			if got := pos.Method(); got != tt.want {
 				t.Fatalf("Status() = %s, want %s", got, tt.want)
 			}
 		})
@@ -57,20 +57,20 @@ func TestPositionStatus(t *testing.T) {
 
 func TestPositionStatusIsStableAcrossRepeatedCallsAndUpdates(t *testing.T) {
 	checkmate := positionFromFEN(t, "7k/5K2/7Q/8/8/8/8/8 b - - 0 1")
-	if got := checkmate.Status(); got != chess.Checkmate {
+	if got := checkmate.Method(); got != chess.Checkmate {
 		t.Fatalf("first Status() = %s, want %s", got, chess.Checkmate)
 	}
-	if got := checkmate.Status(); got != chess.Checkmate {
+	if got := checkmate.Method(); got != chess.Checkmate {
 		t.Fatalf("second Status() = %s, want %s", got, chess.Checkmate)
 	}
 
 	start := chess.NewGame().Position()
 	move := requireMove(t, start.LegalMoves(), "e2e4")
 	next := start.Update(move)
-	if got := start.Status(); got != chess.NoMethod {
+	if got := start.Method(); got != chess.NoMethod {
 		t.Fatalf("original Status() after Update = %s, want %s", got, chess.NoMethod)
 	}
-	if got := next.Status(); got != chess.NoMethod {
+	if got := next.Method(); got != chess.NoMethod {
 		t.Fatalf("updated Status() = %s, want %s", got, chess.NoMethod)
 	}
 }
@@ -374,7 +374,7 @@ func TestApplyInPlaceMatchesUpdate(t *testing.T) {
 			if got.ZobristHash() != want.ZobristHash() {
 				t.Fatalf("%s %s: ApplyInPlace hash differs from Update", fen, m)
 			}
-			if got.IsCheck() != want.IsCheck() || got.Status() != want.Status() {
+			if got.IsCheck() != want.IsCheck() || got.Method() != want.Method() {
 				t.Fatalf("%s %s: ApplyInPlace check/status differs from Update", fen, m)
 			}
 			if len(got.LegalMoves()) != len(want.LegalMoves()) {

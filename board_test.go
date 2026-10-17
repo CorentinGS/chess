@@ -76,10 +76,7 @@ func TestBoard_SquareMapRoundTrip(t *testing.T) {
 	for _, tt := range boardFENs {
 		t.Run(tt.name, func(t *testing.T) {
 			b := boardFromFEN(t, tt.fen)
-			rebuilt, err := chess.NewBoard(b.SquareMap())
-			if err != nil {
-				t.Fatal(err)
-			}
+			rebuilt := chess.NewBoard(b.SquareMap())
 			if rebuilt.String() != b.String() {
 				t.Errorf("NewBoard(SquareMap()) = %q, want %q", rebuilt.String(), b.String())
 			}
@@ -124,28 +121,15 @@ func TestBoard_RotateNinetyDegreesClockwise(t *testing.T) {
 	board := start
 	for i, w := range want {
 		t.Run(rotatedLabel(i+1), func(t *testing.T) {
-			var err error
-			board, err = board.Rotate()
-			if err != nil {
-				t.Fatalf("Rotate() error = %v", err)
-			}
+			board = board.Rotate()
 			if board.String() != w {
 				t.Errorf("Rotate() = %q, want %q", board.String(), w)
 			}
 		})
 	}
-	rotated, err := start.Rotate()
-	if err != nil {
-		t.Fatal(err)
-	}
-	flipped, err := start.Flip(chess.UpDown)
-	if err != nil {
-		t.Fatal(err)
-	}
-	transposed, err := flipped.Transpose()
-	if err != nil {
-		t.Fatal(err)
-	}
+	rotated := start.Rotate()
+	flipped := start.Flip(chess.UpDown)
+	transposed := flipped.Transpose()
 	if rotated.String() != transposed.String() {
 		t.Errorf("Rotate() = %q, want Flip(UpDown).Transpose() = %q", rotated.String(), transposed.String())
 	}
@@ -167,34 +151,22 @@ func rotatedLabel(n int) string {
 func TestBoard_FlipIsInvolution(t *testing.T) {
 	t.Run("UpDown_is_involution", func(t *testing.T) {
 		start := boardFromFEN(t, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
-		once, err := start.Flip(chess.UpDown)
-		if err != nil {
-			t.Fatal(err)
-		}
+		once := start.Flip(chess.UpDown)
 		if want := "RNBQKBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbqkbnr"; once.String() != want {
 			t.Errorf("Flip(UpDown) = %q, want %q", once.String(), want)
 		}
-		twice, err := once.Flip(chess.UpDown)
-		if err != nil {
-			t.Fatal(err)
-		}
+		twice := once.Flip(chess.UpDown)
 		if twice.String() != start.String() {
 			t.Errorf("Flip(UpDown).Flip(UpDown) = %q, want identity %q", twice.String(), start.String())
 		}
 	})
 	t.Run("LeftRight_is_involution", func(t *testing.T) {
 		start := boardFromFEN(t, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
-		once, err := start.Flip(chess.LeftRight)
-		if err != nil {
-			t.Fatal(err)
-		}
+		once := start.Flip(chess.LeftRight)
 		if want := "rnbkqbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBKQBNR"; once.String() != want {
 			t.Errorf("Flip(LeftRight) = %q, want %q", once.String(), want)
 		}
-		twice, err := once.Flip(chess.LeftRight)
-		if err != nil {
-			t.Fatal(err)
-		}
+		twice := once.Flip(chess.LeftRight)
 		if twice.String() != start.String() {
 			t.Errorf("Flip(LeftRight).Flip(LeftRight) = %q, want identity %q", twice.String(), start.String())
 		}
@@ -203,17 +175,11 @@ func TestBoard_FlipIsInvolution(t *testing.T) {
 
 func TestBoard_TransposeIsInvolution(t *testing.T) {
 	start := boardFromFEN(t, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
-	once, err := start.Transpose()
-	if err != nil {
-		t.Fatal(err)
-	}
+	once := start.Transpose()
 	if want := "rp4PR/np4PN/bp4PB/qp4PQ/kp4PK/bp4PB/np4PN/rp4PR"; once.String() != want {
 		t.Errorf("Transpose() = %q, want %q", once.String(), want)
 	}
-	twice, err := once.Transpose()
-	if err != nil {
-		t.Fatal(err)
-	}
+	twice := once.Transpose()
 	if twice.String() != start.String() {
 		t.Errorf("Transpose().Transpose() = %q, want identity %q", twice.String(), start.String())
 	}

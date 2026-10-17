@@ -24,7 +24,7 @@ All notable changes to this project will be documented in this file. See [conven
   longer exported. `ParserError` keeps `Message`, `TokenValue` and
   `Position`; its `TokenType` field is now unexported.
 - move Polyglot opening books to the new `polyglot` package: `polyglot.Book`,
-  `Load`, `LoadBytes`, `NewBook`, `Entry`, `Move`, `WeightedMove`,
+  `Load`, `LoadBytes`, `NewBook`, `Entry`, `RawMove`, `WeightedMove`,
   `EncodeMove`, `DecodeMove`; `ChessMoves` becomes `Moves` and `ToMoveMap`
   becomes `WeightedMoves`. `PieceType.ToPolyglotPromotionValue` is removed.
 - rename tag accessors to `Game.Tag`, `Game.SetTag` (no return value) and
@@ -45,6 +45,13 @@ All notable changes to this project will be documented in this file. See [conven
 - remove `MoveNode.Number`, an undocumented alias of `FullMoveNumber`.
 - make `PGNRenderer` and `DefaultPGNRenderer` internal; use `Game.String` and
   `Game.WritePGN`.
+- rename `Position.Status` to `Position.Method` and `Setup.FullMoveNo` to
+  `Setup.FullMoveNumber`.
+- `NewBoard`, `Board.Flip`, `Board.Rotate` and `Board.Transpose` no longer
+  return an error; they could not fail.
+- remove `Game.MoveList`, `MoveList` and `MoveListEntry`; use `Game.Moves` or
+  the nodes of `MoveTree().MainLine()`.
+- in `polyglot`, `RawMove.ToMove` is `ChessMove` and `FindMoves` is `Entries`.
 - `Position.Ply()` now counts half-moves played (0 at the start, 1 after
   1.e4), matching `MoveNode.Ply()`; it used to be one higher.
 
@@ -53,6 +60,7 @@ All notable changes to this project will be documented in this file. See [conven
 - add `ParseFEN`, which returns a validated `*Position`.
 - add `Position.PseudoLegalMoves()`.
 - add `Position.FullMoveNumber()`, the FEN full-move field.
+- add `Position.Setup()`, the inverse of `NewPosition`.
 - `ApplyInPlace` is now covered by equivalence tests against `Update`.
 
 ## v2.6.0 - 2026-08-17

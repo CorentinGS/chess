@@ -326,7 +326,7 @@ func BenchmarkStalemateStatus(b *testing.B) {
 	}
 	b.ResetTimer()
 	for range b.N {
-		g.Position().Status()
+		g.Position().Method()
 	}
 }
 
@@ -342,7 +342,7 @@ func BenchmarkInvalidStalemateStatus(b *testing.B) {
 	}
 	b.ResetTimer()
 	for range b.N {
-		g.Position().Status()
+		g.Position().Method()
 	}
 }
 
@@ -2358,101 +2358,6 @@ func TestCastlingInteractions(t *testing.T) {
 				t.Errorf("Castling allowed: %v, want: %v", isAllowed, tt.shouldAllow)
 			}
 		})
-	}
-}
-
-func TestMoveListEmptyGame(t *testing.T) {
-	g := NewGame()
-	list := g.MoveList()
-	if len(list) != 0 {
-		t.Fatalf("expected empty move list, got %d", len(list))
-	}
-}
-
-func TestMoveListMainLine(t *testing.T) {
-	g := NewGame()
-	for _, m := range []string{"e4", "e5", "Nf3"} {
-		if _, err := g.MoveText(m, SAN(), nil); err != nil {
-			t.Fatal(err)
-		}
-	}
-	list := g.MoveList()
-	if len(list) != 3 {
-		t.Fatalf("expected 3 move list entries, got %d", len(list))
-	}
-	if list[0].Move.String() != "e2e4" {
-		t.Fatalf("expected first move e2e4, got %s", list[0].Move)
-	}
-}
-
-func TestMoveListComments(t *testing.T) {
-	g := NewGame()
-	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
-		t.Fatal(err)
-	}
-	g.MoveTree().Current().SetComment("good move")
-	list := g.MoveList()
-	if len(list) != 1 {
-		t.Fatalf("expected 1 move list entry, got %d", len(list))
-	}
-	if len(list[0].Comments) != 1 || list[0].Comments[0] != "good move" {
-		t.Fatalf("expected comment %q, got %v", "good move", list[0].Comments)
-	}
-}
-
-func TestMoveListNoComments(t *testing.T) {
-	g := NewGame()
-	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
-		t.Fatal(err)
-	}
-	list := g.MoveList()
-	if len(list[0].Comments) != 0 {
-		t.Fatalf("expected no comments, got %v", list[0].Comments)
-	}
-}
-
-func TestMoveListWithVariations(t *testing.T) {
-	g := NewGame()
-	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := g.MoveText("e5", SAN(), nil); err != nil {
-		t.Fatal(err)
-	}
-	variationMove := Move{}
-	g.MoveTree().AddVariation(g.MoveTree().Root().children[0], variationMove)
-	list := g.MoveList()
-	if len(list) != 2 {
-		t.Fatalf("expected 2 main line entries (variations excluded), got %d", len(list))
-	}
-}
-
-func TestMoveListMatchesMovesLength(t *testing.T) {
-	g := NewGame()
-	for _, m := range []string{"e4", "e5", "Nf3", "Nc6", "Bb5"} {
-		if _, err := g.MoveText(m, SAN(), nil); err != nil {
-			t.Fatal(err)
-		}
-	}
-	moves := g.Moves()
-	list := g.MoveList()
-	if len(list) != len(moves) {
-		t.Fatalf("expected list length %d to match moves length %d", len(list), len(moves))
-	}
-}
-
-func TestMoveListFromPGN(t *testing.T) {
-	pgnData := mustParsePGN("fixtures/pgns/single_game.pgn")
-	r := strings.NewReader(pgnData)
-	opt, err := PGN(r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	game := NewGame(opt)
-
-	list := game.MoveList()
-	if len(list) == 0 {
-		t.Fatal("expected move list from PGN game")
 	}
 }
 

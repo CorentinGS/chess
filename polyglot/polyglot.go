@@ -33,11 +33,12 @@ type Entry struct {
 	Learn  uint32 // Learning data (usually 0)
 }
 
-// Move represents a decoded chess move from a polyglot entry.
+// RawMove is a Polyglot move code decoded into board coordinates. Use
+// ChessMove to get a chess.Move.
 // The coordinates use 0-based indices where:
 // - Files go from 0 (a-file) to 7 (h-file)
 // - Ranks go from 0 (1st rank) to 7 (8th rank).
-type Move struct {
+type RawMove struct {
 	FromFile     int  // Source file (0-7)
 	FromRank     int  // Source rank (0-7)
 	ToFile       int  // Target file (0-7)
@@ -60,7 +61,7 @@ type Move struct {
 //
 //	// Find moves for a position
 //	hash := uint64(0x463b96181691fc9c) // Starting position hash
-//	moves := book.FindMoves(hash)
+//	moves := book.Entries(hash)
 //
 //	// Get a random move weighted by the stored weights
 //	randomMove := book.RandomMove(hash)
@@ -74,6 +75,7 @@ type WeightedMove struct {
 	Weight uint16
 }
 
+// EncodeMove returns the Polyglot move code for m.
 func EncodeMove(m chess.Move) uint16 {
 	var encoded uint16
 	encoded |= uint16(int(m.S2().File()) & 0x7)                // bits 0-2
@@ -84,7 +86,8 @@ func EncodeMove(m chess.Move) uint16 {
 	return encoded
 }
 
-func (pm Move) Encode() uint16 {
+// Encode returns the Polyglot move code for pm.
+func (pm RawMove) Encode() uint16 {
 	var encoded uint16
 	encoded |= uint16(pm.ToFile & 0x7)        // bits 0-2
 	encoded |= uint16(pm.ToRank&0x7) << 3     // bits 3-5
@@ -106,7 +109,10 @@ func convertPolyglotCastleToUCI(fromFile, toFile, rank byte) (byte, byte, byte, 
 	return fromFile, rank, toFile, rank
 }
 
-func (pm Move) ToMove() chess.Move {
+// ChessMove converts pm to a chess.Move. Polyglot encodes castling as the king
+// capturing its own rook (e1h1); ChessMove returns the king's destination
+// (e1g1) with the castling tag set.
+func (pm RawMove) ChessMove() chess.Move {
 	var moveBuf [5]byte
 	moveBuf[0] = 'a' + byte(pm.FromFile)
 	moveBuf[1] = '1' + byte(pm.FromRank)
@@ -204,21 +210,21 @@ func parseBookData(data []byte) (*Book, error) {
 	return &Book{entries: entries}, nil
 }
 
-// FindMoves looks up all moves for a given position hash.
+// Entries looks up all moves for a given position hash.
 // Returns moves sorted by weight (highest weight first).
 // Returns nil if no moves are found.
 //
 // Example:
 //
 //	hash := uint64(0x463b96181691fc9c) // Starting position
-//	moves := book.FindMoves(hash)
+//	moves := book.Entries(hash)
 //	if moves != nil {
 //	    for _, move := range moves {
 //	        decodedMove := DecodeMove(move.Move)
 //	        fmt.Printf("Move: %v, Weight: %d\n", decodedMove, move.Weight)
 //	    }
 //	}
-func (book *Book) FindMoves(positionHash uint64) []Entry {
+func (book *Book) Entries(positionHash uint64) []Entry {
 	idx := sort.Search(len(book.entries), func(i int) bool {
 		return book.entries[i].Key >= positionHash
 	})
@@ -261,8 +267,8 @@ func (book *Book) FindMoves(positionHash uint64) []Entry {
 //	fmt.Printf("From: %c%d, To: %c%d\n",
 //	    'a'+decoded.FromFile, decoded.FromRank+1,
 //	    'a'+decoded.ToFile, decoded.ToRank+1)
-func DecodeMove(move uint16) Move {
-	return Move{
+func DecodeMove(move uint16) RawMove {
+	return RawMove{
 		FromFile:     int((move >> 6) & 0x7),
 		FromRank:     int((move >> 9) & 0x7),
 		ToFile:       int(move & 0x7),
@@ -311,7 +317,7 @@ func isCastlingMove(fromFile, fromRank, toFile, toRank int) bool {
 //	    fmt.Printf("Selected move: %v\n", decodedMove)
 //	}
 func (book *Book) RandomMove(positionHash uint64) (*Entry, error) {
-	moves := book.FindMoves(positionHash)
+	moves := book.Entries(positionHash)
 	if len(moves) == 0 {
 		return nil, nil //nolint:nilnil // nil,nil is the documented "no move for this position" signal
 	}
@@ -399,25 +405,28 @@ func (book *Book) DeleteMoves(positionHash uint64) {
 	book.entries = newEntries
 }
 
+// Moves returns the book moves for the position with the given Polyglot key
+// (Position.ZobristHash), highest weight first.
 func (book *Book) Moves(positionHash uint64) ([]chess.Move, error) {
-	entries := book.FindMoves(positionHash)
+	entries := book.Entries(positionHash)
 	if entries == nil {
 		return nil, errors.New("polyglot: no moves found for the given position")
 	}
 	var moves []chess.Move
 	for _, entry := range entries {
 		pm := DecodeMove(entry.Move)
-		move := pm.ToMove()
+		move := pm.ChessMove()
 		moves = append(moves, move)
 	}
 	return moves, nil
 }
 
+// WeightedMoves returns every book move grouped by position key.
 func (book *Book) WeightedMoves() map[uint64][]WeightedMove {
 	result := make(map[uint64][]WeightedMove, len(book.entries))
 	for _, entry := range book.entries {
 		pm := DecodeMove(entry.Move)
-		move := pm.ToMove()
+		move := pm.ChessMove()
 		mw := WeightedMove{
 			Move:   move,
 			Weight: entry.Weight,

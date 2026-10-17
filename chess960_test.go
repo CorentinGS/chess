@@ -537,17 +537,14 @@ func TestChess960CastlingEdgeCases(t *testing.T) {
 // be included explicitly in the map.
 func makeChess960Set(t *testing.T, pieces map[Square]Piece, rights CastleRights) Setup {
 	t.Helper()
-	b, err := NewBoard(pieces)
-	if err != nil {
-		t.Fatalf("makeChess960Set: NewBoard: %v", err)
-	}
+	b := NewBoard(pieces)
 	return Setup{
-		Board:        *b,
-		Turn:         White,
-		CastleRights: rights,
-		EnPassant:    NoSquare,
-		FullMoveNo:   1,
-		Variant:      Chess960,
+		Board:          *b,
+		Turn:           White,
+		CastleRights:   rights,
+		EnPassant:      NoSquare,
+		FullMoveNumber: 1,
+		Variant:        Chess960,
 	}
 }
 

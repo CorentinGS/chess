@@ -93,48 +93,6 @@ func (g *Game) Moves() []Move {
 	return moves
 }
 
-// MoveListEntry is a single move in a [MoveList]: the move itself plus any
-// comments attached to it. Positions are not cached here — callers that need
-// the pre/post position replay it via [Game.MoveTree] and the cursor API.
-type MoveListEntry struct {
-	Move     Move
-	Comments []string
-}
-
-// MoveList is the main-line move sequence of a game. Variations are not
-// included. The zero value is an empty list; use [Game.MoveList] to obtain one.
-type MoveList []MoveListEntry
-
-// MoveList returns the main-line moves in order with any comments.
-// Variations are not included. The returned slice is safe to retain: it holds
-// no references to the game's live cursor state.
-// Returns an empty slice for games with no moves.
-func (g *Game) MoveList() MoveList {
-	root := g.tree.Root()
-	if root == nil || len(root.children) == 0 {
-		return MoveList{}
-	}
-
-	// Walk the cursor along the main line; capture the move + comments only.
-	defer g.tree.setCurrent(g.tree.Current())
-	g.tree.Reset()
-	list := make(MoveList, 0, len(root.children))
-
-	for g.tree.GoForward() {
-		node := g.tree.Current()
-		var comments []string
-		if node != nil && node.Comments() != "" {
-			comments = []string{node.Comments()}
-		}
-		list = append(list, MoveListEntry{
-			Move:     node.move,
-			Comments: comments,
-		})
-	}
-
-	return list
-}
-
 // Position returns the game's current position.
 func (g *Game) Position() *Position {
 	pos := g.currentPosition()

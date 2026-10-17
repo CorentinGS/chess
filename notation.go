@@ -443,7 +443,7 @@ func getCheckChar(pos *Position, move Move) string {
 		return ""
 	}
 	nextPos := pos.Update(move)
-	if nextPos.Status() == Checkmate {
+	if nextPos.Method() == Checkmate {
 		return mateStr
 	}
 	return checkStr

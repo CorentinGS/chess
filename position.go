@@ -354,9 +354,9 @@ func (pos *Position) PseudoLegalMoves() []Move {
 	return append(legalMovesForMode(pos, generateLegalOnly), unsafeMoves(pos)...)
 }
 
-// Status returns the position's outcome Method (e.g. Checkmate, Stalemate, or
+// Method returns the position's outcome Method (e.g. Checkmate, Stalemate, or
 // NoMethod).
-func (pos *Position) Status() Method {
+func (pos *Position) Method() Method {
 	if pos.statusCached {
 		return pos.status
 	}
