@@ -189,6 +189,11 @@ func (p *pgnParser) resolveOutcome() error {
 	if err != nil {
 		return &ParserError{Message: err.Error(), Position: p.position, err: err}
 	}
+	if method == NoMethod {
+		if m := methodFromTermination(p.game.tagPairs["Termination"]); validOutcomeMethod(outcome, m) && outcome != NoOutcome {
+			method = m
+		}
+	}
 	p.game.outcome = outcome
 	p.game.method = method
 	return nil

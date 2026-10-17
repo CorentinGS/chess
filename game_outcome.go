@@ -6,9 +6,10 @@ import (
 )
 
 // SetOutcome sets the game's outcome and the method that produced it, after
-// checking that they agree: a win needs Checkmate, Resignation or NoMethod, a
-// draw needs a draw method or NoMethod, and NoOutcome needs NoMethod. It does
-// not change the Result tag.
+// checking that they agree: a win takes Checkmate, Resignation, TimeForfeit,
+// Abandoned, Adjudication, RulesInfraction or NoMethod; a draw takes a draw
+// rule, DrawOffer, TimeForfeit, Adjudication or NoMethod; NoOutcome takes
+// NoMethod. It does not change the Result tag.
 func (g *Game) SetOutcome(outcome Outcome, method Method) error {
 	if !validOutcomeMethod(outcome, method) {
 		return fmt.Errorf("chess: invalid outcome/method pair: outcome=%s method=%s", outcome, method)
@@ -24,13 +25,14 @@ func validOutcomeMethod(outcome Outcome, method Method) bool {
 		return method == NoMethod
 	case WhiteWon, BlackWon:
 		switch method {
-		case NoMethod, Checkmate, Resignation:
+		case NoMethod, Checkmate, Resignation, TimeForfeit, Abandoned, Adjudication, RulesInfraction:
 			return true
 		}
 	case Draw:
 		switch method {
 		case NoMethod, DrawOffer, Stalemate, ThreefoldRepetition,
-			FivefoldRepetition, FiftyMoveRule, SeventyFiveMoveRule, InsufficientMaterial:
+			FivefoldRepetition, FiftyMoveRule, SeventyFiveMoveRule, InsufficientMaterial,
+			TimeForfeit, Adjudication:
 			return true
 		}
 	}

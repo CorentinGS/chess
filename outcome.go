@@ -1,6 +1,9 @@
 package chess
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 // outcomeRules configures classifyOutcome. The zero value is Terminal-only:
 // only checkmate and stalemate are detected and the auto-draw fields are
@@ -69,6 +72,23 @@ func fullOutcomeRules(g *Game) outcomeRules {
 		ignoreSeventyFiveMove: g.ignoreSeventyFiveMoveRuleDraw,
 		ignoreInsufficient:    g.ignoreInsufficientMaterialDraw,
 	}
+}
+
+// methodFromTermination maps a PGN Termination tag value to the Method it
+// names, or NoMethod. Values are matched case-insensitively; "normal" and
+// unknown values carry no method because the board or the players decide.
+func methodFromTermination(termination string) Method {
+	switch strings.ToLower(strings.TrimSpace(termination)) {
+	case "time forfeit":
+		return TimeForfeit
+	case "abandoned":
+		return Abandoned
+	case "adjudication":
+		return Adjudication
+	case "rules infraction":
+		return RulesInfraction
+	}
+	return NoMethod
 }
 
 // arbitratePGNOutcome reconciles the three outcome sources visible during PGN

@@ -93,4 +93,13 @@ const (
 	// InsufficientMaterial indicates that the game was automatically drawn
 	// because there was insufficient material for checkmate.
 	InsufficientMaterial
+	// TimeForfeit indicates that a player ran out of time. It is a win for
+	// the opponent, or a draw when the opponent cannot checkmate.
+	TimeForfeit
+	// Abandoned indicates that a player left the game, which the opponent wins.
+	Abandoned
+	// Adjudication indicates that an arbiter decided the result.
+	Adjudication
+	// RulesInfraction indicates that a player lost for breaking the rules.
+	RulesInfraction
 )

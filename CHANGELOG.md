@@ -89,6 +89,8 @@ All notable changes to this project will be documented in this file. See [conven
   `PGNRecord.Decode` errors now wrap `ErrInvalidPGN` like the other decoders.
 
 #### Features
+- add the `TimeForfeit`, `Abandoned`, `Adjudication` and `RulesInfraction`
+  methods; PGN decoding sets them from the `Termination` tag.
 - add `Game.Tags()`, which returns a copy of all PGN tags.
 - add `ParseFEN`, which returns a validated `*Position`.
 - add `Position.PseudoLegalMoves()`.

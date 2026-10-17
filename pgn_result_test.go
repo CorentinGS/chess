@@ -141,3 +141,33 @@ func TestParsePGNWithoutTagsKeepsCommentCommands(t *testing.T) {
 		t.Errorf("PGNGames over two tagless games yielded %d games", n)
 	}
 }
+
+func TestPGNTerminationTagSetsMethod(t *testing.T) {
+	cases := []struct {
+		termination string
+		result      string
+		want        chess.Method
+	}{
+		{"Time forfeit", "1-0", chess.TimeForfeit},
+		{"time forfeit", "1/2-1/2", chess.TimeForfeit},
+		{"Abandoned", "0-1", chess.Abandoned},
+		{"Adjudication", "1/2-1/2", chess.Adjudication},
+		{"Rules infraction", "1-0", chess.RulesInfraction},
+		{"Normal", "1-0", chess.NoMethod},
+		{"Abandoned", "1/2-1/2", chess.NoMethod}, // not a valid draw method
+	}
+	for _, tc := range cases {
+		pgn := "[Result \"" + tc.result + "\"]\n[Termination \"" + tc.termination + "\"]\n\n1. e4 e5 " + tc.result + "\n"
+		g, err := chess.ParsePGN(strings.NewReader(pgn))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if g.Method() != tc.want {
+			t.Errorf("Termination %q, Result %s: Method = %s, want %s", tc.termination, tc.result, g.Method(), tc.want)
+		}
+	}
+	g := chess.NewGame()
+	if err := g.SetOutcome(chess.WhiteWon, chess.TimeForfeit); err != nil {
+		t.Errorf("SetOutcome(WhiteWon, TimeForfeit): %v", err)
+	}
+}
