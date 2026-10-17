@@ -72,6 +72,10 @@ All notable changes to this project will be documented in this file. See [conven
   1.e4), matching `MoveNode.Ply()`; it used to be one higher.
 
 #### Fixes
+- a finished game accepts moves played from an earlier node: they become
+  variations and keep the game's outcome, which belongs to the main line.
+  Only extending the main line of a finished game returns
+  `ErrGameAlreadyEnded`; promoting a line re-evaluates the outcome.
 - PGN framing: a game without tags is no longer dropped when it precedes a
   tagged game or contains a `[%...]` command, consecutive games without tags
   are split, and a leading UTF-8 byte order mark is skipped.

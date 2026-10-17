@@ -119,19 +119,48 @@ func (g *Game) UnsafeMove(move Move, options *MoveInsertOptions) (*MoveNode, err
 
 // moveUnchecked is the internal implementation that performs the move without validation.
 // This is shared by both Move (after validation) and MoveUnchecked.
+//
+// The game's outcome belongs to its main line. Extending the main line of a
+// finished game fails with ErrGameAlreadyEnded; a move played from any other
+// node starts or extends a variation and leaves the outcome alone. When the
+// move changes the end of the main line (extending it, or through
+// PromoteToMainLine), the outcome is re-evaluated at the new final position.
 func (g *Game) moveUnchecked(move Move, options *MoveInsertOptions) (*MoveNode, error) {
-	if g.outcome != NoOutcome {
+	if g.outcome != NoOutcome && isMainLineEnd(g.tree.Current()) {
 		return nil, ErrGameAlreadyEnded
 	}
 
+	oldEnd := g.tree.mainLineEnd()
 	node, err := g.tree.addMove(move, options)
 	if err != nil {
 		return nil, err
 	}
 
-	g.evaluatePositionStatus()
+	if end := g.tree.mainLineEnd(); end != oldEnd {
+		if end == node {
+			g.evaluatePositionStatus()
+		} else {
+			defer g.tree.setCurrent(node)
+			g.tree.setCurrent(end)
+			g.evaluatePositionStatus()
+		}
+	}
 
 	return node, nil
+}
+
+// isMainLineEnd reports whether n is the last node of the main line: it has
+// no continuation and every node from the root to n is a main continuation.
+func isMainLineEnd(n *MoveNode) bool {
+	if n == nil || len(n.children) > 0 {
+		return false
+	}
+	for ; n.parent != nil; n = n.parent {
+		if n.parent.children[0] != n {
+			return false
+		}
+	}
+	return true
 }
 
 // NullMove appends a null move (a side-to-move flip with no piece movement)

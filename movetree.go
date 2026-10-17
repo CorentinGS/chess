@@ -83,6 +83,16 @@ func (t *MoveTree) MainLine() []*MoveNode {
 	return nodes
 }
 
+// mainLineEnd returns the last node of the main line (the root when the
+// tree has no moves).
+func (t *MoveTree) mainLineEnd() *MoveNode {
+	n := t.root
+	for n != nil && len(n.children) > 0 {
+		n = n.children[0]
+	}
+	return n
+}
+
 func (t *MoveTree) addMove(move Move, options *MoveInsertOptions) (*MoveNode, error) {
 	if t == nil || t.current == nil {
 		return nil, errors.New("chess: move tree has no current position")

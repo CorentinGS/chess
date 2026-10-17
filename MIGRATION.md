@@ -305,8 +305,10 @@ if err := game.Resign(chess.Black); err != nil {
 
 ## Terminal outcome guards
 
-`Move`, `UnsafeMove`, `MoveText` and `UnsafeMoveText` reject moves once the game has
-reached a terminal outcome and return `chess.ErrGameAlreadyEnded`. Call
+The outcome belongs to the main line. `Move`, `UnsafeMove`, `MoveText` and
+`UnsafeMoveText` reject a move that would extend the main line of a finished
+game with `chess.ErrGameAlreadyEnded`; from an earlier node (after
+`MoveTree().GoBack()`, say) they add a variation and keep the outcome. Call
 `Game.ClearOutcome()` to resume, or `Game.SetOutcome(outcome, method)` to
 set an outcome explicitly with validation. `Split()` now recomputes each line's
 outcome from its leaf position instead of copying the parent outcome.

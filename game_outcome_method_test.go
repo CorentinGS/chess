@@ -160,24 +160,50 @@ func TestResignSetsOpponentWinner(t *testing.T) {
 	}
 }
 
-func TestMoveAfterGoBackFromTerminalStillRejected(t *testing.T) {
+func TestFinishedGameAcceptsVariationsButNotMainLineMoves(t *testing.T) {
 	g := chess.NewGame()
-	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
-		t.Fatal(err)
+	for _, san := range []string{"f3", "e5", "g4", "Qh4#"} {
+		if _, err := g.MoveText(san, chess.SAN(), nil); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := g.SetOutcome(chess.WhiteWon, chess.Checkmate); err != nil {
-		t.Fatal(err)
+	if g.Outcome() != chess.BlackWon {
+		t.Fatalf("outcome = %s, want 0-1", g.Outcome())
 	}
+
+	// At the end of the main line the game is over.
+	if _, err := g.NullMove(nil); !errors.Is(err, chess.ErrGameAlreadyEnded) {
+		t.Fatalf("move after mate: error = %v, want ErrGameAlreadyEnded", err)
+	}
+
+	// From an earlier node a move is analysis: it adds a variation and the
+	// game keeps its result.
 	if !g.MoveTree().GoBack() {
 		t.Fatal("GoBack failed")
 	}
-	if g.Outcome() != chess.WhiteWon {
-		t.Fatalf("outcome lost after GoBack: %s", g.Outcome())
+	node, err := g.MoveText("Qe7", chess.SAN(), nil)
+	if err != nil {
+		t.Fatalf("variation after GoBack: %v", err)
 	}
-	move := g.LegalMoves()[0]
-	_, err := g.Move(move, nil)
-	if !errors.Is(err, chess.ErrGameAlreadyEnded) {
-		t.Errorf("error = %v, want ErrGameAlreadyEnded", err)
+	if g.Outcome() != chess.BlackWon || g.Method() != chess.Checkmate {
+		t.Fatalf("variation changed the outcome to %s %s", g.Outcome(), g.Method())
+	}
+	if len(node.Parent().Variations()) != 1 {
+		t.Fatalf("Qe7 should be a variation, got %d variations", len(node.Parent().Variations()))
+	}
+	// Extending the variation is allowed too.
+	if _, err := g.MoveText("Nc3", chess.SAN(), nil); err != nil {
+		t.Fatalf("extending the variation: %v", err)
+	}
+
+	// Promoting a line to the main line re-evaluates the outcome.
+	g.MoveTree().GoBack()
+	g.MoveTree().GoBack()
+	if _, err := g.MoveText("Qe7", chess.SAN(), &chess.MoveInsertOptions{PromoteToMainLine: true}); err != nil {
+		t.Fatal(err)
+	}
+	if g.Outcome() != chess.NoOutcome {
+		t.Fatalf("after promoting an unfinished line, outcome = %s, want *", g.Outcome())
 	}
 }
 
