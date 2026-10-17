@@ -5,18 +5,18 @@ import (
 	"fmt"
 )
 
-// PGNError custom error types for different PGN errors.
-type PGNError struct {
+// pgnLexError is a lexer diagnostic attached to a PGN token.
+type pgnLexError struct {
 	msg string
 	pos int // position where error occurred
 }
 
-func (e *PGNError) Error() string {
+func (e *pgnLexError) Error() string {
 	return e.msg
 }
 
-func (e *PGNError) Is(target error) bool {
-	var t *PGNError
+func (e *pgnLexError) Is(target error) bool {
+	var t *pgnLexError
 	ok := errors.As(target, &t)
 	if !ok {
 		return false
@@ -25,17 +25,19 @@ func (e *PGNError) Is(target error) bool {
 	return e.msg == t.msg
 }
 
-// Package-level error sentinels and constructors used throughout the PGN
-// parser. These are immutable factories, not mutable global state, so the
-// gochecknoglobals warning is a false positive.
+// Lexer diagnostic constructors, internal to the PGN lexer.
 var (
-	ErrUnterminatedComment = func(pos int) error { return &PGNError{"unterminated comment", pos} }
-	ErrUnterminatedQuote   = func(pos int) error { return &PGNError{"unterminated quote", pos} }
-	ErrInvalidCommand      = func(pos int) error { return &PGNError{"invalid command in comment", pos} }
-	ErrInvalidPiece        = func(pos int) error { return &PGNError{"invalid piece", pos} }
-	ErrInvalidSquare       = func(pos int) error { return &PGNError{"invalid square", pos} }
-	ErrInvalidRank         = func(pos int) error { return &PGNError{"invalid rank", pos} }
+	errUnterminatedComment = func(pos int) error { return &pgnLexError{"unterminated comment", pos} }
+	errUnterminatedQuote   = func(pos int) error { return &pgnLexError{"unterminated quote", pos} }
+	errInvalidCommand      = func(pos int) error { return &pgnLexError{"invalid command in comment", pos} }
+	errInvalidPiece        = func(pos int) error { return &pgnLexError{"invalid piece", pos} }
+	errInvalidSquare       = func(pos int) error { return &pgnLexError{"invalid square", pos} }
+	errInvalidRank         = func(pos int) error { return &pgnLexError{"invalid rank", pos} }
+)
 
+// Error sentinels. Errors returned by this package wrap them, so callers can
+// branch with errors.Is.
+var (
 	// ErrInvalidFEN is the sentinel for any FEN parse failure. Specific
 	// causes are wrapped with %w so callers can errors.Is(err, ErrInvalidFEN)
 	// without inspecting message text.
@@ -54,14 +56,28 @@ var (
 	ErrGameAlreadyEnded = errors.New("chess: game already ended")
 )
 
+// ParserError describes where PGN parsing failed. Errors from ParsePGN and
+// the other PGN decoders wrap it together with ErrInvalidPGN; use errors.As to
+// read it. When the failure has a cause, such as an illegal move (ErrIllegalMove)
+// or a bad FEN tag (ErrInvalidFEN), errors.Is reaches it through Unwrap.
 type ParserError struct {
-	Message    string
+	// Message describes the failure.
+	Message string
+	// TokenValue is the text of the token where parsing stopped, if any.
 	TokenValue string
-	tokenType  pgnTokenType
-	Position   int
+	// Position is the index of that token within the game record.
+	Position int
+
+	tokenType pgnTokenType
+	err       error
 }
 
 func (e *ParserError) Error() string {
-	return fmt.Sprintf("parser error at position %d: %s (Token: %v, Value: %s)",
+	return fmt.Sprintf("parser error at token %d: %s (Token: %v, Value: %s)",
 		e.Position, e.Message, e.tokenType, e.TokenValue)
+}
+
+// Unwrap returns the underlying cause, or nil.
+func (e *ParserError) Unwrap() error {
+	return e.err
 }

@@ -146,7 +146,7 @@ func (p *pgnParser) Parse() (*Game, error) {
 
 	// Parse header section (tag pairs)
 	if err := p.parseHeader(); err != nil {
-		return nil, fmt.Errorf("%w: parsing header: %w", ErrInvalidPGN, err)
+		return nil, fmt.Errorf("parsing header: %w", err)
 	}
 
 	p.tagOutcome = outcomeFromResultString(p.game.tagPairs["Result"])
@@ -187,7 +187,7 @@ func (p *pgnParser) Parse() (*Game, error) {
 func (p *pgnParser) resolveOutcome() error {
 	outcome, method, err := arbitratePGNOutcome(p.game.outcome, p.game.method, p.tagOutcome, p.tokenOutcome)
 	if err != nil {
-		return &ParserError{Message: err.Error(), Position: p.position}
+		return &ParserError{Message: err.Error(), Position: p.position, err: err}
 	}
 	p.game.outcome = outcome
 	p.game.method = method
@@ -420,6 +420,7 @@ func (p *pgnParser) parseMove() (Move, error) {
 		return Move{}, &ParserError{
 			Message:  strings.TrimPrefix(ErrInvalidMoveText.Error()+": "+err.Error(), "chess: "),
 			Position: p.position,
+			err:      err,
 		}
 	}
 	return move, nil

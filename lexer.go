@@ -172,7 +172,7 @@ func (l *pgnLexer) readCommandParam() pgnToken {
 			l.readChar()
 		}
 		if l.ch == 0 {
-			return pgnToken{Type: tokEOF, Error: ErrUnterminatedQuote(position)}
+			return pgnToken{Type: tokEOF, Error: errUnterminatedQuote(position)}
 		}
 		value := l.input[position:l.position]
 		l.readChar() // skip closing quote
@@ -186,7 +186,7 @@ func (l *pgnLexer) readCommandParam() pgnToken {
 	}
 
 	if l.ch == '}' && l.inCommand {
-		return pgnToken{Type: tokEOF, Error: ErrInvalidCommand(l.position)}
+		return pgnToken{Type: tokEOF, Error: errInvalidCommand(l.position)}
 	}
 
 	l.inCommandParam = l.ch == ',' // set flag if we are still in a command parameter
@@ -239,7 +239,7 @@ func (l *pgnLexer) readRank() pgnToken {
 	rank := l.input[l.position : l.position+1]
 	if !isRank(l.ch) {
 		l.readChar()
-		return pgnToken{Type: tokRank, Error: ErrInvalidRank(l.position), Value: rank}
+		return pgnToken{Type: tokRank, Error: errInvalidRank(l.position), Value: rank}
 	}
 	l.readChar()
 	return pgnToken{Type: tokRank, Value: rank}
@@ -268,7 +268,7 @@ func (l *pgnLexer) readComment() pgnToken {
 			if l.ch == 0 {
 				return pgnToken{
 					Type:  tokEOF,
-					Error: ErrInvalidCommand(l.position),
+					Error: errInvalidCommand(l.position),
 				}
 			}
 			return pgnToken{Type: tokCommandStart, Value: "[%"}
@@ -281,7 +281,7 @@ func (l *pgnLexer) readComment() pgnToken {
 		l.readChar()
 		return pgnToken{
 			Type:  tokEOF,
-			Error: ErrUnterminatedComment(position),
+			Error: errUnterminatedComment(position),
 		}
 	}
 
@@ -304,7 +304,7 @@ func (l *pgnLexer) readPieceMove() pgnToken {
 	piece := l.input[l.position : l.position+1]
 	if !isPiece(l.ch) {
 		l.readChar()
-		return pgnToken{Type: tokPiece, Error: ErrInvalidPiece(l.position), Value: piece}
+		return pgnToken{Type: tokPiece, Error: errInvalidPiece(l.position), Value: piece}
 	}
 	l.readChar()
 
@@ -377,7 +377,7 @@ func (l *pgnLexer) readMove() pgnToken {
 	// Validate the square (e.g., "e4")
 	if length < 2 || !isFile(l.input[position]) || position+1 >= len(l.input) || !isDigit(l.input[position+1]) {
 		l.readChar()
-		return pgnToken{Type: tokSquare, Value: "", Error: ErrInvalidSquare(position)}
+		return pgnToken{Type: tokSquare, Value: "", Error: errInvalidSquare(position)}
 	}
 
 	return pgnToken{Type: tokSquare, Value: l.input[position:l.position]}
@@ -387,7 +387,7 @@ func (l *pgnLexer) readPromotionPiece() pgnToken {
 	piece := l.input[l.position : l.position+1]
 	if !isPiece(l.ch) {
 		l.readChar()
-		return pgnToken{Type: tokPromotionPiece, Error: ErrInvalidPiece(l.position), Value: piece}
+		return pgnToken{Type: tokPromotionPiece, Error: errInvalidPiece(l.position), Value: piece}
 	}
 	l.readChar()
 	return pgnToken{Type: tokPromotionPiece, Value: piece}

@@ -250,6 +250,7 @@ These v2 exports have no direct v3 equivalent under the same name:
 | `WithExpandVariations()` | `WithPGNExpandVariations()` |
 | `NewLexer`, `Lexer`, `Token`, `TokenType` and its constants | _(removed)_; the PGN lexer is internal. Use `PGNEvents` for token-level access to moves, comments and tags. |
 | `ParserError.TokenType` | _(unexported)_; it still appears in `Error()` |
+| `PGNError`, `ErrUnterminatedComment`, `ErrInvalidSquare`, ... | _(removed)_; PGN errors wrap `ErrInvalidPGN` and carry a `*ParserError` |
 
 The `Parse*` helpers return an error instead of the `NoColor` / `NoSquare` /
 `NoPieceType` sentinel, so wrap them if you relied on the sentinel:

@@ -141,7 +141,11 @@ type PGNRecord struct {
 
 // Decode parses this record into a Game.
 func (r PGNRecord) Decode(opts ...PGNOption) (*Game, error) {
-	return parsePGNText(r.Raw, applyPGNOptions(opts))
+	game, err := parsePGNText(r.Raw, applyPGNOptions(opts))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidPGN, err)
+	}
+	return game, nil
 }
 
 // Tags returns the PGN tag pairs in this record without building a Game.

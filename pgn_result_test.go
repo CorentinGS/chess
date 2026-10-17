@@ -83,3 +83,36 @@ func TestPGNTerminalVariationDoesNotSetMainLineOutcome(t *testing.T) {
 		t.Fatalf("Method() = %v, want %v", got, chess.NoMethod)
 	}
 }
+
+func TestIllegalMoveErrorsWrapErrIllegalMove(t *testing.T) {
+	g := chess.NewGame()
+	if _, err := g.Move(chess.NewMove(chess.E2, chess.E5), nil); !errors.Is(err, chess.ErrIllegalMove) {
+		t.Errorf("Game.Move(e2e5) error = %v, want ErrIllegalMove", err)
+	}
+	if _, err := g.MoveText("Qxh7", chess.SAN(), nil); !errors.Is(err, chess.ErrIllegalMove) {
+		t.Errorf("Game.MoveText(Qxh7) error = %v, want ErrIllegalMove", err)
+	}
+	if _, err := g.MoveText("e2e5", chess.UCI(), nil); !errors.Is(err, chess.ErrIllegalMove) {
+		t.Errorf("Game.MoveText(e2e5, UCI) error = %v, want ErrIllegalMove", err)
+	}
+	if _, err := chess.SAN().Decode(g.Position(), "Nf6"); !errors.Is(err, chess.ErrIllegalMove) {
+		t.Errorf("SAN().Decode(Nf6) error = %v, want ErrIllegalMove", err)
+	}
+
+	_, err := chess.ParsePGN(strings.NewReader("1. e4 e5 2. Qxh7 *"))
+	if !errors.Is(err, chess.ErrInvalidPGN) || !errors.Is(err, chess.ErrIllegalMove) {
+		t.Errorf("ParsePGN(illegal) error = %v, want ErrInvalidPGN and ErrIllegalMove", err)
+	}
+	var pe *chess.ParserError
+	if !errors.As(err, &pe) {
+		t.Fatalf("ParsePGN(illegal) error = %v, want *ParserError", err)
+	}
+	if strings.Count(err.Error(), "invalid PGN") != 1 {
+		t.Errorf("error repeats its prefix: %v", err)
+	}
+
+	_, err = chess.ParsePGN(strings.NewReader("[Event \"x"))
+	if strings.Count(err.Error(), "invalid PGN") != 1 {
+		t.Errorf("header error repeats its prefix: %v", err)
+	}
+}

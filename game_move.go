@@ -84,7 +84,7 @@ func (g *Game) Move(move Move, options *MoveInsertOptions) (*MoveNode, error) {
 	options = cmp.Or(options, &MoveInsertOptions{})
 
 	if move.HasTag(Null) {
-		return nil, errors.New("chess: null move is not valid for the current position")
+		return nil, fmt.Errorf("%w: null moves go through Game.NullMove", ErrIllegalMove)
 	}
 
 	canonical, err := resolveCanonicalMove(g.currentPosition(), move)

@@ -52,8 +52,19 @@ All notable changes to this project will be documented in this file. See [conven
 - remove `Game.MoveList`, `MoveList` and `MoveListEntry`; use `Game.Moves` or
   the nodes of `MoveTree().MainLine()`.
 - in `polyglot`, `RawMove.ToMove` is `ChessMove` and `FindMoves` is `Entries`.
+- make the lexer diagnostics internal: `PGNError` and the
+  `ErrUnterminatedComment`, `ErrUnterminatedQuote`, `ErrInvalidCommand`,
+  `ErrInvalidPiece`, `ErrInvalidSquare`, `ErrInvalidRank` constructors never
+  reached callers.
 - `Position.Ply()` now counts half-moves played (0 at the start, 1 after
   1.e4), matching `MoveNode.Ply()`; it used to be one higher.
+
+#### Fixes
+- every illegal-move error wraps `ErrIllegalMove`, including SAN and UCI move
+  text and PGN decoding; `ParserError` gains `Unwrap` so `errors.Is` reaches
+  the cause.
+- PGN header errors no longer repeat the "invalid PGN" prefix, and
+  `PGNRecord.Decode` errors now wrap `ErrInvalidPGN` like the other decoders.
 
 #### Features
 - add `Game.Tags()`, which returns a copy of all PGN tags.

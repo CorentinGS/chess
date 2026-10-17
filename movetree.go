@@ -486,7 +486,7 @@ func validatePositionMove(pos *Position, move Move) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("move %s is not valid for the current position", move.String())
+	return fmt.Errorf("%w %s: not valid for the current position", ErrIllegalMove, move.String())
 }
 
 // collectPaths returns all paths from the given move to each leaf node.

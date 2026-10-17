@@ -7,7 +7,6 @@
 package chess
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -89,7 +88,7 @@ func resolveSANMove(pos *Position, data sanMoveData) (Move, error) {
 		return matched, nil
 	}
 	if len(mismatchReasons) > 0 {
-		return Move{}, fmt.Errorf("chess: no legal move found for position: %s", strings.Join(mismatchReasons, "; "))
+		return Move{}, fmt.Errorf("%w: no legal move matches: %s", ErrIllegalMove, strings.Join(mismatchReasons, "; "))
 	}
 	return Move{}, errorsInvalidSANMove()
 }
@@ -255,7 +254,7 @@ func resolveSANCastle(pos *Position, castle string) (Move, error) {
 }
 
 func errorsInvalidSANMove() error {
-	return errors.New("chess: no legal move found for position")
+	return fmt.Errorf("%w: no legal move matches", ErrIllegalMove)
 }
 
 func squareFromFileRank(file, rank byte) Square {

@@ -6,8 +6,9 @@ import (
 	"math/bits"
 )
 
-// ErrIllegalMove is returned by resolveCanonicalMove when the supplied
-// coordinates do not match any legal move from the given Position.
+// ErrIllegalMove is wrapped by every error caused by a move that is not legal
+// in its position: Game.Move, Game.MoveText, MoveTextCodec.Decode for SAN, and
+// PGN decoding (through ParserError).
 var ErrIllegalMove = errors.New("chess: illegal move")
 
 // resolveCanonicalMove validates a caller-supplied Move against the legal
