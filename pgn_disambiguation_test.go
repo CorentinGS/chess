@@ -118,8 +118,8 @@ func TestPGN_ParsesFullSquareCapture(t *testing.T) {
 	}
 
 	move37 := moves[72]
-	if move37.S1() != G8 || move37.S2() != G7 {
-		t.Errorf("expected move 37 to be g8g7, got %s%s", move37.S1(), move37.S2())
+	if move37.From() != G8 || move37.To() != G7 {
+		t.Errorf("expected move 37 to be g8g7, got %s%s", move37.From(), move37.To())
 	}
 	if !move37.HasTag(Capture) {
 		t.Errorf("expected move 37 to have Capture tag")
@@ -148,7 +148,7 @@ func TestAlgebraicNotation_EncodeDisambiguation(t *testing.T) {
 			var target Move
 			found := false
 			for _, m := range pos.LegalMoves() {
-				if m.S1() == tc.from && m.S2() == tc.to {
+				if m.From() == tc.from && m.To() == tc.to {
 					target = m
 					found = true
 					break

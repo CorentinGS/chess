@@ -58,21 +58,16 @@ func NewNullMove() Move {
 	return Move{tags: Null}
 }
 
-// NewMove returns a Move from origin square s1 to destination square s2.
-// The optional promo argument supplies a promotion piece type; when omitted
-// the move has no promotion. Tags default to none.
-//
-// The constructor does not attempt to infer Capture or Check tags because
-// those depend on the position context (the piece on s1, the occupant of s2,
-// and whether the move leaves the opponent in check). Use Position.IsLegal
-// or Game.Move to obtain a fully tagged canonical Move when the position is
-// known.
-func NewMove(s1, s2 Square, promo ...PieceType) Move {
+// NewMove returns the move from one square to another, with an optional
+// promotion piece. It carries no tags: Capture, Check and the castling tags
+// depend on the position, so Game.Move and MoveTextCodec.Decode return the
+// fully tagged move, and Position.IsLegal accepts an untagged one.
+func NewMove(from, to Square, promo ...PieceType) Move {
 	var p PieceType
 	if len(promo) > 0 {
 		p = promo[0]
 	}
-	return Move{s1: s1, s2: s2, promo: p}
+	return Move{s1: from, s2: to, promo: p}
 }
 
 // A Move is the movement of a piece from one square to another.
@@ -89,18 +84,18 @@ func (m Move) String() string {
 	return m.s1.String() + m.s2.String() + m.promo.String()
 }
 
-// S1 returns the origin square of the move.
-func (m Move) S1() Square {
+// From returns the origin square of the move.
+func (m Move) From() Square {
 	return m.s1
 }
 
-// S2 returns the destination square of the move.
-func (m Move) S2() Square {
+// To returns the destination square of the move.
+func (m Move) To() Square {
 	return m.s2
 }
 
-// Promo returns promotion piece type of the move.
-func (m Move) Promo() PieceType {
+// Promotion returns promotion piece type of the move.
+func (m Move) Promotion() PieceType {
 	return m.promo
 }
 

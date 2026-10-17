@@ -73,6 +73,35 @@ type moveEffect struct {
 	rookTo   Square // castle rook destination, NoSquare if not a castle
 }
 
+// withPhysicalTags returns m with the EnPassant or castling tag set when the
+// board shows that m is one, so a move built with NewMove applies correctly:
+// a pawn landing on the empty en passant square captures en passant, and in
+// standard chess a king moving two files from its start square castles.
+// Chess960 castling cannot be told apart from a king step by its squares, so
+// it must already carry its tag.
+func withPhysicalTags(pos *Position, m Move) Move {
+	if m.tags&(Null|EnPassant|KingSideCastle|QueenSideCastle) != 0 {
+		return m
+	}
+	switch pos.board.Piece(m.s1).Type() {
+	case Pawn:
+		if m.s2 == pos.enPassantSquare && m.s1.File() != m.s2.File() && !pos.board.isOccupied(m.s2) {
+			m.tags |= EnPassant
+		}
+	case King:
+		if pos.variant == Chess960 || (m.s1 != E1 && m.s1 != E8) || m.s1.Rank() != m.s2.Rank() {
+			return m
+		}
+		switch int(m.s2.File()) - int(m.s1.File()) {
+		case 2:
+			m.tags |= KingSideCastle
+		case -2:
+			m.tags |= QueenSideCastle
+		}
+	}
+	return m
+}
+
 // computeMoveEffect derives the physical facts of m from the pre-move board.
 // It is the only place that knows how the special-move tags (EnPassant,
 // KingSideCastle, QueenSideCastle) map to physical effects; both Board.update

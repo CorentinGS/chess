@@ -274,9 +274,9 @@ func decodeRawUCI(s string) (RawMoveText, error) {
 		return RawMoveText{null: true}, nil
 	}
 	return RawMoveText{
-		from:      move.S1(),
-		to:        move.S2(),
-		promotion: move.Promo(),
+		from:      move.From(),
+		to:        move.To(),
+		promotion: move.Promotion(),
 	}, nil
 }
 

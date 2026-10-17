@@ -159,9 +159,9 @@ const (
 )
 
 func moveKey(move chess.Move) uint32 {
-	return uint32(move.S1()) |
-		uint32(move.S2())<<moveKeySquareBits |
-		uint32(move.Promo())<<moveKeyPromoShift
+	return uint32(move.From()) |
+		uint32(move.To())<<moveKeySquareBits |
+		uint32(move.Promotion())<<moveKeyPromoShift
 }
 
 type node struct {

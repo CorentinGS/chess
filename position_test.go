@@ -211,8 +211,8 @@ func TestLegalMovesFastPreservesMoveIdentityAndOrder(t *testing.T) {
 			t.Fatalf("FEN %q fast moves=%d, annotated=%d", fen, len(fast), len(annotated))
 		}
 		for index := range annotated {
-			if fast[index].S1() != annotated[index].S1() || fast[index].S2() != annotated[index].S2() ||
-				fast[index].Promo() != annotated[index].Promo() {
+			if fast[index].From() != annotated[index].From() || fast[index].To() != annotated[index].To() ||
+				fast[index].Promotion() != annotated[index].Promotion() {
 				t.Fatalf("FEN %q move %d identity/order differs: fast=%v annotated=%v", fen, index, fast[index], annotated[index])
 			}
 		}

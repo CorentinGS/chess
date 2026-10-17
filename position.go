@@ -176,14 +176,13 @@ func (pos *Position) IsLegal(m Move) bool {
 	return false
 }
 
-// Update returns a new position resulting from the given move.
-// The move isn't validated - use Game.Move() for validation.
-// This method is optimized for move generation where validation
-// is handled separately.
+// Update returns the position after m, leaving pos unchanged. It does not
+// check legality: pass a move from LegalMoves or one checked with IsLegal.
+// A move built with NewMove works, including standard castling and en
+// passant; Chess960 castling must carry its castling tag (take it from
+// LegalMoves or decode it with a MoveTextCodec).
 //
-// Example:
-//
-//	newPos := pos.Update(move)
+//	next := pos.Update(chess.NewMove(chess.E2, chess.E4))
 func (pos *Position) Update(m Move) *Position {
 	// Null moves flip the side to move without touching the board.
 	if m.HasTag(Null) {
@@ -206,7 +205,7 @@ func (pos *Position) Update(m Move) *Position {
 		variant:         pos.variant,
 		hash:            pos.hash,
 	}
-	newPos.applyMove(m)
+	newPos.applyMove(withPhysicalTags(pos, m))
 	return newPos
 }
 
@@ -222,7 +221,7 @@ func (pos *Position) ApplyInPlace(m Move) {
 		*pos = *next
 		return
 	}
-	pos.applyMove(m)
+	pos.applyMove(withPhysicalTags(pos, m))
 }
 
 // updateHash computes the new Zobrist hash incrementally from a move. It

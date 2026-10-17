@@ -310,8 +310,8 @@ func TestChess960CastlingKingSide(t *testing.T) {
 	if !found {
 		t.Fatal("no king-side castle move generated")
 	}
-	if castle.S1() != D1 || castle.S2() != G1 {
-		t.Errorf("castle = %s%s, want d1g1", castle.S1(), castle.S2())
+	if castle.From() != D1 || castle.To() != G1 {
+		t.Errorf("castle = %s%s, want d1g1", castle.From(), castle.To())
 	}
 	if san := (algebraicNotation{}).Encode(pos, castle); san != "O-O" {
 		t.Errorf("SAN = %q, want O-O", san)
@@ -498,7 +498,7 @@ func TestChess960CastlingEdgeCases(t *testing.T) {
 			}
 			if !tc.want.legal {
 				if seen {
-					t.Errorf("castle move generated, want none: %s%s", castle.S1(), castle.S2())
+					t.Errorf("castle move generated, want none: %s%s", castle.From(), castle.To())
 				}
 				return
 			}
@@ -514,8 +514,8 @@ func TestChess960CastlingEdgeCases(t *testing.T) {
 					t.Fatal("no castle move generated")
 				}
 			}
-			if castle.S1() != tc.want.kingFrom || castle.S2() != tc.want.kingTo {
-				t.Errorf("king %s%s, want %s%s", castle.S1(), castle.S2(), tc.want.kingFrom, tc.want.kingTo)
+			if castle.From() != tc.want.kingFrom || castle.To() != tc.want.kingTo {
+				t.Errorf("king %s%s, want %s%s", castle.From(), castle.To(), tc.want.kingFrom, tc.want.kingTo)
 			}
 			pos2 := pos.Update(castle)
 			if pos2.Board().Piece(tc.want.kingTo) != WhiteKing {
@@ -634,8 +634,8 @@ func TestUCIDecodeChess960AcceptsBothCastleForms(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Decode(%q): %v", tc.in, err)
 			}
-			if m.S1() != C1 || m.S2() != G1 {
-				t.Errorf("Decode(%q) = %v-%v, want c1-g1", tc.in, m.S1(), m.S2())
+			if m.From() != C1 || m.To() != G1 {
+				t.Errorf("Decode(%q) = %v-%v, want c1-g1", tc.in, m.From(), m.To())
 			}
 			if !m.HasTag(KingSideCastle) {
 				t.Errorf("Decode(%q): missing KingSideCastle tag", tc.in)
@@ -679,8 +679,8 @@ func TestUCIDecodeChess960QueenSideCastleForms(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Decode(%q): %v", tc.in, err)
 			}
-			if m.S1() != F1 || m.S2() != C1 {
-				t.Errorf("Decode(%q) = %v-%v, want f1-c1", tc.in, m.S1(), m.S2())
+			if m.From() != F1 || m.To() != C1 {
+				t.Errorf("Decode(%q) = %v-%v, want f1-c1", tc.in, m.From(), m.To())
 			}
 			if !m.HasTag(QueenSideCastle) {
 				t.Errorf("Decode(%q): missing QueenSideCastle tag", tc.in)

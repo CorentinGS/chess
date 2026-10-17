@@ -601,12 +601,12 @@ func TestMoveNodeClone(t *testing.T) {
 
 func TestNewMove(t *testing.T) {
 	m := NewMove(E2, E4)
-	if m.S1() != E2 || m.S2() != E4 || m.Promo() != NoPieceType || m.HasTag(Capture) || m.HasTag(Check) {
+	if m.From() != E2 || m.To() != E4 || m.Promotion() != NoPieceType || m.HasTag(Capture) || m.HasTag(Check) {
 		t.Fatalf("NewMove(E2, E4) = %v, want e2-e4 with no tags", m)
 	}
 
 	promo := NewMove(E7, E8, Queen)
-	if promo.S1() != E7 || promo.S2() != E8 || promo.Promo() != Queen {
+	if promo.From() != E7 || promo.To() != E8 || promo.Promotion() != Queen {
 		t.Fatalf("NewMove(E7, E8, Queen) = %v, want e7-e8=Q", promo)
 	}
 
@@ -614,7 +614,7 @@ func TestNewMove(t *testing.T) {
 	pos := StartingPosition()
 	var found bool
 	for _, legal := range pos.LegalMoves() {
-		if legal.S1() == E2 && legal.S2() == E4 {
+		if legal.From() == E2 && legal.To() == E4 {
 			found = true
 			break
 		}

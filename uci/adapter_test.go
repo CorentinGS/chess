@@ -290,8 +290,8 @@ func Test_FakeAdapter_CmdPositionStoredOnEngine(t *testing.T) {
 	if bestMove == (chess.Move{}) {
 		t.Fatal("expected best move decoded against non-starting position")
 	}
-	if bestMove.S1().String() != "e7" || bestMove.S2().String() != "e5" {
-		t.Errorf("expected e7e5, got %s%s", bestMove.S1(), bestMove.S2())
+	if bestMove.From().String() != "e7" || bestMove.To().String() != "e5" {
+		t.Errorf("expected e7e5, got %s%s", bestMove.From(), bestMove.To())
 	}
 }
 

@@ -219,6 +219,7 @@ listed:
 | `Engine.Getpid()` | `Engine.Pid()` |
 | `Position.Ply()` (1 at the start) | `Position.Ply()` (0 at the start, like `MoveNode.Ply()`) |
 | _(none)_ | `Position.FullMoveNumber()` |
+| `Move.S1()`, `Move.S2()`, `Move.Promo()` | `Move.From()`, `Move.To()`, `Move.Promotion()` |
 | `Position.Status()` | `Position.Method()`, like `Game.Method()` |
 | _(none)_ | `Position.Setup()`, to edit a position and rebuild it with `NewPosition` |
 | `Setup.FullMoveNo` | `Setup.FullMoveNumber` |

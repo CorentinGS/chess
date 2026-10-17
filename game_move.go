@@ -111,7 +111,9 @@ func (g *Game) Move(move Move, options *MoveInsertOptions) (*MoveNode, error) {
 //	}
 func (g *Game) UnsafeMove(move Move, options *MoveInsertOptions) (*MoveNode, error) {
 	options = cmp.Or(options, &MoveInsertOptions{})
-
+	if pos := g.currentPosition(); pos != nil {
+		move = withPhysicalTags(pos, move)
+	}
 	return g.moveUnchecked(move, options)
 }
 

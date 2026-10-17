@@ -624,7 +624,7 @@ func TestBookKeyedByPositionZobristHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(moves) != 1 || !pos.IsLegal(moves[0]) || moves[0].S1() != chess.E2 || moves[0].S2() != chess.E4 {
+	if len(moves) != 1 || !pos.IsLegal(moves[0]) || moves[0].From() != chess.E2 || moves[0].To() != chess.E4 {
 		t.Fatalf("Moves(start) = %v, want [e2e4]", moves)
 	}
 }

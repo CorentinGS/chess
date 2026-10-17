@@ -1969,7 +1969,7 @@ func TestGameMoveValidation(t *testing.T) {
 			}
 
 			stored := game.MoveTree().Current().Move()
-			if stored.S1() != tt.move.S1() || stored.S2() != tt.move.S2() || stored.Promo() != tt.move.Promo() {
+			if stored.From() != tt.move.From() || stored.To() != tt.move.To() || stored.Promotion() != tt.move.Promotion() {
 				t.Errorf("Move() identity mismatch: got %v, want %v", stored, tt.move)
 			}
 		})
@@ -2055,7 +2055,7 @@ func TestGameUnsafeMove(t *testing.T) {
 			}
 
 			stored := game.MoveTree().Current().Move()
-			if stored.S1() != tt.move.S1() || stored.S2() != tt.move.S2() || stored.Promo() != tt.move.Promo() {
+			if stored.From() != tt.move.From() || stored.To() != tt.move.To() || stored.Promotion() != tt.move.Promotion() {
 				t.Errorf("UnsafeMove() identity mismatch: got %v, want %v", stored, tt.move)
 			}
 		})

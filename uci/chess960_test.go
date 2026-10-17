@@ -182,8 +182,8 @@ func TestEngineDecodesBestMoveKingToRook(t *testing.T) {
 		t.Fatalf("CmdGo: %v", err)
 	}
 	best := eng.SearchResults().BestMove
-	if best.S1() != chess.E1 || best.S2() != chess.G1 {
-		t.Fatalf("bestmove = %v-%v, want e1-g1 (canonical castle)", best.S1(), best.S2())
+	if best.From() != chess.E1 || best.To() != chess.G1 {
+		t.Fatalf("bestmove = %v-%v, want e1-g1 (canonical castle)", best.From(), best.To())
 	}
 	if !best.HasTag(chess.KingSideCastle) {
 		t.Errorf("bestmove %v: missing KingSideCastle tag", best)
@@ -203,7 +203,7 @@ func TestCmdPositionEncodesChess960CastleKingToRook(t *testing.T) {
 			break
 		}
 	}
-	if castle.S1() != chess.E1 { // sanity: a castle exists
+	if castle.From() != chess.E1 { // sanity: a castle exists
 		t.Fatalf("no king-side castle found in position")
 	}
 	got := uci.CmdPosition{Position: pos, Moves: []chess.Move{castle}}.String()
@@ -239,7 +239,7 @@ func TestCmdPositionReplaysChess960MovesBeforeCastle(t *testing.T) {
 			break
 		}
 	}
-	if castle.S1() != chess.E1 {
+	if castle.From() != chess.E1 {
 		t.Fatal("no king-side castle found after the preceding moves")
 	}
 

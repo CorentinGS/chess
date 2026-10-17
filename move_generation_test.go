@@ -225,7 +225,7 @@ func TestLegalMovesInCheckScenarios(t *testing.T) {
 	t.Run("double_check_only_king_moves", func(t *testing.T) {
 		pos := positionFromFEN(t, "rnb1kbnr/pppp2pp/5N2/6pQ/8/8/PPPPPPPP/RNB1KB1R b KQkq - 0 1")
 		for _, move := range pos.LegalMoves() {
-			if move.S1() != chess.E8 {
+			if move.From() != chess.E8 {
 				t.Fatalf("double check generated non-king move %s", move)
 			}
 		}
@@ -239,7 +239,7 @@ func TestLegalMovesInCheckScenarios(t *testing.T) {
 	t.Run("discovered_check_tag", func(t *testing.T) {
 		pos := positionFromFEN(t, "4k3/8/8/8/4N3/8/8/4R1K1 w - - 0 1")
 		for _, move := range pos.LegalMoves() {
-			if move.S1() == chess.E4 && move.HasTag(chess.Check) {
+			if move.From() == chess.E4 && move.HasTag(chess.Check) {
 				return
 			}
 		}
@@ -315,7 +315,7 @@ func TestSlidingPieceLegalMovesWithBlockers(t *testing.T) {
 func moveStringsFrom(moves []chess.Move, from chess.Square) []string {
 	out := make([]string, 0, len(moves))
 	for _, move := range moves {
-		if move.S1() == from {
+		if move.From() == from {
 			out = append(out, move.String())
 		}
 	}
@@ -402,4 +402,56 @@ func TestPositionPlyMatchesMoveNodePly(t *testing.T) {
 			t.Fatalf("after %s: FullMoveNumber() = %d, want %d", san, pos.FullMoveNumber(), node.Ply()/2+1)
 		}
 	}
+}
+
+func TestUpdateInfersSpecialMovesFromNewMove(t *testing.T) {
+	cases := []struct {
+		name, fen string
+		move      chess.Move
+	}{
+		{"white_kingside_castle", "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", chess.NewMove(chess.E1, chess.G1)},
+		{"black_queenside_castle", "r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", chess.NewMove(chess.E8, chess.C8)},
+		{"en_passant", "rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3", chess.NewMove(chess.E5, chess.F6)},
+		{"promotion", "4k3/1P6/8/8/8/8/8/4K3 w - - 0 1", chess.NewMove(chess.B7, chess.B8, chess.Queen)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pos := positionFromFEN(t, tc.fen)
+			var tagged chess.Move
+			found := false
+			for _, m := range pos.LegalMoves() {
+				if m.From() == tc.move.From() && m.To() == tc.move.To() && m.Promotion() == tc.move.Promotion() {
+					tagged, found = m, true
+				}
+			}
+			if !found {
+				t.Fatalf("%s is not legal in %s", tc.move, tc.fen)
+			}
+			want := pos.Update(tagged)
+			if got := pos.Update(tc.move); got.FEN() != want.FEN() || got.ZobristHash() != want.ZobristHash() {
+				t.Fatalf("Update(untagged) = %s, want %s", got.FEN(), want.FEN())
+			}
+			inPlace := positionFromFEN(t, tc.fen)
+			inPlace.ApplyInPlace(tc.move)
+			if inPlace.FEN() != want.FEN() {
+				t.Fatalf("ApplyInPlace(untagged) = %s, want %s", inPlace.FEN(), want.FEN())
+			}
+			g := chess.NewGame(mustFENOption(t, tc.fen))
+			if _, err := g.UnsafeMove(tc.move, nil); err != nil {
+				t.Fatal(err)
+			}
+			if g.FEN() != want.FEN() {
+				t.Fatalf("UnsafeMove(untagged) = %s, want %s", g.FEN(), want.FEN())
+			}
+		})
+	}
+}
+
+func mustFENOption(t *testing.T, fen string) chess.GameOption {
+	t.Helper()
+	opt, err := chess.FEN(fen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return opt
 }

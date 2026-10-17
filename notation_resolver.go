@@ -47,21 +47,21 @@ func resolveSANMove(pos *Position, data sanMoveData) (Move, error) {
 	var matched Move
 	matchedMove := false
 	visitLegalMoves(pos, generateLegalAnnotated, func(m Move) bool {
-		if m.S2() != data.dest {
+		if m.To() != data.dest {
 			return false
 		}
 
-		piece := pos.board.Piece(m.S1())
+		piece := pos.board.Piece(m.From())
 		if piece.Type() != data.piece {
 			mismatchReasons = append(mismatchReasons, "piece type mismatch")
 			return false
 		}
-		if originFile != 0 && m.S1().File().Byte() != originFile {
+		if originFile != 0 && m.From().File().Byte() != originFile {
 			mismatchReasons = append(mismatchReasons, "origin file mismatch")
 			return false
 		}
-		if originRank >= 0 && int8(m.S1().Rank()) != originRank {
-			mismatchReasons = append(mismatchReasons, fmt.Sprintf("origin rank mismatch: %d", m.S1()/8+1))
+		if originRank >= 0 && int8(m.From().Rank()) != originRank {
+			mismatchReasons = append(mismatchReasons, fmt.Sprintf("origin rank mismatch: %d", m.From()/8+1))
 			return false
 		}
 		if data.canonical && data.piece != Pawn && data.originFile+data.originRank != formS1(pos, m) {

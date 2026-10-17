@@ -122,7 +122,7 @@ func (uciNotation) Encode(pos *Position, m Move) string {
 	// Exact size needed: 4 chars for squares + up to 1 for promotion
 	sb.Grow(maxLen)
 
-	s1Bytes := m.S1().Bytes()
+	s1Bytes := m.From().Bytes()
 	sb.WriteByte(s1Bytes[0])
 	sb.WriteByte(s1Bytes[1])
 
@@ -131,17 +131,17 @@ func (uciNotation) Encode(pos *Position, m Move) string {
 	// ("e1g1"). The rook origin is the nearest friendly rook on the king's
 	// back rank, derived from the board. Without a position the move falls
 	// back to the king's destination square, matching the standard encoding.
-	to := m.S2()
+	to := m.To()
 	if pos != nil && pos.variant == Chess960 && m.HasTag(KingSideCastle|QueenSideCastle) {
-		if rookFrom, _ := castleRookMove(&pos.board, m, castleKingColor(m.S1())); rookFrom != NoSquare {
+		if rookFrom, _ := castleRookMove(&pos.board, m, castleKingColor(m.From())); rookFrom != NoSquare {
 			to = rookFrom
 		}
 	}
 	toBytes := to.Bytes()
 	sb.WriteByte(toBytes[0])
 	sb.WriteByte(toBytes[1])
-	if m.Promo() != NoPieceType {
-		sb.Write(m.Promo().Bytes())
+	if m.Promotion() != NoPieceType {
+		sb.Write(m.Promotion().Bytes())
 	}
 
 	return sb.String()
@@ -288,7 +288,7 @@ func (algebraicNotation) Encode(pos *Position, m Move) string {
 	sb.Reset()
 	defer stringPool.Put(sb)
 
-	p := pos.Board().Piece(m.S1())
+	p := pos.Board().Piece(m.From())
 	if pChar := pieceTypeChar(p.Type()); pChar != "" {
 		sb.WriteString(pChar)
 	}
@@ -414,7 +414,7 @@ func (longAlgebraicNotation) Encode(pos *Position, m Move) string {
 	} else if m.HasTag(QueenSideCastle) {
 		return "O-O-O" + checkChar
 	}
-	p := pos.Board().Piece(m.S1())
+	p := pos.Board().Piece(m.From())
 	pChar := pieceTypeChar(p.Type())
 	s1Str := m.s1.String()
 	capChar := ""

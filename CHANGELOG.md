@@ -52,6 +52,8 @@ All notable changes to this project will be documented in this file. See [conven
 - remove `Game.MoveList`, `MoveList` and `MoveListEntry`; use `Game.Moves` or
   the nodes of `MoveTree().MainLine()`.
 - in `polyglot`, `RawMove.ToMove` is `ChessMove` and `FindMoves` is `Entries`.
+- rename `Move.S1`, `S2` and `Promo` to `From`, `To` and `Promotion`, like
+  `RawMoveText`.
 - make the lexer diagnostics internal: `PGNError` and the
   `ErrUnterminatedComment`, `ErrUnterminatedQuote`, `ErrInvalidCommand`,
   `ErrInvalidPiece`, `ErrInvalidSquare`, `ErrInvalidRank` constructors never
@@ -60,6 +62,9 @@ All notable changes to this project will be documented in this file. See [conven
   1.e4), matching `MoveNode.Ply()`; it used to be one higher.
 
 #### Fixes
+- `Position.Update`, `ApplyInPlace` and `Game.UnsafeMove` infer the en passant
+  and standard castling tags of a move built with `NewMove`; before, the rook
+  or the captured pawn was left in place.
 - every illegal-move error wraps `ErrIllegalMove`, including SAN and UCI move
   text and PGN decoding; `ParserError` gains `Unwrap` so `errors.Is` reaches
   the cause.
