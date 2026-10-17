@@ -42,6 +42,7 @@ func (CmdUCI) String() string { return "uci" }
 
 func (CmdUCI) IsDone(line string) bool { return line == "uciok" }
 
+//nolint:unparam // the error result is part of the responseHandler contract
 func (CmdUCI) handle(lines []string, e *Engine) error {
 	e.id = map[string]string{}
 	e.options = map[string]Option{}

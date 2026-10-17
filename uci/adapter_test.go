@@ -577,8 +577,8 @@ func Test_CmdGo_MalformedInfoLineLoggedUnderDebug(t *testing.T) {
 // rawCmd is a user-defined command: any type with String and IsDone works.
 type rawCmd string
 
-func (c rawCmd) String() string        { return string(c) }
-func (rawCmd) IsDone(line string) bool { return true }
+func (c rawCmd) String() string     { return string(c) }
+func (rawCmd) IsDone(_ string) bool { return true }
 
 func Test_CustomCmdRuns(t *testing.T) {
 	fake := &fakeAdapter{Responses: map[string][]string{}}
