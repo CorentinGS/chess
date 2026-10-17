@@ -22,7 +22,7 @@ func assertSameSquares(t *testing.T, got []Square, want ...Square) {
 }
 
 func TestBoardAttacksFromWhitePawn(t *testing.T) {
-	pos := mustPosition(
+	pos := mustPosition(t,
 		"4k3/8/8/8/4P3/8/8/4K3 w - - 0 1",
 	)
 
@@ -32,7 +32,7 @@ func TestBoardAttacksFromWhitePawn(t *testing.T) {
 }
 
 func TestBoardAttacksFromBlackPawn(t *testing.T) {
-	pos := mustPosition(
+	pos := mustPosition(t,
 		"4k3/8/8/4p3/8/8/8/4K3 b - - 0 1",
 	)
 
@@ -42,7 +42,7 @@ func TestBoardAttacksFromBlackPawn(t *testing.T) {
 }
 
 func TestBoardAttacksFromPawnOnAFile(t *testing.T) {
-	pos := mustPosition(
+	pos := mustPosition(t,
 		"4k3/8/8/8/P7/8/8/4K3 w - - 0 1",
 	)
 
@@ -52,7 +52,7 @@ func TestBoardAttacksFromPawnOnAFile(t *testing.T) {
 }
 
 func TestBoardAttacksFromRookStopsAfterBlockers(t *testing.T) {
-	pos := mustPosition(
+	pos := mustPosition(t,
 		"4k3/8/3P4/8/1n1R1b2/8/3p4/4K3 w - - 0 1",
 	)
 
@@ -89,7 +89,7 @@ func TestBoardAttacksFromInvalidSquare(t *testing.T) {
 }
 
 func TestBoardAttacksFromIgnoresPins(t *testing.T) {
-	pos := mustPosition(
+	pos := mustPosition(t,
 		"4r1k1/8/8/8/8/8/4R3/4K3 w - - 0 1",
 	)
 
@@ -159,7 +159,7 @@ func TestBoardAttacksFromRemainingPiecesAndPawnHEdge(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assertSameSquares(t, mustPosition(test.fen).Board().AttacksFrom(test.from), test.want...)
+			assertSameSquares(t, mustPosition(t, test.fen).Board().AttacksFrom(test.from), test.want...)
 		})
 	}
 }

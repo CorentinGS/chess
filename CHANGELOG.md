@@ -1,7 +1,6 @@
 # Changelog
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
-- - -
 ## Unreleased
 
 ## v2.6.0 - 2026-08-17
@@ -9,6 +8,91 @@ All notable changes to this project will be documented in this file. See [conven
 - add `Board.AttacksFrom()` for piece attack-map queries (#126).
 
 - - -
+## v3.0.0-beta.4 - 2026-07-24
+
+#### Features
+- add first-class Chess960 (Fischer Random) support: `Variant`,
+  `Chess960Setup(index)`, all 960 indexed starts, variant-aware legal
+  castling, Shredder-FEN output with Shredder/X-FEN input, Chess960 PGN
+  Variant/SetUp/FEN round-trips, and binary variant persistence (ADR-022).
+- add Chess960 UCI support: `uciNotation` encodes castling in the
+  king-to-rook form (e.g. `e1h1`) and decodes both king-to-rook and
+  king-to-destination forms; the `uci` engine client negotiates
+  `UCI_Chess960` when the engine advertises it (ADR-023).
+- add `EmptySetup`, `InitialSetup`, `Setup.SwapTurn`, and `Setup.Mirror` for
+  explicit position construction and analysis.
+- relax FEN import: accept one to six fields, whitespace separators, and
+  fullmove number zero while preserving canonical output.
+
+#### Fixes
+- add `ErrInvalidFEN` and `ErrInvalidPGN`; FEN/PGN parsing now wraps typed
+  sentinel errors so callers can use `errors.Is`.
+- correct the v3 hash migration documentation: removed hash APIs have no
+  deprecated compatibility path.
+- - -
+## v3.0.0-beta.3 - 2026-07-20
+
+#### Breaking Changes
+- remove `Position.ChangeTurn()` (dead: no internal callers; turn mutation is not a public operation).
+- remove `Game.Comments()` and the unexported `Game.comments` field; move annotations live on `MoveNode` (amends ADR-011).
+- remove `GameScanned` and `TokenizeGame`; production PGN decode is lazy via `ParsePGN` / `PGNRecords` (and `parser.Parse` internally), driven by `lexerTokenSource`. The parser's `[]Token` test seam (`newParser`, `sliceTokenSource`, exported via `export_test.go:NewParser`) remains for state-machine unit tests (amends ADR-015).
+- remove `PositionCursor`; promote its methods onto `MoveTree` as `Peek`, `Forward(idx)`, `Goto(node)`, `Reset`. Remove `Game.Cursor()` and `MoveTree.Cursor()`. Position snapshots continue via `MoveNode.Position()` / `Game.Position()`; `MoveTree.Peek()` is a zero-copy alias. `Goto` rejects nodes from a different tree.
+
+#### Removed
+- remove dead internal helper `sortedCommandKeys` (pgn_renderer.go).
+
+#### Changed
+- `Game.copy()` no longer aliases the move tree; every caller (`Clone`, `UnmarshalText`, `Split`, the test `PGN` option) sets the tree explicitly. Removes a latent shared-tree footgun without changing observable behaviour.
+- consolidate PGN parse locality: `parsePGNText` and `lexerTokenSource` move from `framer.go` to `pgn.go`, next to the `Parser` they feed; `framer.go` is now honestly framing + the tokenize bridge.
+- relabel the move-text notation layer as codec internals: header comments on `notation.go` and `notation_resolver.go` (renamed from `san_resolver.go`); no behaviour change (ADR-013, ADR-016).
+- fix a cursor leak in PGN variation parsing on err returns: `parseVariation` (pgn.go) now uses `defer` to restore the active cursor so any err path inside a variation no longer strands the cursor inside the abandoned subtree (amends ADR-018).
+- `opening`: `DefaultBook()` initializes the default book lazily via `sync.Once` on first call, honoring ADR-005. Importing the package no longer parses the embedded ECO table or risks a panic at load time; the first call pays the one-time parse cost.
+
+- - -
+
+## v3.0.0-beta.2 - 2026-06-29
+
+#### Performance
+- speed up full PGN-to-`Game` decoding by resolving SAN moves from direct candidate origins instead of scanning every legal move.
+- reduce parsed position snapshot allocation count by storing board state directly inside internal `Position` values while keeping public defensive-copy APIs unchanged.
+- keep full PGN decode behavior compatible for move tags, checks, castling, promotions, en passant, variations, and parser errors.
+
+#### Documentation
+- document the v3 beta PGN decode performance profile and benchmark workflow.
+
+- - -
+
+## v3.0.0-beta.1 - 2026-06-19
+
+v3 is a major redesign implementing [RFC-001](docs/adr/RFC-001-v3-redesign.md).
+See [MIGRATION.md](MIGRATION.md) for a detailed guide to upgrading from v2.
+
+#### Breaking Changes
+- module path changed to `github.com/corentings/chess/v3`.
+- `Move` is now a 4-field value type (`s1`, `s2`, `promo`, `tags`), passed by value everywhere — `Move()` and `UnsafeMove()` accept `Move` not `*Move`.
+- UCI command globals replaced with struct literals: `CmdUCI{}`, `CmdIsReady{}`, `CmdUCINewGame{}`, etc.
+- `Game.Resign(color)` now returns `error`.
+- `Game.Outcome` and `Game.Method` merged into `Outcome` + `OutcomeMethodPair` with `SetOutcomeMethod`/`ClearOutcome`.
+- `Opening.Game()` returns a caller-owned clone of a pre-computed game.
+- `Position.Hash()` (MD5) removed; use `Position.ZobristHash()` (uint64). `ZobristHasher`/`NewChessHasher`/`NewZobristHasher`/`ZobristHashToUint64`/`GetPolyglotHashBytes` also removed; see MIGRATION.md.
+- `opening.Opening` renamed to `opening.Entry` (stuttered at call site).
+- `(*PolyglotBook).GetRandomMove` → `RandomMove`; `GetChessMoves` → `ChessMoves` (no `Get` prefix on non-trivial operations).
+
+#### Features
+- move tree with full variation support (`Variations`, `AddVariation`, `Split`).
+- extracted PGN renderer (`PGNRenderer`, `DefaultPGNRenderer`, `RenderGameTo`).
+- `Game.WritePGN(w)` for direct writer output.
+- UCI Adapter pattern (`Adapter`, `SubprocessAdapter`, `FakeAdapter`) for testability.
+- SVG image generation API: `SVG(w, *Position, *SVGOptions)` with `//go:embed` piece assets.
+- opening book: `NewBook(io.Reader)` for custom data, `DefaultBook()` singleton.
+- notation `Encode`/`Decode` with value semantics.
+
+#### Performance
+- incremental Zobrist hashing with `Position.ZobristHash()`.
+- mailbox `[64]Piece` for O(1) `Board.Piece()` lookups.
+- zero-allocation `BookECO.Find` via compact `uint32` move keys.
+- non-allocating `Position.SamePosition` fallback (direct struct comparison).
+- `Position.ValidMovesUnsafe()` and `Position.ValidMovesIter()` for allocation-sensitive callers.
 
 ## v2.5.1 - 2026-06-19
 #### Features

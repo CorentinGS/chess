@@ -1,67 +1,129 @@
-/*
-Package chess provides PGN (Portable Game Notation) parsing functionality,
-supporting standard chess notation including moves, variations, comments,
-annotations, and game metadata.
-Example usage:
-
-	// Create parser from tokens
-	tokens := TokenizeGame(game)
-	parser := NewParser(tokens)
-
-	// Parse complete game
-	game, err := parser.Parse()
-*/
 package chess
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // Parser holds the state needed during parsing.
 type Parser struct {
-	game        *Game
-	currentMove *Move
-	tokens      []Token
-	errors      []ParserError
-	position    int
+	game         *Game
+	tokens       pgnTokenSource
+	lexer        *Lexer
+	moveText     MoveTextCodec
+	token        Token
+	initErr      error
+	errors       []ParserError
+	position     int
+	tagOutcome   Outcome
+	tokenOutcome Outcome
 }
 
-// NewParser creates a new parser instance initialized with the given tokens.
-// The parser starts with a root move containing the starting position.
-//
-// Example:
-//
-//	tokens := TokenizeGame(game)
-//	parser := NewParser(tokens)
-func NewParser(tokens []Token) *Parser {
-	rootMove := &Move{
-		position: StartingPosition(),
+type pgnTokenSource interface {
+	NextToken() (Token, error)
+}
+
+type sliceTokenSource struct {
+	tokens []Token
+	pos    int
+}
+
+func (s *sliceTokenSource) NextToken() (Token, error) {
+	if s.pos >= len(s.tokens) {
+		return Token{Type: EOF}, nil
 	}
-	return &Parser{
+	token := s.tokens[s.pos]
+	s.pos++
+	return token, nil
+}
+
+// lexerTokenSource adapts a Lexer to the pgnTokenSource interface so the
+// parser can consume a raw PGN movetext stream without materialising every
+// token up front.
+type lexerTokenSource struct {
+	lexer *Lexer
+}
+
+func (s *lexerTokenSource) NextToken() (Token, error) {
+	return s.lexer.NextToken(), nil
+}
+
+// parsePGNText parses raw PGN movetext into a Game using the given options.
+func parsePGNText(raw string, options pgnOptions) (*Game, error) {
+	return newParserFromSource(&lexerTokenSource{lexer: NewLexer(raw)}, options).Parse()
+}
+
+// newParser creates a parser from a pre-built token slice. This is the test
+// seam for parser state-machine unit tests in pgn_test.go.
+func newParser(tokens []Token) *Parser {
+	return newParserFromSource(&sliceTokenSource{tokens: tokens}, defaultPGNOptions())
+}
+
+func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *Parser {
+	options := defaultPGNOptions()
+	if len(opts) > 0 {
+		options = opts[0]
+	}
+	pos := StartingPosition()
+	tree := newMoveTree(pos)
+	parser := &Parser{
 		tokens: tokens,
 		game: &Game{
-			tagPairs:    make(TagPairs),
-			pos:         StartingPosition(),
-			rootMove:    rootMove, // Empty root move
-			currentMove: rootMove,
+			tagPairs: make(TagPairs),
+			tree:     tree,
+			outcome:  NoOutcome,
+			method:   NoMethod,
 		},
-		currentMove: rootMove,
+		moveText: options.moveTextCodec,
 	}
+	if source, ok := tokens.(*lexerTokenSource); ok {
+		parser.lexer = source.lexer
+		parser.token = parser.lexer.NextToken()
+		return parser
+	}
+	token, err := tokens.NextToken()
+	if err != nil {
+		parser.initErr = err
+		parser.token = Token{Type: Undefined, Value: err.Error()}
+		return parser
+	}
+	parser.token = token
+	return parser
 }
 
 // currentToken returns the current token being processed.
 func (p *Parser) currentToken() Token {
-	if p.position >= len(p.tokens) {
-		return Token{Type: EOF}
-	}
-	return p.tokens[p.position]
+	return p.token
 }
 
 // advance moves to the next token.
+// ponytail: dual branch skips one interface call on the hot lexer path; the
+// slice branch is test-only and uncovered by the unit suite (pgn_test.go:878).
+// Unify on p.tokens.NextToken() — interface cost (~1-2 ns) is parse-noise.
 func (p *Parser) advance() {
 	p.position++
+	if p.lexer != nil {
+		p.token = p.lexer.NextToken()
+		return
+	}
+	token, err := p.tokens.NextToken()
+	if err != nil {
+		p.token = Token{Type: Undefined, Value: err.Error()}
+		return
+	}
+	p.token = token
+}
+
+func (p *Parser) atEnd() bool {
+	return p.currentToken().Type == EOF
+}
+
+func (p *Parser) currentMove() *MoveNode {
+	if p == nil || p.game == nil || p.game.tree == nil {
+		return nil
+	}
+	return p.game.tree.Current()
 }
 
 // Parse processes all tokens and returns the complete game.
@@ -78,32 +140,58 @@ func (p *Parser) advance() {
 //	}
 //	fmt.Printf("Event: %s\n", game.GetTagPair("Event"))
 func (p *Parser) Parse() (*Game, error) {
+	if p.initErr != nil {
+		return nil, p.initErr
+	}
+
 	// Parse header section (tag pairs)
 	if err := p.parseHeader(); err != nil {
-		return nil, errors.New("parsing header")
+		return nil, fmt.Errorf("%w: parsing header: %w", ErrInvalidPGN, err)
 	}
+
+	p.tagOutcome = outcomeFromResultString(p.game.tagPairs["Result"])
 
 	// check if the game has a starting position
 	if value, ok := p.game.tagPairs["FEN"]; ok {
 		pos, err := decodeFEN(value)
 		if err != nil {
-			return nil, errors.New("invalid FEN")
+			return nil, fmt.Errorf("%w: %w", ErrInvalidFEN, err)
 		}
-		p.game.rootMove.position = pos
-		p.game.pos = pos
+		if variantFromTag(p.game.tagPairs["Variant"]) == Chess960 {
+			pos.variant = Chess960
+		}
+		p.game.tree.setRootPosition(pos)
+	} else if variantFromTag(p.game.tagPairs["Variant"]) == Chess960 {
+		// Chess960 declared without a FEN: default to the standard arrangement
+		// (SP-518) treated as a Chess960 position.
+		pos := StartingPosition()
+		pos.variant = Chess960
+		p.game.tree.setRootPosition(pos)
 	}
 
 	// Parse moves section
 	if err := p.parseMoveText(); err != nil {
 		return nil, err
 	}
+	// Terminal-only policy: derive checkmate/stalemate from the final main-line
+	// position but leave automatic draws unset, so the Result tag and movetext
+	// token remain authoritative; resolveOutcome then arbitrates.
+	p.game.outcome, p.game.method = classifyOutcome(p.game.currentPosition(), 0, outcomeRules{})
 
-	if p.game.outcome == UnknownOutcome {
-		p.game.outcome = NoOutcome
+	if err := p.resolveOutcome(); err != nil {
+		return nil, err
 	}
-	p.game.currentMove = p.currentMove
-
 	return p.game, nil
+}
+
+func (p *Parser) resolveOutcome() error {
+	outcome, method, err := arbitratePGNOutcome(p.game.outcome, p.game.method, p.tagOutcome, p.tokenOutcome)
+	if err != nil {
+		return &ParserError{Message: err.Error(), Position: p.position}
+	}
+	p.game.outcome = outcome
+	p.game.method = method
+	return nil
 }
 
 func (p *Parser) parseHeader() error {
@@ -167,16 +255,27 @@ func (p *Parser) parseTagPair() error {
 	return nil
 }
 
+// variantFromTag maps a PGN Variant tag value to a Variant. Recognised Chess960
+// aliases (case-insensitive) yield Chess960; anything else yields Standard.
+func variantFromTag(s string) Variant {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "chess960", "chess 960", "fischer random", "fischerrandom",
+		"fischerandom", "frc", "960":
+		return Chess960
+	}
+	return Standard
+}
+
 func (p *Parser) parseMoveText() error {
 	var moveNumber uint64
 	ply := 1
-	for p.position < len(p.tokens) {
+	for !p.atEnd() {
 		token := p.currentToken()
 
 		switch token.Type {
 		case MoveNumber:
 			number, err := strconv.ParseUint(token.Value, 10, 32)
-			if err == nil && p.currentMove != nil {
+			if err == nil && p.currentMove() != nil {
 				moveNumber = number
 				ply = int((moveNumber-1)*2 + 1)
 			}
@@ -189,36 +288,22 @@ func (p *Parser) parseMoveText() error {
 			p.advance()
 			ply++
 
+		case NullMove:
+			p.addMove(NewNullMove(), uint(moveNumber))
+			p.advance()
+			ply++
+
 		case PIECE, SQUARE, FILE, KingsideCastle, QueensideCastle:
 			move, err := p.parseMove()
 			if err != nil {
 				return err
 			}
-			if moveNumber > 0 {
-				move.number = uint(moveNumber)
-			}
-			p.addMove(move)
+			p.addMove(move, uint(moveNumber))
 			ply++
 
 			// Collect all NAGs and comments that follow the move
-		collectLoop:
-			for {
-				tok := p.currentToken()
-				switch tok.Type {
-				case NAG:
-					p.currentMove.nag = tok.Value
-					p.advance()
-				case CommentStart:
-					block, err := p.parseComment()
-					if err != nil {
-						return err
-					}
-					if p.currentMove != nil {
-						p.currentMove.addCommentBlock(block)
-					}
-				default:
-					break collectLoop
-				}
+			if err = p.collectMoveAnnotations(); err != nil {
+				return err
 			}
 
 		case CommentStart:
@@ -226,8 +311,8 @@ func (p *Parser) parseMoveText() error {
 			if err != nil {
 				return err
 			}
-			if p.currentMove != nil {
-				p.currentMove.addCommentBlock(block)
+			if current := p.currentMove(); current != nil {
+				current.addCommentBlock(block)
 			}
 
 		case VariationStart:
@@ -246,243 +331,97 @@ func (p *Parser) parseMoveText() error {
 	return nil
 }
 
-// parseMove processes tokens until it has a complete move, then validates against legal moves.
-func (p *Parser) parseMove() (*Move, error) {
-	move := &Move{}
-
-	// Handle castling first as it's a special case
-	if p.currentToken().Type == KingsideCastle {
-		move.tags = KingSideCastle
-		for _, m := range p.game.pos.ValidMovesUnsafe() {
-			if m.HasTag(KingSideCastle) {
-				move.s1 = m.S1()
-				move.s2 = m.S2()
-				if m.HasTag(Check) {
-					move.AddTag(Check)
-				}
-				p.advance()
-				return move, nil
-			}
-		}
-		return nil, &ParserError{
-			Message:    "illegal kingside castle",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
-		}
+func (p *Parser) parseMove() (Move, error) {
+	data := sanMoveData{
+		piece:     Pawn,
+		canonical: p.moveText.Policy() == MoveTextPolicyStrict,
 	}
 
-	if p.currentToken().Type == QueensideCastle {
-		move.tags = QueenSideCastle
-		for _, m := range p.game.pos.ValidMovesUnsafe() {
-			if m.HasTag(QueenSideCastle) {
-				move.s1 = m.S1()
-				move.s2 = m.S2()
-				move.position = p.game.pos
-				if m.HasTag(Check) {
-					move.AddTag(Check)
-				}
-				p.advance()
-				return move, nil
-			}
-		}
-		return nil, &ParserError{
-			Message:    "illegal queenside castle",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
-		}
-	}
-
-	// Parse regular move
-	var moveData struct {
-		piece      string    // The piece type (if any)
-		originFile string    // Disambiguation file
-		originRank string    // Disambiguation rank
-		destSquare string    // Destination square
-		isCapture  bool      // Whether it's a capture
-		promotion  PieceType // Promotion piece type
-	}
-
-	// First token could be piece, file (for pawn moves), or square
-	switch p.currentToken().Type {
-	case PIECE:
-		moveData.piece = p.currentToken().Value
+	// Castling: single token
+	if p.currentToken().Type == KingsideCastle || p.currentToken().Type == QueensideCastle {
+		data.castle = p.currentToken().Value
 		p.advance()
+	} else {
+		// Regular move: piece? disambiguation? capture? square promotion? check?
+		hasPiece := p.currentToken().Type == PIECE
+		if hasPiece {
+			data.piece = algebraicPieceType(p.currentToken().Value)
+			p.advance()
+		}
 
-		// Check for disambiguation
-		if p.currentToken().Type == FILE {
-			moveData.originFile = p.currentToken().Value
+		// Optional disambiguation (file, rank, or full origin square)
+		switch p.currentToken().Type {
+		case FILE:
+			data.originFile = p.currentToken().Value
 			p.advance()
-		} else if p.currentToken().Type == RANK {
-			moveData.originRank = p.currentToken().Value
+		case RANK:
+			data.originRank = p.currentToken().Value
 			p.advance()
-		} else if p.currentToken().Type == DeambiguationSquare {
-			// Full square disambiguation (e.g., "Qe8f7" -> piece: Q, origin: e8, dest: f7)
-			originSquare := p.currentToken().Value
-			if len(originSquare) == 2 {
-				moveData.originFile = string(originSquare[0])
-				moveData.originRank = string(originSquare[1])
+		case DeambiguationSquare:
+			if value := p.currentToken().Value; len(value) == 2 {
+				data.originFile = value[:1]
+				data.originRank = value[1:]
 			}
 			p.advance()
 		}
 
-	case FILE:
-		moveData.originFile = p.currentToken().Value
-		p.advance()
-
-	}
-
-	// Handle capture
-	if p.currentToken().Type == CAPTURE {
-		moveData.isCapture = true
-		p.advance()
-	}
-
-	// Get destination square
-	if p.currentToken().Type != SQUARE {
-		return nil, &ParserError{
-			Message:    "expected destination square",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
+		// Optional capture
+		if p.currentToken().Type == CAPTURE {
+			data.capture = true
+			p.advance()
 		}
-	}
-	moveData.destSquare = p.currentToken().Value
-	p.advance()
 
-	// Handle promotion
-	if p.currentToken().Type == PROMOTION {
-		p.advance()
-		if p.currentToken().Type != PromotionPiece {
-			return nil, &ParserError{
-				Message:    "expected promotion piece",
+		// Required destination square
+		if p.currentToken().Type != SQUARE || len(p.currentToken().Value) != 2 {
+			return Move{}, &ParserError{
+				Message:    "expected destination square",
 				TokenType:  p.currentToken().Type,
 				TokenValue: p.currentToken().Value,
 				Position:   p.position,
 			}
 		}
-		moveData.promotion = parsePieceType(p.currentToken().Value)
+		destSquare := p.currentToken().Value
+		data.dest = squareFromFileRank(destSquare[0], destSquare[1])
+		p.advance()
+
+		// Promotion with "="
+		if p.currentToken().Type == PROMOTION {
+			p.advance()
+			if p.currentToken().Type != PromotionPiece {
+				return Move{}, &ParserError{
+					Message:    "expected promotion piece",
+					TokenType:  p.currentToken().Type,
+					TokenValue: p.currentToken().Value,
+					Position:   p.position,
+				}
+			}
+			data.promotion = algebraicPieceType(p.currentToken().Value)
+			p.advance()
+		} else if p.moveText.Policy() == MoveTextPolicyPGNImport &&
+			!hasPiece &&
+			p.currentToken().Type == PIECE &&
+			(destSquare[1] == '1' || destSquare[1] == '8') {
+			// Import-only promotion without "=" (e.g., e8Q).
+			v := p.currentToken().Value
+			if v == "Q" || v == "R" || v == "B" || v == "N" {
+				data.promotion = algebraicPieceType(v)
+				p.advance()
+			}
+		}
+	}
+
+	// Optional check/checkmate suffix
+	if p.currentToken().Type == CHECK || p.currentToken().Type == CHECKMATE {
 		p.advance()
 	}
 
-	// Get target square
-	targetSquare := parseSquare(moveData.destSquare)
-	if targetSquare == NoSquare {
-		return nil, &ParserError{
-			Message:    "invalid destination square",
-			TokenType:  p.currentToken().Type,
-			TokenValue: p.currentToken().Value,
-			Position:   p.position,
-		}
-	}
-
-	// Find matching legal move
-	var matchingMove *Move
-	var err error
-	validMoves := p.game.pos.ValidMovesUnsafe()
-	for _, m := range validMoves {
-		//nolint:nestif // readability
-		if m.S2() == targetSquare {
-			pos := p.game.pos
-			piece := pos.Board().Piece(m.S1())
-
-			// Check piece type
-			if moveData.piece != "" && piece.Type() != PieceTypeFromString(moveData.piece) || moveData.piece == "" && piece.Type() != Pawn {
-				err = &ParserError{
-					Message:    "piece type mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				}
-				continue
-			}
-
-			// Check disambiguation
-			if moveData.originFile != "" && m.S1().File().String() != moveData.originFile {
-				err = &ParserError{
-					Message:    "origin file mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				}
-				continue
-			}
-			if moveData.originRank != "" && strconv.Itoa(int((m.S1()/8)+1)) != moveData.originRank {
-				err = &ParserError{
-					Message:    fmt.Sprintf("origin rank mismatch: %d", m.S1()/8+1),
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				}
-				continue
-			}
-
-			// Check capture
-			if moveData.isCapture != (m.HasTag(Capture) || m.HasTag(EnPassant)) {
-				err = &ParserError{
-					Message:    "capture mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				}
-				continue
-			}
-
-			// Check promotion
-			if moveData.promotion != NoPieceType && m.promo != moveData.promotion {
-				err = &ParserError{
-					Message:    "promotion mismatch",
-					TokenType:  p.currentToken().Type,
-					TokenValue: p.currentToken().Value,
-					Position:   p.position,
-				}
-				continue
-			}
-
-			matchingMove = &m
-			break
-		}
-	}
-
-	if matchingMove == nil {
-		if err != nil {
-			return nil, &ParserError{
-				Message:  fmt.Sprintf("no legal move found for position: %s", err.Error()),
-				Position: p.position,
-			}
-		}
-		return nil, &ParserError{
-			Message:  "no legal move found for position",
+	move, err := resolveSANMove(p.game.currentPosition(), data)
+	if err != nil {
+		return Move{}, &ParserError{
+			Message:  strings.TrimPrefix(ErrInvalidMoveText.Error()+": "+err.Error(), "chess: "),
 			Position: p.position,
 		}
 	}
-
-	// Copy the matched move details
-	move.s1 = matchingMove.S1()
-	move.s2 = matchingMove.S2()
-	move.tags = matchingMove.tags
-	move.promo = matchingMove.promo
-
-	// Handle check/checkmate if present
-	if p.currentToken().Type == CHECK {
-		move.tags |= Check
-		p.advance()
-	}
-
-	// Handle NAG if present
-	if p.currentToken().Type == NAG {
-		move.nag = p.currentToken().Value
-		p.advance()
-	}
-
-	// Set move number for both white and black moves
-	if p.game.pos != nil && p.game.pos.Turn() == Black {
-		if parentMoveNum := p.currentMove.number; parentMoveNum > 0 {
-			move.number = parentMoveNum
-		}
-	}
-
 	return move, nil
 }
 
@@ -491,7 +430,7 @@ func (p *Parser) parseComment() (CommentBlock, error) {
 
 	block := CommentBlock{}
 
-	for p.currentToken().Type != CommentEnd && p.position < len(p.tokens) {
+	for p.currentToken().Type != CommentEnd && !p.atEnd() {
 		switch p.currentToken().Type {
 		case CommandStart:
 			command, err := p.parseCommand()
@@ -513,7 +452,7 @@ func (p *Parser) parseComment() (CommentBlock, error) {
 		p.advance()
 	}
 
-	if p.position >= len(p.tokens) {
+	if p.atEnd() {
 		return CommentBlock{}, &ParserError{
 			Message:  "unterminated comment",
 			Position: p.position,
@@ -531,10 +470,17 @@ func (p *Parser) parseCommand() (CommentItem, error) {
 	// Consume the opening "["
 	p.advance()
 
-	for p.currentToken().Type != CommandEnd && p.position < len(p.tokens) {
+	for p.currentToken().Type != CommandEnd && !p.atEnd() {
 		switch p.currentToken().Type {
-
 		case CommandName:
+			if key != "" {
+				return CommentItem{}, &ParserError{
+					Message:    "duplicate command name in command",
+					Position:   p.position,
+					TokenType:  p.currentToken().Type,
+					TokenValue: p.currentToken().Value,
+				}
+			}
 			// The first token in a command is treated as the key
 			key = p.currentToken().Value
 		case CommandParam:
@@ -553,46 +499,74 @@ func (p *Parser) parseCommand() (CommentItem, error) {
 		p.advance()
 	}
 
-	if p.position >= len(p.tokens) {
+	if p.atEnd() {
 		return CommentItem{}, &ParserError{
 			Message:  "unterminated command",
 			Position: p.position,
 		}
 	}
 
-	// p.advance() // Consume the closing "]"
 	return CommentItem{Kind: CommentCommand, Key: key, Value: value}, nil
+}
+
+// collectMoveAnnotations consumes all NAGs and comments immediately following
+// the current move, attaching them to the current move node.
+func (p *Parser) collectMoveAnnotations() error {
+	for {
+		tok := p.currentToken()
+		switch tok.Type {
+		case NAG:
+			if nagErr := p.currentMove().AddNAG(tok.Value); nagErr != nil {
+				return &ParserError{
+					Message:    nagErr.Error(),
+					TokenValue: tok.Value,
+					TokenType:  NAG,
+					Position:   p.position,
+				}
+			}
+			p.advance()
+		case CommentStart:
+			block, err := p.parseComment()
+			if err != nil {
+				return err
+			}
+			if current := p.currentMove(); current != nil {
+				current.addCommentBlock(block)
+			}
+		default:
+			return nil
+		}
+	}
 }
 
 func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 	p.advance() // consume (
 
 	// Save current state to restore later
-	parentMove := p.currentMove
-	oldPos := p.game.pos
+	parentMove := p.currentMove()
+	oldCurrent := p.game.tree.Current()
+
+	// Restore the active cursor when this function returns, including on
+	// every err path between here and the end. Previously the restore was
+	// open-coded at the success branch only, leaking the cursor into the
+	// abandoned variation subtree on any error.
+	defer p.game.tree.setCurrent(oldCurrent)
 
 	// For variations at game start, we attach to root
-	variationParent := p.game.rootMove
+	variationParent := p.game.tree.Root()
 
-	// Find the move this variation should branch from
-	if parentMove != p.game.rootMove && parentMove.parent != nil {
+	// Find the move this variation should diverge from
+	if parentMove != p.game.tree.Root() && parentMove.parent != nil {
 		variationParent = parentMove.parent
-		if variationParent.parent != nil && variationParent.parent.position != nil {
-			p.game.pos = variationParent.parent.position.Update(variationParent)
-		} else {
-			p.game.pos = p.game.rootMove.position.copy()
-		}
-	} else {
-		p.game.pos = p.game.rootMove.position.copy()
 	}
 
-	p.currentMove = variationParent
+	p.game.tree.setCurrent(variationParent)
 
 	moveNumber := parentMoveNumber
 	ply := parentPly
 	isBlackMove := false
 
-	for p.currentToken().Type != VariationEnd && p.position < len(p.tokens) {
+	for p.currentToken().Type != VariationEnd && !p.atEnd() {
 		switch p.currentToken().Type {
 		case MoveNumber:
 			num, err := strconv.ParseUint(p.currentToken().Value, 10, 32)
@@ -611,6 +585,12 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 			isBlackMove = true
 			ply++
 
+		case NullMove:
+			p.addMove(NewNullMove(), uint(moveNumber))
+			p.advance()
+			ply++
+			isBlackMove = !isBlackMove
+
 		case VariationStart:
 			if err := p.parseVariation(moveNumber, ply); err != nil {
 				return err
@@ -621,16 +601,23 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 			if err != nil {
 				return err
 			}
-			if p.currentMove != nil {
-				p.currentMove.addCommentBlock(block)
+			if current := p.currentMove(); current != nil {
+				current.addCommentBlock(block)
 			}
 
 		case NAG:
-			p.currentMove.nag = p.currentToken().Value
+			if nagErr := p.currentMove().AddNAG(p.currentToken().Value); nagErr != nil {
+				return &ParserError{
+					Message:    nagErr.Error(),
+					TokenValue: p.currentToken().Value,
+					TokenType:  NAG,
+					Position:   p.position,
+				}
+			}
 			p.advance()
 
 		case PIECE, SQUARE, FILE, KingsideCastle, QueensideCastle:
-			if isBlackMove != (p.game.pos.Turn() == Black) {
+			if isBlackMove != (p.game.currentPosition().Turn() == Black) {
 				return &ParserError{
 					Message:  "move color mismatch",
 					Position: p.position,
@@ -642,36 +629,13 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 				return err
 			}
 
-		move.parent = p.currentMove
-		p.currentMove.children = append(p.currentMove.children, move)
-		move.number = uint(moveNumber)
-
-		p.game.pos = p.game.pos.Update(move)
-
-		move.position = p.game.pos
-		p.currentMove = move
+			p.addMove(move, uint(moveNumber))
 			ply++
 			isBlackMove = !isBlackMove
 
 			// Collect all NAGs and comments that follow the move
-		collectVariationAnnotations:
-			for {
-				tok := p.currentToken()
-				switch tok.Type {
-				case NAG:
-					p.currentMove.nag = tok.Value
-					p.advance()
-				case CommentStart:
-					block, err := p.parseComment()
-					if err != nil {
-						return err
-					}
-					if p.currentMove != nil {
-						p.currentMove.addCommentBlock(block)
-					}
-				default:
-					break collectVariationAnnotations
-				}
+			if err = p.collectMoveAnnotations(); err != nil {
+				return err
 			}
 
 		default:
@@ -679,7 +643,7 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 		}
 	}
 
-	if p.position >= len(p.tokens) {
+	if p.atEnd() {
 		return &ParserError{
 			Message:  "unterminated variation",
 			Position: p.position,
@@ -688,85 +652,22 @@ func (p *Parser) parseVariation(parentMoveNumber uint64, parentPly int) error {
 
 	p.advance() // consume )
 
-	p.game.pos = oldPos
-	p.currentMove = parentMove
-	p.game.currentMove = p.currentMove
-
 	return nil
 }
 
 func (p *Parser) parseResult() {
-	result := p.currentToken().Value
-	switch result {
-	case "1-0":
-		p.game.outcome = WhiteWon
-	case "0-1":
-		p.game.outcome = BlackWon
-	case "1/2-1/2":
-		p.game.outcome = Draw
-	default:
-		p.game.outcome = NoOutcome
-	}
+	p.tokenOutcome = outcomeFromResultString(p.currentToken().Value)
 	p.advance()
 }
 
-func (p *Parser) addMove(move *Move) {
-	// For the first move in the game
-	if p.currentMove == p.game.rootMove {
-		move.parent = p.game.rootMove
-		p.game.rootMove.children = append(p.game.rootMove.children, move)
-	} else {
-		// Normal move in the main line
-		move.parent = p.currentMove
-		p.currentMove.children = append(p.currentMove.children, move)
-	}
-
-	// Update position
-	if newPos := p.game.pos.Update(move); newPos != nil {
-		p.game.pos = newPos
-		p.game.evaluatePositionStatus()
-	}
-
-	// Cache position after the move
-	move.position = p.game.pos
-
-	p.currentMove = move
+func outcomeFromResultString(s string) Outcome {
+	o, _ := ParseOutcome(s)
+	return o
 }
 
-// parsePieceType converts a piece character into a PieceType.
-func parsePieceType(s string) PieceType {
-	switch s {
-	case "P":
-		return Pawn
-	case "N":
-		return Knight
-	case "B":
-		return Bishop
-	case "R":
-		return Rook
-	case "Q":
-		return Queen
-	case "K":
-		return King
-	default:
-		return NoPieceType
-	}
-}
-
-// parseSquare converts a square name (e.g., "e4") into a Square.
-func parseSquare(s string) Square {
-	const squareLen = 2
-	if len(s) != squareLen {
-		return NoSquare
-	}
-
-	file := int(s[0] - 'a')
-	rank := int(s[1] - '1')
-
-	// Validate file and rank are within bounds
-	if file < 0 || file > 7 || rank < 0 || rank > 7 {
-		return NoSquare
-	}
-
-	return Square(rank*8 + file)
+func (p *Parser) addMove(move Move, number uint) {
+	parent := p.currentMove()
+	node := &MoveNode{move: move, parent: parent, tree: p.game.tree, number: number}
+	parent.children = append(parent.children, node)
+	p.game.tree.setCurrent(node)
 }

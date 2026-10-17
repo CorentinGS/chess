@@ -70,3 +70,19 @@ func main() {
 	// 1.c4 c5 2.Nf3 e6 3.Nc3 Nc6 4.d4 cxd4 5.Nxd4 Nf6 6.a3 d5 7.cxd5 exd5 8.Bf4 Bc5 9.Ndb5 O-O 10.Nc7 d4 11.Na4 Be7 12.Nxa8 Bf5 13.g3 Qd5 14.f3 Rxa8 15.Bg2 Rd8 16.b4 Qe6 17.Nc5 Bxc5 18.bxc5 Nd5 19.O-O Nc3 20.Qd2 Nxe2+ 21.Kh1 d3 22.Bd6 Qd7 23.Rab1 h6 24.a4 Re8 25.g4 Bg6 26.a5 Ncd4 27.Qb4 Qe6 28.Qxb7 Nc2 29.Qxa7 Ne3 30.Rb8 Nxf1 31.Qb6 d2 32.Rxe8+ Qxe8 33.Qb3 Ne3 34.h3 Bc2 35.Qxc2 Nxc2 36.Kh2 d1=Q 37.h4 Qg1+ 38.Kh3 Ne1 39.h5 Qxg2+ 40.Kh4 Nxf3#  0-1
 }
 ```
+
+## Chess960
+
+Chess960 (Fischer Random) works without extra configuration. When a
+`CmdPosition` carries a Chess960 position, the engine enables its
+`UCI_Chess960` option automatically (if it advertised one in its `uci`
+response), and castling is sent and read in the king-to-rook form
+(`e1h1`) that the option specifies. A later standard position disables the
+option again. Standard-chess traffic is unchanged.
+
+```go
+setup, _ := chess.Chess960Setup(518) // SP-518 == the standard arrangement
+pos, _ := chess.NewPosition(setup)   // pos.Variant() == chess.Chess960
+// Sending this position enables UCI_Chess960 on the engine automatically.
+eng.Run(uci.CmdPosition{Position: pos})
+```

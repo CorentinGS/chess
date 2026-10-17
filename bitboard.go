@@ -93,21 +93,23 @@ func (b bitboard) String() string {
 
 // Draw returns visual representation of the bitboard useful for debugging.
 func (b bitboard) Draw() string {
-	s := "\n A B C D E F G H\n"
+	var sb strings.Builder
+	sb.Grow(154)
+	sb.WriteString("\n A B C D E F G H\n")
 	for r := 7; r >= 0; r-- {
-		s += Rank(r).String()
+		sb.WriteString(Rank(r).String())
 		for f := range numOfSquaresInRow {
 			sq := NewSquare(File(f), Rank(r))
 			if b.Occupied(sq) {
-				s += "1"
+				sb.WriteByte('1')
 			} else {
-				s += "0"
+				sb.WriteByte('0')
 			}
-			s += " "
+			sb.WriteByte(' ')
 		}
-		s += "\n"
+		sb.WriteByte('\n')
 	}
-	return s
+	return sb.String()
 }
 
 // Reverse returns a new bitboard with the bit order reversed, which can be

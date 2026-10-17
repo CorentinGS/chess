@@ -1,25 +1,28 @@
 /*
 Package chess is a go library designed to accomplish the following:
-  - chess game / turn management
+  - chess game state and move tree management
   - move validation
   - PGN encoding / decoding
   - FEN encoding / decoding
+
+Game values are mutable and are not safe for concurrent use by multiple
+goroutines. Callers that share a Game between goroutines must provide their own
+synchronization.
 
 Using Moves
 
 	game := chess.NewGame()
 	moves := game.ValidMoves()
-	game.Move(moves[0])
+	game.Move(moves[0], nil)
 
-Using Algebraic Notation
+Using Strict SAN Move Text
 
 	game := chess.NewGame()
-	game.MoveStr("e4")
+	game.MoveText("e4", SAN(), nil)
 
 Using PGN
 
-	pgn, _ := chess.PGN(pgnReader)
-	game := chess.NewGame(pgn)
+	game, _ := chess.ParsePGN(pgnReader)
 
 Using FEN
 
@@ -32,9 +35,9 @@ Random Game
 
 	import (
 	    "fmt"
-	    "math/rand"
+	    "math/rand/v2"
 
-	    "github.com/corentings/chess/v2"
+	    "github.com/corentings/chess/v3"
 	)
 
 	func main() {
@@ -43,8 +46,8 @@ Random Game
 	    for game.Outcome() == chess.NoOutcome {
 	        // select a random move
 	        moves := game.ValidMoves()
-	        move := moves[rand.Intn(len(moves))]
-	        game.Move(move)
+	        move := moves[rand.IntN(len(moves))]
+	        game.Move(move, nil)
 	    }
 	    // print outcome and game PGN
 	    fmt.Println(game.Position().Board().Draw())

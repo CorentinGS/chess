@@ -8,6 +8,32 @@ import (
 	"time"
 )
 
+func TestGameAccessorsReturnDefensiveCopies(t *testing.T) {
+	game := NewGame()
+	if _, err := game.MoveText("e4", SAN(), nil); err != nil {
+		t.Fatal(err)
+	}
+	game.MoveTree().AddVariation(nil, Move{s1: D2, s2: D4})
+
+	children := game.MoveTree().Root().Children()
+	children[0] = nil
+	if game.MoveTree().Root().children[0] == nil {
+		t.Fatal("Children returned mutable backing slice")
+	}
+
+	variations := game.MoveTree().Variations(game.MoveTree().Root())
+	variations[0] = nil
+	if game.MoveTree().Root().children[1] == nil {
+		t.Fatal("Variations returned mutable backing slice")
+	}
+
+	pos := game.Position()
+	pos.board.mailbox[E4] = NoPiece
+	if got := game.Position().Board().Piece(E4); got != WhitePawn {
+		t.Fatalf("Position returned mutable game position, E4 = %v, want %v", got, WhitePawn)
+	}
+}
+
 func TestCheckmate(t *testing.T) {
 	fenStr := "rn1qkbnr/pbpp1ppp/1p6/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 0 1"
 	fen, err := FEN(fenStr)
@@ -15,7 +41,7 @@ func TestCheckmate(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := NewGame(fen)
-	if err := g.PushMove("Qxf7#", nil); err != nil {
+	if _, err := g.MoveText("Qxf7#", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.Method() != Checkmate {
@@ -32,7 +58,7 @@ func TestCheckmate(t *testing.T) {
 		t.Fatal(err)
 	}
 	g = NewGame(fen)
-	if err := g.PushMove("O-O-O", nil); err != nil {
+	if _, err := g.MoveText("O-O-O", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	t.Log(g.Position().String())
@@ -67,7 +93,7 @@ func TestStalemate(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := NewGame(fen)
-	if err := g.PushMove("Qb6", nil); err != nil {
+	if _, err := g.MoveText("Qb6", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.Method() != Stalemate {
@@ -86,7 +112,7 @@ func TestInvalidStalemate(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := NewGame(fen)
-	if err := g.PushMove("d8=Q", nil); err != nil {
+	if _, err := g.MoveText("d8=Q", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.Outcome() != NoOutcome {
@@ -101,7 +127,7 @@ func TestThreeFoldRepetition(t *testing.T) {
 		"Nf3", "Nf6", "Ng1", "Ng8",
 	}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -120,7 +146,7 @@ func TestInvalidThreeFoldRepetition(t *testing.T) {
 		"Nf3", "Nf6", "Ng1", "Ng8",
 	}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -138,7 +164,7 @@ func TestFiveFoldRepetition(t *testing.T) {
 		"Nf3", "Nf6", "Ng1", "Ng8",
 	}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -156,7 +182,7 @@ func TestFiveFoldRepetitionIgnored(t *testing.T) {
 		"Nf3", "Nf6", "Ng1", "Ng8",
 	}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -184,7 +210,7 @@ func TestInvalidFiftyMoveRule(t *testing.T) {
 func TestSeventyFiveMoveRule(t *testing.T) {
 	fen, _ := FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 149 80")
 	g := NewGame(fen)
-	if err := g.PushMove("Kf8", nil); err != nil {
+	if _, err := g.MoveText("Kf8", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.Outcome() != Draw || g.Method() != SeventyFiveMoveRule {
@@ -195,7 +221,7 @@ func TestSeventyFiveMoveRule(t *testing.T) {
 func TestSeventyFiveMoveRuleIgnored(t *testing.T) {
 	fen, _ := FEN("2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 149 80")
 	g := NewGame(fen, IgnoreSeventyFiveMoveRuleDraw())
-	if err := g.PushMove("Kf8", nil); err != nil {
+	if _, err := g.MoveText("Kf8", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.Outcome() == Draw && g.Method() == SeventyFiveMoveRule {
@@ -277,11 +303,11 @@ func TestInitialNumOfValidMoves(t *testing.T) {
 func TestPositionHash(t *testing.T) {
 	g1 := NewGame()
 	for _, s := range []string{"Nc3", "e5", "Nf3"} {
-		g1.PushMove(s, nil)
+		g1.MoveText(s, SAN(), nil)
 	}
 	g2 := NewGame()
 	for _, s := range []string{"Nf3", "e5", "Nc3"} {
-		g2.PushMove(s, nil)
+		g2.MoveText(s, SAN(), nil)
 	}
 	if g1.Position().ZobristHash() != g2.Position().ZobristHash() {
 		t.Fatalf("expected position hashes to be equal but got %x and %x", g1.Position().ZobristHash(), g2.Position().ZobristHash())
@@ -295,11 +321,11 @@ func BenchmarkStalemateStatus(b *testing.B) {
 		b.Fatal(err)
 	}
 	g := NewGame(fen)
-	if err := g.PushMove("Qb6", nil); err != nil {
+	if _, err := g.MoveText("Qb6", SAN(), nil); err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		g.Position().Status()
 	}
 }
@@ -311,11 +337,11 @@ func BenchmarkInvalidStalemateStatus(b *testing.B) {
 		b.Fatal(err)
 	}
 	g := NewGame(fen)
-	if err := g.PushMove("d8=Q", nil); err != nil {
+	if _, err := g.MoveText("d8=Q", SAN(), nil); err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		g.Position().Status()
 	}
 }
@@ -328,83 +354,101 @@ func BenchmarkPositionHash(b *testing.B) {
 	}
 	g := NewGame(fen)
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		g.Position().ZobristHash()
 	}
 }
 
 func TestAddVariationToEmptyParent(t *testing.T) {
 	g := NewGame()
-	parent := &Move{}
-	newMove := &Move{}
-	g.AddVariation(parent, newMove)
-	if len(parent.children) != 1 || parent.children[0] != newMove {
+	parent := g.MoveTree().Root()
+	newMove := Move{s1: E2, s2: E4}
+	node, err := g.MoveTree().AddVariation(parent, newMove)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parent.children) != 1 || parent.children[0] != node || parent.children[0].move != newMove {
 		t.Fatalf("expected newMove to be added to parent's children")
 	}
-	if newMove.parent != parent {
+	if parent.children[0].parent != parent {
 		t.Fatalf("expected newMove's parent to be set to parent")
 	}
 }
 
 func TestAddVariationToNonEmptyParent(t *testing.T) {
 	g := NewGame()
-	parent := &Move{children: []*Move{{}}}
-	newMove := &Move{}
-	g.AddVariation(parent, newMove)
-	if len(parent.children) != 2 || parent.children[1] != newMove {
+	parent := g.MoveTree().Root()
+	if _, err := g.MoveTree().AddVariation(parent, Move{s1: E2, s2: E4}); err != nil {
+		t.Fatal(err)
+	}
+	newMove := Move{s1: D2, s2: D4}
+	node, err := g.MoveTree().AddVariation(parent, newMove)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parent.children) != 2 || parent.children[1] != node || parent.children[1].move != newMove {
 		t.Fatalf("expected newMove to be added to parent's children")
 	}
-	if newMove.parent != parent {
+	if parent.children[1].parent != parent {
 		t.Fatalf("expected newMove's parent to be set to parent")
 	}
 }
 
 func TestAddVariationWithNilParent(t *testing.T) {
 	g := NewGame()
-	newMove := &Move{}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("expected panic when parent is nil")
-		}
-	}()
-	g.AddVariation(nil, newMove)
+	newMove := Move{s1: E2, s2: E4}
+	if _, err := g.MoveTree().AddVariation(nil, newMove); err != nil {
+		t.Fatal(err)
+	}
+	if len(g.MoveTree().Root().children) != 1 {
+		t.Fatalf("expected variation attached to root, got %d children", len(g.MoveTree().Root().children))
+	}
+	if g.MoveTree().Root().children[0].move != newMove {
+		t.Fatalf("expected variation move %v, got %v", newMove, g.MoveTree().Root().children[0].move)
+	}
+	if g.MoveTree().Root().children[0].parent != g.MoveTree().Root() {
+		t.Fatal("expected variation parent pointer to be the root move")
+	}
 }
 
 func TestNavigateToMainLineFromLeaf(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	g.NavigateToMainLine()
-	if g.currentMove != g.rootMove.children[0] {
+	g.MoveTree().NavigateToMainLine()
+	if g.MoveTree().Current() != g.MoveTree().Root().children[0] {
 		t.Fatalf("expected to navigate to main line root move")
 	}
 }
 
-func TestNavigateToMainLineFromBranch(t *testing.T) {
+func TestNavigateToMainLineFromVariation(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	variationMove := &Move{}
-	g.AddVariation(g.currentMove, variationMove)
-	g.currentMove = variationMove
-	g.NavigateToMainLine()
-	if g.currentMove != g.rootMove.children[0] {
+	variationMove := Move{s1: A7, s2: A6}
+	variationNode, err := g.MoveTree().AddVariation(g.MoveTree().Current(), variationMove)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.tree.setCurrent(variationNode)
+	g.MoveTree().NavigateToMainLine()
+	if g.MoveTree().Current() != g.MoveTree().Root().children[0] {
 		t.Fatalf("expected to navigate to main line root move")
 	}
 }
 
 func TestNavigateToMainLineFromRoot(t *testing.T) {
 	g := NewGame()
-	g.NavigateToMainLine()
-	if g.currentMove != g.rootMove {
+	g.MoveTree().NavigateToMainLine()
+	if g.MoveTree().Current() != g.MoveTree().Root() {
 		t.Fatalf("expected to stay at root move")
 	}
 }
@@ -413,24 +457,24 @@ func TestGoBackFromLeaf(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if !g.GoBack() {
+	if !g.MoveTree().GoBack() {
 		t.Fatalf("expected to go back from leaf move")
 	}
-	if g.currentMove != g.rootMove.children[0].children[0].children[0].children[0] {
+	if g.MoveTree().Current() != g.MoveTree().Root().children[0].children[0].children[0].children[0] {
 		t.Fatalf("expected current move to be Bb5's parent")
 	}
 }
 
 func TestGoBackFromRoot(t *testing.T) {
 	g := NewGame()
-	if g.GoBack() {
+	if g.MoveTree().GoBack() {
 		t.Fatalf("expected not to go back from root move")
 	}
-	if g.currentMove != g.rootMove {
+	if g.MoveTree().Current() != g.MoveTree().Root() {
 		t.Fatalf("expected to stay at root move")
 	}
 }
@@ -439,27 +483,27 @@ func TestGoBackFromMainLine(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3"}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if !g.GoBack() {
+	if !g.MoveTree().GoBack() {
 		t.Fatalf("expected to go back from main line move")
 	}
-	if g.currentMove != g.rootMove.children[0].children[0] {
+	if g.MoveTree().Current() != g.MoveTree().Root().children[0].children[0] {
 		t.Fatalf("expected current move to be e5's parent")
 	}
 }
 
 func TestGoForwardFromRoot(t *testing.T) {
 	g := NewGame()
-	_ = g.PushMove("e4", nil)
-	_ = g.PushMove("e5", nil)
-	g.currentMove = g.rootMove // Reset to root
-	if !g.GoForward() {
+	_, _ = g.MoveText("e4", SAN(), nil)
+	_, _ = g.MoveText("e5", SAN(), nil)
+	g.tree.setCurrent(g.MoveTree().Root()) // Reset to root
+	if !g.MoveTree().GoForward() {
 		t.Fatalf("expected to go forward from root move")
 	}
-	if g.currentMove != g.rootMove.children[0] {
+	if g.MoveTree().Current() != g.MoveTree().Root().children[0] {
 		t.Fatalf("expected current move to be the first child of root move")
 	}
 }
@@ -468,35 +512,40 @@ func TestGoForwardFromLeaf(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6", "Bb5"}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if g.GoForward() {
+	if g.MoveTree().GoForward() {
 		t.Fatalf("expected not to go forward from leaf move")
 	}
-	if g.currentMove != g.rootMove.children[0].children[0].children[0].children[0].children[0] {
+	if g.MoveTree().Current() != g.MoveTree().Root().children[0].children[0].children[0].children[0].children[0] {
 		t.Fatalf("expected current move to stay at leaf move")
 	}
 }
 
-func TestGoForwardFromBranch(t *testing.T) {
+func TestGoForwardFromVariation(t *testing.T) {
 	g := NewGame()
 	moves := []string{"e4", "e5", "Nf3", "Nc6"}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	variationMove := &Move{}
-	g.AddVariation(g.currentMove, variationMove)
-	childMove := &Move{}                     // Add this line
-	g.AddVariation(variationMove, childMove) // Add this line
-	g.currentMove = variationMove
-	if !g.GoForward() {
-		t.Fatalf("expected to go forward from branch move")
+	variationMove := Move{s1: F1, s2: B5}
+	variationNode, err := g.MoveTree().AddVariation(g.MoveTree().Current(), variationMove)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if g.currentMove != childMove { // Change this line
+	childMove := Move{s1: A7, s2: A6}
+	if _, err := g.MoveTree().AddVariation(variationNode, childMove); err != nil {
+		t.Fatal(err)
+	}
+	g.tree.setCurrent(variationNode)
+	if !g.MoveTree().GoForward() {
+		t.Fatalf("expected to go forward from variation move")
+	}
+	if g.MoveTree().Current().move != childMove {
 		t.Fatalf("expected current move to be the child of the variation move")
 	}
 }
@@ -510,7 +559,7 @@ func TestIsAtStartWhenAtRoot(t *testing.T) {
 
 func TestIsAtStartWhenNotAtRoot(t *testing.T) {
 	g := NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if g.IsAtStart() {
@@ -520,7 +569,7 @@ func TestIsAtStartWhenNotAtRoot(t *testing.T) {
 
 func TestIsAtEndWhenAtLeaf(t *testing.T) {
 	g := NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if !g.IsAtEnd() {
@@ -530,14 +579,14 @@ func TestIsAtEndWhenAtLeaf(t *testing.T) {
 
 func TestIsAtEndWhenNotAtLeaf(t *testing.T) {
 	g := NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.MoveText("e5", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
 	// Add this line to move back to a non-leaf position
-	g.GoBack()
+	g.MoveTree().GoBack()
 	if g.IsAtEnd() {
 		t.Fatalf("expected not to be at end when not at leaf move")
 	}
@@ -545,8 +594,8 @@ func TestIsAtEndWhenNotAtLeaf(t *testing.T) {
 
 func TestVariationsWithNoChildren(t *testing.T) {
 	g := NewGame()
-	move := &Move{}
-	variations := g.Variations(move)
+	move := &MoveNode{}
+	variations := g.MoveTree().Variations(move)
 	if variations != nil {
 		t.Fatalf("expected no variations for move with no children")
 	}
@@ -554,8 +603,8 @@ func TestVariationsWithNoChildren(t *testing.T) {
 
 func TestVariationsWithOneChild(t *testing.T) {
 	g := NewGame()
-	move := &Move{children: []*Move{{}}}
-	variations := g.Variations(move)
+	move := &MoveNode{children: []*MoveNode{{}}}
+	variations := g.MoveTree().Variations(move)
 	if variations != nil {
 		t.Fatalf("expected no variations for move with one child")
 	}
@@ -563,8 +612,8 @@ func TestVariationsWithOneChild(t *testing.T) {
 
 func TestVariationsWithMultipleChildren(t *testing.T) {
 	g := NewGame()
-	move := &Move{children: []*Move{{}, {}}}
-	variations := g.Variations(move)
+	move := &MoveNode{children: []*MoveNode{{}, {}}}
+	variations := g.MoveTree().Variations(move)
 	if len(variations) != 1 {
 		t.Fatalf("expected one variation for move with multiple children")
 	}
@@ -572,57 +621,22 @@ func TestVariationsWithMultipleChildren(t *testing.T) {
 
 func TestVariationsWithNilMove(t *testing.T) {
 	g := NewGame()
-	variations := g.Variations(nil)
+	variations := g.MoveTree().Variations(nil)
 	if variations != nil {
 		t.Fatalf("expected no variations for nil move")
-	}
-}
-
-func TestCommentsWithNoComments(t *testing.T) {
-	g := NewGame()
-	comments := g.Comments()
-	if len(comments) != 0 {
-		t.Fatalf("expected no comments but got %d", len(comments))
-	}
-}
-
-func TestCommentsWithSingleComment(t *testing.T) {
-	g := NewGame()
-	g.comments = [][]string{{"First comment"}}
-	comments := g.Comments()
-	if len(comments) != 1 || comments[0][0] != "First comment" {
-		t.Fatalf("expected one comment 'First comment' but got %v", comments)
-	}
-}
-
-func TestCommentsWithMultipleComments(t *testing.T) {
-	g := NewGame()
-	g.comments = [][]string{{"First comment"}, {"Second comment"}}
-	comments := g.Comments()
-	if len(comments) != 2 || comments[0][0] != "First comment" || comments[1][0] != "Second comment" {
-		t.Fatalf("expected comments 'First comment' and 'Second comment' but got %v", comments)
-	}
-}
-
-func TestCommentsWithNilComments(t *testing.T) {
-	g := NewGame()
-	g.comments = nil
-	comments := g.Comments()
-	if comments == nil || len(comments) != 0 {
-		t.Fatalf("expected no comments but got %v", comments)
 	}
 }
 
 func TestPushMove(t *testing.T) {
 	tests := []struct {
 		name          string
-		setupMoves    []string         // Moves to set up the position
-		move          string           // Move to push
-		goBack        bool             // Whether to go back one move before pushing
-		options       *PushMoveOptions // Options for the push
-		wantErr       bool             // Whether we expect an error
-		wantPosition  string           // Expected FEN after the move
-		checkMainline []string         // Expected mainline moves in UCI notation
+		setupMoves    []string           // Moves to set up the position
+		move          string             // Move to push
+		goBack        bool               // Whether to go back one move before pushing
+		options       *MoveInsertOptions // Options for the push
+		wantErr       bool               // Whether we expect an error
+		wantPosition  string             // Expected FEN after the move
+		checkMainline []string           // Expected mainline moves in UCI notation
 	}{
 		{
 			name:          "basic pawn move",
@@ -648,7 +662,7 @@ func TestPushMove(t *testing.T) {
 			setupMoves:    []string{"e4", "e5", "Nf3"},
 			move:          "Nc3",
 			goBack:        true,
-			options:       &PushMoveOptions{},
+			options:       &MoveInsertOptions{},
 			wantPosition:  "rnbqkbnr/pppp1ppp/8/4p3/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2",
 			checkMainline: []string{"e2e4", "e7e5", "g1f3"}, // Original mainline remains
 		},
@@ -657,7 +671,7 @@ func TestPushMove(t *testing.T) {
 			setupMoves:    []string{"e4", "e5", "Nf3"},
 			move:          "Nc3",
 			goBack:        true,
-			options:       &PushMoveOptions{ForceMainline: true},
+			options:       &MoveInsertOptions{PromoteToMainLine: true},
 			wantPosition:  "rnbqkbnr/pppp1ppp/8/4p3/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2",
 			checkMainline: []string{"e2e4", "e7e5", "b1c3"}, // New mainline
 		},
@@ -666,7 +680,7 @@ func TestPushMove(t *testing.T) {
 			setupMoves:    []string{"e4", "e5", "Nf3"},
 			move:          "Nf3",
 			goBack:        true,
-			options:       &PushMoveOptions{},
+			options:       &MoveInsertOptions{},
 			wantPosition:  "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
 			checkMainline: []string{"e2e4", "e7e5", "g1f3"},
 		},
@@ -700,19 +714,19 @@ func TestPushMove(t *testing.T) {
 
 			// Setup moves
 			for _, move := range tt.setupMoves {
-				err := game.PushMove(move, nil)
+				_, err := game.MoveText(move, SAN(), nil)
 				if err != nil {
 					t.Fatalf("setup failed: %v", err)
 				}
 			}
 
 			// Go back one move if needed for the test
-			if tt.goBack && game.currentMove != nil && game.currentMove.parent != nil {
-				game.GoBack()
+			if tt.goBack && game.MoveTree().Current() != nil && game.MoveTree().Current().parent != nil {
+				game.MoveTree().GoBack()
 			}
 
 			// Test the move
-			err := game.PushMove(tt.move, tt.options)
+			_, err := game.MoveText(tt.move, SAN(), tt.options)
 
 			// Check error expectation
 			if (err != nil) != tt.wantErr {
@@ -726,7 +740,7 @@ func TestPushMove(t *testing.T) {
 
 			// Check position
 			if tt.wantPosition != "" {
-				gotFEN := game.pos.String()
+				gotFEN := game.currentPosition().String()
 				if gotFEN != tt.wantPosition {
 					t.Errorf("Position after move = %v, want %v", gotFEN, tt.wantPosition)
 				}
@@ -746,7 +760,7 @@ func TestPushMove(t *testing.T) {
 // Helper function to get the mainline moves from a game
 func getMainline(game *Game) []string {
 	var moves []string
-	current := game.rootMove
+	current := game.MoveTree().Root()
 
 	for len(current.children) > 0 {
 		current = current.children[0] // Follow main line (first variation)
@@ -757,20 +771,21 @@ func getMainline(game *Game) []string {
 }
 
 // Helper function to convert a move to algebraic notation
-func algebraicMove(move *Move) string {
+func algebraicMove(move *MoveNode) string {
+	mv := move.Move()
 	// This is a simplified version - you might want to implement proper algebraic notation
-	if move.HasTag(KingSideCastle) {
+	if mv.HasTag(KingSideCastle) {
 		return "O-O"
 	}
-	if move.HasTag(QueenSideCastle) {
+	if mv.HasTag(QueenSideCastle) {
 		return "O-O-O"
 	}
 
-	s1 := move.s1.String()
-	s2 := move.s2.String()
+	s1 := mv.s1.String()
+	s2 := mv.s2.String()
 
-	if move.promo != NoPieceType {
-		return s1 + s2 + "=" + move.promo.String()
+	if mv.promo != NoPieceType {
+		return s1 + s2 + "=" + mv.promo.String()
 	}
 
 	return s1 + s2
@@ -791,39 +806,25 @@ func moveSlicesEqual(a, b []string) bool {
 
 func TestCopyGameState(t *testing.T) {
 	original := NewGame()
-	_ = original.PushMove("e4", nil)
-	_ = original.PushMove("e5", nil)
-	_ = original.PushMove("Nf3", nil)
+	_, _ = original.MoveText("e4", SAN(), nil)
+	_, _ = original.MoveText("e5", SAN(), nil)
+	_, _ = original.MoveText("Nf3", SAN(), nil)
 
 	newGame := NewGame()
 	newGame.copy(original)
+	newGame.tree = original.tree // copy() does not set tree; caller hands it over
 
-	if newGame.pos.String() != original.pos.String() {
-		t.Fatalf("expected position %s but got %s", original.pos.String(), newGame.pos.String())
+	if newGame.currentPosition().String() != original.currentPosition().String() {
+		t.Fatalf("expected position %s but got %s", original.currentPosition().String(), newGame.currentPosition().String())
 	}
-	if newGame.currentMove != original.currentMove {
-		t.Fatalf("expected current move to be %v but got %v", original.currentMove, newGame.currentMove)
+	if newGame.MoveTree().Current() != original.MoveTree().Current() {
+		t.Fatalf("expected current move to be %v but got %v", original.MoveTree().Current(), newGame.MoveTree().Current())
 	}
 	if newGame.outcome != original.outcome {
 		t.Fatalf("expected outcome %s but got %s", original.outcome, newGame.outcome)
 	}
 	if newGame.method != original.method {
 		t.Fatalf("expected method %d but got %d", original.method, newGame.method)
-	}
-	if len(newGame.Comments()) != len(original.Comments()) {
-		t.Fatalf("expected comments %v but got %v", original.Comments(), newGame.Comments())
-	}
-}
-
-func TestCopyGameStateWithNilComments(t *testing.T) {
-	original := NewGame()
-	original.comments = nil
-
-	newGame := NewGame()
-	newGame.copy(original)
-
-	if newGame.comments == nil {
-		t.Fatalf("expected comments to be initialized")
 	}
 }
 
@@ -841,22 +842,22 @@ func TestCopyGameStateWithTagPairs(t *testing.T) {
 
 func TestCloneGameState(t *testing.T) {
 	original := NewGame()
-	_ = original.PushMove("e4", nil)
-	_ = original.PushMove("e5", nil)
-	_ = original.PushMove("Nf3", nil)
+	_, _ = original.MoveText("e4", SAN(), nil)
+	_, _ = original.MoveText("e5", SAN(), nil)
+	_, _ = original.MoveText("Nf3", SAN(), nil)
 
 	clone := original.Clone()
 
-	if clone.pos.String() != original.pos.String() {
-		t.Fatalf("expected position %s but got %s", original.pos.String(), clone.pos.String())
+	if clone.currentPosition().String() != original.currentPosition().String() {
+		t.Fatalf("expected position %s but got %s", original.currentPosition().String(), clone.currentPosition().String())
 	}
-	if clone.currentMove.String() != original.currentMove.String() {
-		t.Fatalf("expected current move to be %v but got %v", original.currentMove, clone.currentMove)
+	if clone.MoveTree().Current().Move().String() != original.MoveTree().Current().Move().String() {
+		t.Fatalf("expected current move to be %v but got %v", original.MoveTree().Current(), clone.MoveTree().Current())
 	}
-	if clone.currentMove == original.currentMove {
+	if clone.MoveTree().Current() == original.MoveTree().Current() {
 		t.Errorf("clone failed to deep copy currentMove")
 	}
-	if clone.rootMove == original.rootMove {
+	if clone.MoveTree().Root() == original.MoveTree().Root() {
 		t.Errorf("clone failed to deep copy rootMove")
 	}
 	if clone.outcome != original.outcome {
@@ -865,16 +866,13 @@ func TestCloneGameState(t *testing.T) {
 	if clone.method != original.method {
 		t.Fatalf("expected method %d but got %d", original.method, clone.method)
 	}
-	if len(clone.Comments()) != len(original.Comments()) {
-		t.Fatalf("expected comments %v but got %v", original.Comments(), clone.Comments())
-	}
 
 	// make sure we can modify the clone without impact on the original
-	err := clone.PushMove("Nf6", nil)
+	_, err := clone.MoveText("Nf6", SAN(), nil)
 	if err != nil {
 		t.Fatalf("failed to push Nf6")
 	}
-	if clone.pos.String() == original.pos.String() {
+	if clone.currentPosition().String() == original.currentPosition().String() {
 		t.Error("modifying the clone incorrectly mutates the original position")
 	}
 	if len(clone.Moves()) == len(original.Moves()) {
@@ -885,14 +883,15 @@ func TestCloneGameState(t *testing.T) {
 	}
 }
 
-func TestCloneGameStateWithNilComments(t *testing.T) {
-	original := NewGame()
-	original.comments = nil
+func TestCopyDoesNotSetTree(t *testing.T) {
+	src := NewGame()
+	_, _ = src.MoveText("e4", SAN(), nil)
 
-	clone := original.Clone()
-
-	if clone.comments == nil {
-		t.Fatalf("expected comments to be initialized")
+	dst := &Game{}
+	dst.copy(src)
+	// copy() intentionally does not touch tree; every caller sets it explicitly.
+	if dst.tree != nil {
+		t.Fatalf("copy() must not alias or set the tree; got %v", dst.tree)
 	}
 }
 
@@ -971,7 +970,7 @@ func TestEligibleDrawsWithThreeRepetitions(t *testing.T) {
 	g := NewGame()
 	moves := []string{"Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6"}
 	for _, m := range moves {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1078,8 +1077,8 @@ func TestPGNWithValidData(t *testing.T) {
 	if len(g.Positions()) != 7 {
 		t.Fatalf("expected 7 positions got %v", len(g.Positions()))
 	}
-	if g.currentMove.String() != "a7a6" {
-		t.Fatalf("expected current move a7a6 but got %v", g.currentMove.String())
+	if g.MoveTree().Current().Move().String() != "a7a6" {
+		t.Fatalf("expected current move a7a6 but got %v", g.MoveTree().Current().Move().String())
 	}
 }
 
@@ -1124,7 +1123,7 @@ func TestGameString(t *testing.T) {
 			name: "GameStringWithSingleMove",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("e4", nil)
+				_, _ = g.MoveText("e4", SAN(), nil)
 				return g
 			},
 			expected: "1. e4 *",
@@ -1133,9 +1132,9 @@ func TestGameString(t *testing.T) {
 			name: "GameStringWithMultipleMoves",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("e4", nil)
-				_ = g.PushMove("e5", nil)
-				_ = g.PushMove("Nf3", nil)
+				_, _ = g.MoveText("e4", SAN(), nil)
+				_, _ = g.MoveText("e5", SAN(), nil)
+				_, _ = g.MoveText("Nf3", SAN(), nil)
 				return g
 			},
 			expected: "1. e4 e5 2. Nf3 *",
@@ -1144,15 +1143,15 @@ func TestGameString(t *testing.T) {
 			name: "GameStringWithLongerGame",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("Nf3", nil)
-				_ = g.PushMove("Nc6", nil)
-				_ = g.PushMove("Nc3", nil)
-				_ = g.PushMove("e6", nil)
-				_ = g.PushMove("e4", nil)
-				_ = g.PushMove("a6", nil)
-				_ = g.PushMove("Ne2", nil)
-				_ = g.PushMove("Nf6", nil)
-				_ = g.PushMove("Ned4", nil)
+				_, _ = g.MoveText("Nf3", SAN(), nil)
+				_, _ = g.MoveText("Nc6", SAN(), nil)
+				_, _ = g.MoveText("Nc3", SAN(), nil)
+				_, _ = g.MoveText("e6", SAN(), nil)
+				_, _ = g.MoveText("e4", SAN(), nil)
+				_, _ = g.MoveText("a6", SAN(), nil)
+				_, _ = g.MoveText("Ne2", SAN(), nil)
+				_, _ = g.MoveText("Nf6", SAN(), nil)
+				_, _ = g.MoveText("Ned4", SAN(), nil)
 				return g
 			},
 			expected: "1. Nf3 Nc6 2. Nc3 e6 3. e4 a6 4. Ne2 Nf6 5. Ned4 *",
@@ -1161,8 +1160,8 @@ func TestGameString(t *testing.T) {
 			name: "GameStringWithComments",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("e4", nil)
-				g.currentMove.comments = "Good move"
+				_, _ = g.MoveText("e4", SAN(), nil)
+				g.MoveTree().Current().SetComment("Good move")
 				return g
 			},
 			expected: "1. e4 {Good move} *",
@@ -1171,11 +1170,11 @@ func TestGameString(t *testing.T) {
 			name: "GameStringWithVariations",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("e4", nil)
-				_ = g.PushMove("e5", nil)
-				_ = g.PushMove("Nf3", nil)
-				g.GoBack()
-				_ = g.PushMove("Nc3", nil)
+				_, _ = g.MoveText("e4", SAN(), nil)
+				_, _ = g.MoveText("e5", SAN(), nil)
+				_, _ = g.MoveText("Nf3", SAN(), nil)
+				g.MoveTree().GoBack()
+				_, _ = g.MoveText("Nc3", SAN(), nil)
 				return g
 			},
 			expected: "1. e4 e5 2. Nf3 (2. Nc3) *",
@@ -1221,9 +1220,9 @@ func TestGameString(t *testing.T) {
 			name: "GameStringWithCommentsAndClock",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("e4", nil)
-				g.currentMove.comments = "Good move"
-				g.currentMove.SetCommand("clk", "10:00:00")
+				_, _ = g.MoveText("e4", SAN(), nil)
+				g.MoveTree().Current().SetComment("Good move")
+				g.MoveTree().Current().SetCommand("clk", "10:00:00")
 				return g
 			},
 			expected: "1. e4 {Good move [%clk 10:00:00]} *",
@@ -1232,41 +1231,41 @@ func TestGameString(t *testing.T) {
 			name: "GameStringWithCommandsOnly",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("e4", nil)
-				g.currentMove.SetCommand("eval", "0.24")
-				g.currentMove.SetCommand("clk", "10:00:00")
+				_, _ = g.MoveText("e4", SAN(), nil)
+				g.MoveTree().Current().SetCommand("eval", "0.24")
+				g.MoveTree().Current().SetCommand("clk", "10:00:00")
 				return g
 			},
-			expected: "1. e4 { [%clk 10:00:00] [%eval 0.24]} *",
+			expected: "1. e4 { [%eval 0.24] [%clk 10:00:00]} *",
 		},
 		{
 			name: "GameStringWithCommentsAndMultipleCommands",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("e4", nil)
-				g.currentMove.comments = "Good move"
-				g.currentMove.SetCommand("eval", "0.24")
-				g.currentMove.SetCommand("clk", "10:00:00")
+				_, _ = g.MoveText("e4", SAN(), nil)
+				g.MoveTree().Current().SetComment("Good move")
+				g.MoveTree().Current().SetCommand("eval", "0.24")
+				g.MoveTree().Current().SetCommand("clk", "10:00:00")
 				return g
 			},
-			expected: "1. e4 {Good move [%clk 10:00:00] [%eval 0.24]} *",
+			expected: "1. e4 {Good move [%eval 0.24] [%clk 10:00:00]} *",
 		},
 		{
 			name: "GameStringWithMultipleNestedVariations",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("e4", nil)
-				_ = g.PushMove("e5", nil)
-				_ = g.PushMove("Nf3", nil)
-				g.GoBack()
-				_ = g.PushMove("Nc3", nil)
-				g.GoBack()
-				_ = g.PushMove("d4", nil)
-				_ = g.PushMove("d5", nil)
-				_ = g.PushMove("c4", nil)
-				g.GoBack()
-				_ = g.PushMove("c3", nil)
-				g.GoBack()
+				_, _ = g.MoveText("e4", SAN(), nil)
+				_, _ = g.MoveText("e5", SAN(), nil)
+				_, _ = g.MoveText("Nf3", SAN(), nil)
+				g.MoveTree().GoBack()
+				_, _ = g.MoveText("Nc3", SAN(), nil)
+				g.MoveTree().GoBack()
+				_, _ = g.MoveText("d4", SAN(), nil)
+				_, _ = g.MoveText("d5", SAN(), nil)
+				_, _ = g.MoveText("c4", SAN(), nil)
+				g.MoveTree().GoBack()
+				_, _ = g.MoveText("c3", SAN(), nil)
+				g.MoveTree().GoBack()
 				return g
 			},
 			expected: "1. e4 e5 2. Nf3 (2. Nc3) (2. d4 d5 3. c4 (3. c3)) *",
@@ -1275,14 +1274,14 @@ func TestGameString(t *testing.T) {
 			name: "GameStringWithVariationsForBlack",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("e4", nil)
-				_ = g.PushMove("e5", nil)
-				_ = g.PushMove("Nf3", nil)
-				_ = g.PushMove("Nc6", nil)
-				_ = g.PushMove("Bb5", nil)
-				_ = g.PushMove("a6", nil)
-				g.GoBack()
-				_ = g.PushMove("d6", nil)
+				_, _ = g.MoveText("e4", SAN(), nil)
+				_, _ = g.MoveText("e5", SAN(), nil)
+				_, _ = g.MoveText("Nf3", SAN(), nil)
+				_, _ = g.MoveText("Nc6", SAN(), nil)
+				_, _ = g.MoveText("Bb5", SAN(), nil)
+				_, _ = g.MoveText("a6", SAN(), nil)
+				g.MoveTree().GoBack()
+				_, _ = g.MoveText("d6", SAN(), nil)
 				return g
 			},
 			expected: "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 (3... d6) *",
@@ -1291,9 +1290,9 @@ func TestGameString(t *testing.T) {
 			name: "GameStringWithVariationsOnRoot",
 			setup: func() *Game {
 				g := NewGame()
-				_ = g.PushMove("e4", nil)
-				g.GoBack()
-				_ = g.PushMove("d4", nil)
+				_, _ = g.MoveText("e4", SAN(), nil)
+				g.MoveTree().GoBack()
+				_, _ = g.MoveText("d4", SAN(), nil)
 				return g
 			},
 			expected: "1. e4 (1. d4) *",
@@ -1310,29 +1309,29 @@ func TestGameString(t *testing.T) {
 	}
 }
 
-func FuzzTestPushNotationMove(f *testing.F) {
+func FuzzTestMoveText(f *testing.F) {
 	f.Add("e2e4", 0)
 	f.Add("e4", 1)
 	f.Add("Nb1c3", 2)
 
-	f.Fuzz(func(t *testing.T, move string, notationType int) {
+	f.Fuzz(func(_ *testing.T, move string, codecType int) {
 		game := NewGame()
 
-		var notation Notation
-		switch notationType % 3 {
+		var codec MoveTextCodec
+		switch codecType % 3 {
 		case 0:
-			notation = UCINotation{}
+			codec = UCI()
 		case 1:
-			notation = AlgebraicNotation{}
+			codec = SAN()
 		case 2:
-			notation = LongAlgebraicNotation{}
+			codec = LongAlgebraic()
 		}
 
-		_ = game.PushNotationMove(move, notation, nil)
+		_, _ = game.MoveText(move, codec, nil)
 	})
 }
 
-func TestInvalidPushNotationMove(t *testing.T) {
+func TestInvalidMoveText(t *testing.T) {
 	fen := "r1bqk1nr/pp1pppbp/6p1/1Bp1P3/P2n1P2/2N2N2/1PPP2PP/R1BQK2R w KQkq - 0 1"
 	bogusMv := "Kxh1"
 	opt, err := FEN(fen)
@@ -1341,17 +1340,17 @@ func TestInvalidPushNotationMove(t *testing.T) {
 	}
 	game := NewGame(opt)
 
-	err = game.PushNotationMove(bogusMv, UCINotation{}, nil)
+	_, err = game.MoveText(bogusMv, UCI(), nil)
 	if err == nil {
-		t.Errorf("PushNotationMove() (uci) succeeded in pushing bogus mv when it should have failed")
+		t.Errorf("MoveText() (uci) succeeded in pushing bogus mv when it should have failed")
 	}
-	err = game.PushNotationMove(bogusMv, AlgebraicNotation{}, nil)
+	_, err = game.MoveText(bogusMv, SAN(), nil)
 	if err == nil {
-		t.Errorf("PushNotationMove() (alg) succeeded in pushing bogus mv when it should have failed")
+		t.Errorf("MoveText() (SAN) succeeded in pushing bogus mv when it should have failed")
 	}
 }
 
-func TestValidPushNotationMove(t *testing.T) {
+func TestValidMoveText(t *testing.T) {
 	pgn := strings.NewReader("1. e4 (1. g4) 1... c5 2. Nc3 Nc6 3. f4 g6 4. Nf3 Bg7 5. a4 Nf6 6. e5 *")
 	mv := "Ng4"
 	opt, err := PGN(pgn)
@@ -1363,25 +1362,24 @@ func TestValidPushNotationMove(t *testing.T) {
 	startMlen := len(game.Moves())
 	startPlen := len(game.Positions())
 
-	err = game.PushNotationMove(mv, AlgebraicNotation{}, &PushMoveOptions{
-		ForceMainline: true,
+	_, err = game.MoveText(mv, SAN(), &MoveInsertOptions{
+		PromoteToMainLine: true,
 	})
 	if err != nil {
-		t.Errorf("PushNotationMove() failed but should have succeeded")
+		t.Errorf("MoveText() failed but should have succeeded")
 	}
 
 	if len(game.Moves()) != startMlen+1 {
-		t.Errorf("PushNotationMove() failed to update game.Moves()")
+		t.Errorf("MoveText() failed to update game.Moves()")
 	}
 	if len(game.Positions()) != startPlen+1 {
-		t.Errorf("PushNotationMove() failed to update game.Positions()")
+		t.Errorf("MoveText() failed to update game.Positions()")
 	}
 }
 
 func validateSplit(t *testing.T, origPgn string, expectedLastLines []string) {
 	reader := strings.NewReader(origPgn)
-	scanner := NewScanner(reader)
-	game, err := scanner.ParseNext()
+	game, err := NewPGNDecoder(reader).Decode()
 	if err != nil {
 		t.Fatalf("fail to parse game: %s", err.Error())
 	}
@@ -1437,12 +1435,12 @@ func TestRootMoveComments(t *testing.T) {
 		game := NewGame()
 
 		// Add a comment to the root move
-		root := game.GetRootMove()
+		root := game.MoveTree().Root()
 		root.AddComment("This is a comment before the first move")
 
 		// Add some moves
-		game.PushMove("e4", nil)
-		game.PushMove("e5", nil)
+		game.MoveText("e4", SAN(), nil)
+		game.MoveText("e5", SAN(), nil)
 
 		// Generate PGN
 		pgn := game.String()
@@ -1479,7 +1477,7 @@ func TestRootMoveComments(t *testing.T) {
 		game := NewGame()
 
 		// Add a comment to the root move
-		root := game.GetRootMove()
+		root := game.MoveTree().Root()
 		root.AddComment("Comment on empty game")
 
 		// Generate PGN
@@ -1495,12 +1493,12 @@ func TestRootMoveComments(t *testing.T) {
 		game := NewGame()
 
 		// Add multiple comments to the root move
-		root := game.GetRootMove()
+		root := game.MoveTree().Root()
 		root.AddComment("First comment. ")
 		root.AddComment("Second comment.")
 
 		// Add some moves
-		game.PushMove("e4", nil)
+		game.MoveText("e4", SAN(), nil)
 
 		// Generate PGN
 		pgn := game.String()
@@ -1519,11 +1517,11 @@ func TestRootMoveComments(t *testing.T) {
 		game.AddTagPair("Site", "Test Site")
 
 		// Add a comment to the root move
-		root := game.GetRootMove()
+		root := game.MoveTree().Root()
 		root.AddComment("Comment with tags")
 
 		// Add some moves
-		game.PushMove("e4", nil)
+		game.MoveText("e4", SAN(), nil)
 
 		// Generate PGN
 		pgn := game.String()
@@ -1565,14 +1563,14 @@ func TestRootMoveComments(t *testing.T) {
 		game := NewGame()
 
 		// Add a comment to the root move
-		root := game.GetRootMove()
+		root := game.MoveTree().Root()
 		root.AddComment("Comment before variations")
 
 		// Add moves and create variations
-		game.PushMove("e4", nil)
-		game.PushMove("e5", nil)
-		game.GoBack()
-		game.PushMove("d5", nil)
+		game.MoveText("e4", SAN(), nil)
+		game.MoveText("e5", SAN(), nil)
+		game.MoveTree().GoBack()
+		game.MoveText("d5", SAN(), nil)
 
 		// Generate PGN
 		pgn := game.String()
@@ -1598,60 +1596,6 @@ func TestRootMoveComments(t *testing.T) {
 			if foundMoves && !foundComment {
 				t.Errorf("Comment should appear before moves in PGN with variations")
 			}
-		}
-	})
-}
-
-func TestWriteAnnotationsLegacyBranches(t *testing.T) {
-	t.Run("NilMove", func(t *testing.T) {
-		var sb strings.Builder
-		writeAnnotations(nil, &sb)
-		if sb.String() != "" {
-			t.Fatalf("expected empty annotation output, got %q", sb.String())
-		}
-	})
-
-	t.Run("CommentOnly", func(t *testing.T) {
-		move := &Move{comments: "Good move"}
-		move.ensureCommentBlocksFromLegacy()
-		move.commentBlocks = nil
-
-		var sb strings.Builder
-		writeAnnotations(move, &sb)
-		if sb.String() != " {Good move}" {
-			t.Fatalf("expected comment-only annotation, got %q", sb.String())
-		}
-	})
-
-	t.Run("CommandOnly", func(t *testing.T) {
-		move := &Move{command: map[string]string{"clk": "0:05:00"}}
-		move.ensureCommentBlocksFromLegacy()
-		move.commentBlocks = nil
-
-		var sb strings.Builder
-		writeAnnotations(move, &sb)
-		if sb.String() != " { [%clk 0:05:00]}" {
-			t.Fatalf("expected command-only annotation, got %q", sb.String())
-		}
-	})
-
-	t.Run("CommentAndCommand", func(t *testing.T) {
-		move := &Move{comments: "Good move", command: map[string]string{"clk": "0:05:00"}}
-		move.ensureCommentBlocksFromLegacy()
-		move.commentBlocks = nil
-
-		var sb strings.Builder
-		writeAnnotations(move, &sb)
-		if sb.String() != " {Good move [%clk 0:05:00]}" {
-			t.Fatalf("expected merged annotation, got %q", sb.String())
-		}
-	})
-
-	t.Run("EmptyStructuredBlock", func(t *testing.T) {
-		var sb strings.Builder
-		writeCommentBlocks([]CommentBlock{{}}, &sb)
-		if sb.String() != "" {
-			t.Fatalf("expected empty structured block to be skipped, got %q", sb.String())
 		}
 	})
 }
@@ -1911,13 +1855,13 @@ func TestGameMoveValidation(t *testing.T) {
 	tests := []struct {
 		name        string
 		setupMoves  []string // Moves to set up the position
-		move        *Move    // Move to test
+		move        Move     // Move to test
 		wantErr     bool     // Whether we expect an error
 		errorString string   // Expected error string (if wantErr is true)
 	}{
 		{
 			name: "valid move should succeed",
-			move: &Move{
+			move: Move{
 				s1: E2,
 				s2: E4,
 			},
@@ -1925,33 +1869,27 @@ func TestGameMoveValidation(t *testing.T) {
 		},
 		{
 			name: "invalid move should fail",
-			move: &Move{
+			move: Move{
 				s1: E2,
 				s2: E5, // Invalid move - pawn can't move three squares from e2 to e5
 			},
 			wantErr:     true,
-			errorString: "move e2e5 is not valid for the current position",
-		},
-		{
-			name:        "nil move should fail",
-			move:        nil,
-			wantErr:     true,
-			errorString: "move cannot be nil",
+			errorString: "chess: illegal move e2e5",
 		},
 		{
 			name:       "invalid move from valid position should fail",
 			setupMoves: []string{"e4", "e5"},
-			move: &Move{
+			move: Move{
 				s1: E4,
 				s2: E6, // Invalid move - pawn can't move two squares from e4 to e6
 			},
 			wantErr:     true,
-			errorString: "move e4e6 is not valid for the current position",
+			errorString: "chess: illegal move e4e6",
 		},
 		{
 			name:       "valid move from valid position should succeed",
 			setupMoves: []string{"e4", "e5"},
-			move: &Move{
+			move: Move{
 				s1: G1,
 				s2: F3,
 			},
@@ -1960,7 +1898,7 @@ func TestGameMoveValidation(t *testing.T) {
 		{
 			name:       "valid promotion move should succeed",
 			setupMoves: []string{"e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"},
-			move: &Move{
+			move: Move{
 				s1:    B7,
 				s2:    A8,
 				promo: Queen,
@@ -1970,18 +1908,18 @@ func TestGameMoveValidation(t *testing.T) {
 		{
 			name:       "invalid promotion move should fail",
 			setupMoves: []string{"e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"},
-			move: &Move{
+			move: Move{
 				s1:    B7,
 				s2:    A8,
 				promo: King, // Invalid promotion piece
 			},
 			wantErr:     true,
-			errorString: "move b7a8k is not valid for the current position",
+			errorString: "chess: illegal move b7a8k",
 		},
 		{
 			name:       "valid castling move should succeed",
 			setupMoves: []string{"e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "d3", "Nf6"},
-			move: &Move{
+			move: Move{
 				s1:   E1,
 				s2:   G1,
 				tags: KingSideCastle,
@@ -1991,13 +1929,13 @@ func TestGameMoveValidation(t *testing.T) {
 		{
 			name:       "invalid castling move should fail",
 			setupMoves: []string{"e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "d3", "Nf6"},
-			move: &Move{
+			move: Move{
 				s1:   E1,
 				s2:   H1, // Invalid castling destination
 				tags: KingSideCastle,
 			},
 			wantErr:     true,
-			errorString: "move e1h1 is not valid for the current position",
+			errorString: "chess: illegal move e1h1",
 		},
 	}
 
@@ -2008,14 +1946,14 @@ func TestGameMoveValidation(t *testing.T) {
 
 			// Setup moves
 			for _, move := range tt.setupMoves {
-				err := game.PushMove(move, nil)
+				_, err := game.MoveText(move, SAN(), nil)
 				if err != nil {
 					t.Fatalf("setup failed: %v", err)
 				}
 			}
 
 			// Test the move
-			err := game.Move(tt.move, nil)
+			_, err := game.Move(tt.move, nil)
 
 			// Check error expectation
 			if (err != nil) != tt.wantErr {
@@ -2024,24 +1962,24 @@ func TestGameMoveValidation(t *testing.T) {
 			}
 
 			if tt.wantErr {
-				if tt.errorString != "" && err.Error() != tt.errorString {
-					t.Errorf("Move() error = %v, want error string %v", err.Error(), tt.errorString)
+				if tt.errorString != "" && !strings.Contains(err.Error(), tt.errorString) {
+					t.Errorf("Move() error = %v, want error string to contain %v", err.Error(), tt.errorString)
 				}
 				return
 			}
 
-			// If the move was successful, verify it was added to the game
-			if tt.move != nil {
-				// Check that the current move matches our move
-				if game.currentMove == nil {
-					t.Errorf("Move() succeeded but currentMove is nil")
-					return
-				}
+			// Check that the current move matches our move by identity (origin,
+			// destination, promotion). Position-derived tags may differ between
+			// the caller-supplied and stored Move because the canon stores the
+			// generated Move; tags are derived, not part of Move identity.
+			if game.MoveTree().Current() == nil {
+				t.Errorf("Move() succeeded but currentMove is nil")
+				return
+			}
 
-				if game.currentMove.s1 != tt.move.s1 || game.currentMove.s2 != tt.move.s2 || game.currentMove.promo != tt.move.promo {
-					t.Errorf("Move() succeeded but currentMove doesn't match: got %v, want %v",
-						game.currentMove, tt.move)
-				}
+			stored := game.MoveTree().Current().Move()
+			if stored.S1() != tt.move.S1() || stored.S2() != tt.move.S2() || stored.Promo() != tt.move.Promo() {
+				t.Errorf("Move() identity mismatch: got %v, want %v", stored, tt.move)
 			}
 		})
 	}
@@ -2051,12 +1989,12 @@ func TestGameUnsafeMove(t *testing.T) {
 	tests := []struct {
 		name       string
 		setupMoves []string // Moves to set up the position
-		move       *Move    // Move to test
+		move       Move     // Move to test
 		wantErr    bool     // Whether we expect an error
 	}{
 		{
 			name: "valid move should succeed without validation",
-			move: &Move{
+			move: Move{
 				s1: E2,
 				s2: E4,
 			},
@@ -2064,21 +2002,16 @@ func TestGameUnsafeMove(t *testing.T) {
 		},
 		{
 			name: "invalid move should still succeed (no validation)",
-			move: &Move{
+			move: Move{
 				s1: E2,
 				s2: E5, // Invalid move but UnsafeMove doesn't validate
 			},
 			wantErr: false, // UnsafeMove doesn't validate, so no error expected
 		},
 		{
-			name:    "nil move should fail",
-			move:    nil,
-			wantErr: true,
-		},
-		{
 			name:       "complex valid move should succeed",
 			setupMoves: []string{"e4", "e5"},
-			move: &Move{
+			move: Move{
 				s1: G1,
 				s2: F3,
 			},
@@ -2087,7 +2020,7 @@ func TestGameUnsafeMove(t *testing.T) {
 		{
 			name:       "promotion move should succeed without validation",
 			setupMoves: []string{"e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"},
-			move: &Move{
+			move: Move{
 				s1:    B7,
 				s2:    A8,
 				promo: Queen,
@@ -2103,14 +2036,14 @@ func TestGameUnsafeMove(t *testing.T) {
 
 			// Setup moves
 			for _, move := range tt.setupMoves {
-				err := game.PushMove(move, nil)
+				_, err := game.MoveText(move, SAN(), nil)
 				if err != nil {
 					t.Fatalf("setup failed: %v", err)
 				}
 			}
 
 			// Test the move
-			err := game.UnsafeMove(tt.move, nil)
+			_, err := game.UnsafeMove(tt.move, nil)
 
 			// Check error expectation
 			if (err != nil) != tt.wantErr {
@@ -2122,18 +2055,17 @@ func TestGameUnsafeMove(t *testing.T) {
 				return
 			}
 
-			// If the move was successful, verify it was added to the game
-			if tt.move != nil {
-				// Check that the current move matches our move
-				if game.currentMove == nil {
-					t.Errorf("UnsafeMove() succeeded but currentMove is nil")
-					return
-				}
+			// Check that the current move matches our move by identity (origin,
+			// destination, promotion). UnsafeMove trusts the caller, so the stored
+			// Move carries the caller's tags verbatim.
+			if game.MoveTree().Current() == nil {
+				t.Errorf("UnsafeMove() succeeded but currentMove is nil")
+				return
+			}
 
-				if game.currentMove.s1 != tt.move.s1 || game.currentMove.s2 != tt.move.s2 || game.currentMove.promo != tt.move.promo {
-					t.Errorf("UnsafeMove() succeeded but currentMove doesn't match: got %v, want %v",
-						game.currentMove, tt.move)
-				}
+			stored := game.MoveTree().Current().Move()
+			if stored.S1() != tt.move.S1() || stored.S2() != tt.move.S2() || stored.Promo() != tt.move.Promo() {
+				t.Errorf("UnsafeMove() identity mismatch: got %v, want %v", stored, tt.move)
 			}
 		})
 	}
@@ -2151,13 +2083,13 @@ func TestMoveVsUnsafeMovePerformance(t *testing.T) {
 		t.Fatal("no valid moves available")
 	}
 
-	move := &validMoves[0]
+	move := validMoves[0]
 
 	// Test Move (with validation)
 	start := time.Now()
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		gameClone := game.Clone()
-		err := gameClone.Move(move, nil)
+		_, err := gameClone.Move(move, nil)
 		if err != nil {
 			t.Fatalf("Move failed: %v", err)
 		}
@@ -2166,9 +2098,9 @@ func TestMoveVsUnsafeMovePerformance(t *testing.T) {
 
 	// Test UnsafeMove (without validation)
 	start = time.Now()
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		gameClone := game.Clone()
-		err := gameClone.UnsafeMove(move, nil)
+		_, err := gameClone.UnsafeMove(move, nil)
 		if err != nil {
 			t.Fatalf("UnsafeMove failed: %v", err)
 		}
@@ -2185,50 +2117,37 @@ func TestMoveVsUnsafeMovePerformance(t *testing.T) {
 	}
 }
 
-func TestUnsafePushNotationMove(t *testing.T) {
+func TestUnsafeMoveText(t *testing.T) {
 	tests := []struct {
 		name       string
 		setupMoves []string // Moves to set up the position
 		moveStr    string   // Move to test
-		notation   Notation // Notation to use
-		wantErr    bool     // Whether we expect an error
+		codec      MoveTextCodec
+		wantErr    bool // Whether we expect an error
 	}{
 		{
-			name:     "valid algebraic move should succeed without validation",
-			moveStr:  "e4",
-			notation: AlgebraicNotation{},
-			wantErr:  false,
+			name:    "valid UCI move should succeed without validation",
+			moveStr: "e2e4",
+			codec:   UCI(),
+			wantErr: false,
 		},
 		{
-			name:     "valid UCI move should succeed without validation",
-			moveStr:  "e2e4",
-			notation: UCINotation{},
-			wantErr:  false,
+			name:    "valid long algebraic move should succeed without validation",
+			moveStr: "e2e4",
+			codec:   LongAlgebraic(),
+			wantErr: false,
 		},
 		{
-			name:     "valid long algebraic move should succeed without validation",
-			moveStr:  "e2e4",
-			notation: LongAlgebraicNotation{},
-			wantErr:  false,
-		},
-		{
-			name:     "invalid notation should fail during parsing",
-			moveStr:  "xyz",
-			notation: AlgebraicNotation{},
-			wantErr:  true, // This should fail at notation parsing, not validation
-		},
-		{
-			name:       "complex valid move should succeed",
-			setupMoves: []string{"e4", "e5"},
-			moveStr:    "Nf3",
-			notation:   AlgebraicNotation{},
-			wantErr:    false,
+			name:    "invalid notation should fail during parsing",
+			moveStr: "xyz",
+			codec:   UCI(),
+			wantErr: true, // This should fail at notation parsing, not validation
 		},
 		{
 			name:       "invalid move should still succeed (no validation)",
 			setupMoves: []string{"e4", "e5"},
-			moveStr:    "e2e3", // This move is illegal but UnsafePushNotationMove doesn't validate
-			notation:   UCINotation{},
+			moveStr:    "e2e3", // This move is illegal but UnsafePushMoveText doesn't validate
+			codec:      UCI(),
 			wantErr:    false, // No validation, so no error expected
 		},
 	}
@@ -2240,18 +2159,18 @@ func TestUnsafePushNotationMove(t *testing.T) {
 
 			// Setup moves
 			for _, move := range tt.setupMoves {
-				err := game.PushNotationMove(move, AlgebraicNotation{}, nil)
+				_, err := game.MoveText(move, SAN(), nil)
 				if err != nil {
 					t.Fatalf("setup failed: %v", err)
 				}
 			}
 
 			// Test the move
-			err := game.UnsafePushNotationMove(tt.moveStr, tt.notation, nil)
+			_, err := game.UnsafeMoveText(tt.moveStr, tt.codec, nil)
 
 			// Check error expectation
 			if (err != nil) != tt.wantErr {
-				t.Errorf("UnsafePushNotationMove() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("UnsafeMoveText() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -2260,22 +2179,22 @@ func TestUnsafePushNotationMove(t *testing.T) {
 			}
 
 			// If the move was successful, verify it was added to the game
-			if game.currentMove == nil {
-				t.Errorf("UnsafePushNotationMove() succeeded but currentMove is nil")
+			if game.MoveTree().Current() == nil {
+				t.Errorf("UnsafeMoveText() succeeded but currentMove is nil")
 				return
 			}
 
 			// For successful cases, just verify that some move was made
 			moves := game.Moves()
 			if len(moves) == 0 {
-				t.Errorf("UnsafePushNotationMove() succeeded but no moves in game")
+				t.Errorf("UnsafeMoveText() succeeded but no moves in game")
 			}
 		})
 	}
 }
 
-// TestPushNotationMoveVsUnsafePushNotationMovePerformance demonstrates the performance difference
-func TestPushNotationMoveVsUnsafePushNotationMovePerformance(t *testing.T) {
+// TestPushMoveTextVsUnsafePushMoveTextPerformance demonstrates the performance difference.
+func TestPushMoveTextVsUnsafePushMoveTextPerformance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -2284,37 +2203,37 @@ func TestPushNotationMoveVsUnsafePushNotationMovePerformance(t *testing.T) {
 
 	// Test with a common opening move
 	moveStr := "e4"
-	notation := AlgebraicNotation{}
+	unsafeMoveStr := "e2e4"
 
-	// Test PushNotationMove (with validation)
+	// Test PushMoveText (with validation)
 	start := time.Now()
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		gameClone := game.Clone()
-		err := gameClone.PushNotationMove(moveStr, notation, nil)
+		_, err := gameClone.MoveText(moveStr, SAN(), nil)
 		if err != nil {
-			t.Fatalf("PushNotationMove failed: %v", err)
+			t.Fatalf("PushMoveText failed: %v", err)
 		}
 	}
 	pushNotationMoveTime := time.Since(start)
 
-	// Test UnsafePushNotationMove (without validation)
+	// Test UnsafePushMoveText (without validation)
 	start = time.Now()
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		gameClone := game.Clone()
-		err := gameClone.UnsafePushNotationMove(moveStr, notation, nil)
+		_, err := gameClone.UnsafeMoveText(unsafeMoveStr, UCI(), nil)
 		if err != nil {
-			t.Fatalf("UnsafePushNotationMove failed: %v", err)
+			t.Fatalf("UnsafePushMoveText failed: %v", err)
 		}
 	}
 	unsafePushNotationMoveTime := time.Since(start)
 
-	t.Logf("PushNotationMove() (with validation): %v", pushNotationMoveTime)
-	t.Logf("UnsafePushNotationMove() (no validation): %v", unsafePushNotationMoveTime)
+	t.Logf("MoveText() (with validation): %v", pushNotationMoveTime)
+	t.Logf("UnsafeMoveText() (no validation): %v", unsafePushNotationMoveTime)
 	t.Logf("Performance improvement: %.2fx", float64(pushNotationMoveTime)/float64(unsafePushNotationMoveTime))
 
-	// UnsafePushNotationMove should be faster
+	// UnsafePushMoveText should be faster
 	if unsafePushNotationMoveTime >= pushNotationMoveTime {
-		t.Logf("Warning: UnsafePushNotationMove wasn't faster than PushNotationMove - this might be expected for simple positions")
+		t.Logf("Warning: UnsafePushMoveText wasn't faster than PushMoveText - this might be expected for simple positions")
 	}
 }
 
@@ -2417,11 +2336,11 @@ func TestCastlingInteractions(t *testing.T) {
 
 			// Make first move
 			pos := g.Position()
-			m1, err := AlgebraicNotation{}.Decode(pos, tt.firstMove)
+			m1, err := decodeSANText(pos, tt.firstMove, true)
 			if err != nil {
 				t.Fatalf("Failed to decode first move %s: %v", tt.firstMove, err)
 			}
-			if err := g.Move(m1, nil); err != nil {
+			if _, err := g.Move(m1, nil); err != nil {
 				t.Fatalf("Failed to make first move %s: %v", tt.firstMove, err)
 			}
 
@@ -2451,96 +2370,87 @@ func TestCastlingInteractions(t *testing.T) {
 	}
 }
 
-func TestMoveHistoryEmptyGame(t *testing.T) {
+func TestMoveListEmptyGame(t *testing.T) {
 	g := NewGame()
-	history := g.MoveHistory()
-	if len(history) != 0 {
-		t.Fatalf("expected empty move history, got %d", len(history))
+	list := g.MoveList()
+	if len(list) != 0 {
+		t.Fatalf("expected empty move list, got %d", len(list))
 	}
 }
 
-func TestMoveHistoryMainLine(t *testing.T) {
+func TestMoveListMainLine(t *testing.T) {
 	g := NewGame()
 	for _, m := range []string{"e4", "e5", "Nf3"} {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	history := g.MoveHistory()
-	if len(history) != 3 {
-		t.Fatalf("expected 3 move history entries, got %d", len(history))
+	list := g.MoveList()
+	if len(list) != 3 {
+		t.Fatalf("expected 3 move list entries, got %d", len(list))
 	}
-	if history[0].Move.String() != "e2e4" {
-		t.Fatalf("expected first move e2e4, got %s", history[0].Move)
-	}
-	if history[0].PrePosition != g.rootMove.position {
-		t.Fatalf("expected first pre-position to be root position")
-	}
-	if history[0].PostPosition != history[0].Move.position {
-		t.Fatalf("expected post-position to match move position")
-	}
-	if history[1].PrePosition != history[0].PostPosition {
-		t.Fatalf("expected second pre-position to match first post-position")
+	if list[0].Move.String() != "e2e4" {
+		t.Fatalf("expected first move e2e4, got %s", list[0].Move)
 	}
 }
 
-func TestMoveHistoryComments(t *testing.T) {
+func TestMoveListComments(t *testing.T) {
 	g := NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	g.currentMove.SetComment("good move")
-	history := g.MoveHistory()
-	if len(history) != 1 {
-		t.Fatalf("expected 1 move history entry, got %d", len(history))
+	g.MoveTree().Current().SetComment("good move")
+	list := g.MoveList()
+	if len(list) != 1 {
+		t.Fatalf("expected 1 move list entry, got %d", len(list))
 	}
-	if len(history[0].Comments) != 1 || history[0].Comments[0] != "good move" {
-		t.Fatalf("expected comment %q, got %v", "good move", history[0].Comments)
+	if len(list[0].Comments) != 1 || list[0].Comments[0] != "good move" {
+		t.Fatalf("expected comment %q, got %v", "good move", list[0].Comments)
 	}
 }
 
-func TestMoveHistoryNoComments(t *testing.T) {
+func TestMoveListNoComments(t *testing.T) {
 	g := NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	history := g.MoveHistory()
-	if len(history[0].Comments) != 0 {
-		t.Fatalf("expected no comments, got %v", history[0].Comments)
+	list := g.MoveList()
+	if len(list[0].Comments) != 0 {
+		t.Fatalf("expected no comments, got %v", list[0].Comments)
 	}
 }
 
-func TestMoveHistoryWithVariations(t *testing.T) {
+func TestMoveListWithVariations(t *testing.T) {
 	g := NewGame()
-	if err := g.PushMove("e4", nil); err != nil {
+	if _, err := g.MoveText("e4", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.PushMove("e5", nil); err != nil {
+	if _, err := g.MoveText("e5", SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	variationMove := &Move{}
-	g.AddVariation(g.rootMove.children[0], variationMove)
-	history := g.MoveHistory()
-	if len(history) != 2 {
-		t.Fatalf("expected 2 main line entries (variations excluded), got %d", len(history))
+	variationMove := Move{}
+	g.MoveTree().AddVariation(g.MoveTree().Root().children[0], variationMove)
+	list := g.MoveList()
+	if len(list) != 2 {
+		t.Fatalf("expected 2 main line entries (variations excluded), got %d", len(list))
 	}
 }
 
-func TestMoveHistoryMatchesMovesLength(t *testing.T) {
+func TestMoveListMatchesMovesLength(t *testing.T) {
 	g := NewGame()
 	for _, m := range []string{"e4", "e5", "Nf3", "Nc6", "Bb5"} {
-		if err := g.PushMove(m, nil); err != nil {
+		if _, err := g.MoveText(m, SAN(), nil); err != nil {
 			t.Fatal(err)
 		}
 	}
 	moves := g.Moves()
-	history := g.MoveHistory()
-	if len(history) != len(moves) {
-		t.Fatalf("expected history length %d to match moves length %d", len(history), len(moves))
+	list := g.MoveList()
+	if len(list) != len(moves) {
+		t.Fatalf("expected list length %d to match moves length %d", len(list), len(moves))
 	}
 }
 
-func TestMoveHistoryFromPGN(t *testing.T) {
+func TestMoveListFromPGN(t *testing.T) {
 	pgnData := mustParsePGN("fixtures/pgns/single_game.pgn")
 	r := strings.NewReader(pgnData)
 	opt, err := PGN(r)
@@ -2549,24 +2459,9 @@ func TestMoveHistoryFromPGN(t *testing.T) {
 	}
 	game := NewGame(opt)
 
-	history := game.MoveHistory()
-	if len(history) == 0 {
-		t.Fatal("expected move history from PGN game")
-	}
-
-	for i, h := range history {
-		if h.Move == nil {
-			t.Fatalf("entry %d: Move is nil", i)
-		}
-		if h.PrePosition == nil {
-			t.Fatalf("entry %d: PrePosition is nil", i)
-		}
-		if h.PostPosition == nil {
-			t.Fatalf("entry %d: PostPosition is nil", i)
-		}
-		if i > 0 && h.PrePosition != history[i-1].PostPosition {
-			t.Fatalf("entry %d: PrePosition should match previous PostPosition", i)
-		}
+	list := game.MoveList()
+	if len(list) == 0 {
+		t.Fatal("expected move list from PGN game")
 	}
 }
 

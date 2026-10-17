@@ -61,6 +61,7 @@ const (
 	CommandParam        // Command parameter
 	CommandEnd          // ]
 	DeambiguationSquare // Full square disambiguation (e.g., e8 in Qe8f7)
+	NullMove            // A null move: Z0, Z1, --, or @@
 )
 
 func (t TokenType) String() string {
@@ -96,6 +97,8 @@ func (t TokenType) String() string {
 		"CommandName",
 		"CommandParam",
 		"CommandEnd",
+		"DeambiguationSquare",
+		"NullMove",
 	}
 
 	if t < 0 || int(t) >= len(types) {
@@ -207,19 +210,18 @@ func (l *Lexer) readCommandParam() Token {
 }
 
 func (l *Lexer) readNAG() Token {
-	// Handle cases where NAG starts with '!' or '?'
-	// This shouldn't happen from my understanding of the PGN spec but lichess pgn files have it.
-	// TODO: Better NAG handling of different formats
+	// Handle cases where NAG starts with '!' or '?' (symbolic move-quality
+	// spellings such as ! ? !! ?? !? ?!). This isn't part of the strict PGN
+	// spec, but Lichess and other sources emit them, so they are accepted on
+	// import. The lexer reads the maximal run of '!' and '?' characters as a
+	// single token; normalisation to the canonical "$N" form happens at the
+	// storage boundary (see ParseNAG).
 	if l.ch == '!' || l.ch == '?' {
-		value := string(l.ch)
-		l.readChar() // Read the next character
-
-		// Check if the next character is also '!' or '?'
-		if l.ch == '!' || l.ch == '?' {
-			value += string(l.ch) // Append the second character
-			l.readChar()          // Move to the next character
+		position := l.position
+		for l.ch == '!' || l.ch == '?' {
+			l.readChar()
 		}
-
+		value := l.input[position:l.position]
 		return Token{Type: NAG, Value: value}
 	}
 	l.readChar() // skip the $ symbol
@@ -250,7 +252,7 @@ func (l *Lexer) readResult() Token {
 }
 
 func (l *Lexer) readRank() Token {
-	rank := string(l.ch)
+	rank := l.input[l.position : l.position+1]
 	if !isRank(l.ch) {
 		l.readChar()
 		return Token{Type: RANK, Error: ErrInvalidRank(l.position), Value: rank}
@@ -264,10 +266,15 @@ func (l *Lexer) readComment() Token {
 
 	// Look for command start sequence
 	for l.ch != '}' && l.ch != 0 {
+		if l.ch == '\\' && l.peekChar() == '}' {
+			l.readChar()
+			l.readChar()
+			continue
+		}
 		if l.ch == '[' && l.peekChar() == '%' {
 			if position != l.position {
 				// Return accumulated comment text before the command
-				return Token{Type: COMMENT, Value: strings.TrimSpace(l.input[position:l.position])}
+				return Token{Type: COMMENT, Value: cleanCommentText(l.input[position:l.position])}
 			}
 			// Start command processing
 			l.readChar() // skip [
@@ -296,16 +303,21 @@ func (l *Lexer) readComment() Token {
 
 	// Return remaining comment text if any
 	if position != l.position {
-		return Token{Type: COMMENT, Value: strings.TrimSpace(l.input[position:l.position])}
+		return Token{Type: COMMENT, Value: cleanCommentText(l.input[position:l.position])}
 	}
 
 	return Token{Type: CommentEnd, Value: "}"}
 }
 
+func cleanCommentText(text string) string {
+	text = strings.TrimSpace(text)
+	return strings.ReplaceAll(text, `\}`, "}")
+}
+
 // Update readPieceMove to handle piece moves.
 func (l *Lexer) readPieceMove() Token {
 	// Capture just the piece
-	piece := string(l.ch)
+	piece := l.input[l.position : l.position+1]
 	if !isPiece(l.ch) {
 		l.readChar()
 		return Token{Type: PIECE, Error: ErrInvalidPiece(l.position), Value: piece}
@@ -329,7 +341,7 @@ func (l *Lexer) readMove() Token {
 
 	// For pawn captures
 	if isFile(l.ch) {
-		file := string(l.ch)
+		file := l.input[l.position : l.position+1]
 		l.readChar()
 
 		// Check for capture
@@ -375,7 +387,7 @@ func (l *Lexer) readMove() Token {
 		l.readPosition = position + 1
 		l.readChar()
 		// Return just the first character as disambiguation
-		return Token{Type: FILE, Value: string(l.input[position])}
+		return Token{Type: FILE, Value: l.input[position : position+1]}
 	}
 
 	// Validate the square (e.g., "e4")
@@ -388,7 +400,7 @@ func (l *Lexer) readMove() Token {
 }
 
 func (l *Lexer) readPromotionPiece() Token {
-	piece := string(l.ch)
+	piece := l.input[l.position : l.position+1]
 	if !isPiece(l.ch) {
 		l.readChar()
 		return Token{Type: PromotionPiece, Error: ErrInvalidPiece(l.position), Value: piece}
@@ -409,7 +421,18 @@ func (l *Lexer) readChar() {
 
 func (l *Lexer) readTagValue() Token {
 	l.readChar() // skip opening quote
+	position := l.position
+	for l.ch != '"' && l.ch != '\\' && l.ch != 0 {
+		l.readChar()
+	}
+	if l.ch != '\\' {
+		value := l.input[position:l.position]
+		l.readChar() // skip closing quote
+		return Token{Type: TagValue, Value: value}
+	}
+
 	var value strings.Builder
+	value.WriteString(l.input[position:l.position])
 	for l.ch != '"' && l.ch != 0 {
 		if l.ch == '\\' {
 			next := l.peekChar()
@@ -468,10 +491,68 @@ func (l *Lexer) readCastling() (Token, bool) {
 	if l.ch == '-' && l.peekChar() == 'O' {
 		l.readChar() // skip -
 		l.readChar() // skip O
-		return Token{Type: QueensideCastle, Value: "O-O-O"}, true
+		return Token{Type: QueensideCastle, Value: castleQS}, true
 	}
 
-	return Token{Type: KingsideCastle, Value: "O-O"}, true
+	return Token{Type: KingsideCastle, Value: castleKS}, true
+}
+
+// readNullMove consumes a null-move token at the current position and returns
+// it. Recognised spellings: "Z0", "Z1", "--", "@@", "0000". Returns (Token{}, false)
+// if the current character does not start a null-move token. Safe to call from
+// NextToken before the main dispatch because it never clashes with valid move
+// squares, piece letters, or result tokens.
+func (l *Lexer) readNullMove() (Token, bool) {
+	switch l.ch {
+	case 'Z':
+		next := l.peekChar()
+		if next != '0' && next != '1' {
+			return Token{}, false
+		}
+		position := l.position
+		l.readChar()
+		l.readChar()
+		return Token{Type: NullMove, Value: l.input[position:l.position]}, true
+
+	case '-':
+		if l.peekChar() != '-' {
+			return Token{}, false
+		}
+		// Standalone "--" — readResult already consumed any result token
+		// beginning with a digit ("1-0", "0-1", "1/2-1/2"), and readCastling
+		// requires an uppercase O, so we cannot be inside those.
+		l.readChar()
+		l.readChar()
+		return Token{Type: NullMove, Value: "--"}, true
+
+	case '@':
+		if l.peekChar() != '@' {
+			return Token{}, false
+		}
+		l.readChar()
+		l.readChar()
+		return Token{Type: NullMove, Value: "@@"}, true
+
+	case '0':
+		// "0000" — must be four zeros with nothing digit/dash-adjacent to
+		// avoid clashing with result/castle tokens. readCastling consumes
+		// "O-O" / "O-O-O" and readResult consumes "1-0" / "0-1" before we
+		// reach here, so standalone "0000" can safely be claimed.
+		if l.position+3 >= len(l.input) {
+			return Token{}, false
+		}
+		if l.input[l.position+1] != '0' ||
+			l.input[l.position+2] != '0' ||
+			l.input[l.position+3] != '0' {
+			return Token{}, false
+		}
+		l.readChar()
+		l.readChar()
+		l.readChar()
+		l.readChar()
+		return Token{Type: NullMove, Value: "0000"}, true
+	}
+	return Token{}, false
 }
 
 // NextToken reads the next token from the input stream.
@@ -525,6 +606,12 @@ func (l *Lexer) NextToken() Token {
 
 	if l.inTag && isLetter(l.ch) {
 		return l.readTagKey()
+	}
+
+	// Null move tokens: "Z0", "Z1" (ChessBase / Scid), "--" (pgn-extract,
+	// Scid), "@@" (some exporters), and "0000" (UCI convention).
+	if tok, ok := l.readNullMove(); ok {
+		return tok
 	}
 
 	switch l.ch {
@@ -611,6 +698,15 @@ func (l *Lexer) NextToken() Token {
 			l.ch = l.input[position]
 			return l.readResult()
 		default:
+			// "1/2-1/2" draw result token, e.g. "1. e4 e5 1/2-1/2". The digit
+			// run stopped at '/'; if the literal pattern starts at the run
+			// start, reset and let readResult consume and validate it.
+			if position+7 <= len(l.input) && l.input[position:position+7] == Draw.String() {
+				l.position = position
+				l.readPosition = position + 1
+				l.ch = l.input[position]
+				return l.readResult()
+			}
 			// Reset position and try again as a regular number
 			l.position = position
 			l.readPosition = position + 1
@@ -632,7 +728,7 @@ func (l *Lexer) NextToken() Token {
 		}
 	}
 
-	tok := Token{Type: Undefined, Value: string(l.ch)}
+	tok := Token{Type: Undefined, Value: l.input[l.position : l.position+1]}
 	l.readChar()
 	return tok
 }
