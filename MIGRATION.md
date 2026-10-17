@@ -217,6 +217,8 @@ listed:
 | `func(*Game)` options | `GameOption` (`FEN`, `Ignore*Draw` return it) |
 | `func(*Engine)` options, `uci.Debug` | `uci.EngineOption`, `uci.Debug()` |
 | `Engine.Getpid()` | `Engine.Pid()` |
+| `Position.Ply()` (1 at the start) | `Position.Ply()` (0 at the start, like `MoveNode.Ply()`) |
+| _(none)_ | `Position.FullMoveNumber()` |
 
 Iterate a Bitboard's squares or an attack set:
 

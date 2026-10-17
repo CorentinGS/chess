@@ -462,19 +462,28 @@ func (pos *Position) Variant() Variant {
 	return pos.variant
 }
 
-// Ply returns the half-move number (increments every move).
+// Ply returns the number of half-moves played since the start of the game,
+// derived from the full-move number and side to move: 0 in the starting
+// position, 1 after 1.e4. It matches MoveNode.Ply for positions reached
+// from the standard start.
 func (pos *Position) Ply() int {
 	if pos == nil {
 		return 0
 	}
-	if pos.moveCount == 0 {
+	ply := (pos.moveCount - 1) * 2
+	if pos.turn == Black {
+		ply++
+	}
+	return max(ply, 0)
+}
+
+// FullMoveNumber returns the FEN full-move number: 1 at the start, incremented
+// after each Black move.
+func (pos *Position) FullMoveNumber() int {
+	if pos == nil {
 		return 0
 	}
-
-	if pos.turn == White {
-		return (pos.moveCount-1)*2 + 1
-	}
-	return (pos.moveCount) * 2
+	return pos.moveCount
 }
 
 // FEN returns the position in Forsyth-Edwards Notation, for example

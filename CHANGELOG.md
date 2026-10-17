@@ -45,11 +45,14 @@ All notable changes to this project will be documented in this file. See [conven
 - remove `MoveNode.Number`, an undocumented alias of `FullMoveNumber`.
 - make `PGNRenderer` and `DefaultPGNRenderer` internal; use `Game.String` and
   `Game.WritePGN`.
+- `Position.Ply()` now counts half-moves played (0 at the start, 1 after
+  1.e4), matching `MoveNode.Ply()`; it used to be one higher.
 
 #### Features
 - add `Game.Tags()`, which returns a copy of all PGN tags.
 - add `ParseFEN`, which returns a validated `*Position`.
 - add `Position.PseudoLegalMoves()`.
+- add `Position.FullMoveNumber()`, the FEN full-move field.
 - `ApplyInPlace` is now covered by equivalence tests against `Update`.
 
 ## v2.6.0 - 2026-08-17

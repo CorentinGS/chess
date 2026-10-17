@@ -383,3 +383,23 @@ func TestApplyInPlaceMatchesUpdate(t *testing.T) {
 		}
 	}
 }
+
+func TestPositionPlyMatchesMoveNodePly(t *testing.T) {
+	g := chess.NewGame()
+	if got := g.Position().Ply(); got != 0 {
+		t.Fatalf("starting Position.Ply() = %d, want 0", got)
+	}
+	for _, san := range []string{"e4", "e5", "Nf3", "Nc6", "Bb5"} {
+		node, err := g.MoveText(san, chess.SAN(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pos := g.Position()
+		if pos.Ply() != node.Ply() {
+			t.Fatalf("after %s: Position.Ply() = %d, MoveNode.Ply() = %d", san, pos.Ply(), node.Ply())
+		}
+		if pos.FullMoveNumber() != (node.Ply()/2)+1 {
+			t.Fatalf("after %s: FullMoveNumber() = %d, want %d", san, pos.FullMoveNumber(), node.Ply()/2+1)
+		}
+	}
+}
