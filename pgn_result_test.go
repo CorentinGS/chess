@@ -116,3 +116,28 @@ func TestIllegalMoveErrorsWrapErrIllegalMove(t *testing.T) {
 		t.Errorf("header error repeats its prefix: %v", err)
 	}
 }
+
+func TestParsePGNWithoutTagsKeepsCommentCommands(t *testing.T) {
+	for _, in := range []string{
+		"1. e4 {good [%clk 0:01:00] move} *",
+		"{opening} 1. e4 { [%clk 0:01:00] } e5 *",
+	} {
+		game, err := chess.ParsePGN(strings.NewReader(in))
+		if err != nil {
+			t.Fatalf("ParsePGN(%q): %v", in, err)
+		}
+		if clk, ok := game.MoveTree().MainLine()[0].Command("clk"); !ok || clk != "0:01:00" {
+			t.Errorf("ParsePGN(%q): Command(clk) = %q, %v", in, clk, ok)
+		}
+	}
+	var n int
+	for _, err := range chess.PGNGames(strings.NewReader("1. e4 {[%clk 0:01:00]} e5 1-0\n\n1. d4 d5 0-1\n")) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		n++
+	}
+	if n != 2 {
+		t.Errorf("PGNGames over two tagless games yielded %d games", n)
+	}
+}

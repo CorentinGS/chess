@@ -33,9 +33,12 @@ func splitPGNGames(data []byte, atEOF bool) (int, []byte, error) {
 	return processGameContent(data, start, atEOF)
 }
 
-// Helper to skip leading whitespace.
+// Helper to skip leading whitespace and a UTF-8 byte order mark.
 func skipLeadingWhitespace(data []byte) int {
 	start := 0
+	if bytes.HasPrefix(data, utf8BOM) {
+		start = len(utf8BOM)
+	}
 	for ; start < len(data); start++ {
 		if !isWhitespace(data[start]) {
 			break
@@ -52,9 +55,13 @@ func handleEOF(data []byte, atEOF bool) (int, []byte, error) {
 	return 0, nil, nil
 }
 
-// Helper to find the start of a game (normally first '[' character).
+// Helper to find the start of a game: its tag section ('['), or its
+// movetext when the game has no tags. Anything else is preamble skipped up to
+// the next '['.
 func findGameStart(data []byte, start int, atEOF bool) int {
-	// If the first character is not '[', find the next '[' character
+	if start < len(data) && startsTaglessGame(data[start]) {
+		return start
+	}
 	if start < len(data) && data[start] != '[' {
 		idx := bytes.IndexByte(data[start:], '[')
 		if idx == -1 {
@@ -63,6 +70,12 @@ func findGameStart(data []byte, start int, atEOF bool) int {
 		start += idx
 	}
 	return start
+}
+
+// startsTaglessGame reports whether b can open the movetext of a game without
+// tags: a move number or a leading comment.
+func startsTaglessGame(b byte) bool {
+	return (b >= '1' && b <= '9') || b == '{'
 }
 
 // Helper to find the start of a game without tags.
@@ -143,13 +156,17 @@ func updateCommentState(ch byte, inComment bool) bool {
 	return inComment
 }
 
-// Helper to find the next game start after a newline character.
+// utf8BOM is the byte order mark some editors write at the start of a file.
+var utf8BOM = []byte("\xEF\xBB\xBF")
+
+// Helper to find the next game start after a newline that follows a result:
+// the next tag section or tagless movetext, else the next "[Event " tag.
 func findNextGameStart(data []byte) int {
-	nextGame := bytes.Index(data, []byte("[Event "))
-	if nextGame != -1 {
-		return nextGame
+	next := skipLeadingWhitespace(data)
+	if next < len(data) && (data[next] == '[' || startsTaglessGame(data[next])) {
+		return next
 	}
-	return -1
+	return bytes.Index(data, []byte("[Event "))
 }
 
 // Helper to check for game result tokens (e.g., "1-0", "0-1", "1/2-1/2", "*").
