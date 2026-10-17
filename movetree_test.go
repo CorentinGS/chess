@@ -277,11 +277,11 @@ func TestParseVariationErrorRestoresCursor(t *testing.T) {
 	// AddNAG on an invalid NAG value. Pre-fix, parseVariation's err return
 	// left the cursor on the abandoned subtree node. Post-fix, the defer
 	// restores oldCurrent.
-	parser := NewParser([]Token{
-		{Type: VariationStart, Value: "("},
-		{Type: SQUARE, Value: "e4"},
-		{Type: NAG, Value: "!!!"}, // not in nagSymbolToNumeric and not "$N" — ParseNAG errors
-		{Type: VariationEnd, Value: ")"},
+	parser := NewParser([]pgnToken{
+		{Type: tokVariationStart, Value: "("},
+		{Type: tokSquare, Value: "e4"},
+		{Type: tokNAG, Value: "!!!"}, // not in nagSymbolToNumeric and not "$N" — ParseNAG errors
+		{Type: tokVariationEnd, Value: ")"},
 	})
 
 	before := parser.game.tree.Current()

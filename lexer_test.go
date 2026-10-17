@@ -1,10 +1,8 @@
-package chess_test
+package chess
 
 import (
 	"os"
 	"testing"
-
-	"github.com/corentings/chess/v3"
 )
 
 func TestLexer_TokenizesFullGame(t *testing.T) {
@@ -18,60 +16,60 @@ func TestLexer_TokenizesFullGame(t *testing.T) {
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 {This is the Ruy Lopez.} 3... a6 1-0`
 
-	lexer := chess.NewLexer(input)
+	lexer := newPGNLexer(input)
 	expectedTokens := []struct {
-		typ   chess.TokenType
+		typ   pgnTokenType
 		value string
 	}{
-		{chess.TagStart, "["},
-		{chess.TagKey, "Event"},
-		{chess.TagValue, "Example"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Site"},
-		{chess.TagValue, "Internet"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Date"},
-		{chess.TagValue, "2023.12.06"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Round"},
-		{chess.TagValue, "1"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "White"},
-		{chess.TagValue, "Player1"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Black"},
-		{chess.TagValue, "Player2"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Result"},
-		{chess.TagValue, "1-0"},
-		{chess.TagEnd, "]"},
-		{chess.MoveNumber, "1"},
-		{chess.DOT, "."},
-		{chess.SQUARE, "e4"},
-		{chess.SQUARE, "e5"},
-		{chess.MoveNumber, "2"},
-		{chess.DOT, "."},
-		{chess.PIECE, "N"},
-		{chess.SQUARE, "f3"},
-		{chess.PIECE, "N"},
-		{chess.SQUARE, "c6"},
-		{chess.MoveNumber, "3"},
-		{chess.DOT, "."},
-		{chess.PIECE, "B"},
-		{chess.SQUARE, "b5"},
-		{chess.CommentStart, "{"},
-		{chess.COMMENT, "This is the Ruy Lopez."},
-		{chess.CommentEnd, "}"},
-		{chess.MoveNumber, "3"},
-		{chess.ELLIPSIS, "..."},
-		{chess.SQUARE, "a6"},
-		{chess.RESULT, "1-0"},
+		{tokTagStart, "["},
+		{tokTagKey, "Event"},
+		{tokTagValue, "Example"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Site"},
+		{tokTagValue, "Internet"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Date"},
+		{tokTagValue, "2023.12.06"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Round"},
+		{tokTagValue, "1"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "White"},
+		{tokTagValue, "Player1"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Black"},
+		{tokTagValue, "Player2"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Result"},
+		{tokTagValue, "1-0"},
+		{tokTagEnd, "]"},
+		{tokMoveNumber, "1"},
+		{tokDot, "."},
+		{tokSquare, "e4"},
+		{tokSquare, "e5"},
+		{tokMoveNumber, "2"},
+		{tokDot, "."},
+		{tokPiece, "N"},
+		{tokSquare, "f3"},
+		{tokPiece, "N"},
+		{tokSquare, "c6"},
+		{tokMoveNumber, "3"},
+		{tokDot, "."},
+		{tokPiece, "B"},
+		{tokSquare, "b5"},
+		{tokCommentStart, "{"},
+		{tokComment, "This is the Ruy Lopez."},
+		{tokCommentEnd, "}"},
+		{tokMoveNumber, "3"},
+		{tokEllipsis, "..."},
+		{tokSquare, "a6"},
+		{tokResult, "1-0"},
 	}
 
 	for i, expected := range expectedTokens {
@@ -84,23 +82,23 @@ func TestLexer_TokenizesFullGame(t *testing.T) {
 
 	// Test EOF
 	token := lexer.NextToken()
-	if token.Type != chess.EOF {
+	if token.Type != tokEOF {
 		t.Errorf("Expected EOF token, got %v", token.Type)
 	}
 }
 
 func TestLexer_ParsesTagValueWithApostrophe(t *testing.T) {
 	input := "[Opening \"King's Indian Attack, General\"]"
-	lexer := chess.NewLexer(input)
+	lexer := newPGNLexer(input)
 
 	expectedTokens := []struct {
-		typ   chess.TokenType
+		typ   pgnTokenType
 		value string
 	}{
-		{chess.TagStart, "["},
-		{chess.TagKey, "Opening"},
-		{chess.TagValue, "King's Indian Attack, General"},
-		{chess.TagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Opening"},
+		{tokTagValue, "King's Indian Attack, General"},
+		{tokTagEnd, "]"},
 	}
 
 	for i, expected := range expectedTokens {
@@ -113,13 +111,13 @@ func TestLexer_ParsesTagValueWithApostrophe(t *testing.T) {
 }
 
 func TestLexer_ParsesTagValueWithEscapedBackslash(t *testing.T) {
-	lexer := chess.NewLexer(`[Path "C:\\Games"]`)
+	lexer := newPGNLexer(`[Path "C:\\Games"]`)
 	lexer.NextToken()
 	lexer.NextToken()
 
 	token := lexer.NextToken()
-	if token.Type != chess.TagValue || token.Value != `C:\Games` {
-		t.Fatalf("TagValue = {%v, %q}, want {%v, %q}", token.Type, token.Value, chess.TagValue, `C:\Games`)
+	if token.Type != tokTagValue || token.Value != `C:\Games` {
+		t.Fatalf("TagValue = {%v, %q}, want {%v, %q}", token.Type, token.Value, tokTagValue, `C:\Games`)
 	}
 }
 
@@ -127,29 +125,29 @@ func TestLexer_CheckAndCheckmateSuffixes(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected []chess.Token
+		expected []pgnToken
 	}{
 		{
 			name:  "Check",
 			input: "e5+",
-			expected: []chess.Token{
-				{Type: chess.SQUARE, Value: "e5"},
-				{Type: chess.CHECK, Value: "+"},
+			expected: []pgnToken{
+				{Type: tokSquare, Value: "e5"},
+				{Type: tokCheck, Value: "+"},
 			},
 		},
 		{
 			name:  "Checkmate",
 			input: "e5#",
-			expected: []chess.Token{
-				{Type: chess.SQUARE, Value: "e5"},
-				{Type: chess.CHECKMATE, Value: "#"},
+			expected: []pgnToken{
+				{Type: tokSquare, Value: "e5"},
+				{Type: tokCheckmate, Value: "#"},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lexer := chess.NewLexer(tt.input)
+			lexer := newPGNLexer(tt.input)
 
 			for i, expected := range tt.expected {
 				token := lexer.NextToken()
@@ -161,7 +159,7 @@ func TestLexer_CheckAndCheckmateSuffixes(t *testing.T) {
 
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
-			if token.Type != chess.EOF {
+			if token.Type != tokEOF {
 				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
@@ -172,43 +170,43 @@ func TestLexer_Promotion(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected []chess.Token
+		expected []pgnToken
 	}{
 		{
 			name:  "Promotion",
 			input: "e8=Q",
-			expected: []chess.Token{
-				{Type: chess.SQUARE, Value: "e8"},
-				{Type: chess.PROMOTION, Value: "="},
-				{Type: chess.PromotionPiece, Value: "Q"},
+			expected: []pgnToken{
+				{Type: tokSquare, Value: "e8"},
+				{Type: tokPromotion, Value: "="},
+				{Type: tokPromotionPiece, Value: "Q"},
 			},
 		},
 		{
 			name:  "Promotion in game",
 			input: "1. e8=Q e1=N 2. exd8=R",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e8"},
-				{Type: chess.PROMOTION, Value: "="},
-				{Type: chess.PromotionPiece, Value: "Q"},
-				{Type: chess.SQUARE, Value: "e1"},
-				{Type: chess.PROMOTION, Value: "="},
-				{Type: chess.PromotionPiece, Value: "N"},
-				{Type: chess.MoveNumber, Value: "2"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.FILE, Value: "e"},
-				{Type: chess.CAPTURE, Value: "x"},
-				{Type: chess.SQUARE, Value: "d8"},
-				{Type: chess.PROMOTION, Value: "="},
-				{Type: chess.PromotionPiece, Value: "R"},
+			expected: []pgnToken{
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "e8"},
+				{Type: tokPromotion, Value: "="},
+				{Type: tokPromotionPiece, Value: "Q"},
+				{Type: tokSquare, Value: "e1"},
+				{Type: tokPromotion, Value: "="},
+				{Type: tokPromotionPiece, Value: "N"},
+				{Type: tokMoveNumber, Value: "2"},
+				{Type: tokDot, Value: "."},
+				{Type: tokFile, Value: "e"},
+				{Type: tokCapture, Value: "x"},
+				{Type: tokSquare, Value: "d8"},
+				{Type: tokPromotion, Value: "="},
+				{Type: tokPromotionPiece, Value: "R"},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lexer := chess.NewLexer(tt.input)
+			lexer := newPGNLexer(tt.input)
 
 			for i, expected := range tt.expected {
 				token := lexer.NextToken()
@@ -220,7 +218,7 @@ func TestLexer_Promotion(t *testing.T) {
 
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
-			if token.Type != chess.EOF {
+			if token.Type != tokEOF {
 				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
@@ -231,84 +229,84 @@ func TestLexer_NAG(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected []chess.Token
+		expected []pgnToken
 	}{
 		{
 			name:  "NAG",
 			input: "e5 $1",
-			expected: []chess.Token{
-				{Type: chess.SQUARE, Value: "e5"},
-				{Type: chess.NAG, Value: "$1"},
+			expected: []pgnToken{
+				{Type: tokSquare, Value: "e5"},
+				{Type: tokNAG, Value: "$1"},
 			},
 		},
 		{
 			name:  "NAG in game",
 			input: "1. e5 $1 e6 $2 2. Nf3 $3",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e5"},
-				{Type: chess.NAG, Value: "$1"},
-				{Type: chess.SQUARE, Value: "e6"},
-				{Type: chess.NAG, Value: "$2"},
-				{Type: chess.MoveNumber, Value: "2"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "f3"},
-				{Type: chess.NAG, Value: "$3"},
+			expected: []pgnToken{
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "e5"},
+				{Type: tokNAG, Value: "$1"},
+				{Type: tokSquare, Value: "e6"},
+				{Type: tokNAG, Value: "$2"},
+				{Type: tokMoveNumber, Value: "2"},
+				{Type: tokDot, Value: "."},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "f3"},
+				{Type: tokNAG, Value: "$3"},
 			},
 		},
 		{
 			name:  "NAG and comment after move",
 			input: "e4 $1 {Good move}",
-			expected: []chess.Token{
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.NAG, Value: "$1"},
-				{Type: chess.CommentStart, Value: "{"},
-				{Type: chess.COMMENT, Value: "Good move"},
-				{Type: chess.CommentEnd, Value: "}"},
+			expected: []pgnToken{
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokNAG, Value: "$1"},
+				{Type: tokCommentStart, Value: "{"},
+				{Type: tokComment, Value: "Good move"},
+				{Type: tokCommentEnd, Value: "}"},
 			},
 		},
 		{
 			name:  "Comment and NAG after move",
 			input: "e4 {Good move} $1",
-			expected: []chess.Token{
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.CommentStart, Value: "{"},
-				{Type: chess.COMMENT, Value: "Good move"},
-				{Type: chess.CommentEnd, Value: "}"},
-				{Type: chess.NAG, Value: "$1"},
+			expected: []pgnToken{
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokCommentStart, Value: "{"},
+				{Type: tokComment, Value: "Good move"},
+				{Type: tokCommentEnd, Value: "}"},
+				{Type: tokNAG, Value: "$1"},
 			},
 		},
 		{
 			name:  "Move with multiple NAGs and comment",
 			input: "e4 $1 $2 {Excellent move}",
-			expected: []chess.Token{
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.NAG, Value: "$1"},
-				{Type: chess.NAG, Value: "$2"},
-				{Type: chess.CommentStart, Value: "{"},
-				{Type: chess.COMMENT, Value: "Excellent move"},
-				{Type: chess.CommentEnd, Value: "}"},
+			expected: []pgnToken{
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokNAG, Value: "$1"},
+				{Type: tokNAG, Value: "$2"},
+				{Type: tokCommentStart, Value: "{"},
+				{Type: tokComment, Value: "Excellent move"},
+				{Type: tokCommentEnd, Value: "}"},
 			},
 		},
 		{
 			name:  "Move with comment and multiple NAGs",
 			input: "e4 {Excellent move} $1 $2",
-			expected: []chess.Token{
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.CommentStart, Value: "{"},
-				{Type: chess.COMMENT, Value: "Excellent move"},
-				{Type: chess.CommentEnd, Value: "}"},
-				{Type: chess.NAG, Value: "$1"},
-				{Type: chess.NAG, Value: "$2"},
+			expected: []pgnToken{
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokCommentStart, Value: "{"},
+				{Type: tokComment, Value: "Excellent move"},
+				{Type: tokCommentEnd, Value: "}"},
+				{Type: tokNAG, Value: "$1"},
+				{Type: tokNAG, Value: "$2"},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lexer := chess.NewLexer(tt.input)
+			lexer := newPGNLexer(tt.input)
 
 			for i, expected := range tt.expected {
 				token := lexer.NextToken()
@@ -320,7 +318,7 @@ func TestLexer_NAG(t *testing.T) {
 
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
-			if token.Type != chess.EOF {
+			if token.Type != tokEOF {
 				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
@@ -331,73 +329,73 @@ func TestLexer_Captures(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected []chess.Token
+		expected []pgnToken
 	}{
 		{
 			name:  "Pawn capture",
 			input: "exf3",
-			expected: []chess.Token{
-				{Type: chess.FILE, Value: "e"},
-				{Type: chess.CAPTURE, Value: "x"},
-				{Type: chess.SQUARE, Value: "f3"},
+			expected: []pgnToken{
+				{Type: tokFile, Value: "e"},
+				{Type: tokCapture, Value: "x"},
+				{Type: tokSquare, Value: "f3"},
 			},
 		},
 		{
 			name:  "Piece capture",
 			input: "Nxc6",
-			expected: []chess.Token{
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.CAPTURE, Value: "x"},
-				{Type: chess.SQUARE, Value: "c6"},
+			expected: []pgnToken{
+				{Type: tokPiece, Value: "N"},
+				{Type: tokCapture, Value: "x"},
+				{Type: tokSquare, Value: "c6"},
 			},
 		},
 		{
 			name:  "Piece capture with file disambiguation",
 			input: "Nbxc6",
-			expected: []chess.Token{
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.FILE, Value: "b"},
-				{Type: chess.CAPTURE, Value: "x"},
-				{Type: chess.SQUARE, Value: "c6"},
+			expected: []pgnToken{
+				{Type: tokPiece, Value: "N"},
+				{Type: tokFile, Value: "b"},
+				{Type: tokCapture, Value: "x"},
+				{Type: tokSquare, Value: "c6"},
 			},
 		},
 		{
 			name:  "Piece capture with rank disambiguation",
 			input: "N4xd5",
-			expected: []chess.Token{
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.RANK, Value: "4"},
-				{Type: chess.CAPTURE, Value: "x"},
-				{Type: chess.SQUARE, Value: "d5"},
+			expected: []pgnToken{
+				{Type: tokPiece, Value: "N"},
+				{Type: tokRank, Value: "4"},
+				{Type: tokCapture, Value: "x"},
+				{Type: tokSquare, Value: "d5"},
 			},
 		},
 		{
 			name:  "Complex position with captures",
 			input: "1. e4 d5 2. Nf3 Nc6 3. Nbxd5",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.SQUARE, Value: "d5"},
-				{Type: chess.MoveNumber, Value: "2"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "f3"},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "c6"},
-				{Type: chess.MoveNumber, Value: "3"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.FILE, Value: "b"},
-				{Type: chess.CAPTURE, Value: "x"},
-				{Type: chess.SQUARE, Value: "d5"},
+			expected: []pgnToken{
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokSquare, Value: "d5"},
+				{Type: tokMoveNumber, Value: "2"},
+				{Type: tokDot, Value: "."},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "f3"},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "c6"},
+				{Type: tokMoveNumber, Value: "3"},
+				{Type: tokDot, Value: "."},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokFile, Value: "b"},
+				{Type: tokCapture, Value: "x"},
+				{Type: tokSquare, Value: "d5"},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lexer := chess.NewLexer(tt.input)
+			lexer := newPGNLexer(tt.input)
 
 			for i, expected := range tt.expected {
 				token := lexer.NextToken()
@@ -409,7 +407,7 @@ func TestLexer_Captures(t *testing.T) {
 
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
-			if token.Type != chess.EOF {
+			if token.Type != tokEOF {
 				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
@@ -421,32 +419,32 @@ func TestLexer_CapturesInGameContext(t *testing.T) {
 	input := "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6"
 
 	expectedTokens := []struct {
-		typ   chess.TokenType
+		typ   pgnTokenType
 		value string
 	}{
-		{chess.MoveNumber, "1"},
-		{chess.DOT, "."},
-		{chess.SQUARE, "e4"},
-		{chess.SQUARE, "e5"},
-		{chess.MoveNumber, "2"},
-		{chess.DOT, "."},
-		{chess.PIECE, "N"},
-		{chess.SQUARE, "f3"},
-		{chess.PIECE, "N"},
-		{chess.SQUARE, "c6"},
-		{chess.MoveNumber, "3"},
-		{chess.DOT, "."},
-		{chess.PIECE, "B"},
-		{chess.SQUARE, "b5"},
-		{chess.SQUARE, "a6"},
-		{chess.MoveNumber, "4"},
-		{chess.DOT, "."},
-		{chess.PIECE, "B"},
-		{chess.CAPTURE, "x"},
-		{chess.SQUARE, "c6"},
+		{tokMoveNumber, "1"},
+		{tokDot, "."},
+		{tokSquare, "e4"},
+		{tokSquare, "e5"},
+		{tokMoveNumber, "2"},
+		{tokDot, "."},
+		{tokPiece, "N"},
+		{tokSquare, "f3"},
+		{tokPiece, "N"},
+		{tokSquare, "c6"},
+		{tokMoveNumber, "3"},
+		{tokDot, "."},
+		{tokPiece, "B"},
+		{tokSquare, "b5"},
+		{tokSquare, "a6"},
+		{tokMoveNumber, "4"},
+		{tokDot, "."},
+		{tokPiece, "B"},
+		{tokCapture, "x"},
+		{tokSquare, "c6"},
 	}
 
-	lexer := chess.NewLexer(input)
+	lexer := newPGNLexer(input)
 
 	for i, expected := range expectedTokens {
 		token := lexer.NextToken()
@@ -461,72 +459,72 @@ func TestLexer_Commands(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected []chess.Token
+		expected []pgnToken
 	}{
 		{
 			name:  "Command",
 			input: "{[%clk 12:34:56]}",
-			expected: []chess.Token{
-				{Type: chess.CommentStart, Value: "{"},
-				{Type: chess.CommandStart, Value: "[%"},
-				{Type: chess.CommandName, Value: "clk"},
-				{Type: chess.CommandParam, Value: "12:34:56"},
-				{Type: chess.CommandEnd, Value: "]"},
-				{Type: chess.CommentEnd, Value: "}"},
+			expected: []pgnToken{
+				{Type: tokCommentStart, Value: "{"},
+				{Type: tokCommandStart, Value: "[%"},
+				{Type: tokCommandName, Value: "clk"},
+				{Type: tokCommandParam, Value: "12:34:56"},
+				{Type: tokCommandEnd, Value: "]"},
+				{Type: tokCommentEnd, Value: "}"},
 			},
 		},
 		{
 			name:  "Command in game",
 			input: "1. e4 {[%clk 12:34:56]} e5",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.CommentStart, Value: "{"},
-				{Type: chess.CommandStart, Value: "[%"},
-				{Type: chess.CommandName, Value: "clk"},
-				{Type: chess.CommandParam, Value: "12:34:56"},
-				{Type: chess.CommandEnd, Value: "]"},
-				{Type: chess.CommentEnd, Value: "}"},
-				{Type: chess.SQUARE, Value: "e5"},
+			expected: []pgnToken{
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokCommentStart, Value: "{"},
+				{Type: tokCommandStart, Value: "[%"},
+				{Type: tokCommandName, Value: "clk"},
+				{Type: tokCommandParam, Value: "12:34:56"},
+				{Type: tokCommandEnd, Value: "]"},
+				{Type: tokCommentEnd, Value: "}"},
+				{Type: tokSquare, Value: "e5"},
 			},
 		},
 		{ // Test multiple commands
 			name:  "Multiple commands",
 			input: "{[%clk 0:00:07][%eval -6.05] White is toast}",
-			expected: []chess.Token{
-				{Type: chess.CommentStart, Value: "{"},
-				{Type: chess.CommandStart, Value: "[%"},
-				{Type: chess.CommandName, Value: "clk"},
-				{Type: chess.CommandParam, Value: "0:00:07"},
-				{Type: chess.CommandEnd, Value: "]"},
-				{Type: chess.CommandStart, Value: "[%"},
-				{Type: chess.CommandName, Value: "eval"},
-				{Type: chess.CommandParam, Value: "-6.05"},
-				{Type: chess.CommandEnd, Value: "]"},
-				{Type: chess.COMMENT, Value: "White is toast"},
-				{Type: chess.CommentEnd, Value: "}"},
+			expected: []pgnToken{
+				{Type: tokCommentStart, Value: "{"},
+				{Type: tokCommandStart, Value: "[%"},
+				{Type: tokCommandName, Value: "clk"},
+				{Type: tokCommandParam, Value: "0:00:07"},
+				{Type: tokCommandEnd, Value: "]"},
+				{Type: tokCommandStart, Value: "[%"},
+				{Type: tokCommandName, Value: "eval"},
+				{Type: tokCommandParam, Value: "-6.05"},
+				{Type: tokCommandEnd, Value: "]"},
+				{Type: tokComment, Value: "White is toast"},
+				{Type: tokCommentEnd, Value: "}"},
 			},
 		},
 		{
 			name:  "Command with multiple parameters",
 			input: "{[%command 1:45:12,Nf6,\"very interesting, but wrong\"]}",
-			expected: []chess.Token{
-				{Type: chess.CommentStart, Value: "{"},
-				{Type: chess.CommandStart, Value: "[%"},
-				{Type: chess.CommandName, Value: "command"},
-				{Type: chess.CommandParam, Value: "1:45:12"},
-				{Type: chess.CommandParam, Value: "Nf6"},
-				{Type: chess.CommandParam, Value: "very interesting, but wrong"},
-				{Type: chess.CommandEnd, Value: "]"},
-				{Type: chess.CommentEnd, Value: "}"},
+			expected: []pgnToken{
+				{Type: tokCommentStart, Value: "{"},
+				{Type: tokCommandStart, Value: "[%"},
+				{Type: tokCommandName, Value: "command"},
+				{Type: tokCommandParam, Value: "1:45:12"},
+				{Type: tokCommandParam, Value: "Nf6"},
+				{Type: tokCommandParam, Value: "very interesting, but wrong"},
+				{Type: tokCommandEnd, Value: "]"},
+				{Type: tokCommentEnd, Value: "}"},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lexer := chess.NewLexer(tt.input)
+			lexer := newPGNLexer(tt.input)
 
 			for i, expected := range tt.expected {
 				token := lexer.NextToken()
@@ -538,7 +536,7 @@ func TestLexer_Commands(t *testing.T) {
 
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
-			if token.Type != chess.EOF {
+			if token.Type != tokEOF {
 				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
@@ -549,101 +547,101 @@ func TestLexer_Variations(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected []chess.Token
+		expected []pgnToken
 	}{
 		{
 			name:  "Variation start",
 			input: "1. e4 (1. d4) e5",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.VariationStart, Value: "("},
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "d4"},
-				{Type: chess.VariationEnd, Value: ")"},
-				{Type: chess.SQUARE, Value: "e5"},
+			expected: []pgnToken{
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokVariationStart, Value: "("},
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "d4"},
+				{Type: tokVariationEnd, Value: ")"},
+				{Type: tokSquare, Value: "e5"},
 			},
 		},
 		{
 			name:  "Variation in game",
 			input: "1. e4 (1. d4) e5 2. Nf3 (2. Nc3) Nc6",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.VariationStart, Value: "("},
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "d4"},
-				{Type: chess.VariationEnd, Value: ")"},
-				{Type: chess.SQUARE, Value: "e5"},
-				{Type: chess.MoveNumber, Value: "2"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "f3"},
-				{Type: chess.VariationStart, Value: "("},
-				{Type: chess.MoveNumber, Value: "2"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "c3"},
-				{Type: chess.VariationEnd, Value: ")"},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "c6"},
+			expected: []pgnToken{
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokVariationStart, Value: "("},
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "d4"},
+				{Type: tokVariationEnd, Value: ")"},
+				{Type: tokSquare, Value: "e5"},
+				{Type: tokMoveNumber, Value: "2"},
+				{Type: tokDot, Value: "."},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "f3"},
+				{Type: tokVariationStart, Value: "("},
+				{Type: tokMoveNumber, Value: "2"},
+				{Type: tokDot, Value: "."},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "c3"},
+				{Type: tokVariationEnd, Value: ")"},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "c6"},
 			},
 		},
 		{
 			name:  "Nested variations",
 			input: "1. e4 (1. d4 (1. c4)) 1... e5",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.VariationStart, Value: "("},
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "d4"},
-				{Type: chess.VariationStart, Value: "("},
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "c4"},
-				{Type: chess.VariationEnd, Value: ")"},
-				{Type: chess.VariationEnd, Value: ")"},
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.ELLIPSIS, Value: "..."},
-				{Type: chess.SQUARE, Value: "e5"},
+			expected: []pgnToken{
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokVariationStart, Value: "("},
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "d4"},
+				{Type: tokVariationStart, Value: "("},
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "c4"},
+				{Type: tokVariationEnd, Value: ")"},
+				{Type: tokVariationEnd, Value: ")"},
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokEllipsis, Value: "..."},
+				{Type: tokSquare, Value: "e5"},
 			},
 		},
 
 		{
 			name:  "Another variation",
 			input: "1. e4 e5 (1... e6 2. d4 d5) 2. Nf3",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.SQUARE, Value: "e5"},
-				{Type: chess.VariationStart, Value: "("},
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.ELLIPSIS, Value: "..."},
-				{Type: chess.SQUARE, Value: "e6"},
-				{Type: chess.MoveNumber, Value: "2"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "d4"},
-				{Type: chess.SQUARE, Value: "d5"},
-				{Type: chess.VariationEnd, Value: ")"},
-				{Type: chess.MoveNumber, Value: "2"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "f3"},
+			expected: []pgnToken{
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokSquare, Value: "e5"},
+				{Type: tokVariationStart, Value: "("},
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokEllipsis, Value: "..."},
+				{Type: tokSquare, Value: "e6"},
+				{Type: tokMoveNumber, Value: "2"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "d4"},
+				{Type: tokSquare, Value: "d5"},
+				{Type: tokVariationEnd, Value: ")"},
+				{Type: tokMoveNumber, Value: "2"},
+				{Type: tokDot, Value: "."},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "f3"},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lexer := chess.NewLexer(tt.input)
+			lexer := newPGNLexer(tt.input)
 
 			for i, expected := range tt.expected {
 				token := lexer.NextToken()
@@ -655,7 +653,7 @@ func TestLexer_Variations(t *testing.T) {
 
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
-			if token.Type != chess.EOF {
+			if token.Type != tokEOF {
 				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
@@ -666,76 +664,76 @@ func TestLexer_Castling(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected []chess.Token
+		expected []pgnToken
 	}{
 		{
 			name:  "Short castle",
 			input: "O-O",
-			expected: []chess.Token{
-				{Type: chess.KingsideCastle, Value: "O-O"},
+			expected: []pgnToken{
+				{Type: tokKingsideCastle, Value: "O-O"},
 			},
 		},
 		{
 			name:  "Long castle",
 			input: "O-O-O",
-			expected: []chess.Token{
-				{Type: chess.QueensideCastle, Value: "O-O-O"},
+			expected: []pgnToken{
+				{Type: tokQueensideCastle, Value: "O-O-O"},
 			},
 		},
 		{
 			name:  "Short castle in game",
 			input: "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. O-O",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.SQUARE, Value: "e5"},
-				{Type: chess.MoveNumber, Value: "2"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "f3"},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "c6"},
-				{Type: chess.MoveNumber, Value: "3"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "B"},
-				{Type: chess.SQUARE, Value: "c4"},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "f6"},
-				{Type: chess.MoveNumber, Value: "4"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.KingsideCastle, Value: "O-O"},
+			expected: []pgnToken{
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokSquare, Value: "e5"},
+				{Type: tokMoveNumber, Value: "2"},
+				{Type: tokDot, Value: "."},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "f3"},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "c6"},
+				{Type: tokMoveNumber, Value: "3"},
+				{Type: tokDot, Value: "."},
+				{Type: tokPiece, Value: "B"},
+				{Type: tokSquare, Value: "c4"},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "f6"},
+				{Type: tokMoveNumber, Value: "4"},
+				{Type: tokDot, Value: "."},
+				{Type: tokKingsideCastle, Value: "O-O"},
 			},
 		},
 		{
 			name:  "Long castle in game",
 			input: "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. O-O-O",
-			expected: []chess.Token{
-				{Type: chess.MoveNumber, Value: "1"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.SQUARE, Value: "e4"},
-				{Type: chess.SQUARE, Value: "e5"},
-				{Type: chess.MoveNumber, Value: "2"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "f3"},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "c6"},
-				{Type: chess.MoveNumber, Value: "3"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.PIECE, Value: "B"},
-				{Type: chess.SQUARE, Value: "c4"},
-				{Type: chess.PIECE, Value: "N"},
-				{Type: chess.SQUARE, Value: "f6"},
-				{Type: chess.MoveNumber, Value: "4"},
-				{Type: chess.DOT, Value: "."},
-				{Type: chess.QueensideCastle, Value: "O-O-O"},
+			expected: []pgnToken{
+				{Type: tokMoveNumber, Value: "1"},
+				{Type: tokDot, Value: "."},
+				{Type: tokSquare, Value: "e4"},
+				{Type: tokSquare, Value: "e5"},
+				{Type: tokMoveNumber, Value: "2"},
+				{Type: tokDot, Value: "."},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "f3"},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "c6"},
+				{Type: tokMoveNumber, Value: "3"},
+				{Type: tokDot, Value: "."},
+				{Type: tokPiece, Value: "B"},
+				{Type: tokSquare, Value: "c4"},
+				{Type: tokPiece, Value: "N"},
+				{Type: tokSquare, Value: "f6"},
+				{Type: tokMoveNumber, Value: "4"},
+				{Type: tokDot, Value: "."},
+				{Type: tokQueensideCastle, Value: "O-O-O"},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lexer := chess.NewLexer(tt.input)
+			lexer := newPGNLexer(tt.input)
 
 			for i, expected := range tt.expected {
 				token := lexer.NextToken()
@@ -747,7 +745,7 @@ func TestLexer_Castling(t *testing.T) {
 
 			// Verify we get EOF after all tokens
 			token := lexer.NextToken()
-			if token.Type != chess.EOF {
+			if token.Type != tokEOF {
 				t.Errorf("expected EOF after sequence, got %v", token.Type)
 			}
 		})
@@ -758,7 +756,7 @@ func TestFuzzRegressions(t *testing.T) {
 	seeds := []string{"y", "a", "{[%0", "{[%,\""}
 	for _, input := range seeds {
 		t.Run(input, func(t *testing.T) {
-			lexer := chess.NewLexer(input)
+			lexer := newPGNLexer(input)
 			defer func() {
 				if r := recover(); r != nil {
 					t.Errorf("Lexer panicked on input %q: %v", input, r)
@@ -768,7 +766,7 @@ func TestFuzzRegressions(t *testing.T) {
 			for {
 				token := lexer.NextToken()
 				count++
-				if token.Type == chess.EOF {
+				if token.Type == tokEOF {
 					break
 				}
 				if count > len(input)*3 {
@@ -844,8 +842,8 @@ func FuzzLexer(f *testing.F) {
 			}
 		}()
 
-		lexer := chess.NewLexer(input)
-		var tokens []chess.Token
+		lexer := newPGNLexer(input)
+		var tokens []pgnToken
 
 		t.Log("Input:", input)
 
@@ -855,7 +853,7 @@ func FuzzLexer(f *testing.F) {
 			tokens = append(tokens, token)
 
 			// Stop at EOF
-			if token.Type == chess.EOF {
+			if token.Type == tokEOF {
 				break
 			}
 
@@ -872,23 +870,23 @@ func FuzzLexer(f *testing.F) {
 	})
 }
 
-func validateTokens(t *testing.T, tokens []chess.Token) {
+func validateTokens(t *testing.T, tokens []pgnToken) {
 	for i, token := range tokens {
 		// Validate specific token values
 		switch token.Type {
-		case chess.FILE:
+		case tokFile:
 			if len(token.Value) != 1 || token.Value[0] < 'a' || token.Value[0] > 'h' {
 				t.Errorf("Invalid file at token %d: %v", i, token.Value)
 			}
-		case chess.RANK:
+		case tokRank:
 			if len(token.Value) != 1 || (!(token.Value[0] >= '1' && token.Value[0] <= '8') && token.Error == nil) {
 				t.Errorf("Invalid rank at token %d: %v", i, token.Value)
 			}
-		case chess.PIECE:
+		case tokPiece:
 			if len(token.Value) != 1 || (!(token.Value[0] == 'N' || token.Value[0] == 'B' || token.Value[0] == 'R' || token.Value[0] == 'Q' || token.Value[0] == 'K') && token.Error == nil) {
 				t.Errorf("Invalid piece at token %d: %v", i, token.Value)
 			}
-		case chess.PromotionPiece:
+		case tokPromotionPiece:
 			if len(token.Value) != 1 || (!(token.Value[0] == 'N' || token.Value[0] == 'B' || token.Value[0] == 'R' || token.Value[0] == 'Q' || token.Value[0] == 'K') && token.Error == nil) {
 				t.Errorf("Invalid promotion piece at token %d: %v", i, token.Value)
 			}
@@ -903,101 +901,101 @@ func TestLexer_FromPositionFixture(t *testing.T) {
 		t.Fatalf("Failed to read fixture: %v", err)
 	}
 
-	lexer := chess.NewLexer(string(data))
+	lexer := newPGNLexer(string(data))
 
 	expected := []struct {
-		typ   chess.TokenType
+		typ   pgnTokenType
 		value string
 	}{
 		// Tags
-		{chess.TagStart, "["},
-		{chess.TagKey, "Event"},
-		{chess.TagValue, "Slav Defense: Chebanenko Variation, 5. cxd5"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Site"},
-		{chess.TagValue, ""},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Date"},
-		{chess.TagValue, "2025.07.12"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Round"},
-		{chess.TagValue, "1"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "White"},
-		{chess.TagValue, ""},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Black"},
-		{chess.TagValue, ""},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Result"},
-		{chess.TagValue, "*"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "UTCDate"},
-		{chess.TagValue, "2025.07.12"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "UTCTime"},
-		{chess.TagValue, "15:51:01"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "Variant"},
-		{chess.TagValue, "Standard"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "ECO"},
-		{chess.TagValue, "D15"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "FEN"},
-		{chess.TagValue, "rnbqkb1r/1p2pppp/p1p2n2/3p4/2PP4/2N2N2/PP2PPPP/R1BQKB1R w KQkq - 0 5"},
-		{chess.TagEnd, "]"},
-		{chess.TagStart, "["},
-		{chess.TagKey, "SetUp"},
-		{chess.TagValue, "1"},
-		{chess.TagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Event"},
+		{tokTagValue, "Slav Defense: Chebanenko Variation, 5. cxd5"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Site"},
+		{tokTagValue, ""},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Date"},
+		{tokTagValue, "2025.07.12"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Round"},
+		{tokTagValue, "1"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "White"},
+		{tokTagValue, ""},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Black"},
+		{tokTagValue, ""},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Result"},
+		{tokTagValue, "*"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "UTCDate"},
+		{tokTagValue, "2025.07.12"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "UTCTime"},
+		{tokTagValue, "15:51:01"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "Variant"},
+		{tokTagValue, "Standard"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "ECO"},
+		{tokTagValue, "D15"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "FEN"},
+		{tokTagValue, "rnbqkb1r/1p2pppp/p1p2n2/3p4/2PP4/2N2N2/PP2PPPP/R1BQKB1R w KQkq - 0 5"},
+		{tokTagEnd, "]"},
+		{tokTagStart, "["},
+		{tokTagKey, "SetUp"},
+		{tokTagValue, "1"},
+		{tokTagEnd, "]"},
 		// Moves
-		{chess.MoveNumber, "5"},
-		{chess.DOT, "."},
-		{chess.FILE, "c"},
-		{chess.CAPTURE, "x"},
-		{chess.SQUARE, "d5"},
-		{chess.VariationStart, "("},
-		{chess.MoveNumber, "5"},
-		{chess.DOT, "."},
-		{chess.SQUARE, "e3"},
-		{chess.SQUARE, "e6"},
-		{chess.MoveNumber, "6"},
-		{chess.DOT, "."},
-		{chess.FILE, "c"},
-		{chess.CAPTURE, "x"},
-		{chess.SQUARE, "d5"},
-		{chess.FILE, "c"},
-		{chess.CAPTURE, "x"},
-		{chess.SQUARE, "d5"},
-		{chess.VariationEnd, ")"},
-		{chess.MoveNumber, "5"},
-		{chess.ELLIPSIS, "..."},
-		{chess.FILE, "c"},
-		{chess.CAPTURE, "x"},
-		{chess.SQUARE, "d5"},
-		{chess.MoveNumber, "6"},
-		{chess.DOT, "."},
-		{chess.SQUARE, "e3"},
-		{chess.SQUARE, "e6"},
-		{chess.CommentStart, "{"},
-		{chess.CommandStart, "[%"},
-		{chess.CommandName, "eval"},
-		{chess.CommandParam, "0.11"},
-		{chess.CommandEnd, "]"},
-		{chess.CommentEnd, "}"},
-		{chess.RESULT, "*"},
+		{tokMoveNumber, "5"},
+		{tokDot, "."},
+		{tokFile, "c"},
+		{tokCapture, "x"},
+		{tokSquare, "d5"},
+		{tokVariationStart, "("},
+		{tokMoveNumber, "5"},
+		{tokDot, "."},
+		{tokSquare, "e3"},
+		{tokSquare, "e6"},
+		{tokMoveNumber, "6"},
+		{tokDot, "."},
+		{tokFile, "c"},
+		{tokCapture, "x"},
+		{tokSquare, "d5"},
+		{tokFile, "c"},
+		{tokCapture, "x"},
+		{tokSquare, "d5"},
+		{tokVariationEnd, ")"},
+		{tokMoveNumber, "5"},
+		{tokEllipsis, "..."},
+		{tokFile, "c"},
+		{tokCapture, "x"},
+		{tokSquare, "d5"},
+		{tokMoveNumber, "6"},
+		{tokDot, "."},
+		{tokSquare, "e3"},
+		{tokSquare, "e6"},
+		{tokCommentStart, "{"},
+		{tokCommandStart, "[%"},
+		{tokCommandName, "eval"},
+		{tokCommandParam, "0.11"},
+		{tokCommandEnd, "]"},
+		{tokCommentEnd, "}"},
+		{tokResult, "*"},
 	}
 
 	for i, exp := range expected {
@@ -1008,12 +1006,12 @@ func TestLexer_FromPositionFixture(t *testing.T) {
 		}
 	}
 	// final EOF
-	if tok := lexer.NextToken(); tok.Type != chess.EOF {
+	if tok := lexer.NextToken(); tok.Type != tokEOF {
 		t.Errorf("Expected EOF, got %v", tok.Type)
 	}
 }
 
-func assertTokenSequence(t *testing.T, l *chess.Lexer, expected []chess.Token) {
+func assertTokenSequence(t *testing.T, l *pgnLexer, expected []pgnToken) {
 	t.Helper()
 	for i, exp := range expected {
 		tok := l.NextToken()
@@ -1025,16 +1023,16 @@ func assertTokenSequence(t *testing.T, l *chess.Lexer, expected []chess.Token) {
 			t.Errorf("Token %d: expected error %q, got nil", i, exp.Error)
 		}
 	}
-	if tok := l.NextToken(); tok.Type != chess.EOF {
+	if tok := l.NextToken(); tok.Type != tokEOF {
 		t.Errorf("expected EOF after sequence, got {%v, %q}", tok.Type, tok.Value)
 	}
 }
 
 func TestLexer_EmptyInput(t *testing.T) {
 	for _, in := range []string{"", "   ", " \t\n  "} {
-		l := chess.NewLexer(in)
+		l := newPGNLexer(in)
 		tok := l.NextToken()
-		if tok.Type != chess.EOF {
+		if tok.Type != tokEOF {
 			t.Errorf("NewLexer(%q).NextToken() = %v, want EOF", in, tok.Type)
 		}
 	}
@@ -1042,12 +1040,12 @@ func TestLexer_EmptyInput(t *testing.T) {
 
 func TestLexer_UndefinedToken(t *testing.T) {
 	for _, in := range []string{"@", ";", "~"} {
-		l := chess.NewLexer(in)
+		l := newPGNLexer(in)
 		tok := l.NextToken()
-		if tok.Type != chess.Undefined || tok.Value != in {
+		if tok.Type != tokUndefined || tok.Value != in {
 			t.Errorf("NewLexer(%q).NextToken() = {%v, %q}, want {Undefined, %q}", in, tok.Type, tok.Value, in)
 		}
-		if eof := l.NextToken(); eof.Type != chess.EOF {
+		if eof := l.NextToken(); eof.Type != tokEOF {
 			t.Errorf("expected EOF after undefined, got %v", eof.Type)
 		}
 	}
@@ -1057,33 +1055,33 @@ func TestLexer_DeambiguationSquare(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
-		want  []chess.Token
+		want  []pgnToken
 	}{
-		{"full_square", "Qe8f7", []chess.Token{
-			{Type: chess.PIECE, Value: "Q"},
-			{Type: chess.DeambiguationSquare, Value: "e8"},
-			{Type: chess.SQUARE, Value: "f7"},
+		{"full_square", "Qe8f7", []pgnToken{
+			{Type: tokPiece, Value: "Q"},
+			{Type: tokDisambiguationSquare, Value: "e8"},
+			{Type: tokSquare, Value: "f7"},
 		}},
-		{"full_square_capture", "Qg8xg7", []chess.Token{
-			{Type: chess.PIECE, Value: "Q"},
-			{Type: chess.DeambiguationSquare, Value: "g8"},
-			{Type: chess.CAPTURE, Value: "x"},
-			{Type: chess.SQUARE, Value: "g7"},
+		{"full_square_capture", "Qg8xg7", []pgnToken{
+			{Type: tokPiece, Value: "Q"},
+			{Type: tokDisambiguationSquare, Value: "g8"},
+			{Type: tokCapture, Value: "x"},
+			{Type: tokSquare, Value: "g7"},
 		}},
-		{"file_only", "Nbd7", []chess.Token{
-			{Type: chess.PIECE, Value: "N"},
-			{Type: chess.FILE, Value: "b"},
-			{Type: chess.SQUARE, Value: "d7"},
+		{"file_only", "Nbd7", []pgnToken{
+			{Type: tokPiece, Value: "N"},
+			{Type: tokFile, Value: "b"},
+			{Type: tokSquare, Value: "d7"},
 		}},
-		{"rank_only", "N4d7", []chess.Token{
-			{Type: chess.PIECE, Value: "N"},
-			{Type: chess.RANK, Value: "4"},
-			{Type: chess.SQUARE, Value: "d7"},
+		{"rank_only", "N4d7", []pgnToken{
+			{Type: tokPiece, Value: "N"},
+			{Type: tokRank, Value: "4"},
+			{Type: tokSquare, Value: "d7"},
 		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assertTokenSequence(t, chess.NewLexer(tt.input), tt.want)
+			assertTokenSequence(t, newPGNLexer(tt.input), tt.want)
 		})
 	}
 }
@@ -1092,18 +1090,18 @@ func TestLexer_ResultSpellings(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
-		want  []chess.Token
+		want  []pgnToken
 	}{
-		{"white_wins", "1-0", []chess.Token{{Type: chess.RESULT, Value: "1-0"}}},
-		{"black_wins", "0-1", []chess.Token{{Type: chess.RESULT, Value: "0-1"}}},
-		{"ongoing", "*", []chess.Token{{Type: chess.RESULT, Value: "*"}}},
-		{"draw", "1/2-1/2", []chess.Token{
-			{Type: chess.RESULT, Value: "1/2-1/2"},
+		{"white_wins", "1-0", []pgnToken{{Type: tokResult, Value: "1-0"}}},
+		{"black_wins", "0-1", []pgnToken{{Type: tokResult, Value: "0-1"}}},
+		{"ongoing", "*", []pgnToken{{Type: tokResult, Value: "*"}}},
+		{"draw", "1/2-1/2", []pgnToken{
+			{Type: tokResult, Value: "1/2-1/2"},
 		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assertTokenSequence(t, chess.NewLexer(tt.input), tt.want)
+			assertTokenSequence(t, newPGNLexer(tt.input), tt.want)
 		})
 	}
 }
@@ -1112,28 +1110,28 @@ func TestLexer_NAGSymbols(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
-		want  []chess.Token
+		want  []pgnToken
 	}{
-		{"double_bang", "e4!!", []chess.Token{
-			{Type: chess.SQUARE, Value: "e4"},
-			{Type: chess.NAG, Value: "!!"},
+		{"double_bang", "e4!!", []pgnToken{
+			{Type: tokSquare, Value: "e4"},
+			{Type: tokNAG, Value: "!!"},
 		}},
-		{"bang", "e4!", []chess.Token{
-			{Type: chess.SQUARE, Value: "e4"},
-			{Type: chess.NAG, Value: "!"},
+		{"bang", "e4!", []pgnToken{
+			{Type: tokSquare, Value: "e4"},
+			{Type: tokNAG, Value: "!"},
 		}},
-		{"question", "e4?", []chess.Token{
-			{Type: chess.SQUARE, Value: "e4"},
-			{Type: chess.NAG, Value: "?"},
+		{"question", "e4?", []pgnToken{
+			{Type: tokSquare, Value: "e4"},
+			{Type: tokNAG, Value: "?"},
 		}},
-		{"dubious", "e4?!", []chess.Token{
-			{Type: chess.SQUARE, Value: "e4"},
-			{Type: chess.NAG, Value: "?!"},
+		{"dubious", "e4?!", []pgnToken{
+			{Type: tokSquare, Value: "e4"},
+			{Type: tokNAG, Value: "?!"},
 		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assertTokenSequence(t, chess.NewLexer(tt.input), tt.want)
+			assertTokenSequence(t, newPGNLexer(tt.input), tt.want)
 		})
 	}
 }
@@ -1142,9 +1140,9 @@ func TestLexer_NAGMaximalRun(t *testing.T) {
 	// A run of more than two '!'/'?' characters must be a single NAG token,
 	// not split into a valid token plus a trailing symbol (regression for the
 	// "!!!" bug that produced two NAG tokens).
-	assertTokenSequence(t, chess.NewLexer("e4!!!"), []chess.Token{
-		{Type: chess.SQUARE, Value: "e4"},
-		{Type: chess.NAG, Value: "!!!"},
+	assertTokenSequence(t, newPGNLexer("e4!!!"), []pgnToken{
+		{Type: tokSquare, Value: "e4"},
+		{Type: tokNAG, Value: "!!!"},
 	})
 }
 
@@ -1163,15 +1161,15 @@ func TestLexer_ErrorPaths(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := chess.NewLexer(tt.input)
-			var errToken chess.Token
+			l := newPGNLexer(tt.input)
+			var errToken pgnToken
 			for {
 				tok := l.NextToken()
 				if tok.Error != nil {
 					errToken = tok
 					break
 				}
-				if tok.Type == chess.EOF {
+				if tok.Type == tokEOF {
 					t.Fatalf("reached EOF without an error token for input %q", tt.input)
 				}
 			}

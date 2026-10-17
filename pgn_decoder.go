@@ -146,17 +146,17 @@ func (r PGNRecord) Decode(opts ...PGNOption) (*Game, error) {
 
 // Tags returns the PGN tag pairs in this record without building a Game.
 func (r PGNRecord) Tags() (map[string]string, error) {
-	lex := NewLexer(r.Raw)
+	lex := newPGNLexer(r.Raw)
 	tags := make(map[string]string)
 	for {
 		tok := lex.NextToken()
-		if tok.Type == EOF || tok.Type != TagStart {
+		if tok.Type == tokEOF || tok.Type != tokTagStart {
 			return tags, nil
 		}
 		key := lex.NextToken()
 		val := lex.NextToken()
 		end := lex.NextToken()
-		if end.Type == TagEnd && key.Type == TagKey && val.Type == TagValue {
+		if end.Type == tokTagEnd && key.Type == tokTagKey && val.Type == tokTagValue {
 			tags[key.Value] = val.Value
 		}
 	}
@@ -350,26 +350,26 @@ func PGNEvents(r io.Reader, opts ...PGNOption) iter.Seq2[PGNEvent, error] {
 }
 
 func yieldPGNRecordEvents(record PGNRecord, yield func(PGNEvent, error) bool) bool {
-	lex := NewLexer(record.Raw)
-	var pending *Token
+	lex := newPGNLexer(record.Raw)
+	var pending *pgnToken
 	for {
-		var tok Token
+		var tok pgnToken
 		if pending != nil {
 			tok = *pending
 			pending = nil
 		} else {
 			tok = lex.NextToken()
 		}
-		if tok.Type == EOF {
+		if tok.Type == tokEOF {
 			return yield(PGNEvent{Kind: PGNGameEnd, Index: record.Index, Offset: record.Offset}, nil)
 		}
 		event := PGNEvent{Index: record.Index, Offset: record.Offset}
 		switch tok.Type {
-		case TagStart:
+		case tokTagStart:
 			key := lex.NextToken()
 			val := lex.NextToken()
 			lex.NextToken() // TagEnd
-			if key.Type == TagKey && val.Type == TagValue {
+			if key.Type == tokTagKey && val.Type == tokTagValue {
 				event.Kind = PGNTag
 				event.Name = key.Value
 				event.Value = val.Value
@@ -377,7 +377,7 @@ func yieldPGNRecordEvents(record PGNRecord, yield func(PGNEvent, error) bool) bo
 					return false
 				}
 			}
-		case CommentStart:
+		case tokCommentStart:
 			comment := collectPGNComment(lex)
 			if comment != "" {
 				event.Kind = PGNComment
@@ -386,18 +386,18 @@ func yieldPGNRecordEvents(record PGNRecord, yield func(PGNEvent, error) bool) bo
 					return false
 				}
 			}
-		case NAG:
+		case tokNAG:
 			event.Kind = PGNNAG
 			event.NAG = tok.Value
 			if !yield(event, nil) {
 				return false
 			}
-		case VariationStart:
+		case tokVariationStart:
 			event.Kind = PGNVariationStart
 			if !yield(event, nil) {
 				return false
 			}
-		case VariationEnd:
+		case tokVariationEnd:
 			event.Kind = PGNVariationEnd
 			if !yield(event, nil) {
 				return false
@@ -416,29 +416,29 @@ func yieldPGNRecordEvents(record PGNRecord, yield func(PGNEvent, error) bool) bo
 	}
 }
 
-func collectPGNComment(lex *Lexer) string {
+func collectPGNComment(lex *pgnLexer) string {
 	var b strings.Builder
 	lastWasComment := false
 	for {
 		tok := lex.NextToken()
 		switch tok.Type {
-		case COMMENT:
+		case tokComment:
 			b.WriteString(tok.Value)
 			lastWasComment = true
-		case CommandStart:
+		case tokCommandStart:
 			if lastWasComment && b.Len() > 0 {
 				b.WriteByte(' ')
 			}
 			lastWasComment = false
-		case CommentEnd:
+		case tokCommentEnd:
 			return b.String()
-		case EOF:
+		case tokEOF:
 			return b.String()
 		}
 	}
 }
 
-func collectPGNMove(lex *Lexer, first Token) (string, Token) {
+func collectPGNMove(lex *pgnLexer, first pgnToken) (string, pgnToken) {
 	var b strings.Builder
 	b.WriteString(first.Value)
 	for {
@@ -450,10 +450,10 @@ func collectPGNMove(lex *Lexer, first Token) (string, Token) {
 	}
 }
 
-func isPGNMoveToken(tokenType TokenType) bool {
+func isPGNMoveToken(tokenType pgnTokenType) bool {
 	switch tokenType {
-	case PIECE, SQUARE, CAPTURE, FILE, RANK, KingsideCastle, QueensideCastle,
-		PROMOTION, PromotionPiece, CHECK, CHECKMATE, DeambiguationSquare, NullMove:
+	case tokPiece, tokSquare, tokCapture, tokFile, tokRank, tokKingsideCastle, tokQueensideCastle,
+		tokPromotion, tokPromotionPiece, tokCheck, tokCheckmate, tokDisambiguationSquare, tokNullMove:
 		return true
 	default:
 		return false

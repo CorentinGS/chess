@@ -201,6 +201,8 @@ These v2 exports have no direct v3 equivalent under the same name:
 | `NewScanner` / `Scanner.HasNext` / `Scanner.ParseNext` | `PGNGames(r, opts...)`, `NewPGNDecoder(r, opts...).Decode()`, or `ParsePGN(r)` for a single game |
 | `GameScanned`, `TokenizeGame`, `NewParser(tokens).Parse()` | _(removed)_; the PGN parser is internal. Use the decoders above. |
 | `WithExpandVariations()` | `WithPGNExpandVariations()` |
+| `NewLexer`, `Lexer`, `Token`, `TokenType` and its constants | _(removed)_; the PGN lexer is internal. Use `PGNEvents` for token-level access to moves, comments and tags. |
+| `ParserError.TokenType` | _(unexported)_; it still appears in `Error()` |
 
 The `Parse*` helpers return an error instead of the `NoColor` / `NoSquare` /
 `NoPieceType` sentinel, so wrap them if you relied on the sentinel:

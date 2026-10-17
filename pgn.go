@@ -10,9 +10,9 @@ import (
 type pgnParser struct {
 	game         *Game
 	tokens       pgnTokenSource
-	lexer        *Lexer
+	lexer        *pgnLexer
 	moveText     MoveTextCodec
-	token        Token
+	token        pgnToken
 	initErr      error
 	errors       []ParserError
 	position     int
@@ -21,17 +21,17 @@ type pgnParser struct {
 }
 
 type pgnTokenSource interface {
-	NextToken() (Token, error)
+	NextToken() (pgnToken, error)
 }
 
 type sliceTokenSource struct {
-	tokens []Token
+	tokens []pgnToken
 	pos    int
 }
 
-func (s *sliceTokenSource) NextToken() (Token, error) {
+func (s *sliceTokenSource) NextToken() (pgnToken, error) {
 	if s.pos >= len(s.tokens) {
-		return Token{Type: EOF}, nil
+		return pgnToken{Type: tokEOF}, nil
 	}
 	token := s.tokens[s.pos]
 	s.pos++
@@ -42,21 +42,21 @@ func (s *sliceTokenSource) NextToken() (Token, error) {
 // parser can consume a raw PGN movetext stream without materialising every
 // token up front.
 type lexerTokenSource struct {
-	lexer *Lexer
+	lexer *pgnLexer
 }
 
-func (s *lexerTokenSource) NextToken() (Token, error) {
+func (s *lexerTokenSource) NextToken() (pgnToken, error) {
 	return s.lexer.NextToken(), nil
 }
 
 // parsePGNText parses raw PGN movetext into a Game using the given options.
 func parsePGNText(raw string, options pgnOptions) (*Game, error) {
-	return newParserFromSource(&lexerTokenSource{lexer: NewLexer(raw)}, options).Parse()
+	return newParserFromSource(&lexerTokenSource{lexer: newPGNLexer(raw)}, options).Parse()
 }
 
 // newParser creates a parser from a pre-built token slice. This is the test
 // seam for parser state-machine unit tests in pgn_test.go.
-func newParser(tokens []Token) *pgnParser {
+func newParser(tokens []pgnToken) *pgnParser {
 	return newParserFromSource(&sliceTokenSource{tokens: tokens}, defaultPGNOptions())
 }
 
@@ -85,7 +85,7 @@ func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *pgnParser {
 	token, err := tokens.NextToken()
 	if err != nil {
 		parser.initErr = err
-		parser.token = Token{Type: Undefined, Value: err.Error()}
+		parser.token = pgnToken{Type: tokUndefined, Value: err.Error()}
 		return parser
 	}
 	parser.token = token
@@ -93,7 +93,7 @@ func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *pgnParser {
 }
 
 // currentToken returns the current token being processed.
-func (p *pgnParser) currentToken() Token {
+func (p *pgnParser) currentToken() pgnToken {
 	return p.token
 }
 
@@ -109,14 +109,14 @@ func (p *pgnParser) advance() {
 	}
 	token, err := p.tokens.NextToken()
 	if err != nil {
-		p.token = Token{Type: Undefined, Value: err.Error()}
+		p.token = pgnToken{Type: tokUndefined, Value: err.Error()}
 		return
 	}
 	p.token = token
 }
 
 func (p *pgnParser) atEnd() bool {
-	return p.currentToken().Type == EOF
+	return p.currentToken().Type == tokEOF
 }
 
 func (p *pgnParser) currentMove() *MoveNode {
@@ -195,7 +195,7 @@ func (p *pgnParser) resolveOutcome() error {
 }
 
 func (p *pgnParser) parseHeader() error {
-	for p.currentToken().Type == TagStart {
+	for p.currentToken().Type == tokTagStart {
 		if err := p.parseTagPair(); err != nil {
 			return err
 		}
@@ -205,10 +205,10 @@ func (p *pgnParser) parseHeader() error {
 
 func (p *pgnParser) parseTagPair() error {
 	// Expect [
-	if p.currentToken().Type != TagStart {
+	if p.currentToken().Type != tokTagStart {
 		return &ParserError{
 			Message:    "expected tag start",
-			TokenType:  p.currentToken().Type,
+			tokenType:  p.currentToken().Type,
 			TokenValue: p.currentToken().Value,
 			Position:   p.position,
 		}
@@ -216,10 +216,10 @@ func (p *pgnParser) parseTagPair() error {
 	p.advance()
 
 	// Get key
-	if p.currentToken().Type != TagKey {
+	if p.currentToken().Type != tokTagKey {
 		return &ParserError{
 			Message:    "expected tag key",
-			TokenType:  p.currentToken().Type,
+			tokenType:  p.currentToken().Type,
 			TokenValue: p.currentToken().Value,
 			Position:   p.position,
 		}
@@ -228,10 +228,10 @@ func (p *pgnParser) parseTagPair() error {
 	p.advance()
 
 	// Get value
-	if p.currentToken().Type != TagValue {
+	if p.currentToken().Type != tokTagValue {
 		return &ParserError{
 			Message:    "expected tag value",
-			TokenType:  p.currentToken().Type,
+			tokenType:  p.currentToken().Type,
 			TokenValue: p.currentToken().Value,
 			Position:   p.position,
 		}
@@ -240,10 +240,10 @@ func (p *pgnParser) parseTagPair() error {
 	p.advance()
 
 	// Expect ]
-	if p.currentToken().Type != TagEnd {
+	if p.currentToken().Type != tokTagEnd {
 		return &ParserError{
 			Message:    "expected tag end",
-			TokenType:  p.currentToken().Type,
+			tokenType:  p.currentToken().Type,
 			TokenValue: p.currentToken().Value,
 			Position:   p.position,
 		}
@@ -273,27 +273,27 @@ func (p *pgnParser) parseMoveText() error {
 		token := p.currentToken()
 
 		switch token.Type {
-		case MoveNumber:
+		case tokMoveNumber:
 			number, err := strconv.ParseUint(token.Value, 10, 32)
 			if err == nil && p.currentMove() != nil {
 				moveNumber = number
 				ply = int((moveNumber-1)*2 + 1)
 			}
 			p.advance()
-			if p.currentToken().Type == DOT {
+			if p.currentToken().Type == tokDot {
 				p.advance()
 			}
 
-		case ELLIPSIS:
+		case tokEllipsis:
 			p.advance()
 			ply++
 
-		case NullMove:
+		case tokNullMove:
 			p.addMove(NewNullMove(), uint(moveNumber))
 			p.advance()
 			ply++
 
-		case PIECE, SQUARE, FILE, KingsideCastle, QueensideCastle:
+		case tokPiece, tokSquare, tokFile, tokKingsideCastle, tokQueensideCastle:
 			move, err := p.parseMove()
 			if err != nil {
 				return err
@@ -306,7 +306,7 @@ func (p *pgnParser) parseMoveText() error {
 				return err
 			}
 
-		case CommentStart:
+		case tokCommentStart:
 			block, err := p.parseComment()
 			if err != nil {
 				return err
@@ -315,12 +315,12 @@ func (p *pgnParser) parseMoveText() error {
 				current.addCommentBlock(block)
 			}
 
-		case VariationStart:
+		case tokVariationStart:
 			if err := p.parseVariation(moveNumber, ply); err != nil {
 				return err
 			}
 
-		case RESULT:
+		case tokResult:
 			p.parseResult()
 			return nil
 
@@ -338,12 +338,12 @@ func (p *pgnParser) parseMove() (Move, error) {
 	}
 
 	// Castling: single token
-	if p.currentToken().Type == KingsideCastle || p.currentToken().Type == QueensideCastle {
+	if p.currentToken().Type == tokKingsideCastle || p.currentToken().Type == tokQueensideCastle {
 		data.castle = p.currentToken().Value
 		p.advance()
 	} else {
 		// Regular move: piece? disambiguation? capture? square promotion? check?
-		hasPiece := p.currentToken().Type == PIECE
+		hasPiece := p.currentToken().Type == tokPiece
 		if hasPiece {
 			data.piece = algebraicPieceType(p.currentToken().Value)
 			p.advance()
@@ -351,13 +351,13 @@ func (p *pgnParser) parseMove() (Move, error) {
 
 		// Optional disambiguation (file, rank, or full origin square)
 		switch p.currentToken().Type {
-		case FILE:
+		case tokFile:
 			data.originFile = p.currentToken().Value
 			p.advance()
-		case RANK:
+		case tokRank:
 			data.originRank = p.currentToken().Value
 			p.advance()
-		case DeambiguationSquare:
+		case tokDisambiguationSquare:
 			if value := p.currentToken().Value; len(value) == 2 {
 				data.originFile = value[:1]
 				data.originRank = value[1:]
@@ -366,16 +366,16 @@ func (p *pgnParser) parseMove() (Move, error) {
 		}
 
 		// Optional capture
-		if p.currentToken().Type == CAPTURE {
+		if p.currentToken().Type == tokCapture {
 			data.capture = true
 			p.advance()
 		}
 
 		// Required destination square
-		if p.currentToken().Type != SQUARE || len(p.currentToken().Value) != 2 {
+		if p.currentToken().Type != tokSquare || len(p.currentToken().Value) != 2 {
 			return Move{}, &ParserError{
 				Message:    "expected destination square",
-				TokenType:  p.currentToken().Type,
+				tokenType:  p.currentToken().Type,
 				TokenValue: p.currentToken().Value,
 				Position:   p.position,
 			}
@@ -385,12 +385,12 @@ func (p *pgnParser) parseMove() (Move, error) {
 		p.advance()
 
 		// Promotion with "="
-		if p.currentToken().Type == PROMOTION {
+		if p.currentToken().Type == tokPromotion {
 			p.advance()
-			if p.currentToken().Type != PromotionPiece {
+			if p.currentToken().Type != tokPromotionPiece {
 				return Move{}, &ParserError{
 					Message:    "expected promotion piece",
-					TokenType:  p.currentToken().Type,
+					tokenType:  p.currentToken().Type,
 					TokenValue: p.currentToken().Value,
 					Position:   p.position,
 				}
@@ -399,7 +399,7 @@ func (p *pgnParser) parseMove() (Move, error) {
 			p.advance()
 		} else if p.moveText.Policy() == MoveTextPolicyPGNImport &&
 			!hasPiece &&
-			p.currentToken().Type == PIECE &&
+			p.currentToken().Type == tokPiece &&
 			(destSquare[1] == '1' || destSquare[1] == '8') {
 			// Import-only promotion without "=" (e.g., e8Q).
 			v := p.currentToken().Value
@@ -411,7 +411,7 @@ func (p *pgnParser) parseMove() (Move, error) {
 	}
 
 	// Optional check/checkmate suffix
-	if p.currentToken().Type == CHECK || p.currentToken().Type == CHECKMATE {
+	if p.currentToken().Type == tokCheck || p.currentToken().Type == tokCheckmate {
 		p.advance()
 	}
 
@@ -430,22 +430,22 @@ func (p *pgnParser) parseComment() (CommentBlock, error) {
 
 	block := CommentBlock{}
 
-	for p.currentToken().Type != CommentEnd && !p.atEnd() {
+	for p.currentToken().Type != tokCommentEnd && !p.atEnd() {
 		switch p.currentToken().Type {
-		case CommandStart:
+		case tokCommandStart:
 			command, err := p.parseCommand()
 			if err != nil {
 				return CommentBlock{}, err
 			}
 			block.Items = append(block.Items, command)
 
-		case COMMENT:
+		case tokComment:
 			block.Items = append(block.Items, CommentItem{Kind: CommentText, Text: p.currentToken().Value})
 		default:
 			return CommentBlock{}, &ParserError{
 				Message:    "unexpected token in comment",
 				Position:   p.position,
-				TokenType:  p.currentToken().Type,
+				tokenType:  p.currentToken().Type,
 				TokenValue: p.currentToken().Value,
 			}
 		}
@@ -470,20 +470,20 @@ func (p *pgnParser) parseCommand() (CommentItem, error) {
 	// Consume the opening "["
 	p.advance()
 
-	for p.currentToken().Type != CommandEnd && !p.atEnd() {
+	for p.currentToken().Type != tokCommandEnd && !p.atEnd() {
 		switch p.currentToken().Type {
-		case CommandName:
+		case tokCommandName:
 			if key != "" {
 				return CommentItem{}, &ParserError{
 					Message:    "duplicate command name in command",
 					Position:   p.position,
-					TokenType:  p.currentToken().Type,
+					tokenType:  p.currentToken().Type,
 					TokenValue: p.currentToken().Value,
 				}
 			}
 			// The first token in a command is treated as the key
 			key = p.currentToken().Value
-		case CommandParam:
+		case tokCommandParam:
 			// The second token is treated as the value for the current key
 			if key != "" && value == "" {
 				value = p.currentToken().Value
@@ -492,7 +492,7 @@ func (p *pgnParser) parseCommand() (CommentItem, error) {
 			return CommentItem{}, &ParserError{
 				Message:    "unexpected token in command",
 				Position:   p.position,
-				TokenType:  p.currentToken().Type,
+				tokenType:  p.currentToken().Type,
 				TokenValue: p.currentToken().Value,
 			}
 		}
@@ -515,17 +515,17 @@ func (p *pgnParser) collectMoveAnnotations() error {
 	for {
 		tok := p.currentToken()
 		switch tok.Type {
-		case NAG:
+		case tokNAG:
 			if nagErr := p.currentMove().AddNAG(tok.Value); nagErr != nil {
 				return &ParserError{
 					Message:    nagErr.Error(),
 					TokenValue: tok.Value,
-					TokenType:  NAG,
+					tokenType:  tokNAG,
 					Position:   p.position,
 				}
 			}
 			p.advance()
-		case CommentStart:
+		case tokCommentStart:
 			block, err := p.parseComment()
 			if err != nil {
 				return err
@@ -566,37 +566,37 @@ func (p *pgnParser) parseVariation(parentMoveNumber uint64, parentPly int) error
 	ply := parentPly
 	isBlackMove := false
 
-	for p.currentToken().Type != VariationEnd && !p.atEnd() {
+	for p.currentToken().Type != tokVariationEnd && !p.atEnd() {
 		switch p.currentToken().Type {
-		case MoveNumber:
+		case tokMoveNumber:
 			num, err := strconv.ParseUint(p.currentToken().Value, 10, 32)
 			if err == nil {
 				moveNumber = num
 				ply = int((moveNumber-1)*2 + 1)
 			}
 			p.advance()
-			if p.currentToken().Type == DOT {
+			if p.currentToken().Type == tokDot {
 				p.advance()
 				isBlackMove = false
 			}
 
-		case ELLIPSIS:
+		case tokEllipsis:
 			p.advance()
 			isBlackMove = true
 			ply++
 
-		case NullMove:
+		case tokNullMove:
 			p.addMove(NewNullMove(), uint(moveNumber))
 			p.advance()
 			ply++
 			isBlackMove = !isBlackMove
 
-		case VariationStart:
+		case tokVariationStart:
 			if err := p.parseVariation(moveNumber, ply); err != nil {
 				return err
 			}
 
-		case CommentStart:
+		case tokCommentStart:
 			block, err := p.parseComment()
 			if err != nil {
 				return err
@@ -605,18 +605,18 @@ func (p *pgnParser) parseVariation(parentMoveNumber uint64, parentPly int) error
 				current.addCommentBlock(block)
 			}
 
-		case NAG:
+		case tokNAG:
 			if nagErr := p.currentMove().AddNAG(p.currentToken().Value); nagErr != nil {
 				return &ParserError{
 					Message:    nagErr.Error(),
 					TokenValue: p.currentToken().Value,
-					TokenType:  NAG,
+					tokenType:  tokNAG,
 					Position:   p.position,
 				}
 			}
 			p.advance()
 
-		case PIECE, SQUARE, FILE, KingsideCastle, QueensideCastle:
+		case tokPiece, tokSquare, tokFile, tokKingsideCastle, tokQueensideCastle:
 			if isBlackMove != (p.game.currentPosition().Turn() == Black) {
 				return &ParserError{
 					Message:  "move color mismatch",

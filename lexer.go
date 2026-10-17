@@ -1,23 +1,7 @@
-/*
-Package chess provides PGN lexical analysis through a lexer that converts
-PGN text into a stream of tokens. The lexer handles all standard PGN notation
-including moves, annotations, comments, and game metadata.
-The lexer provides token-by-token processing of PGN content with proper handling
-of chess-specific notation and PGN syntax rules.
-Example usage:
+// The PGN lexer turns PGN text into a stream of pgnTokens for the parser and
+// the streaming accessors. It is internal: callers decode PGN through
+// ParsePGN, PGNGames, PGNRecords, PGNEvents or PGNDecoder.
 
-	// Create new lexer
-	lexer := NewLexer("[Event \"World Championship\"] 1. e4 e5 {Opening}")
-
-	// Process tokens
-	for {
-		token := lexer.NextToken()
-		if token.Type == EOF {
-			break
-		}
-		// Process token
-	}
-*/
 package chess
 
 import (
@@ -25,46 +9,46 @@ import (
 	"unicode"
 )
 
-// TokenType represents the type of token in PGN text.
-type TokenType int
+// pgnTokenType represents the type of token in PGN text.
+type pgnTokenType int
 
 const (
-	EOF TokenType = iota
-	Undefined
-	TagStart            // [
-	TagEnd              // ]
-	TagKey              // The key part of a tag (e.g., "Site")
-	TagValue            // The value part of a tag (e.g., "Internet")
-	MoveNumber          // 1, 2, 3, etc.
-	DOT                 // .
-	ELLIPSIS            // ...
-	PIECE               // N, B, R, Q, K
-	SQUARE              // e4, e5, etc.
-	CommentStart        // {
-	CommentEnd          // }
-	COMMENT             // The comment text
-	RESULT              // 1-0, 0-1, 1/2-1/2, *
-	CAPTURE             // 'x' in moves
-	FILE                // a-h in moves when used as disambiguation
-	RANK                // 1-8 in moves when used as disambiguation
-	KingsideCastle      // 0-0
-	QueensideCastle     // 0-0-0
-	PROMOTION           // = in moves
-	PromotionPiece      // The piece being promoted to (Q, R, B, N)
-	CHECK               // + in moves
-	CHECKMATE           // # in moves
-	NAG                 // Numeric Annotation Glyph (e.g., $1, $2, etc.)
-	VariationStart      // ( for starting a variation
-	VariationEnd        // ) for ending a variation
-	CommandStart        // [%
-	CommandName         // The command name (e.g., clk, eval)
-	CommandParam        // Command parameter
-	CommandEnd          // ]
-	DeambiguationSquare // Full square disambiguation (e.g., e8 in Qe8f7)
-	NullMove            // A null move: Z0, Z1, --, or @@
+	tokEOF pgnTokenType = iota
+	tokUndefined
+	tokTagStart             // [
+	tokTagEnd               // ]
+	tokTagKey               // The key part of a tag (e.g., "Site")
+	tokTagValue             // The value part of a tag (e.g., "Internet")
+	tokMoveNumber           // 1, 2, 3, etc.
+	tokDot                  // .
+	tokEllipsis             // ...
+	tokPiece                // N, B, R, Q, K
+	tokSquare               // e4, e5, etc.
+	tokCommentStart         // {
+	tokCommentEnd           // }
+	tokComment              // The comment text
+	tokResult               // 1-0, 0-1, 1/2-1/2, *
+	tokCapture              // 'x' in moves
+	tokFile                 // a-h in moves when used as disambiguation
+	tokRank                 // 1-8 in moves when used as disambiguation
+	tokKingsideCastle       // 0-0
+	tokQueensideCastle      // 0-0-0
+	tokPromotion            // = in moves
+	tokPromotionPiece       // The piece being promoted to (Q, R, B, N)
+	tokCheck                // + in moves
+	tokCheckmate            // # in moves
+	tokNAG                  // Numeric Annotation Glyph (e.g., $1, $2, etc.)
+	tokVariationStart       // ( for starting a variation
+	tokVariationEnd         // ) for ending a variation
+	tokCommandStart         // [%
+	tokCommandName          // The command name (e.g., clk, eval)
+	tokCommandParam         // Command parameter
+	tokCommandEnd           // ]
+	tokDisambiguationSquare // Full square disambiguation (e.g., e8 in Qe8f7)
+	tokNullMove             // A null move: Z0, Z1, --, or @@
 )
 
-func (t TokenType) String() string {
+func (t pgnTokenType) String() string {
 	types := []string{
 		"EOF",
 		"Undefined",
@@ -108,15 +92,15 @@ func (t TokenType) String() string {
 	return types[t]
 }
 
-// Token represents a lexical token from PGN text.
-type Token struct {
+// pgnToken represents a lexical token from PGN text.
+type pgnToken struct {
 	Error error
 	Value string
-	Type  TokenType
+	Type  pgnTokenType
 }
 
-// Lexer provides lexical analysis of PGN text.
-type Lexer struct {
+// pgnLexer provides lexical analysis of PGN text.
+type pgnLexer struct {
 	input          string
 	position       int
 	readPosition   int
@@ -127,56 +111,56 @@ type Lexer struct {
 	inCommandParam bool
 }
 
-// NewLexer creates a new Lexer for the provided input text.
+// newPGNLexer creates a new Lexer for the provided input text.
 // The lexer is initialized and ready to produce tokens through
 // calls to NextToken().
 //
 // Example:
 //
-//	lexer := NewLexer("1. e4 e5")
-func NewLexer(input string) *Lexer {
-	l := &Lexer{input: input}
+//	lexer := newPGNLexer("1. e4 e5")
+func newPGNLexer(input string) *pgnLexer {
+	l := &pgnLexer{input: input}
 	l.readChar()
 	return l
 }
 
-func (l *Lexer) peekChar() byte {
+func (l *pgnLexer) peekChar() byte {
 	if l.readPosition >= len(l.input) {
 		return 0
 	}
 	return l.input[l.readPosition]
 }
 
-func (l *Lexer) skipWhitespace() {
+func (l *pgnLexer) skipWhitespace() {
 	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
 		l.readChar()
 	}
 }
 
-func (l *Lexer) readNumber() Token {
+func (l *pgnLexer) readNumber() pgnToken {
 	position := l.position
 	for isDigit(l.ch) {
 		l.readChar()
 	}
-	return Token{Type: MoveNumber, Value: l.input[position:l.position]}
+	return pgnToken{Type: tokMoveNumber, Value: l.input[position:l.position]}
 }
 
-func (l *Lexer) readCommandName() Token {
+func (l *pgnLexer) readCommandName() pgnToken {
 	position := l.position
 	// Read alphanumeric characters until space
 	for isAlphaNumeric(l.ch) {
 		l.readChar()
 	}
 	l.inCommandParam = true
-	return Token{Type: CommandName, Value: l.input[position:l.position]}
+	return pgnToken{Type: tokCommandName, Value: l.input[position:l.position]}
 }
 
-func (l *Lexer) readCommandParam() Token {
+func (l *pgnLexer) readCommandParam() pgnToken {
 	l.skipWhitespace()
 
 	// check for EOF
 	if l.ch == 0 {
-		return Token{Type: EOF, Value: ""}
+		return pgnToken{Type: tokEOF, Value: ""}
 	}
 
 	position := l.position
@@ -188,11 +172,11 @@ func (l *Lexer) readCommandParam() Token {
 			l.readChar()
 		}
 		if l.ch == 0 {
-			return Token{Type: EOF, Error: ErrUnterminatedQuote(position)}
+			return pgnToken{Type: tokEOF, Error: ErrUnterminatedQuote(position)}
 		}
 		value := l.input[position:l.position]
 		l.readChar() // skip closing quote
-		return Token{Type: CommandParam, Value: value}
+		return pgnToken{Type: tokCommandParam, Value: value}
 	}
 
 	// Read until comma or ] for non-quoted parameters
@@ -202,14 +186,14 @@ func (l *Lexer) readCommandParam() Token {
 	}
 
 	if l.ch == '}' && l.inCommand {
-		return Token{Type: EOF, Error: ErrInvalidCommand(l.position)}
+		return pgnToken{Type: tokEOF, Error: ErrInvalidCommand(l.position)}
 	}
 
 	l.inCommandParam = l.ch == ',' // set flag if we are still in a command parameter
-	return Token{Type: CommandParam, Value: strings.TrimSpace(l.input[position:l.position])}
+	return pgnToken{Type: tokCommandParam, Value: strings.TrimSpace(l.input[position:l.position])}
 }
 
-func (l *Lexer) readNAG() Token {
+func (l *pgnLexer) readNAG() pgnToken {
 	// Handle cases where NAG starts with '!' or '?' (symbolic move-quality
 	// spellings such as ! ? !! ?? !? ?!). This isn't part of the strict PGN
 	// spec, but Lichess and other sources emit them, so they are accepted on
@@ -222,7 +206,7 @@ func (l *Lexer) readNAG() Token {
 			l.readChar()
 		}
 		value := l.input[position:l.position]
-		return Token{Type: NAG, Value: value}
+		return pgnToken{Type: tokNAG, Value: value}
 	}
 	l.readChar() // skip the $ symbol
 	position := l.position
@@ -233,35 +217,35 @@ func (l *Lexer) readNAG() Token {
 	}
 
 	// Include the $ in the token value
-	return Token{
-		Type:  NAG,
+	return pgnToken{
+		Type:  tokNAG,
 		Value: "$" + l.input[position:l.position],
 	}
 }
 
-func (l *Lexer) readResult() Token {
+func (l *pgnLexer) readResult() pgnToken {
 	position := l.position
 	for !isWhitespace(l.ch) && l.ch != 0 {
 		l.readChar()
 	}
 	result := l.input[position:l.position]
 	if isResult(result) {
-		return Token{Type: RESULT, Value: result}
+		return pgnToken{Type: tokResult, Value: result}
 	}
-	return Token{Type: MoveNumber, Value: result}
+	return pgnToken{Type: tokMoveNumber, Value: result}
 }
 
-func (l *Lexer) readRank() Token {
+func (l *pgnLexer) readRank() pgnToken {
 	rank := l.input[l.position : l.position+1]
 	if !isRank(l.ch) {
 		l.readChar()
-		return Token{Type: RANK, Error: ErrInvalidRank(l.position), Value: rank}
+		return pgnToken{Type: tokRank, Error: ErrInvalidRank(l.position), Value: rank}
 	}
 	l.readChar()
-	return Token{Type: RANK, Value: rank}
+	return pgnToken{Type: tokRank, Value: rank}
 }
 
-func (l *Lexer) readComment() Token {
+func (l *pgnLexer) readComment() pgnToken {
 	position := l.position
 
 	// Look for command start sequence
@@ -274,7 +258,7 @@ func (l *Lexer) readComment() Token {
 		if l.ch == '[' && l.peekChar() == '%' {
 			if position != l.position {
 				// Return accumulated comment text before the command
-				return Token{Type: COMMENT, Value: cleanCommentText(l.input[position:l.position])}
+				return pgnToken{Type: tokComment, Value: cleanCommentText(l.input[position:l.position])}
 			}
 			// Start command processing
 			l.readChar() // skip [
@@ -282,12 +266,12 @@ func (l *Lexer) readComment() Token {
 			l.inCommand = true
 			// check for EOF after command start
 			if l.ch == 0 {
-				return Token{
-					Type:  EOF,
+				return pgnToken{
+					Type:  tokEOF,
 					Error: ErrInvalidCommand(l.position),
 				}
 			}
-			return Token{Type: CommandStart, Value: "[%"}
+			return pgnToken{Type: tokCommandStart, Value: "[%"}
 		}
 		l.readChar()
 	}
@@ -295,18 +279,18 @@ func (l *Lexer) readComment() Token {
 	// Check for unterminated comment
 	if l.ch == 0 {
 		l.readChar()
-		return Token{
-			Type:  EOF,
+		return pgnToken{
+			Type:  tokEOF,
 			Error: ErrUnterminatedComment(position),
 		}
 	}
 
 	// Return remaining comment text if any
 	if position != l.position {
-		return Token{Type: COMMENT, Value: cleanCommentText(l.input[position:l.position])}
+		return pgnToken{Type: tokComment, Value: cleanCommentText(l.input[position:l.position])}
 	}
 
-	return Token{Type: CommentEnd, Value: "}"}
+	return pgnToken{Type: tokCommentEnd, Value: "}"}
 }
 
 func cleanCommentText(text string) string {
@@ -315,20 +299,20 @@ func cleanCommentText(text string) string {
 }
 
 // Update readPieceMove to handle piece moves.
-func (l *Lexer) readPieceMove() Token {
+func (l *pgnLexer) readPieceMove() pgnToken {
 	// Capture just the piece
 	piece := l.input[l.position : l.position+1]
 	if !isPiece(l.ch) {
 		l.readChar()
-		return Token{Type: PIECE, Error: ErrInvalidPiece(l.position), Value: piece}
+		return pgnToken{Type: tokPiece, Error: ErrInvalidPiece(l.position), Value: piece}
 	}
 	l.readChar()
 
 	// Return just the piece - the square or capture will be read in subsequent tokens
-	return Token{Type: PIECE, Value: piece}
+	return pgnToken{Type: tokPiece, Value: piece}
 }
 
-func (l *Lexer) readMove() Token {
+func (l *pgnLexer) readMove() pgnToken {
 	const disambiguationLength = 3
 	const disambiguationSquareLength = 4
 
@@ -336,7 +320,7 @@ func (l *Lexer) readMove() Token {
 
 	// Check for EOF early
 	if l.ch == 0 {
-		return Token{Type: EOF, Value: ""}
+		return pgnToken{Type: tokEOF, Value: ""}
 	}
 
 	// For pawn captures
@@ -346,7 +330,7 @@ func (l *Lexer) readMove() Token {
 
 		// Check for capture
 		if l.ch == 'x' {
-			return Token{Type: FILE, Value: file}
+			return pgnToken{Type: tokFile, Value: file}
 		}
 	}
 
@@ -370,7 +354,7 @@ func (l *Lexer) readMove() Token {
 		l.position = position + 2
 		l.readPosition = position + 3
 		l.ch = l.input[l.position] // set current char to the first character of the second square
-		return Token{Type: DeambiguationSquare, Value: l.input[position : position+2]}
+		return pgnToken{Type: tokDisambiguationSquare, Value: l.input[position : position+2]}
 	}
 
 	// Handle full square disambiguation before a capture
@@ -379,7 +363,7 @@ func (l *Lexer) readMove() Token {
 		isFile(l.input[position]) && isDigit(l.input[position+1]) &&
 		l.ch == 'x' && l.readPosition+1 < len(l.input) &&
 		isFile(l.input[l.readPosition]) && isDigit(l.input[l.readPosition+1]) {
-		return Token{Type: DeambiguationSquare, Value: l.input[position:l.position]}
+		return pgnToken{Type: tokDisambiguationSquare, Value: l.input[position:l.position]}
 	}
 
 	// If we read 3 characters, first one is disambiguation
@@ -387,29 +371,29 @@ func (l *Lexer) readMove() Token {
 		l.readPosition = position + 1
 		l.readChar()
 		// Return just the first character as disambiguation
-		return Token{Type: FILE, Value: l.input[position : position+1]}
+		return pgnToken{Type: tokFile, Value: l.input[position : position+1]}
 	}
 
 	// Validate the square (e.g., "e4")
 	if length < 2 || !isFile(l.input[position]) || position+1 >= len(l.input) || !isDigit(l.input[position+1]) {
 		l.readChar()
-		return Token{Type: SQUARE, Value: "", Error: ErrInvalidSquare(position)}
+		return pgnToken{Type: tokSquare, Value: "", Error: ErrInvalidSquare(position)}
 	}
 
-	return Token{Type: SQUARE, Value: l.input[position:l.position]}
+	return pgnToken{Type: tokSquare, Value: l.input[position:l.position]}
 }
 
-func (l *Lexer) readPromotionPiece() Token {
+func (l *pgnLexer) readPromotionPiece() pgnToken {
 	piece := l.input[l.position : l.position+1]
 	if !isPiece(l.ch) {
 		l.readChar()
-		return Token{Type: PromotionPiece, Error: ErrInvalidPiece(l.position), Value: piece}
+		return pgnToken{Type: tokPromotionPiece, Error: ErrInvalidPiece(l.position), Value: piece}
 	}
 	l.readChar()
-	return Token{Type: PromotionPiece, Value: piece}
+	return pgnToken{Type: tokPromotionPiece, Value: piece}
 }
 
-func (l *Lexer) readChar() {
+func (l *pgnLexer) readChar() {
 	if l.readPosition >= len(l.input) {
 		l.ch = 0
 	} else {
@@ -419,7 +403,7 @@ func (l *Lexer) readChar() {
 	l.readPosition++
 }
 
-func (l *Lexer) readTagValue() Token {
+func (l *pgnLexer) readTagValue() pgnToken {
 	l.readChar() // skip opening quote
 	position := l.position
 	for l.ch != '"' && l.ch != '\\' && l.ch != 0 {
@@ -428,7 +412,7 @@ func (l *Lexer) readTagValue() Token {
 	if l.ch != '\\' {
 		value := l.input[position:l.position]
 		l.readChar() // skip closing quote
-		return Token{Type: TagValue, Value: value}
+		return pgnToken{Type: tokTagValue, Value: value}
 	}
 
 	var value strings.Builder
@@ -447,33 +431,33 @@ func (l *Lexer) readTagValue() Token {
 		l.readChar()
 	}
 	l.readChar() // skip closing quote
-	return Token{Type: TagValue, Value: value.String()}
+	return pgnToken{Type: tokTagValue, Value: value.String()}
 }
 
-func (l *Lexer) readTagKey() Token {
+func (l *pgnLexer) readTagKey() pgnToken {
 	position := l.position
 	for isLetter(l.ch) || isDigit(l.ch) {
 		l.readChar()
 	}
-	return Token{Type: TagKey, Value: l.input[position:l.position]}
+	return pgnToken{Type: tokTagKey, Value: l.input[position:l.position]}
 }
 
-func (l *Lexer) readCastling() (Token, bool) {
+func (l *pgnLexer) readCastling() (pgnToken, bool) {
 	position := l.position
 
 	// First character should be uppercase 'O'
 	if l.ch != 'O' {
-		return Token{}, false
+		return pgnToken{}, false
 	}
 
 	// Check if we have enough characters for at least kingside castling (O-O)
 	if l.position+2 >= len(l.input) {
-		return Token{}, false
+		return pgnToken{}, false
 	}
 
 	// Check for "O-O" pattern
 	if l.peekChar() != '-' {
-		return Token{}, false
+		return pgnToken{}, false
 	}
 	l.readChar() // skip O
 	l.readChar() // skip -
@@ -483,7 +467,7 @@ func (l *Lexer) readCastling() (Token, bool) {
 		l.position = position
 		l.readPosition = position + 1
 		l.ch = l.input[position]
-		return Token{}, false
+		return pgnToken{}, false
 	}
 	l.readChar() // skip O
 
@@ -491,10 +475,10 @@ func (l *Lexer) readCastling() (Token, bool) {
 	if l.ch == '-' && l.peekChar() == 'O' {
 		l.readChar() // skip -
 		l.readChar() // skip O
-		return Token{Type: QueensideCastle, Value: castleQS}, true
+		return pgnToken{Type: tokQueensideCastle, Value: castleQS}, true
 	}
 
-	return Token{Type: KingsideCastle, Value: castleKS}, true
+	return pgnToken{Type: tokKingsideCastle, Value: castleKS}, true
 }
 
 // readNullMove consumes a null-move token at the current position and returns
@@ -502,36 +486,36 @@ func (l *Lexer) readCastling() (Token, bool) {
 // if the current character does not start a null-move token. Safe to call from
 // NextToken before the main dispatch because it never clashes with valid move
 // squares, piece letters, or result tokens.
-func (l *Lexer) readNullMove() (Token, bool) {
+func (l *pgnLexer) readNullMove() (pgnToken, bool) {
 	switch l.ch {
 	case 'Z':
 		next := l.peekChar()
 		if next != '0' && next != '1' {
-			return Token{}, false
+			return pgnToken{}, false
 		}
 		position := l.position
 		l.readChar()
 		l.readChar()
-		return Token{Type: NullMove, Value: l.input[position:l.position]}, true
+		return pgnToken{Type: tokNullMove, Value: l.input[position:l.position]}, true
 
 	case '-':
 		if l.peekChar() != '-' {
-			return Token{}, false
+			return pgnToken{}, false
 		}
 		// Standalone "--" — readResult already consumed any result token
 		// beginning with a digit ("1-0", "0-1", "1/2-1/2"), and readCastling
 		// requires an uppercase O, so we cannot be inside those.
 		l.readChar()
 		l.readChar()
-		return Token{Type: NullMove, Value: "--"}, true
+		return pgnToken{Type: tokNullMove, Value: "--"}, true
 
 	case '@':
 		if l.peekChar() != '@' {
-			return Token{}, false
+			return pgnToken{}, false
 		}
 		l.readChar()
 		l.readChar()
-		return Token{Type: NullMove, Value: "@@"}, true
+		return pgnToken{Type: tokNullMove, Value: "@@"}, true
 
 	case '0':
 		// "0000" — must be four zeros with nothing digit/dash-adjacent to
@@ -539,20 +523,20 @@ func (l *Lexer) readNullMove() (Token, bool) {
 		// "O-O" / "O-O-O" and readResult consumes "1-0" / "0-1" before we
 		// reach here, so standalone "0000" can safely be claimed.
 		if l.position+3 >= len(l.input) {
-			return Token{}, false
+			return pgnToken{}, false
 		}
 		if l.input[l.position+1] != '0' ||
 			l.input[l.position+2] != '0' ||
 			l.input[l.position+3] != '0' {
-			return Token{}, false
+			return pgnToken{}, false
 		}
 		l.readChar()
 		l.readChar()
 		l.readChar()
 		l.readChar()
-		return Token{Type: NullMove, Value: "0000"}, true
+		return pgnToken{Type: tokNullMove, Value: "0000"}, true
 	}
-	return Token{}, false
+	return pgnToken{}, false
 }
 
 // NextToken reads the next token from the input stream.
@@ -574,7 +558,7 @@ func (l *Lexer) readNullMove() (Token, bool) {
 //	token = lexer.NextToken()  // NOTATION: "e4"
 //	token = lexer.NextToken()  // COMMENT: "Strong move"
 //	token = lexer.NextToken()  // EOF
-func (l *Lexer) NextToken() Token {
+func (l *pgnLexer) NextToken() pgnToken {
 	l.skipWhitespace()
 
 	if l.inCommand {
@@ -582,7 +566,7 @@ func (l *Lexer) NextToken() Token {
 		case ']':
 			l.inCommand = false
 			l.readChar()
-			return Token{Type: CommandEnd, Value: "]"}
+			return pgnToken{Type: tokCommandEnd, Value: "]"}
 		case ',':
 			l.readChar()
 			return l.readCommandParam()
@@ -599,7 +583,7 @@ func (l *Lexer) NextToken() Token {
 		if l.ch == '}' {
 			l.inComment = false
 			l.readChar()
-			return Token{Type: CommentEnd, Value: "}"}
+			return pgnToken{Type: tokCommentEnd, Value: "}"}
 		}
 		return l.readComment()
 	}
@@ -617,40 +601,40 @@ func (l *Lexer) NextToken() Token {
 	switch l.ch {
 	case '(':
 		l.readChar()
-		return Token{Type: VariationStart, Value: "("}
+		return pgnToken{Type: tokVariationStart, Value: "("}
 
 	case ')':
 		l.readChar()
-		return Token{Type: VariationEnd, Value: ")"}
+		return pgnToken{Type: tokVariationEnd, Value: ")"}
 	case '[':
 		l.inTag = true
 		l.readChar()
-		return Token{Type: TagStart, Value: "["}
+		return pgnToken{Type: tokTagStart, Value: "["}
 	case ']':
 		l.inTag = false
 		l.readChar()
-		return Token{Type: TagEnd, Value: "]"}
+		return pgnToken{Type: tokTagEnd, Value: "]"}
 	case '"':
 		return l.readTagValue()
 	case '{':
 		l.readChar()
 		l.inComment = true
-		return Token{Type: CommentStart, Value: "{"}
+		return pgnToken{Type: tokCommentStart, Value: "{"}
 	case '}':
 		l.readChar()
-		return Token{Type: CommentEnd, Value: "}"}
+		return pgnToken{Type: tokCommentEnd, Value: "}"}
 	case '.':
 		if l.peekChar() == '.' && l.readPosition+1 < len(l.input) && l.input[l.readPosition+1] == '.' {
 			l.readChar()
 			l.readChar()
 			l.readChar()
-			return Token{Type: ELLIPSIS, Value: "..."}
+			return pgnToken{Type: tokEllipsis, Value: "..."}
 		}
 		l.readChar()
-		return Token{Type: DOT, Value: "."}
+		return pgnToken{Type: tokDot, Value: "."}
 	case 'x':
 		l.readChar()
-		return Token{Type: CAPTURE, Value: "x"}
+		return pgnToken{Type: tokCapture, Value: "x"}
 	case '*':
 		fallthrough
 	case '-':
@@ -666,13 +650,13 @@ func (l *Lexer) NextToken() Token {
 		return l.readPieceMove()
 	case '=':
 		l.readChar()
-		return Token{Type: PROMOTION, Value: "="}
+		return pgnToken{Type: tokPromotion, Value: "="}
 	case '+':
 		l.readChar()
-		return Token{Type: CHECK, Value: "+"}
+		return pgnToken{Type: tokCheck, Value: "+"}
 	case '#':
 		l.readChar()
-		return Token{Type: CHECKMATE, Value: "#"}
+		return pgnToken{Type: tokCheckmate, Value: "#"}
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		if l.inTag {
 			return l.readTagValue()
@@ -691,7 +675,7 @@ func (l *Lexer) NextToken() Token {
 		}
 		switch l.ch {
 		case '.':
-			return Token{Type: MoveNumber, Value: l.input[position:l.position]}
+			return pgnToken{Type: tokMoveNumber, Value: l.input[position:l.position]}
 		case '-':
 			l.position = position
 			l.readPosition = position + 1
@@ -714,7 +698,7 @@ func (l *Lexer) NextToken() Token {
 			return l.readNumber()
 		}
 	case 0:
-		return Token{Type: EOF, Value: ""}
+		return pgnToken{Type: tokEOF, Value: ""}
 	default:
 		if isLetter(l.ch) {
 			if unicode.IsUpper(rune(l.ch)) {
@@ -728,7 +712,7 @@ func (l *Lexer) NextToken() Token {
 		}
 	}
 
-	tok := Token{Type: Undefined, Value: l.input[l.position : l.position+1]}
+	tok := pgnToken{Type: tokUndefined, Value: l.input[l.position : l.position+1]}
 	l.readChar()
 	return tok
 }

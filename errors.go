@@ -57,11 +57,11 @@ var (
 type ParserError struct {
 	Message    string
 	TokenValue string
-	TokenType  TokenType
+	tokenType  pgnTokenType
 	Position   int
 }
 
 func (e *ParserError) Error() string {
 	return fmt.Sprintf("parser error at position %d: %s (Token: %v, Value: %s)",
-		e.Position, e.Message, e.TokenType, e.TokenValue)
+		e.Position, e.Message, e.tokenType, e.TokenValue)
 }

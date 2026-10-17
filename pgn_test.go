@@ -96,8 +96,8 @@ type errorTokenSource struct {
 	err error
 }
 
-func (s errorTokenSource) NextToken() (Token, error) {
-	return Token{}, s.err
+func (s errorTokenSource) NextToken() (pgnToken, error) {
+	return pgnToken{}, s.err
 }
 
 func TestParserReportsInitialTokenSourceError(t *testing.T) {
@@ -871,10 +871,10 @@ func assertCommentItem(t *testing.T, item CommentItem, kind CommentItemKind, tex
 
 func TestParserAnnotationErrors(t *testing.T) {
 	t.Run("UnexpectedTokenInComment", func(t *testing.T) {
-		parser := NewParser([]Token{
-			{Type: CommentStart, Value: "{"},
-			{Type: MoveNumber, Value: "1"},
-			{Type: CommentEnd, Value: "}"},
+		parser := NewParser([]pgnToken{
+			{Type: tokCommentStart, Value: "{"},
+			{Type: tokMoveNumber, Value: "1"},
+			{Type: tokCommentEnd, Value: "}"},
 		})
 		_, err := parser.parseComment()
 		if err == nil {
@@ -883,9 +883,9 @@ func TestParserAnnotationErrors(t *testing.T) {
 	})
 
 	t.Run("UnterminatedComment", func(t *testing.T) {
-		parser := NewParser([]Token{
-			{Type: CommentStart, Value: "{"},
-			{Type: COMMENT, Value: "missing close"},
+		parser := NewParser([]pgnToken{
+			{Type: tokCommentStart, Value: "{"},
+			{Type: tokComment, Value: "missing close"},
 		})
 		_, err := parser.parseComment()
 		if err == nil {
@@ -894,12 +894,12 @@ func TestParserAnnotationErrors(t *testing.T) {
 	})
 
 	t.Run("CommandErrorPropagatesFromComment", func(t *testing.T) {
-		parser := NewParser([]Token{
-			{Type: CommentStart, Value: "{"},
-			{Type: CommandStart, Value: "[%"},
-			{Type: MoveNumber, Value: "1"},
-			{Type: CommandEnd, Value: "]"},
-			{Type: CommentEnd, Value: "}"},
+		parser := NewParser([]pgnToken{
+			{Type: tokCommentStart, Value: "{"},
+			{Type: tokCommandStart, Value: "[%"},
+			{Type: tokMoveNumber, Value: "1"},
+			{Type: tokCommandEnd, Value: "]"},
+			{Type: tokCommentEnd, Value: "}"},
 		})
 		_, err := parser.parseComment()
 		if err == nil {
@@ -908,10 +908,10 @@ func TestParserAnnotationErrors(t *testing.T) {
 	})
 
 	t.Run("UnexpectedTokenInCommand", func(t *testing.T) {
-		parser := NewParser([]Token{
-			{Type: CommandStart, Value: "[%"},
-			{Type: MoveNumber, Value: "1"},
-			{Type: CommandEnd, Value: "]"},
+		parser := NewParser([]pgnToken{
+			{Type: tokCommandStart, Value: "[%"},
+			{Type: tokMoveNumber, Value: "1"},
+			{Type: tokCommandEnd, Value: "]"},
 		})
 		_, err := parser.parseCommand()
 		if err == nil {
@@ -920,9 +920,9 @@ func TestParserAnnotationErrors(t *testing.T) {
 	})
 
 	t.Run("UnterminatedCommand", func(t *testing.T) {
-		parser := NewParser([]Token{
-			{Type: CommandStart, Value: "[%"},
-			{Type: CommandName, Value: "clk"},
+		parser := NewParser([]pgnToken{
+			{Type: tokCommandStart, Value: "[%"},
+			{Type: tokCommandName, Value: "clk"},
 		})
 		_, err := parser.parseCommand()
 		if err == nil {
@@ -939,10 +939,10 @@ func TestParserAnnotationErrors(t *testing.T) {
 			t.Fatalf("FEN: %v", err)
 		}
 		g := NewGame(opt)
-		parser := NewParser([]Token{
-			{Type: PIECE, Value: "N"},
-			{Type: CAPTURE, Value: "x"},
-			{Type: SQUARE, Value: "e1"},
+		parser := NewParser([]pgnToken{
+			{Type: tokPiece, Value: "N"},
+			{Type: tokCapture, Value: "x"},
+			{Type: tokSquare, Value: "e1"},
 		})
 		parser.game = g
 		_, err = parser.parseMove()
@@ -959,13 +959,13 @@ func TestParserAnnotationErrors(t *testing.T) {
 	})
 
 	t.Run("DuplicateCommandName", func(t *testing.T) {
-		parser := NewParser([]Token{
-			{Type: CommandStart, Value: "[%"},
-			{Type: CommandName, Value: "clk"},
-			{Type: CommandParam, Value: "0:05:00"},
-			{Type: CommandName, Value: "eval"},
-			{Type: CommandParam, Value: "0.24"},
-			{Type: CommandEnd, Value: "]"},
+		parser := NewParser([]pgnToken{
+			{Type: tokCommandStart, Value: "[%"},
+			{Type: tokCommandName, Value: "clk"},
+			{Type: tokCommandParam, Value: "0:05:00"},
+			{Type: tokCommandName, Value: "eval"},
+			{Type: tokCommandParam, Value: "0.24"},
+			{Type: tokCommandEnd, Value: "]"},
 		})
 		_, err := parser.parseCommand()
 		if err == nil {
@@ -976,20 +976,20 @@ func TestParserAnnotationErrors(t *testing.T) {
 
 func TestParserVariationErrors(t *testing.T) {
 	t.Run("UnterminatedVariation", func(t *testing.T) {
-		parser := NewParser([]Token{{Type: VariationStart, Value: "("}})
+		parser := NewParser([]pgnToken{{Type: tokVariationStart, Value: "("}})
 		if err := parser.parseVariation(1, 1); err == nil {
 			t.Fatal("expected unterminated variation error")
 		}
 	})
 
 	t.Run("MoveColorMismatch", func(t *testing.T) {
-		parser := NewParser([]Token{
-			{Type: VariationStart, Value: "("},
-			{Type: MoveNumber, Value: "1"},
-			{Type: DOT, Value: "."},
-			{Type: ELLIPSIS, Value: "..."},
-			{Type: SQUARE, Value: "e5"},
-			{Type: VariationEnd, Value: ")"},
+		parser := NewParser([]pgnToken{
+			{Type: tokVariationStart, Value: "("},
+			{Type: tokMoveNumber, Value: "1"},
+			{Type: tokDot, Value: "."},
+			{Type: tokEllipsis, Value: "..."},
+			{Type: tokSquare, Value: "e5"},
+			{Type: tokVariationEnd, Value: ")"},
 		})
 		if err := parser.parseVariation(1, 1); err == nil {
 			t.Fatal("expected move color mismatch error")
@@ -997,11 +997,11 @@ func TestParserVariationErrors(t *testing.T) {
 	})
 
 	t.Run("CommentErrorInsideVariation", func(t *testing.T) {
-		parser := NewParser([]Token{
-			{Type: VariationStart, Value: "("},
-			{Type: CommentStart, Value: "{"},
-			{Type: MoveNumber, Value: "1"},
-			{Type: VariationEnd, Value: ")"},
+		parser := NewParser([]pgnToken{
+			{Type: tokVariationStart, Value: "("},
+			{Type: tokCommentStart, Value: "{"},
+			{Type: tokMoveNumber, Value: "1"},
+			{Type: tokVariationEnd, Value: ")"},
 		})
 		if err := parser.parseVariation(1, 1); err == nil {
 			t.Fatal("expected variation comment error")
@@ -1010,7 +1010,7 @@ func TestParserVariationErrors(t *testing.T) {
 }
 
 func TestParseResultDraw(t *testing.T) {
-	parser := NewParser([]Token{{Type: RESULT, Value: "1/2-1/2"}})
+	parser := NewParser([]pgnToken{{Type: tokResult, Value: "1/2-1/2"}})
 	parser.parseResult()
 	if err := parser.resolveOutcome(); err != nil {
 		t.Fatal(err)

@@ -19,6 +19,10 @@ All notable changes to this project will be documented in this file. See [conven
   now internal.
 - replace `Position.UnsafeMoves` (only the illegal subset) with
   `Position.PseudoLegalMoves`; remove `Game.UnsafeMoves`.
+- make the PGN lexer internal: `Lexer`, `NewLexer`, `Token`, `TokenType` and
+  its 33 constants (`EOF`, `SQUARE`, `CHECKMATE`, `NullMove`, ...) are no
+  longer exported. `ParserError` keeps `Message`, `TokenValue` and
+  `Position`; its `TokenType` field is now unexported.
 
 ## v2.6.0 - 2026-08-17
 #### Features
