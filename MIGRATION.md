@@ -185,6 +185,20 @@ for m := range pos.LegalMovesSeq() {
 }
 ```
 
+## Tags and commands
+
+PGN tag accessors drop the `Get`/`Pair` wording, and a game's tags can now be
+listed:
+
+| v2 | v3 |
+|---|---|
+| `Game.GetTagPair(k) string` | `Game.Tag(k) string` |
+| `Game.AddTagPair(k, v) bool` | `Game.SetTag(k, v)` (no return value) |
+| `Game.RemoveTagPair(k) bool` | `Game.RemoveTag(k) bool` |
+| _(none)_ | `Game.Tags() map[string]string` (a copy) |
+| `chess.TagPairs` | _(unexported)_; use `Game.Tags()` |
+| `MoveNode.GetCommand(key)` | `MoveNode.Command(key)` |
+
 ## Removed APIs
 
 These v2 exports have no direct v3 equivalent under the same name:

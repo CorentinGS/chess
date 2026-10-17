@@ -373,8 +373,8 @@ func (p *pgnRender) writeVariations(node *MoveNode, moveNum int, isWhite bool) b
 // round-trip a Chess960 game: Variant names the variant, and SetUp/FEN record
 // the starting position. Existing tags are preserved unchanged. The returned
 // map is always a fresh copy, so the game's own tag pairs are not mutated.
-func chess960PGNTags(tags TagPairs, rootPos *Position) TagPairs {
-	out := make(TagPairs, len(tags)+3)
+func chess960PGNTags(tags tagMap, rootPos *Position) tagMap {
+	out := make(tagMap, len(tags)+3)
 	for k, v := range tags {
 		out[k] = v
 	}

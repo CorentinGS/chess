@@ -48,7 +48,7 @@ func TestPGNRecordDecodeReturnsGame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode error: %v", err)
 	}
-	if got := game.GetTagPair("Event"); got != "one" {
+	if got := game.Tag("Event"); got != "one" {
 		t.Fatalf("Event tag = %q, want one", got)
 	}
 }

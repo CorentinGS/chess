@@ -70,7 +70,7 @@ func newParserFromSource(tokens pgnTokenSource, opts ...pgnOptions) *pgnParser {
 	parser := &pgnParser{
 		tokens: tokens,
 		game: &Game{
-			tagPairs: make(TagPairs),
+			tagPairs: make(tagMap),
 			tree:     tree,
 			outcome:  NoOutcome,
 			method:   NoMethod,
@@ -138,7 +138,7 @@ func (p *pgnParser) currentMove() *MoveNode {
 //	if err != nil {
 //	    log.Fatal("Error parsing game:", err)
 //	}
-//	fmt.Printf("Event: %s\n", game.GetTagPair("Event"))
+//	fmt.Printf("Event: %s\n", game.Tag("Event"))
 func (p *pgnParser) Parse() (*Game, error) {
 	if p.initErr != nil {
 		return nil, p.initErr

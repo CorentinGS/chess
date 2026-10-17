@@ -272,7 +272,7 @@ func TestBigPgn(t *testing.T) {
 				t.Fatalf("game moves are not correct, expected 0, got %d", len(game.Moves()))
 			}
 
-			if game.GetTagPair("Variant") == "From Position" {
+			if game.Tag("Variant") == "From Position" {
 				t.Skip("Skipping test for From Position")
 			}
 
@@ -368,7 +368,7 @@ func TestCompleteGame(t *testing.T) {
 	// print all moves
 	moves := game.MoveTree().MainLine()
 
-	if got, ok := game.MoveTree().MainLine()[0].GetCommand("eval"); !ok || got != "0.17" {
+	if got, ok := game.MoveTree().MainLine()[0].Command("eval"); !ok || got != "0.17" {
 		t.Fatalf("game move 1 is not correct, expected eval, got %s", got)
 	}
 
@@ -404,12 +404,12 @@ func TestLichessMultipleCommand(t *testing.T) {
 	}
 
 	// Check if move one has the correct command
-	if got, ok := game.MoveTree().MainLine()[0].GetCommand("eval"); !ok || got != "0.0" {
+	if got, ok := game.MoveTree().MainLine()[0].Command("eval"); !ok || got != "0.0" {
 		t.Fatalf("game move 1 is not correct, expected eval, got %s", got)
 	}
 
 	// Check for clock also
-	if got, ok := game.MoveTree().MainLine()[0].GetCommand("clk"); !ok || got != "0:03:00" {
+	if got, ok := game.MoveTree().MainLine()[0].Command("clk"); !ok || got != "0:03:00" {
 		t.Fatalf("game move 1 is not correct, expected clock, got %s", got)
 	}
 
@@ -418,12 +418,12 @@ func TestLichessMultipleCommand(t *testing.T) {
 		t.Fatalf("game move 5 is not correct, expected comment, got %s", game.MoveTree().MainLine()[4].Comments())
 	}
 
-	if got, ok := game.MoveTree().MainLine()[4].GetCommand("eval"); !ok || got != "0.14" {
+	if got, ok := game.MoveTree().MainLine()[4].Command("eval"); !ok || got != "0.14" {
 		t.Fatalf("game move 5 is not correct, expected eval, got %s", got)
 	}
 
 	// check for clock
-	if got, ok := game.MoveTree().MainLine()[4].GetCommand("clk"); !ok || got != "0:02:58" {
+	if got, ok := game.MoveTree().MainLine()[4].Command("clk"); !ok || got != "0:02:58" {
 		t.Fatalf("game move 5 is not correct, expected clock, got %s", got)
 	}
 }
@@ -581,10 +581,10 @@ func TestVariationCommands(t *testing.T) {
 	if d5Move.Comments() != "good move" {
 		t.Errorf("expected comment 'good move' on 1...d5, got %q", d5Move.Comments())
 	}
-	if got, ok := d5Move.GetCommand("eval"); !ok || got != "-0.5" {
+	if got, ok := d5Move.Command("eval"); !ok || got != "-0.5" {
 		t.Errorf("expected eval command '-0.5' on 1...d5, got %q", got)
 	}
-	if got, ok := d5Move.GetCommand("clk"); !ok || got != "0:05:00" {
+	if got, ok := d5Move.Command("clk"); !ok || got != "0:05:00" {
 		t.Errorf("expected clk command '0:05:00' on 1...d5, got %q", got)
 	}
 }
@@ -691,7 +691,7 @@ func TestPGNAnnotationFidelityRoundTrip(t *testing.T) {
 	if move.Comments() != "Good move second" {
 		t.Fatalf("expected flattened comments, got %q", move.Comments())
 	}
-	if got, ok := move.GetCommand("clk"); !ok || got != "0:05:00" {
+	if got, ok := move.Command("clk"); !ok || got != "0:05:00" {
 		t.Fatalf("expected clk command, got %q, %v", got, ok)
 	}
 
@@ -719,11 +719,11 @@ func TestPGNAnnotationFidelityPreservesOrderAndDuplicateCommands(t *testing.T) {
 	reparsed := mustParseSingleGame(t, roundTrip)
 	move := reparsed.MoveTree().MainLine()[0]
 
-	if got, ok := move.GetCommand("clk"); !ok || got != "0:04:59" {
+	if got, ok := move.Command("clk"); !ok || got != "0:04:59" {
 		t.Fatalf("expected last duplicate clk command, got %q, %v", got, ok)
 	}
 	move.SetCommand("clk", "0:04:00")
-	if got, ok := move.GetCommand("clk"); !ok || got != "0:04:00" {
+	if got, ok := move.Command("clk"); !ok || got != "0:04:00" {
 		t.Fatalf("expected SetCommand to update last duplicate clk command, got %q, %v", got, ok)
 	}
 
@@ -742,7 +742,7 @@ func TestPGNAnnotationFidelityCommandUsesFirstParameter(t *testing.T) {
 	game := mustParseSingleGame(t, withMinimalTags(`1. e4 {[%command 1:45:12,Nf6,"very interesting, but wrong"]} *`))
 	move := game.MoveTree().MainLine()[0]
 
-	if got, ok := move.GetCommand("command"); !ok || got != "1:45:12" {
+	if got, ok := move.Command("command"); !ok || got != "1:45:12" {
 		t.Fatalf("expected first command parameter, got %q, %v", got, ok)
 	}
 
@@ -797,7 +797,7 @@ func TestPGNAnnotationFidelityLegacyAPIsAndDefensiveCopies(t *testing.T) {
 	if move.Comments() != "Good move!" {
 		t.Fatalf("expected legacy comments, got %q", move.Comments())
 	}
-	if got, ok := move.GetCommand("clk"); !ok || got != "0:04:59" {
+	if got, ok := move.Command("clk"); !ok || got != "0:04:59" {
 		t.Fatalf("expected updated clk command, got %q, %v", got, ok)
 	}
 	if !strings.Contains(game.String(), "{Good move! [%clk 0:04:59]}") {

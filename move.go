@@ -131,7 +131,9 @@ func (n *MoveNode) Move() Move {
 	return n.move
 }
 
-func (n *MoveNode) GetCommand(key string) (string, bool) {
+// Command returns the value of the last [%key value] command in the node's
+// comments, and whether one was found.
+func (n *MoveNode) Command(key string) (string, bool) {
 	if n == nil {
 		return "", false
 	}

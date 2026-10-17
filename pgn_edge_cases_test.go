@@ -26,8 +26,8 @@ func TestPGNDecoderPreservesEscapedQuoteInTagValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parser rejects spec-legal escaped quote in tag value: %v", err)
 	}
-	if game.GetTagPair("Event") != `Internet Section 08A g/8'+2"` {
-		t.Fatalf("expected unescaped quote in tag value, got %q", game.GetTagPair("Event"))
+	if game.Tag("Event") != `Internet Section 08A g/8'+2"` {
+		t.Fatalf("expected unescaped quote in tag value, got %q", game.Tag("Event"))
 	}
 	pgn := game.String()
 	if !strings.Contains(pgn, `[Event "Internet Section 08A g/8'+2\""]`) {

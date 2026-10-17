@@ -8,13 +8,13 @@ import (
 	"maps"
 )
 
-// TagPairs represents a collection of PGN tag pairs.
-type TagPairs map[string]string
+// tagMap represents a collection of PGN tag pairs.
+type tagMap map[string]string
 
 // A Game represents a single chess game.
 type Game struct {
 	outcome                        Outcome   // Game result
-	tagPairs                       TagPairs  // PGN tag pairs
+	tagPairs                       tagMap  // PGN tag pairs
 	tree                           *MoveTree // Move tree and active cursor
 	method                         Method    // How the game ended
 	ignoreFivefoldRepetitionDraw   bool      // Flag for automatic FivefoldRepetition draw handling
@@ -217,34 +217,31 @@ func (g *Game) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// AddTagPair adds or updates a tag pair with the given key and
-// value and returns true if the value is overwritten.
-func (g *Game) AddTagPair(k, v string) bool {
+// SetTag sets the PGN tag k to v, replacing any existing value.
+func (g *Game) SetTag(k, v string) {
 	if g.tagPairs == nil {
-		g.tagPairs = make(map[string]string)
-	}
-	if _, existing := g.tagPairs[k]; existing {
-		g.tagPairs[k] = v
-		return true
+		g.tagPairs = make(tagMap)
 	}
 	g.tagPairs[k] = v
-	return false
 }
 
-// GetTagPair returns the tag pair for the given key or nil
-// if it is not present.
-func (g *Game) GetTagPair(k string) string {
+// Tag returns the value of the PGN tag k, or "" if the game has no such tag.
+func (g *Game) Tag(k string) string {
 	return g.tagPairs[k]
 }
 
-// RemoveTagPair removes the tag pair for the given key and
-// returns true if a tag pair was removed.
-func (g *Game) RemoveTagPair(k string) bool {
+// Tags returns a copy of the game's PGN tags. Modifying the returned map does
+// not affect the game.
+func (g *Game) Tags() map[string]string {
+	return maps.Clone(map[string]string(g.tagPairs))
+}
+
+// RemoveTag removes the PGN tag k and reports whether it was present.
+func (g *Game) RemoveTag(k string) bool {
 	if _, existing := g.tagPairs[k]; existing {
 		delete(g.tagPairs, k)
 		return true
 	}
-
 	return false
 }
 

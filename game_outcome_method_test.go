@@ -221,41 +221,45 @@ func TestClearOutcome(t *testing.T) {
 
 func TestClearOutcomeDoesNotModifyResultTag(t *testing.T) {
 	g := chess.NewGame()
-	g.AddTagPair("Result", "1-0")
+	g.SetTag("Result", "1-0")
 	if err := g.SetOutcomeMethod(chess.OutcomeMethodPair{chess.WhiteWon, chess.Checkmate}); err != nil {
 		t.Fatal(err)
 	}
 	g.ClearOutcome()
-	if got := g.GetTagPair("Result"); got != "1-0" {
+	if got := g.Tag("Result"); got != "1-0" {
 		t.Errorf("Result tag after ClearOutcome = %q, want 1-0", got)
 	}
 }
 
 func TestTagPairLifecycle(t *testing.T) {
 	g := chess.NewGame()
-	if g.AddTagPair("Event", "E1") {
-		t.Error("first AddTagPair should return false (no prior value)")
+	g.SetTag("Event", "E1")
+	if got := g.Tag("Event"); got != "E1" {
+		t.Errorf("Tag = %q, want E1", got)
 	}
-	if got := g.GetTagPair("Event"); got != "E1" {
-		t.Errorf("GetTagPair = %q, want E1", got)
+	g.SetTag("Event", "E2")
+	tags := g.Tags()
+	if tags["Event"] != "E2" {
+		t.Errorf("Tags()[Event] = %q, want E2", tags["Event"])
 	}
-	if !g.AddTagPair("Event", "E2") {
-		t.Error("overwriting AddTagPair should return true")
+	tags["Event"] = "mutated"
+	if got := g.Tag("Event"); got != "E2" {
+		t.Errorf("mutating Tags() changed the game: Tag = %q", got)
 	}
-	if got := g.GetTagPair("Event"); got != "E2" {
-		t.Errorf("GetTagPair after overwrite = %q, want E2", got)
+	if got := g.Tag("Event"); got != "E2" {
+		t.Errorf("Tag after overwrite = %q, want E2", got)
 	}
-	if !g.RemoveTagPair("Event") {
-		t.Error("RemoveTagPair on existing key should return true")
+	if !g.RemoveTag("Event") {
+		t.Error("RemoveTag on existing key should return true")
 	}
-	if got := g.GetTagPair("Event"); got != "" {
-		t.Errorf("GetTagPair after remove = %q, want empty", got)
+	if got := g.Tag("Event"); got != "" {
+		t.Errorf("Tag after remove = %q, want empty", got)
 	}
-	if g.RemoveTagPair("Event") {
-		t.Error("RemoveTagPair on absent key should return false")
+	if g.RemoveTag("Event") {
+		t.Error("RemoveTag on absent key should return false")
 	}
-	if g.RemoveTagPair("NeverExisted") {
-		t.Error("RemoveTagPair on never-existing key should return false")
+	if g.RemoveTag("NeverExisted") {
+		t.Error("RemoveTag on never-existing key should return false")
 	}
 }
 

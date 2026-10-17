@@ -21,7 +21,7 @@ func TestDecodePGNGamesParallelDecodesAllGames(t *testing.T) {
 		if result.Err != nil {
 			t.Fatalf("parallel result error: %v", result.Err)
 		}
-		events[result.Game.GetTagPair("Event")] = true
+		events[result.Game.Tag("Event")] = true
 	}
 	if !events["one"] || !events["two"] || len(events) != 2 {
 		t.Fatalf("decoded events = %v, want one and two", events)
@@ -42,7 +42,7 @@ func TestDecodePGNGamesParallelOrderedPreservesPGNOrder(t *testing.T) {
 		if result.Err != nil {
 			t.Fatalf("parallel result error: %v", result.Err)
 		}
-		events = append(events, result.Game.GetTagPair("Event"))
+		events = append(events, result.Game.Tag("Event"))
 		indexes = append(indexes, result.Index)
 	}
 	if strings.Join(events, ",") != "one,two" {

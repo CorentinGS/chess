@@ -27,6 +27,13 @@ All notable changes to this project will be documented in this file. See [conven
   `Load`, `LoadBytes`, `NewBook`, `Entry`, `Move`, `WeightedMove`,
   `EncodeMove`, `DecodeMove`; `ChessMoves` becomes `Moves` and `ToMoveMap`
   becomes `WeightedMoves`. `PieceType.ToPolyglotPromotionValue` is removed.
+- rename tag accessors to `Game.Tag`, `Game.SetTag` (no return value) and
+  `Game.RemoveTag`; unexport `TagPairs`. Rename `MoveNode.GetCommand` to
+  `MoveNode.Command`.
+
+#### Features
+- add `Game.Tags()`, which returns a copy of all PGN tags.
+- add `Position.PseudoLegalMoves()`.
 
 ## v2.6.0 - 2026-08-17
 #### Features

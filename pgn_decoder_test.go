@@ -36,7 +36,7 @@ func TestParsePGNReturnsSingleGame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParsePGN error: %v", err)
 	}
-	if got := game.GetTagPair("Event"); got != "one" {
+	if got := game.Tag("Event"); got != "one" {
 		t.Fatalf("Event tag = %q, want %q", got, "one")
 	}
 	if got := len(game.Moves()); got != 1 {
@@ -51,7 +51,7 @@ func TestPGNDecoderDecodesMultipleGames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first Decode error: %v", err)
 	}
-	if got := first.GetTagPair("Event"); got != "one" {
+	if got := first.Tag("Event"); got != "one" {
 		t.Fatalf("first Event tag = %q, want %q", got, "one")
 	}
 	if dec.Index() != 1 {
@@ -62,7 +62,7 @@ func TestPGNDecoderDecodesMultipleGames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second Decode error: %v", err)
 	}
-	if got := second.GetTagPair("Event"); got != "two" {
+	if got := second.Tag("Event"); got != "two" {
 		t.Fatalf("second Event tag = %q, want %q", got, "two")
 	}
 	if dec.Index() != 2 {
@@ -80,7 +80,7 @@ func TestPGNGamesIteratesGamesAndErrors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("PGNGames yielded error: %v", err)
 		}
-		events = append(events, game.GetTagPair("Event"))
+		events = append(events, game.Tag("Event"))
 	}
 
 	if strings.Join(events, ",") != "one,two" {

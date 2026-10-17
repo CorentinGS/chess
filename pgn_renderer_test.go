@@ -12,13 +12,13 @@ import (
 
 func TestPGNRenderer_RenderMatchesGameString(t *testing.T) {
 	g := chess.NewGame()
-	g.AddTagPair("Event", "Test Event")
-	g.AddTagPair("Site", "Test Site")
-	g.AddTagPair("Date", "2024.01.01")
-	g.AddTagPair("Round", "1")
-	g.AddTagPair("White", "Player A")
-	g.AddTagPair("Black", "Player B")
-	g.AddTagPair("Result", "*")
+	g.SetTag("Event", "Test Event")
+	g.SetTag("Site", "Test Site")
+	g.SetTag("Date", "2024.01.01")
+	g.SetTag("Round", "1")
+	g.SetTag("White", "Player A")
+	g.SetTag("Black", "Player B")
+	g.SetTag("Result", "*")
 
 	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
@@ -147,7 +147,7 @@ func TestPGNRenderer_EscapesCommentEndBrace(t *testing.T) {
 
 func TestPGNRenderer_EscapesTagValueQuotes(t *testing.T) {
 	g := chess.NewGame()
-	g.AddTagPair("White", `A "B" C`)
+	g.SetTag("White", `A "B" C`)
 	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
@@ -173,15 +173,15 @@ func TestPGNRenderer_EmitsCommandAnnotation(t *testing.T) {
 
 func TestPGNRenderer_OrdersTagsBySevenTagRosterThenAlpha(t *testing.T) {
 	g := chess.NewGame()
-	g.AddTagPair("Result", "*")
-	g.AddTagPair("Zebra", "z")
-	g.AddTagPair("Date", "2026.06.19")
-	g.AddTagPair("Black", "B")
-	g.AddTagPair("Alpha", "a")
-	g.AddTagPair("Round", "1")
-	g.AddTagPair("White", "A")
-	g.AddTagPair("Event", "E")
-	g.AddTagPair("Site", "S")
+	g.SetTag("Result", "*")
+	g.SetTag("Zebra", "z")
+	g.SetTag("Date", "2026.06.19")
+	g.SetTag("Black", "B")
+	g.SetTag("Alpha", "a")
+	g.SetTag("Round", "1")
+	g.SetTag("White", "A")
+	g.SetTag("Event", "E")
+	g.SetTag("Site", "S")
 	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestPGNRenderer_DoesNotMutateGame(t *testing.T) {
 		t.Fatal(err)
 	}
 	g.MoveTree().Root().Children()[0].SetComment("a comment")
-	g.AddTagPair("Custom", "value")
+	g.SetTag("Custom", "value")
 
 	before := g.String()
 	beforePos := g.Position().XFENString()

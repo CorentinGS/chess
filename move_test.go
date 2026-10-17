@@ -374,28 +374,28 @@ func TestSetNAGsRejectsMalformed(t *testing.T) {
 	}
 }
 
-func TestGetCommand(t *testing.T) {
-	t.Run("GetCommandReturnsValueIfExists", func(t *testing.T) {
+func TestCommand(t *testing.T) {
+	t.Run("CommandReturnsValueIfExists", func(t *testing.T) {
 		move := &MoveNode{}
 		move.SetCommand("key", "value")
-		value, ok := move.GetCommand("key")
+		value, ok := move.Command("key")
 		if !ok || value != "value" {
 			t.Fatalf("expected value to be 'value' and ok to be true, but got value: %v, ok: %v", value, ok)
 		}
 	})
 
-	t.Run("GetCommandReturnsFalseIfKeyDoesNotExist", func(t *testing.T) {
+	t.Run("CommandReturnsFalseIfKeyDoesNotExist", func(t *testing.T) {
 		move := &MoveNode{}
 		move.SetCommand("key", "value")
-		_, ok := move.GetCommand("nonexistent")
+		_, ok := move.Command("nonexistent")
 		if ok {
 			t.Fatalf("expected ok to be false, but got true")
 		}
 	})
 
-	t.Run("GetCommandDoesNotCreateAnnotations", func(t *testing.T) {
+	t.Run("CommandDoesNotCreateAnnotations", func(t *testing.T) {
 		move := &MoveNode{}
-		_, ok := move.GetCommand("key")
+		_, ok := move.Command("key")
 		if ok {
 			t.Fatalf("expected ok to be false, but got true")
 		}
@@ -592,7 +592,7 @@ func TestMoveNodeClone(t *testing.T) {
 		tree3.setTree(clonedM2)
 		assertMoveNodesAreEqual(t, clonedM1, clonedM2)
 		clonedM1.SetCommand("foo", "bar modified")
-		fooVal, ok := clonedM2.GetCommand("foo")
+		fooVal, ok := clonedM2.Command("foo")
 		if !ok || fooVal != "bar" {
 			t.Fatalf("cloned mv %v is not a deep copy", clonedM2)
 		}

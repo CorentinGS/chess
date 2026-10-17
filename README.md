@@ -547,7 +547,7 @@ Moves and tag pairs added to the PGN output:
 
 ```go
 game := chess.NewGame()
-game.AddTagPair("Event", "F/S Return Match")
+game.SetTag("Event", "F/S Return Match")
 game.MoveText("e4", chess.SAN(), nil)
 game.MoveText("e5", chess.SAN(), nil)
 fmt.Println(game)
@@ -580,7 +580,7 @@ for _, block := range node.CommentBlocks() {
 }
 ```
 
-The helpers `MoveNode.Comments()`, `MoveNode.GetCommand()`, `MoveNode.SetCommand()`, `MoveNode.SetComment()`, and
+The helpers `MoveNode.Comments()`, `MoveNode.Command()`, `MoveNode.SetCommand()`, `MoveNode.SetComment()`, and
 `MoveNode.AddComment()` remain available for callers that only need a flattened text comment or single command value.
 
 #### Scan PGN
@@ -598,7 +598,7 @@ for game, err := range chess.PGNGames(f) {
     if err != nil {
         log.Fatal("Failed to parse game: %v", err)
     }
-    fmt.Println(game.GetTagPair("Site"))
+    fmt.Println(game.Tag("Site"))
     // Output &{Site https://lichess.org/8jb5kiqw}
 }
 ```
@@ -621,7 +621,7 @@ for {
     if err != nil {
         log.Fatal("Failed to parse game: %v", err)
     }
-    fmt.Println(game.GetTagPair("Site"))
+    fmt.Println(game.Tag("Site"))
 }
 ```
 
@@ -647,7 +647,7 @@ for game, err := range chess.PGNGames(f, chess.WithPGNExpandVariations()) {
     if err != nil {
         log.Fatal("Failed to parse game: %v", err)
     }
-    fmt.Println(game.GetTagPair("Site"))
+    fmt.Println(game.Tag("Site"))
     // Output &{Site https://lichess.org/8jb5kiqw}
 }
 ```

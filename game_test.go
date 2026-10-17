@@ -830,13 +830,13 @@ func TestCopyGameState(t *testing.T) {
 
 func TestCopyGameStateWithTagPairs(t *testing.T) {
 	original := NewGame()
-	original.AddTagPair("Event", "Test Event")
+	original.SetTag("Event", "Test Event")
 
 	newGame := NewGame()
 	newGame.copy(original)
 
-	if newGame.GetTagPair("Event") != "Test Event" {
-		t.Fatalf("expected tag pair 'Test Event' but got %s", newGame.GetTagPair("Event"))
+	if newGame.Tag("Event") != "Test Event" {
+		t.Fatalf("expected tag pair 'Test Event' but got %s", newGame.Tag("Event"))
 	}
 }
 
@@ -897,19 +897,19 @@ func TestCopyDoesNotSetTree(t *testing.T) {
 
 func TestCloneGameStateWithTagPairs(t *testing.T) {
 	original := NewGame()
-	original.AddTagPair("Event", "Test Event")
+	original.SetTag("Event", "Test Event")
 
 	clone := original.Clone()
 
-	if clone.GetTagPair("Event") != "Test Event" {
-		t.Fatalf("expected tag pair 'Test Event' but got %s", clone.GetTagPair("Event"))
+	if clone.Tag("Event") != "Test Event" {
+		t.Fatalf("expected tag pair 'Test Event' but got %s", clone.Tag("Event"))
 	}
 
 	// modify original to ensure the clone is a true deep copy
-	original.AddTagPair("Event", "Test Event Modified")
+	original.SetTag("Event", "Test Event Modified")
 
-	if clone.GetTagPair("Event") != "Test Event" {
-		t.Fatalf("expected tag pair 'Test Event' but got %s", clone.GetTagPair("Event"))
+	if clone.Tag("Event") != "Test Event" {
+		t.Fatalf("expected tag pair 'Test Event' but got %s", clone.Tag("Event"))
 	}
 }
 
@@ -989,67 +989,58 @@ func TestEligibleDrawsWithFiftyMoveRule(t *testing.T) {
 	}
 }
 
-func TestRemoveTagPairWhenKeyExists(t *testing.T) {
+func TestRemoveTagWhenKeyExists(t *testing.T) {
 	g := NewGame()
-	g.AddTagPair("Event", "Test Event")
-	removed := g.RemoveTagPair("Event")
+	g.SetTag("Event", "Test Event")
+	removed := g.RemoveTag("Event")
 	if !removed {
 		t.Fatalf("expected tag pair to be removed")
 	}
-	if g.GetTagPair("Event") != "" {
-		t.Fatalf("expected tag pair to be empty but got %s", g.GetTagPair("Event"))
+	if g.Tag("Event") != "" {
+		t.Fatalf("expected tag pair to be empty but got %s", g.Tag("Event"))
 	}
 }
 
-func TestRemoveTagPairWhenKeyDoesNotExist(t *testing.T) {
+func TestRemoveTagWhenKeyDoesNotExist(t *testing.T) {
 	g := NewGame()
-	removed := g.RemoveTagPair("NonExistentKey")
+	removed := g.RemoveTag("NonExistentKey")
 	if removed {
 		t.Fatalf("expected tag pair not to be removed")
 	}
 }
 
-func TestRemoveTagPairFromEmptyTagPairs(t *testing.T) {
+func TestRemoveTagFromEmptyTagPairs(t *testing.T) {
 	g := NewGame()
 	g.tagPairs = make(map[string]string)
-	removed := g.RemoveTagPair("Event")
+	removed := g.RemoveTag("Event")
 	if removed {
 		t.Fatalf("expected tag pair not to be removed")
 	}
 }
 
-func TestAddTagPairWhenKeyExists(t *testing.T) {
+func TestSetTagWhenKeyExists(t *testing.T) {
 	g := NewGame()
-	g.AddTagPair("Event", "Test Event")
-	overwritten := g.AddTagPair("Event", "Updated Event")
-	if !overwritten {
-		t.Fatalf("expected tag pair to be overwritten")
-	}
-	if g.GetTagPair("Event") != "Updated Event" {
-		t.Fatalf("expected tag pair to be 'Updated Event' but got %s", g.GetTagPair("Event"))
+	g.SetTag("Event", "Test Event")
+	g.SetTag("Event", "Updated Event")
+	if g.Tag("Event") != "Updated Event" {
+		t.Fatalf("expected tag pair to be 'Updated Event' but got %s", g.Tag("Event"))
 	}
 }
 
-func TestAddTagPairWhenKeyDoesNotExist(t *testing.T) {
+func TestSetTagWhenKeyDoesNotExist(t *testing.T) {
 	g := NewGame()
-	overwritten := g.AddTagPair("Event", "Test Event")
-	if overwritten {
-		t.Fatalf("expected tag pair not to be overwritten")
-	}
-	if g.GetTagPair("Event") != "Test Event" {
-		t.Fatalf("expected tag pair to be 'Test Event' but got %s", g.GetTagPair("Event"))
+	g.SetTag("Event", "Test Event")
+	if g.Tag("Event") != "Test Event" {
+		t.Fatalf("expected tag pair to be 'Test Event' but got %s", g.Tag("Event"))
 	}
 }
 
-func TestAddTagPairWithNilTagPairs(t *testing.T) {
+func TestSetTagWithNilTagMap(t *testing.T) {
 	g := NewGame()
 	g.tagPairs = nil
-	overwritten := g.AddTagPair("Event", "Test Event")
-	if overwritten {
-		t.Fatalf("expected tag pair not to be overwritten")
-	}
-	if g.GetTagPair("Event") != "Test Event" {
-		t.Fatalf("expected tag pair to be 'Test Event' but got %s", g.GetTagPair("Event"))
+	g.SetTag("Event", "Test Event")
+	if g.Tag("Event") != "Test Event" {
+		t.Fatalf("expected tag pair to be 'Test Event' but got %s", g.Tag("Event"))
 	}
 	if g.tagPairs == nil {
 		t.Fatalf("expected tagPairs to be initialized")
@@ -1183,8 +1174,8 @@ func TestGameString(t *testing.T) {
 			name: "GameStringWithTags",
 			setup: func() *Game {
 				g := NewGame()
-				g.AddTagPair("Event", "Test Event")
-				g.AddTagPair("Site", "Test Site")
+				g.SetTag("Event", "Test Event")
+				g.SetTag("Site", "Test Site")
 				return g
 			},
 			expected: "[Event \"Test Event\"]\n[Site \"Test Site\"]\n\n*",
@@ -1513,8 +1504,8 @@ func TestRootMoveComments(t *testing.T) {
 		game := NewGame()
 
 		// Add tag pairs
-		game.AddTagPair("Event", "Test Event")
-		game.AddTagPair("Site", "Test Site")
+		game.SetTag("Event", "Test Event")
+		game.SetTag("Site", "Test Site")
 
 		// Add a comment to the root move
 		root := game.MoveTree().Root()

@@ -108,7 +108,7 @@ func TestSplit_RecomputesTerminalOutcomesFromLeaf(t *testing.T) {
 			for _, sg := range splitGames {
 				if sg.Outcome() == tt.wantOutcome && sg.Method() == tt.wantMethod {
 					found = true
-					if got := sg.GetTagPair("Result"); got != tt.wantResult {
+					if got := sg.Tag("Result"); got != tt.wantResult {
 						t.Errorf("Result tag = %q, want %q (Split must sync the Result tag)", got, tt.wantResult)
 					}
 				}
@@ -188,7 +188,7 @@ func TestSplit_EmitsAutoDraws(t *testing.T) {
 		if sg.Outcome() != chess.Draw || sg.Method() != chess.SeventyFiveMoveRule {
 			t.Errorf("split outcome/method = %s/%s, want Draw/SeventyFiveMoveRule", sg.Outcome(), sg.Method())
 		}
-		if got := sg.GetTagPair("Result"); got != "1/2-1/2" {
+		if got := sg.Tag("Result"); got != "1/2-1/2" {
 			t.Errorf("Result tag = %q, want \"1/2-1/2\" (Split must sync the tag)", got)
 		}
 		assertNoVariations(t, sg)
@@ -219,7 +219,7 @@ func TestSplit_EmitsAutoDraws(t *testing.T) {
 		if sg.Outcome() != chess.Draw || sg.Method() != chess.FivefoldRepetition {
 			t.Errorf("split outcome/method = %s/%s, want Draw/FivefoldRepetition", sg.Outcome(), sg.Method())
 		}
-		if got := sg.GetTagPair("Result"); got != "1/2-1/2" {
+		if got := sg.Tag("Result"); got != "1/2-1/2" {
 			t.Errorf("Result tag = %q, want \"1/2-1/2\" (Split must sync the tag)", got)
 		}
 		assertNoVariations(t, sg)
