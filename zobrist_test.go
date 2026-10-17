@@ -6,7 +6,7 @@ import (
 	"github.com/corentings/chess/v3"
 )
 
-func TestHashFromFEN(t *testing.T) {
+func TestZobristHashFromFEN(t *testing.T) {
 	t.Run("Known Position Hashes", func(t *testing.T) {
 		knownPositions := []struct {
 			name string
@@ -16,11 +16,10 @@ func TestHashFromFEN(t *testing.T) {
 			{"startpos", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 0x463b96181691fc9c},
 			{"after_e4", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1", 0x823c9b50fd114196},
 			{"after_e4_e5", "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2", 0x0844931a6ef4b9a0},
-			{"empty", "8/8/8/8/8/8/8/8 w - - 0 1", 0xf8d626aaaf278509},
 		}
 		for _, tc := range knownPositions {
 			t.Run(tc.name, func(t *testing.T) {
-				hash, err := chess.HashFromFEN(tc.fen)
+				hash, err := hashFEN(tc.fen)
 				if err != nil {
 					t.Fatalf("Expected no error, got %v", err)
 				}
@@ -44,7 +43,7 @@ func TestHashFromFEN(t *testing.T) {
 		}
 		for _, tc := range invalidFENs {
 			t.Run(tc.name, func(t *testing.T) {
-				if _, err := chess.HashFromFEN(tc.fen); err == nil {
+				if _, err := hashFEN(tc.fen); err == nil {
 					t.Errorf("Expected error for %q, got nil", tc.fen)
 				}
 			})
@@ -55,8 +54,8 @@ func TestHashFromFEN(t *testing.T) {
 		positionWhite := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 		positionBlack := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
 
-		hashWhite, err1 := chess.HashFromFEN(positionWhite)
-		hashBlack, err2 := chess.HashFromFEN(positionBlack)
+		hashWhite, err1 := hashFEN(positionWhite)
+		hashBlack, err2 := hashFEN(positionBlack)
 
 		if err1 != nil || err2 != nil {
 			t.Fatalf("Unexpected errors: %v, %v", err1, err2)
@@ -71,9 +70,9 @@ func TestHashFromFEN(t *testing.T) {
 		withoutCastling := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1"
 		onlyWhiteCastling := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1"
 
-		hashAll, _ := chess.HashFromFEN(withAllCastling)
-		hashNone, _ := chess.HashFromFEN(withoutCastling)
-		hashWhite, _ := chess.HashFromFEN(onlyWhiteCastling)
+		hashAll, _ := hashFEN(withAllCastling)
+		hashNone, _ := hashFEN(withoutCastling)
+		hashWhite, _ := hashFEN(onlyWhiteCastling)
 
 		if hashAll == hashNone || hashAll == hashWhite || hashWhite == hashNone {
 			t.Error("Expected different hashes for different castling rights")
@@ -84,8 +83,8 @@ func TestHashFromFEN(t *testing.T) {
 		afterE4E5 := "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"
 		afterE4E6 := "rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
 
-		hashWithEP, err1 := chess.HashFromFEN(afterE4E5)
-		hashWithoutEP, err2 := chess.HashFromFEN(afterE4E6)
+		hashWithEP, err1 := hashFEN(afterE4E5)
+		hashWithoutEP, err2 := hashFEN(afterE4E6)
 
 		if err1 != nil || err2 != nil {
 			t.Fatalf("Unexpected errors: %v, %v", err1, err2)
@@ -113,7 +112,7 @@ func TestHashFromFEN(t *testing.T) {
 
 		hashes := make([]uint64, len(positions))
 		for i, pos := range positions {
-			hash, err := chess.HashFromFEN(pos)
+			hash, err := hashFEN(pos)
 			if err != nil {
 				t.Fatalf("Unexpected error for position %s: %v", pos, err)
 			}
@@ -131,18 +130,25 @@ func TestHashFromFEN(t *testing.T) {
 	})
 }
 
-func BenchmarkHashFromFEN(b *testing.B) {
+func BenchmarkZobristHashFromFEN(b *testing.B) {
 	fens := []string{
 		"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-		"8/8/8/8/8/8/8/8 w - - 0 1",
 		"rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2",
 	}
 	for _, fen := range fens {
 		b.Run(fen, func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				_, _ = chess.HashFromFEN(fen)
+				_, _ = hashFEN(fen)
 			}
 		})
 	}
+}
+
+func hashFEN(fen string) (uint64, error) {
+	pos, err := chess.ParseFEN(fen)
+	if err != nil {
+		return 0, err
+	}
+	return pos.ZobristHash(), nil
 }

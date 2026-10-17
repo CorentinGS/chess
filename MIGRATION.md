@@ -162,7 +162,7 @@ mechanical renames with no behaviour change; update the symbol at the call site.
 | v2 | v3 | Reason |
 |---|---|---|
 | `opening.Opening` | `opening.Entry` | Stuttered at the call site (`opening.Opening{}`). |
-| `chess.GetPolyglotHashBytes` | _(removed)_ | Use `HashFromFEN` / `Position.ZobristHash`; convert a `uint64` via `binary.LittleEndian`. |
+| `chess.GetPolyglotHashBytes` | _(removed)_ | Use `ParseFEN(fen)` then `Position.ZobristHash`; convert a `uint64` via `binary.LittleEndian`. |
 
 The unexported `newOpening` constructor is renamed `newEntry` to match.
 
@@ -368,15 +368,15 @@ removed with no direct replacement:
   `Position.ZobristHash() uint64`.
 - `ZobristHasher`, `NewChessHasher()`, `NewZobristHasher()` are removed. The
   incremental hasher is now internal to `Position`. Callers who previously
-  hashed FEN strings without instantiating a `Position` should use the free
-  function `HashFromFEN(fen string) (uint64, error)`, which is a direct
-  replacement for `ZobristHasher.HashPosition(fen)`.
+  hashed FEN strings should call `ParseFEN(fen)` and then `ZobristHash()`,
+  which replaces `ZobristHasher.HashPosition(fen)`; the position is validated
+  first, so an impossible position returns an error instead of a hash.
 - `ZobristHashToUint64(hash string) uint64` is removed. Convert hex hashes
   with `strconv.ParseUint(s, 16, 64)`.
 - `GetPolyglotHashBytes(index int) []byte` and `GetPolyglotHashes() []string`
   are removed: the Polyglot random table is an implementation detail of the
   hash. For the raw 8-byte little-endian form of a position key, convert the
-  `uint64` from `HashFromFEN` or `Position.ZobristHash` via
+  `uint64` from `Position.ZobristHash` via
   `binary.LittleEndian.PutUint64`.
 
 `Position.LegalMovesSeq()` (no allocation once cached) and
