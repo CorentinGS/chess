@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/corentings/chess/v3"
@@ -626,5 +627,47 @@ func TestBookKeyedByPositionZobristHash(t *testing.T) {
 	}
 	if len(moves) != 1 || !pos.IsLegal(moves[0]) || moves[0].From() != chess.E2 || moves[0].To() != chess.E4 {
 		t.Fatalf("Moves(start) = %v, want [e2e4]", moves)
+	}
+}
+
+// TestZobristHashMatchesPolyglotSpec checks Position.ZobristHash against the
+// reference keys published with the Polyglot book format, both when the
+// position is reached by playing moves (incremental hash) and when it is
+// parsed from FEN. The Polyglot en passant rule (the file is hashed only when a
+// pawn can capture) is covered by e2e4 (not capturable) and f7f5 (capturable);
+// e1e2, e8f7 and a1a3 cover lost castling rights.
+func TestZobristHashMatchesPolyglotSpec(t *testing.T) {
+	cases := []struct {
+		moves string
+		fen   string
+		key   uint64
+	}{
+		{"", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 0x463b96181691fc9c},
+		{"e2e4", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1", 0x823c9b50fd114196},
+		{"e2e4 d7d5", "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2", 0x0756b94461c50fb0},
+		{"e2e4 d7d5 e4e5", "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2", 0x662fafb965db29d4},
+		{"e2e4 d7d5 e4e5 f7f5", "rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3", 0x22a48b5a8e47ff78},
+		{"e2e4 d7d5 e4e5 f7f5 e1e2", "rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPPKPPP/RNBQ1BNR b kq - 0 3", 0x652a607ca3f242c1},
+		{"e2e4 d7d5 e4e5 f7f5 e1e2 e8f7", "rnbq1bnr/ppp1pkpp/8/3pPp2/8/8/PPPPKPPP/RNBQ1BNR w - - 0 4", 0x00fdd303c946bdd9},
+		{"a2a4 b7b5 h2h4 b5b4 c2c4", "rnbqkbnr/p1pppppp/8/8/PpP4P/8/1P1PPPP1/RNBQKBNR b KQkq c3 0 3", 0x3c8123ea7b067637},
+		{"a2a4 b7b5 h2h4 b5b4 c2c4 b4c3 a1a3", "rnbqkbnr/p1pppppp/8/8/P6P/R1p5/1P1PPPP1/1NBQKBNR b Kkq - 0 4", 0x5c3f9b829b279560},
+	}
+	for _, tc := range cases {
+		g := chess.NewGame()
+		for _, uci := range strings.Fields(tc.moves) {
+			if _, err := g.MoveText(uci, chess.UCI(), nil); err != nil {
+				t.Fatalf("%s: %v", tc.moves, err)
+			}
+		}
+		if got := g.Position().ZobristHash(); got != tc.key {
+			t.Errorf("after %q: ZobristHash = %#016x, want %#016x", tc.moves, got, tc.key)
+		}
+		pos, err := chess.ParseFEN(tc.fen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := pos.ZobristHash(); got != tc.key {
+			t.Errorf("ParseFEN(%q).ZobristHash = %#016x, want %#016x", tc.fen, got, tc.key)
+		}
 	}
 }
