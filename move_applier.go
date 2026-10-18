@@ -203,7 +203,7 @@ func castleRookMove(b *Board, m Move, c Color) (Square, Square) {
 // applyMove applies the non-null bookkeeping rule to pos in place. It updates
 // the board, side to move, castling rights, en-passant square, half-move clock,
 // full-move number, the in-check flag, the Zobrist hash, and invalidates the
-// cached legal-move and status values.
+// cached legal-move and Method values.
 //
 // updateHash is called while pos still holds pre-move state, so its reads of
 // pos.board / pos.hash / pos.castleRights / pos.enPassantSquare are the
@@ -245,7 +245,7 @@ func (pos *Position) applyMove(m Move) moveEffect {
 	pos.moveCount = moveCount
 	pos.hash = newHash
 	pos.legalMoves = nil
-	pos.statusCached = false
+	pos.methodCached = false
 	pos.inCheck, pos.checkers = checkState(pos)
 	return eff
 }
@@ -254,7 +254,7 @@ func (pos *Position) applyMove(m Move) moveEffect {
 // move plus scalar state, ~56 bytes versus ~264 for perft's full-state
 // positionUndo. The tree retains one entry per played level for the game's
 // lifetime, so size matters here; perft's undo is stack-allocated on a hot
-// path and stays untouched (ADR-0001). legalMoves/status caches are not
+// path and stays untouched (ADR-0001). legalMoves/method caches are not
 // captured: applyMove invalidates both on the forward path, so restoring
 // them as invalid matches the forward state exactly.
 type cursorUndo struct {
@@ -304,7 +304,7 @@ func (pos *Position) unmakeMoveCursor(m Move, u cursorUndo) {
 	pos.inCheck = u.inCheck
 	pos.checkers = u.checkers
 	pos.legalMoves = nil
-	pos.statusCached = false
+	pos.methodCached = false
 }
 
 // updateCastleRights returns the castling rights after m is played. It inspects

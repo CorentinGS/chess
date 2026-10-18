@@ -127,8 +127,8 @@ type Position struct {
 	inCheck         bool         // Whether current side is in check
 	checkers        bitboard     // Bitboard of pieces giving check (zero when not in check)
 	hash            uint64       // Zobrist hash for O(1) position comparison
-	status          Method       // Cached Status result
-	statusCached    bool         // Whether status contains a valid cached value
+	method          Method       // Cached Method result
+	methodCached    bool         // Whether method contains a valid cached value
 	variant         Variant      // Starting-position variant (zero = Standard)
 }
 
@@ -356,12 +356,12 @@ func (pos *Position) PseudoLegalMoves() []Move {
 // Method returns the position's outcome Method (e.g. Checkmate, Stalemate, or
 // NoMethod).
 func (pos *Position) Method() Method {
-	if pos.statusCached {
-		return pos.status
+	if pos.methodCached {
+		return pos.method
 	}
-	pos.status = status(pos)
-	pos.statusCached = true
-	return pos.status
+	pos.method = positionMethod(pos)
+	pos.methodCached = true
+	return pos.method
 }
 
 // Outcome returns the decisive or draw outcome implied by the position, or

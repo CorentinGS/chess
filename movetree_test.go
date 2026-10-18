@@ -78,13 +78,13 @@ func TestMoveTreeForwardIndex(t *testing.T) {
 
 	g.tree.GoToStart()
 
-	if g.tree.GoToChild(3) {
+	if g.tree.GoToContinuation(3) {
 		t.Fatal("Forward(3) should fail (out of range)")
 	}
-	if g.tree.GoToChild(-1) {
+	if g.tree.GoToContinuation(-1) {
 		t.Fatal("Forward(-1) should fail")
 	}
-	if !g.tree.GoToChild(1) {
+	if !g.tree.GoToContinuation(1) {
 		t.Fatal("Forward(1) failed")
 	}
 	want := StartingPosition().Update(b.move).String()
@@ -219,7 +219,7 @@ func TestMoveTreeNilSafe(t *testing.T) {
 	if t1.Peek() != nil {
 		t.Fatal("Peek on nil tree should be nil")
 	}
-	if t1.GoToChild(0) {
+	if t1.GoToContinuation(0) {
 		t.Fatal("Forward on nil tree should be false")
 	}
 	if t1.GoTo(nil) {

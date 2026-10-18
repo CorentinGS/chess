@@ -101,7 +101,7 @@ func TestAddVariationStoresPosition(t *testing.T) {
 	if _, err := g.MoveTree().AddVariation(nil, move); err != nil {
 		t.Fatal(err)
 	}
-	children := g.MoveTree().Root().Children()
+	children := g.MoveTree().Root().Continuations()
 	if len(children) != 1 {
 		t.Fatalf("root children = %d, want 1", len(children))
 	}

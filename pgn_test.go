@@ -660,7 +660,7 @@ func TestRoundTripWithVariationsAndCommandAnnotations(t *testing.T) {
 		if m.Comments() != "" {
 			m.SetCommand("eval", "0.25")
 		}
-		for _, child := range m.Children() {
+		for _, child := range m.Continuations() {
 			walk(child)
 		}
 	}
@@ -761,10 +761,10 @@ func TestPGNAnnotationFidelityVariationsAndExpansion(t *testing.T) {
 	reparsed := mustParseSingleGame(t, roundTrip)
 
 	e4 := reparsed.MoveTree().MainLine()[0]
-	if len(e4.Children()) < 2 {
-		t.Fatalf("expected e4 variation, got %d children", len(e4.Children()))
+	if len(e4.Continuations()) < 2 {
+		t.Fatalf("expected e4 variation, got %d children", len(e4.Continuations()))
 	}
-	c5 := e4.Children()[1]
+	c5 := e4.Continuations()[1]
 	blocks := c5.CommentBlocks()
 	if len(blocks) != 1 || len(blocks[0].Items) != 2 {
 		t.Fatalf("expected variation annotation block, got %#v", blocks)
@@ -1055,7 +1055,7 @@ func TestVariationMoveNumbers(t *testing.T) {
 	t.Logf("Root move number: %d", game.MoveTree().Root().number)
 	t.Logf("Root move ply: %d", game.MoveTree().Root().Ply())
 	t.Logf("Root move full move number: %d", game.MoveTree().Root().FullMoveNumber())
-	t.Logf("Second move: %v", game.MoveTree().Root().Children()[0])
+	t.Logf("Second move: %v", game.MoveTree().Root().Continuations()[0])
 
 	// Mainline starts at move 1
 	checkMoveNumbers(game.MoveTree().Root(), 1)

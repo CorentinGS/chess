@@ -16,7 +16,7 @@ type MoveInsertOptions struct {
 //
 // The root is a synthetic position node, not a move occurrence. The cursor's
 // current position is tracked in pos alongside current: every navigation
-// (addMove, GoForward, GoBack, Forward, Goto, Reset, setCurrent) advances pos
+// (addMove, GoForward, GoBack, GoToContinuation, GoTo, GoToStart, GoToEnd, setCurrent) advances pos
 // via the in-place makeMoveCursor / unmakeMoveCursor pair (move_applier.go),
 // with one entry in undos per level between root and current. rootPos holds
 // the starting position so the cursor can be reset without re-deriving it
@@ -77,7 +77,7 @@ func (t *MoveTree) MainLine() []*MoveNode {
 	}
 
 	nodes := make([]*MoveNode, 0)
-	for current := t.root.MainChild(); current != nil; current = current.MainChild() {
+	for current := t.root.MainContinuation(); current != nil; current = current.MainContinuation() {
 		nodes = append(nodes, current)
 	}
 	return nodes
@@ -87,8 +87,8 @@ func (t *MoveTree) MainLine() []*MoveNode {
 // tree has no moves).
 func (t *MoveTree) mainLineEnd() *MoveNode {
 	n := t.root
-	for n != nil && len(n.children) > 0 {
-		n = n.children[0]
+	for next := n.MainContinuation(); next != nil; next = next.MainContinuation() {
+		n = next
 	}
 	return n
 }
@@ -228,7 +228,7 @@ func (t *MoveTree) GoToEnd() {
 
 // Peek returns the live [Position] at the tree's active cursor without copying.
 // The returned pointer aliases the tree's internal state and is valid only
-// until the next cursor move (GoForward, GoBack, Forward, Goto, Reset,
+// until the next cursor move (GoForward, GoBack, GoToContinuation, GoTo, GoToStart, GoToEnd,
 // AddVariation, or any move pushed onto the tree). Callers MUST NOT mutate
 // it; mutation corrupts the cursor and every subsequent read in the library,
 // including legal-move generation and repetition detection.
@@ -245,11 +245,12 @@ func (t *MoveTree) Peek() *Position {
 	return t.pos
 }
 
-// GoToChild advances the cursor to the idx-th child of the current node.
-// GoToChild(0) is equivalent to [MoveTree.GoForward] (main-line continuation).
+// GoToContinuation advances the cursor to the idx-th continuation of the
+// current node, in the order of [MoveNode.Continuations]. GoToContinuation(0)
+// is equivalent to [MoveTree.GoForward] (the main-line continuation).
 // Returns true on success; false if t is nil, the current node has no
-// children, or idx is out of range.
-func (t *MoveTree) GoToChild(idx int) bool {
+// continuations, or idx is out of range.
+func (t *MoveTree) GoToContinuation(idx int) bool {
 	if t == nil || t.current == nil {
 		return false
 	}
@@ -257,7 +258,7 @@ func (t *MoveTree) GoToChild(idx int) bool {
 		return false
 	}
 	// Route through setCurrent so the direct-child fast path owns the
-	// makeMove/undo append invariant. Forward(0) then matches GoForward.
+	// makeMove/undo append invariant. GoToContinuation(0) then matches GoForward.
 	t.setCurrent(t.current.children[idx])
 	return true
 }

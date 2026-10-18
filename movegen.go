@@ -49,7 +49,7 @@ func unsafeMoves(pos *Position) []Move {
 	return standardMoves(pos, false, generateUnsafeOnly)
 }
 
-// status returns the current position's Method (Checkmate, Stalemate, or
+// positionMethod returns the current position's Method (Checkmate, Stalemate, or
 // NoMethod).
 //
 // The Method is determined by:
@@ -58,7 +58,7 @@ func unsafeMoves(pos *Position) []Move {
 //
 // If the position has cached valid moves in pos.legalMoves, those will be
 // used. Otherwise, moves will be calculated to determine the Method.
-func status(pos *Position) Method {
+func positionMethod(pos *Position) Method {
 	var hasMove bool
 	if pos.legalMoves != nil {
 		hasMove = len(pos.legalMoves) > 0

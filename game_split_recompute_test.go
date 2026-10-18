@@ -11,10 +11,10 @@ func assertNoVariations(t *testing.T, g *chess.Game) {
 	t.Helper()
 	var walk func(node *chess.MoveNode)
 	walk = func(node *chess.MoveNode) {
-		if children := node.Children(); len(children) > 1 {
+		if children := node.Continuations(); len(children) > 1 {
 			t.Errorf("node has %d children, split games must have 0 variations", len(children))
 		}
-		for _, c := range node.Children() {
+		for _, c := range node.Continuations() {
 			walk(c)
 		}
 	}
@@ -130,7 +130,7 @@ func TestSplit_HonoursIgnoreFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The ignore option must precede FEN: FEN evaluates status while applied,
+	// The ignore option must precede FEN: FEN evaluates the outcome while applied,
 	// so the flag has to be set first for the parent to stay in progress.
 	g := chess.NewGame(chess.IgnoreInsufficientMaterialDraw(), fenOpt)
 	if g.Outcome() != chess.NoOutcome {

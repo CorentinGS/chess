@@ -267,7 +267,7 @@ func TestUnsafeTransitionConsistency(t *testing.T) {
 		pos.inCheck, pos.checkers = checkState(pos)
 		g := NewGame()
 		g.tree.setRootPosition(pos)
-		g.evaluatePositionStatus()
+		g.evaluateOutcome()
 		// White pawn on E4 pushing to D5 (where the black queen sits) but
 		// tagged as en-passant. Real e.p. would clear D5's adjacent square
 		// instead; a misuse of the tag must demote to a normal capture

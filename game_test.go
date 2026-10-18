@@ -15,7 +15,7 @@ func TestGameAccessorsReturnDefensiveCopies(t *testing.T) {
 	}
 	game.MoveTree().AddVariation(nil, Move{s1: D2, s2: D4})
 
-	children := game.MoveTree().Root().Children()
+	children := game.MoveTree().Root().Continuations()
 	children[0] = nil
 	if game.MoveTree().Root().children[0] == nil {
 		t.Fatal("Children returned mutable backing slice")
@@ -759,7 +759,7 @@ func getMainline(game *Game) []string {
 	current := game.MoveTree().Root()
 
 	for len(current.children) > 0 {
-		current = current.children[0] // Follow main line (first variation)
+		current = current.children[0] // Follow the main-line continuation
 		moves = append(moves, algebraicMove(current))
 	}
 

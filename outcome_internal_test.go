@@ -67,7 +67,7 @@ func TestClassifyOutcome(t *testing.T) {
 			}
 			// decodeFEN does not populate inCheck; production callers always
 			// have it set (FEN option / move application), so mirror that here
-			// so Status() can detect checkmate.
+			// so Method() can detect checkmate.
 			pos.inCheck = isInCheck(pos)
 			gotOutcome, gotMethod := classifyOutcome(pos, tt.repetitions, tt.rules)
 			if gotOutcome != tt.wantOutcome || gotMethod != tt.wantMethod {

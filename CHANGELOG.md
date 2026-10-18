@@ -34,7 +34,7 @@ All notable changes to this project will be documented in this file. See [conven
   returns it), `XFENString` becomes `CanonicalFEN`, `PositionKey` becomes
   `FENKey`.
 - return `Bitboard` from `Board.AttacksFrom` and `Position.Checkers`.
-- iterators return `iter.Seq`: `Bitboard.Squares()`, `MoveNode.ChildrenSeq()`
+- iterators return `iter.Seq`: `Bitboard.Squares()`, `MoveNode.ContinuationsSeq()`
   (was `ChildrenIter`), `Position.LegalMovesSeq()`.
 - replace `Board.Draw2(perspective, darkMode)` with
   `Board.DrawWith(DrawOptions)`.
@@ -59,13 +59,14 @@ All notable changes to this project will be documented in this file. See [conven
 - remove `ValidateSAN`; use `SAN().ValidateSyntax`.
 - rename `DecodePGNGamesParallel` to `PGNGamesParallel`.
 - move `MainChild` and `Variations` from `MoveTree` (taking a node) to
-  `MoveNode`; remove `MoveTree.Continuations`, which `MoveNode.Children`
-  already provides.
+  `MoveNode`, named `MoveNode.MainContinuation` and `MoveNode.Variations`;
+  `MoveTree.Continuations(n)` becomes `MoveNode.Continuations()` and
+  `MoveNode.Children` is renamed to match.
 - `MoveNode.SetComment` replaces the comment text but keeps commands such as
   `[%clk]`; it used to delete them.
 - remove `PieceType.Bytes`; `PieceType.String` gives the same letter.
 - name the `MoveTree` cursor moves consistently: `Forward(i)` becomes
-  `GoToChild(i)`, `Goto` becomes `GoTo`, `Reset` becomes `GoToStart`;
+  `GoToContinuation(i)`, `Goto` becomes `GoTo`, `Reset` becomes `GoToStart`;
   `NavigateToMainLine` is removed and `GoToEnd` is added.
 - `uci.Cmd` is reduced to `String` and `IsDone`, so any such type can be
   run (e.g. a raw `debug on`); `Handle` and `LockRequired` are internal.

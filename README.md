@@ -925,11 +925,11 @@ func main() {
 	))
 
 	tree := g.MoveTree()
-	e4 := tree.Root().MainChild() // first move of the main line
+	e4 := tree.Root().MainContinuation() // first move of the main line
 
 	// Walk the main line by following the main continuation at each node.
 	fmt.Print("main: ")
-	for n := e4; n != nil; n = n.MainChild() {
+	for n := e4; n != nil; n = n.MainContinuation() {
 		fmt.Printf("%s ", n.Move())
 	}
 	fmt.Println()
@@ -949,18 +949,19 @@ Useful APIs over the tree:
 - `MoveTree.Root() *MoveNode` — root position node.
 - `MoveTree.Current() *MoveNode` — active cursor node.
 - `MoveTree.MainLine() []*MoveNode` — main-line nodes, excluding the root.
-- `MoveNode.MainChild() *MoveNode` — main continuation.
-- `MoveNode.Children() []*MoveNode` — all continuations, main line first.
+- `MoveNode.MainContinuation() *MoveNode` — main-line continuation.
+- `MoveNode.Continuations() []*MoveNode` — all continuations, main line
+  first (`ContinuationsSeq()` iterates without allocating).
 - `MoveNode.Variations() []*MoveNode` — sideline continuations.
 - `MoveTree.AddVariation(parent *MoveNode, move Move) (*MoveNode, error)` —
   validate and append a sideline.
-- `MoveTree.GoForward()`, `GoBack()`, `GoToChild(i)`, `GoTo(node)`,
+- `MoveTree.GoForward()`, `GoBack()`, `GoToContinuation(i)`, `GoTo(node)`,
   `GoToStart()`, `GoToEnd()` — move the cursor. The cursor *is* the game's
   current position: `Game.Position()`, `Game.LegalMoves()` and the move
   methods all act on it. Moves played away from the end of the main line add
   variations; the game's outcome belongs to the main line.
 - `node.Move()`, `node.Position()`, `node.Comments()`, `node.NAGs()`,
-  `node.Children()`, and `node.Parent()` — per-node data.
+  `node.Continuations()`, and `node.Parent()` — per-node data.
 
 Perft does not store its results in the game tree; it walks a temporary move
 tree internally, so it does not affect the `MoveTree` you see from `Game`.

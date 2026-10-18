@@ -97,8 +97,8 @@ type positionUndo struct {
 	inCheck         bool
 	checkers        bitboard
 	hash            uint64
-	status          Method
-	statusCached    bool
+	method          Method
+	methodCached    bool
 }
 
 func (pos *Position) makeMove(m Move) positionUndo {
@@ -113,8 +113,8 @@ func (pos *Position) makeMove(m Move) positionUndo {
 		inCheck:         pos.inCheck,
 		checkers:        pos.checkers,
 		hash:            pos.hash,
-		status:          pos.status,
-		statusCached:    pos.statusCached,
+		method:          pos.method,
+		methodCached:    pos.methodCached,
 	}
 
 	if m.HasTag(Null) {
@@ -141,6 +141,6 @@ func (pos *Position) unmakeMove(undo positionUndo) {
 	pos.inCheck = undo.inCheck
 	pos.checkers = undo.checkers
 	pos.hash = undo.hash
-	pos.status = undo.status
-	pos.statusCached = undo.statusCached
+	pos.method = undo.method
+	pos.methodCached = undo.methodCached
 }

@@ -338,9 +338,9 @@ func (n *MoveNode) Position() *Position {
 	return n.tree.pos.copy()
 }
 
-// MainChild returns the main-line continuation of n, or nil at the end of
-// the line.
-func (n *MoveNode) MainChild() *MoveNode {
+// MainContinuation returns the main-line continuation of n (its first
+// continuation), or nil at the end of the line.
+func (n *MoveNode) MainContinuation() *MoveNode {
 	if n == nil || len(n.children) == 0 {
 		return nil
 	}
@@ -355,17 +355,17 @@ func (n *MoveNode) Variations() []*MoveNode {
 	return append([]*MoveNode{}, n.children[1:]...)
 }
 
-// Children returns every continuation of n, main line first.
-func (n *MoveNode) Children() []*MoveNode {
+// Continuations returns every continuation of n, main line first.
+func (n *MoveNode) Continuations() []*MoveNode {
 	if n == nil {
 		return nil
 	}
 	return append([]*MoveNode{}, n.children...)
 }
 
-// ChildrenSeq returns an iterator over the node's continuations, main line
-// first, in the same order as Children. It does not allocate.
-func (n *MoveNode) ChildrenSeq() iter.Seq[*MoveNode] {
+// ContinuationsSeq returns an iterator over the node's continuations, main line
+// first, in the same order as Continuations. It does not allocate.
+func (n *MoveNode) ContinuationsSeq() iter.Seq[*MoveNode] {
 	return func(yield func(*MoveNode) bool) {
 		if n == nil {
 			return

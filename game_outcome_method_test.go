@@ -220,7 +220,7 @@ func TestAddVariationAllowedAfterTerminalOutcome(t *testing.T) {
 	}
 	variation := g.LegalMoves()[0]
 	g.MoveTree().AddVariation(g.MoveTree().Root(), variation)
-	if len(g.MoveTree().Root().Children()) == 0 {
+	if len(g.MoveTree().Root().Continuations()) == 0 {
 		t.Error("AddVariation did not append child after terminal outcome")
 	}
 }

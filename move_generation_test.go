@@ -34,7 +34,7 @@ func requireMove(t *testing.T, moves []chess.Move, want string) chess.Move {
 	return move
 }
 
-func TestPositionStatus(t *testing.T) {
+func TestPositionMethod(t *testing.T) {
 	tests := []struct {
 		name string
 		fen  string
@@ -49,19 +49,19 @@ func TestPositionStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pos := positionFromFEN(t, tt.fen)
 			if got := pos.Method(); got != tt.want {
-				t.Fatalf("Status() = %s, want %s", got, tt.want)
+				t.Fatalf("Method() = %s, want %s", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestPositionStatusIsStableAcrossRepeatedCallsAndUpdates(t *testing.T) {
+func TestPositionMethodIsStableAcrossRepeatedCallsAndUpdates(t *testing.T) {
 	checkmate := positionFromFEN(t, "7k/5K2/7Q/8/8/8/8/8 b - - 0 1")
 	if got := checkmate.Method(); got != chess.Checkmate {
-		t.Fatalf("first Status() = %s, want %s", got, chess.Checkmate)
+		t.Fatalf("first Method() = %s, want %s", got, chess.Checkmate)
 	}
 	if got := checkmate.Method(); got != chess.Checkmate {
-		t.Fatalf("second Status() = %s, want %s", got, chess.Checkmate)
+		t.Fatalf("second Method() = %s, want %s", got, chess.Checkmate)
 	}
 
 	start := chess.NewGame().Position()
@@ -71,7 +71,7 @@ func TestPositionStatusIsStableAcrossRepeatedCallsAndUpdates(t *testing.T) {
 		t.Fatalf("original Status() after Update = %s, want %s", got, chess.NoMethod)
 	}
 	if got := next.Method(); got != chess.NoMethod {
-		t.Fatalf("updated Status() = %s, want %s", got, chess.NoMethod)
+		t.Fatalf("updated Method() = %s, want %s", got, chess.NoMethod)
 	}
 }
 
@@ -375,7 +375,7 @@ func TestApplyInPlaceMatchesUpdate(t *testing.T) {
 				t.Fatalf("%s %s: ApplyInPlace hash differs from Update", fen, m)
 			}
 			if got.IsCheck() != want.IsCheck() || got.Method() != want.Method() {
-				t.Fatalf("%s %s: ApplyInPlace check/status differs from Update", fen, m)
+				t.Fatalf("%s %s: ApplyInPlace check/method differs from Update", fen, m)
 			}
 			if len(got.LegalMoves()) != len(want.LegalMoves()) {
 				t.Fatalf("%s %s: ApplyInPlace legal move count differs from Update", fen, m)

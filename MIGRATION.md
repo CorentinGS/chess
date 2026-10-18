@@ -69,7 +69,7 @@ for _, node := range game.MoveTree().MainLine() {
 
 `game.Moves()` still returns `[]Move` (bare values, main line only). Use
 `game.MoveTree()` for tree access: `tree.Root()`, `tree.Current()`,
-`tree.MainLine()`, `node.Children()`, `node.MainChild()`, `node.Variations()`,
+`tree.MainLine()`, `node.Continuations()`, `node.MainContinuation()`, `node.Variations()`,
 `node.Comments()`, `node.SetCommand(key, val)`, `node.SetComment(text)`,
 `node.AddComment(text)`, `node.NAGs()`, and `node.Parent()`
 for variation traversal.
@@ -211,7 +211,7 @@ listed:
 | `Board.AttacksFrom(sq) []Square` | `Board.AttacksFrom(sq) Bitboard` |
 | `Board.Draw2(perspective, dark)` | `Board.DrawWith(DrawOptions{Perspective: c, DarkMode: dark})` |
 | `for sq := range bb.Squares` | `for sq := range bb.Squares()` |
-| `MoveNode.ChildrenIter` | `MoveNode.ChildrenSeq()` |
+| `MoveNode.ChildrenIter` | `MoveNode.ContinuationsSeq()` |
 | `MoveNode.Number()` | `MoveNode.FullMoveNumber()` |
 | `Game.NullMove()` | `Game.NullMove(nil)` |
 | `func(*Game)` options | `GameOption` (`FEN`, `Ignore*Draw` return it) |
@@ -226,8 +226,9 @@ listed:
 | `ValidateSAN(s)` | `SAN().ValidateSyntax(s)` |
 | `PieceType.Bytes()` | `PieceType.String()` |
 | `DecodePGNGamesParallel` | `PGNGamesParallel` |
-| `tree.MainChild(n)`, `tree.Variations(n)`, `tree.Continuations(n)` | `n.MainChild()`, `n.Variations()`, `n.Children()` |
-| `tree.Forward(i)`, `tree.Goto(n)`, `tree.Reset()` | `tree.GoToChild(i)`, `tree.GoTo(n)`, `tree.GoToStart()` |
+| `tree.MainChild(n)`, `tree.Variations(n)`, `tree.Continuations(n)` | `n.MainContinuation()`, `n.Variations()`, `n.Continuations()` |
+| `MoveNode.Children()` (v2 `Move.Children()`) | `MoveNode.Continuations()` |
+| `tree.Forward(i)`, `tree.Goto(n)`, `tree.Reset()` | `tree.GoToContinuation(i)`, `tree.GoTo(n)`, `tree.GoToStart()` |
 | `tree.NavigateToMainLine()` | `tree.GoToStart(); tree.GoForward()`; new `tree.GoToEnd()` |
 | `MoveNode.SetComment` dropped `[%cmd]` commands | it keeps them; `SetCommentBlocks` replaces everything |
 | _(none)_ | `Position.Setup()`, to edit a position and rebuild it with `NewPosition` |
@@ -330,10 +331,10 @@ for t.GoForward() {
 }
 ```
 
-`MoveTree` gains `Peek`, `Forward(idx)`, `Goto(node)`, and `Reset` as public
-methods. `Peek` returns the live cursor position without copying; the pointer
-is invalidated by any navigation. `Goto` rejects nodes from a different tree
-with `false`.
+`MoveTree` gains `Peek`, `GoToContinuation(idx)`, `GoTo(node)`, `GoToStart`
+and `GoToEnd` as public methods. `Peek` returns the live cursor position
+without copying; the pointer is invalidated by any navigation. `GoTo` rejects
+nodes from a different tree with `false`.
 
 ## Null moves
 

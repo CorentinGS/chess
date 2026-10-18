@@ -135,7 +135,7 @@ func TestPGNRenderer_EscapesCommentEndBrace(t *testing.T) {
 	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	g.MoveTree().Root().Children()[0].SetComment("keeps } inside")
+	g.MoveTree().Root().Continuations()[0].SetComment("keeps } inside")
 
 	out := g.String()
 	if !strings.Contains(out, `keeps \} inside`) {
@@ -143,7 +143,7 @@ func TestPGNRenderer_EscapesCommentEndBrace(t *testing.T) {
 	}
 
 	parsed := chess.NewGame(mustPGNOption(t, out))
-	if got := parsed.MoveTree().Root().Children()[0].Comments(); got != "keeps } inside" {
+	if got := parsed.MoveTree().Root().Continuations()[0].Comments(); got != "keeps } inside" {
 		t.Fatalf("round-tripped comment = %q, want %q", got, "keeps } inside")
 	}
 }
@@ -166,7 +166,7 @@ func TestPGNRenderer_EmitsCommandAnnotation(t *testing.T) {
 	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	g.MoveTree().Root().Children()[0].SetCommand("clk", "0:01:23")
+	g.MoveTree().Root().Continuations()[0].SetCommand("clk", "0:01:23")
 
 	out := g.String()
 	if !strings.Contains(out, "[%clk 0:01:23]") {
@@ -205,7 +205,7 @@ func TestPGNRenderer_DoesNotMutateGame(t *testing.T) {
 	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	g.MoveTree().Root().Children()[0].SetComment("a comment")
+	g.MoveTree().Root().Continuations()[0].SetComment("a comment")
 	g.SetTag("Custom", "value")
 
 	before := g.String()
@@ -240,8 +240,8 @@ func TestPGNRenderer_IsIdempotentOnAnnotations(t *testing.T) {
 	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	g.MoveTree().Root().Children()[0].SetComment("best move")
-	if err := g.MoveTree().Root().Children()[0].SetNAGs([]string{"$1"}); err != nil {
+	g.MoveTree().Root().Continuations()[0].SetComment("best move")
+	if err := g.MoveTree().Root().Continuations()[0].SetNAGs([]string{"$1"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := g.MoveText("e5", chess.SAN(), nil); err != nil {
@@ -275,7 +275,7 @@ func TestPGNRenderer_WritesNAGsBeforeComments(t *testing.T) {
 	if _, err := g.MoveText("e4", chess.SAN(), nil); err != nil {
 		t.Fatal(err)
 	}
-	move := g.MoveTree().Root().Children()[0]
+	move := g.MoveTree().Root().Continuations()[0]
 	move.SetComment("best move")
 	// Multiple NAGs are kept in order and rendered as canonical "$N" before
 	// the comment, even when imported via symbolic spellings.

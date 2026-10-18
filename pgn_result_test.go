@@ -155,6 +155,7 @@ func TestPGNTerminationTagSetsMethod(t *testing.T) {
 		{"Rules infraction", "1-0", chess.RulesInfraction},
 		{"Normal", "1-0", chess.NoMethod},
 		{"Abandoned", "1/2-1/2", chess.NoMethod}, // not a valid draw method
+		{"Abandoned", "*", chess.NoMethod},       // no outcome, so no method
 	}
 	for _, tc := range cases {
 		pgn := "[Result \"" + tc.result + "\"]\n[Termination \"" + tc.termination + "\"]\n\n1. e4 e5 " + tc.result + "\n"
@@ -166,7 +167,16 @@ func TestPGNTerminationTagSetsMethod(t *testing.T) {
 			t.Errorf("Termination %q, Result %s: Method = %s, want %s", tc.termination, tc.result, g.Method(), tc.want)
 		}
 	}
-	g := chess.NewGame()
+	// A method without an outcome would break the NoOutcome/NoMethod
+	// pairing; the Termination tag still carries the reason.
+	g, err := chess.ParsePGN(strings.NewReader("[Result \"*\"]\n[Termination \"abandoned\"]\n\n1. e4 *\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Outcome() != chess.NoOutcome || g.Tag("Termination") != "abandoned" {
+		t.Errorf("Result *, Termination abandoned: Outcome = %s, Termination tag = %q", g.Outcome(), g.Tag("Termination"))
+	}
+	g = chess.NewGame()
 	if err := g.SetOutcome(chess.WhiteWon, chess.TimeForfeit); err != nil {
 		t.Errorf("SetOutcome(WhiteWon, TimeForfeit): %v", err)
 	}

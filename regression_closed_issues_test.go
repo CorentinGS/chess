@@ -154,7 +154,7 @@ func TestRegressionIssue104_AnnotatedVariationsRoundTripExpanded(t *testing.T) {
 	var annotate func(n *chess.MoveNode)
 	annotate = func(n *chess.MoveNode) {
 		n.SetCommand("eval", "0.25")
-		for _, child := range n.Children() {
+		for _, child := range n.Continuations() {
 			annotate(child)
 		}
 	}

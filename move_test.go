@@ -500,14 +500,14 @@ func BenchmarkValidMoves(b *testing.B) {
 func BenchmarkMoveNodeChildren(b *testing.B) {
 	node := &MoveNode{children: make([]*MoveNode, 8)}
 	for b.Loop() {
-		_ = node.Children()
+		_ = node.Continuations()
 	}
 }
 
-func BenchmarkMoveNodeChildrenSeq(b *testing.B) {
+func BenchmarkMoveNodeContinuationsSeq(b *testing.B) {
 	node := &MoveNode{children: make([]*MoveNode, 8)}
 	for b.Loop() {
-		for range node.ChildrenSeq() {
+		for range node.ContinuationsSeq() {
 		}
 	}
 }

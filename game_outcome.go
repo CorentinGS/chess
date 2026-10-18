@@ -54,19 +54,16 @@ func (g *Game) ClearOutcome() {
 // method.  If the method isn't valid then an error is returned.
 // Returns ErrGameAlreadyEnded if the game is already in a terminal state.
 func (g *Game) Draw(method Method) error {
-	const halfMoveClockForFiftyMoveRule = 100
-	const numOfRepetitionsForThreefoldRepetition = 3
-
 	if g.outcome != NoOutcome {
 		return ErrGameAlreadyEnded
 	}
 	switch method {
 	case ThreefoldRepetition:
-		if g.numOfRepetitions() < numOfRepetitionsForThreefoldRepetition {
+		if !g.canClaimThreefoldRepetition() {
 			return errors.New("chess: draw by ThreefoldRepetition requires at least three repetitions of the current board state")
 		}
 	case FiftyMoveRule:
-		if g.currentPosition().halfMoveClock < halfMoveClockForFiftyMoveRule {
+		if !g.canClaimFiftyMoveRule() {
 			return errors.New("chess: draw by FiftyMoveRule requires a half move clock of 100 or greater")
 		}
 	case DrawOffer:
@@ -99,23 +96,34 @@ func (g *Game) Resign(color Color) error {
 
 // EligibleDraws returns valid inputs for the Draw() method.
 func (g *Game) EligibleDraws() []Method {
-	const halfMoveClockForFiftyMoveRule = 100
-	const numOfRepetitionsForThreefoldRepetition = 3
-
 	draws := []Method{DrawOffer}
-	if g.numOfRepetitions() >= numOfRepetitionsForThreefoldRepetition {
+	if g.canClaimThreefoldRepetition() {
 		draws = append(draws, ThreefoldRepetition)
 	}
-	if g.currentPosition().halfMoveClock >= halfMoveClockForFiftyMoveRule {
+	if g.canClaimFiftyMoveRule() {
 		draws = append(draws, FiftyMoveRule)
 	}
 	return draws
 }
 
-// evaluatePositionStatus updates the game's outcome and method based on the
+// canClaimThreefoldRepetition reports whether the current position has
+// occurred at least three times, so a player may claim a draw.
+func (g *Game) canClaimThreefoldRepetition() bool {
+	const numOfRepetitionsForThreefoldRepetition = 3
+	return g.numOfRepetitions() >= numOfRepetitionsForThreefoldRepetition
+}
+
+// canClaimFiftyMoveRule reports whether fifty moves by each side have passed
+// without a capture or pawn move, so a player may claim a draw.
+func (g *Game) canClaimFiftyMoveRule() bool {
+	const halfMoveClockForFiftyMoveRule = 100
+	return g.currentPosition().halfMoveClock >= halfMoveClockForFiftyMoveRule
+}
+
+// evaluateOutcome updates the game's outcome and method based on the
 // current position. It runs the Full outcome policy (all automatic draws,
 // honouring the Game's ignore flags) and is called after every Move and FEN.
-func (g *Game) evaluatePositionStatus() {
+func (g *Game) evaluateOutcome() {
 	g.outcome, g.method = classifyOutcome(g.currentPosition(), g.numOfRepetitions(), fullOutcomeRules(g))
 }
 

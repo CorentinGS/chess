@@ -34,7 +34,7 @@ func FEN(fen string) (GameOption, error) {
 	}
 	return func(g *Game) {
 		g.tree.setRootPosition(pos)
-		g.evaluatePositionStatus()
+		g.evaluateOutcome()
 	}, nil
 }
 
