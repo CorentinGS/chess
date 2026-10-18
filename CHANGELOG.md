@@ -3,6 +3,9 @@ All notable changes to this project will be documented in this file. See [conven
 
 ## Unreleased
 
+- - -
+## v3.0.0-beta.5 - 2026-10-18
+
 #### Breaking Changes
 - remove the deprecated `Game.PushMove`, `Game.PushMoveText`, and
   `Game.UnsafePushMoveText` wrappers; use `Game.MoveText` /
