@@ -317,7 +317,7 @@
 </svg>
 <rect x="0" y="315" width="45" height="45" style="fill: #a57551" />
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="360" height="360" viewBox="0 -315 360 360">
-  <g style="opacity:1; fill:000000; fill-opacity:1; fill-rule:evenodd; stroke:#000000; stroke-width:1.5; stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4; stroke-dasharray:none; stroke-opacity:1;">
+  <g style="opacity:1; fill:#000000; fill-opacity:1; fill-rule:evenodd; stroke:#000000; stroke-width:1.5; stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4; stroke-dasharray:none; stroke-opacity:1;">
     <path
       d="M 9,39 L 36,39 L 36,36 L 9,36 L 9,39 z "
       style="stroke-linecap:butt;" />
@@ -421,7 +421,7 @@
 <text x="177" y="357" style="text-anchor:end;font-size:11px;fill: #a57551" >e</text>
 <rect x="180" y="315" width="45" height="45" style="fill: #a57551" />
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="360" height="360" viewBox="-180 -315 360 360">
-  <g style="opacity:1; fill:000000; fill-opacity:1; fill-rule:evenodd; stroke:#000000; stroke-width:1.5; stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4; stroke-dasharray:none; stroke-opacity:1;">
+  <g style="opacity:1; fill:#000000; fill-opacity:1; fill-rule:evenodd; stroke:#000000; stroke-width:1.5; stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4; stroke-dasharray:none; stroke-opacity:1;">
     <g style="fill:#000000; stroke:none;">
       <circle cx="6"    cy="12" r="2.75" />
       <circle cx="14"   cy="9"  r="2.75" />
@@ -494,7 +494,7 @@
 <text x="312" y="357" style="text-anchor:end;font-size:11px;fill: #ebd1a6" >b</text>
 <rect x="315" y="315" width="45" height="45" style="fill: #ebd1a6" />
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="360" height="360" viewBox="-315 -315 360 360">
-  <g style="opacity:1; fill:000000; fill-opacity:1; fill-rule:evenodd; stroke:#000000; stroke-width:1.5; stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4; stroke-dasharray:none; stroke-opacity:1;">
+  <g style="opacity:1; fill:#000000; fill-opacity:1; fill-rule:evenodd; stroke:#000000; stroke-width:1.5; stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4; stroke-dasharray:none; stroke-opacity:1;">
     <path
       d="M 9,39 L 36,39 L 36,36 L 9,36 L 9,39 z "
       style="stroke-linecap:butt;" />
