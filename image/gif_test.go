@@ -2,6 +2,7 @@ package image_test
 
 import (
 	"bytes"
+	"errors"
 	stdimage "image"
 	"image/color"
 	"image/draw"
@@ -82,6 +83,22 @@ func TestGIFRejectsInvalidInput(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGIFReturnsWriterError(t *testing.T) {
+	want := errors.New("write failed")
+	err := image.GIF(errorWriter{err: want}, []*chess.Board{chess.NewGame().Position().Board()}, 5)
+	if !errors.Is(err, want) {
+		t.Fatalf("GIF error = %v, want wrapped %v", err, want)
+	}
+}
+
+type errorWriter struct {
+	err error
+}
+
+func (w errorWriter) Write([]byte) (int, error) {
+	return 0, w.err
 }
 
 func TestGIFMoveUpdatesSourceAndDestinationSquares(t *testing.T) {

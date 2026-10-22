@@ -88,6 +88,10 @@ func GIF(w io.Writer, boards []*chess.Board, delay int, opts ...func(*encoder)) 
 }
 
 func loadPieceSprites() (map[chess.Piece]*stdimage.RGBA, error) {
+	return loadPieceSpritesFrom(internal.MustSVG)
+}
+
+func loadPieceSpritesFrom(readSVG func(string) string) (map[chess.Piece]*stdimage.RGBA, error) {
 	sprites := make(map[chess.Piece]*stdimage.RGBA, 12)
 	for pieceType, name := range pieceTypeMap {
 		if pieceType == chess.NoPieceType {
@@ -95,19 +99,27 @@ func loadPieceSprites() (map[chess.Piece]*stdimage.RGBA, error) {
 		}
 		for _, color := range []chess.Color{chess.White, chess.Black} {
 			filename := fmt.Sprintf("pieces/%s%s.svg", color.String(), name)
-			svgData := internal.MustSVG(filename)
-			icon, err := oksvg.ReadIconStream(strings.NewReader(svgData), oksvg.StrictErrorMode)
+			svgData := readSVG(filename)
+			sprite, err := parsePieceSprite(filename, svgData)
 			if err != nil {
-				return nil, fmt.Errorf("image: parse piece SVG %q: %w", filename, err)
+				return nil, err
 			}
-			sprite := stdimage.NewRGBA(stdimage.Rect(0, 0, sqWidth, sqHeight))
-			icon.SetTarget(0, 0, sqWidth, sqHeight)
-			scanner := rasterx.NewScannerGV(sqWidth, sqHeight, sprite, sprite.Bounds())
-			icon.Draw(rasterx.NewDasher(sqWidth, sqHeight, scanner), 1)
 			sprites[chess.NewPiece(pieceType, color)] = sprite
 		}
 	}
 	return sprites, nil
+}
+
+func parsePieceSprite(filename, svgData string) (*stdimage.RGBA, error) {
+	icon, err := oksvg.ReadIconStream(strings.NewReader(svgData), oksvg.StrictErrorMode)
+	if err != nil {
+		return nil, fmt.Errorf("image: parse piece SVG %q: %w", filename, err)
+	}
+	sprite := stdimage.NewRGBA(stdimage.Rect(0, 0, sqWidth, sqHeight))
+	icon.SetTarget(0, 0, sqWidth, sqHeight)
+	scanner := rasterx.NewScannerGV(sqWidth, sqHeight, sprite, sprite.Bounds())
+	icon.Draw(rasterx.NewDasher(sqWidth, sqHeight, scanner), 1)
+	return sprite, nil
 }
 
 func boardOrder(perspective chess.Color) ([]chess.Rank, []chess.File) {
