@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file. See [conven
 
 ## Unreleased
 
+#### Fixes
+- PGN decoding: a reader that fails mid-stream now returns its error instead
+  of looping forever; `PGNDecoder.Decode`, `PGNGames` and `PGNRecords`
+  surface the read failure to the caller.
+
 - - -
 ## v3.0.0-beta.5 - 2026-10-18
 

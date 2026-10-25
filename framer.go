@@ -218,22 +218,25 @@ func newPGNFramer(r io.Reader, opts ...PGNOption) *pgnFramer {
 
 func (f *pgnFramer) next() (PGNRecord, error) {
 	for {
-		if f.readErr != nil && len(f.buffer) == 0 {
-			err := f.readErr
-			f.readErr = nil
-			return PGNRecord{}, err
-		}
-
 		advance, token, err := splitPGNGames(f.buffer, f.eof)
 		if err != nil {
 			return PGNRecord{}, err
 		}
 		if advance == 0 && token == nil {
+			if f.readErr != nil {
+				// The reader failed and the buffered bytes do not form a
+				// complete record: report the error instead of reading
+				// again, which would spin forever on a failing reader.
+				return PGNRecord{}, f.readErr
+			}
 			if f.eof {
 				return PGNRecord{}, io.EOF
 			}
-			if readErr := f.readMore(); readErr != nil && len(f.buffer) == 0 {
-				return PGNRecord{}, readErr
+			if readErr := f.readMore(); readErr != nil {
+				// The reader failed. Keep the error: the buffered bytes may
+				// still form a complete record, which is returned before the
+				// error is reported.
+				f.readErr = readErr
 			}
 			continue
 		}
@@ -261,9 +264,6 @@ func (f *pgnFramer) readMore() error {
 	if err == io.EOF {
 		f.eof = true
 		return nil
-	}
-	if err != nil {
-		f.readErr = err
 	}
 	return err
 }
