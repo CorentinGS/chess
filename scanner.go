@@ -90,13 +90,14 @@ func WithExpandVariations() ScannerOption {
 // WithScannerBufferSize() sets the maximum size, in bytes, of a single game
 // the scanner will read. The default is bufio's 64 KiB, which is enough for
 // most PGN files but not for a game carrying large comments or variations.
+// A size below the default is ignored.
 //
 // Example:
 //
 //	scanner := chess.NewScanner(f, chess.WithScannerBufferSize(16*1024*1024))
 func WithScannerBufferSize(size int) ScannerOption {
 	return func(s *Scanner) {
-		s.bufferSize = size
+		s.bufferSize = max(size, bufio.MaxScanTokenSize)
 	}
 }
 
@@ -117,6 +118,7 @@ func NewScanner(r io.Reader, opts ...ScannerOption) *Scanner {
 	ret := &Scanner{
 		scanner:         s,
 		nextParsedGames: make([]*Game, 0),
+		bufferSize:      bufio.MaxScanTokenSize,
 	}
 
 	// apply all the options
@@ -124,11 +126,9 @@ func NewScanner(r io.Reader, opts ...ScannerOption) *Scanner {
 		opt(ret)
 	}
 
-	if ret.bufferSize > 0 {
-		// A nil buffer keeps the scanner's default start size; only the
-		// maximum token size changes.
-		s.Buffer(nil, ret.bufferSize)
-	}
+	// A nil buffer keeps the scanner's default start size; only the maximum
+	// token size changes.
+	s.Buffer(nil, ret.bufferSize)
 
 	return ret
 }
