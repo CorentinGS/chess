@@ -90,3 +90,26 @@ func TestPGNDecoderCleanEndStillReturnsEOF(t *testing.T) {
 		t.Fatalf("Decode error = %v, want io.EOF", err)
 	}
 }
+
+// A record that was fully read before the failure is still returned; the read
+// error only surfaces once the incomplete remainder is reached.
+func TestPGNDecoderReturnsCompleteRecordBeforeReadError(t *testing.T) {
+	const pgn = "[Event \"one\"]\n\n1. e4 e5 1-0\n\n[Event \"two\"]\n\n1. d4"
+	dec := chess.NewPGNDecoder(&failingReader{data: pgn, err: errReadFailed})
+
+	first, err := dec.Decode()
+	if err != nil {
+		t.Fatalf("first Decode error = %v, want nil", err)
+	}
+	if got := first.Tag("Event"); got != "one" {
+		t.Fatalf("first Event tag = %q, want %q", got, "one")
+	}
+
+	second, err := dec.Decode()
+	if !errors.Is(err, errReadFailed) {
+		t.Fatalf("second Decode error = %v, want %v", err, errReadFailed)
+	}
+	if second != nil {
+		t.Fatalf("second Decode game = %v, want nil", second)
+	}
+}
