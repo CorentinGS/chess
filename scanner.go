@@ -113,6 +113,24 @@ func NewScanner(r io.Reader, opts ...ScannerOption) *Scanner {
 	return ret
 }
 
+// LastError returns the error, if any, that stopped the last scan.
+// It is set when HasNext returns false because the source could not be
+// read, for instance when a single game exceeds the scanner's token limit.
+//
+// Errors returned by ScanGame and ParseNext are reported directly and are
+// not stored here.
+//
+// Example:
+//
+//	if !scanner.HasNext() {
+//	    if err := scanner.LastError(); err != nil {
+//	        // Do something.
+//	    }
+//	}
+func (s *Scanner) LastError() error {
+	return s.lastError
+}
+
 // ScanGame reads and returns the next game from the source.
 // Returns nil and io.EOF when no more games are available.
 // Returns nil and an error if reading fails.
