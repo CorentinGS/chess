@@ -362,3 +362,42 @@ func TestEscapedQuoteInTagValue(t *testing.T) {
 		t.Fatalf("round-trip PGN does not contain escaped quote: %s", pgn)
 	}
 }
+
+func TestScannerLastError(t *testing.T) {
+	const pgn = `[Event "one"]
+
+1. e4 e5 1-0
+`
+
+	scanner := NewScanner(strings.NewReader(pgn))
+	if err := scanner.LastError(); err != nil {
+		t.Fatalf("LastError on a fresh scanner = %v, want nil", err)
+	}
+	if !scanner.HasNext() {
+		t.Fatal("scanner should report one game")
+	}
+	if _, err := scanner.ParseNext(); err != nil {
+		t.Fatalf("ParseNext error: %v", err)
+	}
+	if err := scanner.LastError(); err != nil {
+		t.Fatalf("LastError after a successful scan = %v, want nil", err)
+	}
+}
+
+func TestScannerLastErrorReportsReadFailure(t *testing.T) {
+	// A single game larger than the scanner's token limit cannot be read.
+	var b strings.Builder
+	b.WriteString("[Event \"big\"]\n\n1. e4 {")
+	for b.Len() < 128*1024 {
+		b.WriteString("x")
+	}
+	b.WriteString("} e5 1-0\n")
+
+	scanner := NewScanner(strings.NewReader(b.String()))
+	if scanner.HasNext() {
+		t.Fatal("HasNext should fail on a game larger than the token limit")
+	}
+	if scanner.LastError() == nil {
+		t.Fatal("LastError should report the read failure")
+	}
+}
