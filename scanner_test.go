@@ -384,8 +384,9 @@ func TestScannerLastError(t *testing.T) {
 	}
 }
 
-func TestScannerLastErrorReportsReadFailure(t *testing.T) {
-	// A single game larger than the scanner's token limit cannot be read.
+// oversizedGamePGN returns a single game larger than bufio's default 64 KiB
+// token limit.
+func oversizedGamePGN() string {
 	var b strings.Builder
 	b.WriteString("[Event \"big\"]\n\n1. e4 {")
 	for b.Len() < 128*1024 {
@@ -393,11 +394,37 @@ func TestScannerLastErrorReportsReadFailure(t *testing.T) {
 	}
 	b.WriteString("} e5 1-0\n")
 
-	scanner := NewScanner(strings.NewReader(b.String()))
+	return b.String()
+}
+
+func TestScannerLastErrorReportsReadFailure(t *testing.T) {
+	// A single game larger than the scanner's token limit cannot be read.
+	scanner := NewScanner(strings.NewReader(oversizedGamePGN()))
 	if scanner.HasNext() {
 		t.Fatal("HasNext should fail on a game larger than the token limit")
 	}
 	if scanner.LastError() == nil {
 		t.Fatal("LastError should report the read failure")
+	}
+}
+
+func TestScannerBufferSizeAllowsLargeGames(t *testing.T) {
+	// A game larger than bufio's default 64 KiB token limit is rejected
+	// unless the buffer size is raised.
+	small := NewScanner(strings.NewReader(oversizedGamePGN()))
+	if small.HasNext() {
+		t.Fatal("HasNext should fail on a game larger than the default token limit")
+	}
+
+	large := NewScanner(strings.NewReader(oversizedGamePGN()), WithScannerBufferSize(1024*1024))
+	if !large.HasNext() {
+		t.Fatal("HasNext should succeed once the buffer size allows the game")
+	}
+	game, err := large.ParseNext()
+	if err != nil {
+		t.Fatalf("ParseNext error: %v", err)
+	}
+	if game.GetTagPair("Event") != "big" {
+		t.Fatalf("Event tag = %q, want %q", game.GetTagPair("Event"), "big")
 	}
 }
