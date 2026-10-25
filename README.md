@@ -590,6 +590,16 @@ fmt.Println(game.GetTagPair("Site"))
 }
 ```
 
+#### Scan PGN with large games
+
+A game carrying large comments or variations can exceed the 64 KiB limit the
+scanner reads a single game with. Raise the limit with
+`WithScannerBufferSize`:
+
+```go
+scanner := chess.NewScanner(f, chess.WithScannerBufferSize(16*1024*1024))
+```
+
 ### FEN
 
 [FEN](https://en.wikipedia.org/wiki/Forsyth–Edwards_Notation), or Forsyth–Edwards Notation, is the standard notation for
