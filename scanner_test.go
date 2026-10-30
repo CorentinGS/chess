@@ -159,6 +159,46 @@ func TestScannerEmptyFile(t *testing.T) {
 	}
 }
 
+func TestScannerMultipleTaglessGames(t *testing.T) {
+	tests := []struct {
+		name  string
+		games []string
+	}{
+		{
+			name:  "blank line between games without results",
+			games: []string{"1. e4 e6", "1. e4 e5"},
+		},
+		{
+			name:  "result marker before next game",
+			games: []string{"1. e4 e6 *", "1. e4 e5 *"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scanner := NewScanner(strings.NewReader(strings.Join(tt.games, "\n\n")))
+
+			for i, want := range tt.games {
+				if !scanner.HasNext() {
+					t.Fatalf("expected game %d, scanner stopped early", i+1)
+				}
+
+				got, err := scanner.ScanGame()
+				if err != nil {
+					t.Fatalf("failed to scan game %d: %v", i+1, err)
+				}
+				if got.Raw != want {
+					t.Errorf("game %d = %q, want %q", i+1, got.Raw, want)
+				}
+			}
+
+			if scanner.HasNext() {
+				t.Fatal("scanner returned more games than expected")
+			}
+		})
+	}
+}
+
 func TestSequentialProcessing(t *testing.T) {
 	file, err := os.Open(filepath.Join("fixtures/pgns", "multi_game.pgn"))
 	if err != nil {
