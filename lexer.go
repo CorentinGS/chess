@@ -586,7 +586,15 @@ func (l *Lexer) NextToken() Token {
 	case '#':
 		l.readChar()
 		return Token{Type: CHECKMATE, Value: "#"}
-	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+	case '1':
+		if strings.HasPrefix(l.input[l.position:], "1/2-1/2") {
+			for range len("1/2-1/2") {
+				l.readChar()
+			}
+			return Token{Type: RESULT, Value: "1/2-1/2"}
+		}
+		fallthrough
+	case '0', '2', '3', '4', '5', '6', '7', '8', '9':
 		if l.inTag {
 			return l.readTagValue()
 		}
