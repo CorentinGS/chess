@@ -353,6 +353,13 @@ func (AlgebraicNotation) Decode(pos *Position, s string) (*Move, error) {
 
 	// Try matching against valid moves
 	for _, m := range pos.ValidMovesUnsafe() {
+		// Full-square disambiguation must match the move's origin.
+		if components.originFile != "" && components.originRank != "" &&
+			(m.S1().File().String() != components.originFile ||
+				m.S1().Rank().String() != components.originRank) {
+			continue
+		}
+
 		// Encode current move
 		moveStr := AlgebraicNotation{}.Encode(pos, &m)
 
