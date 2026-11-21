@@ -62,8 +62,15 @@ type MoveWithWeight struct {
 }
 
 func MoveToPolyglot(m Move) uint16 {
+	toFile := m.S2().File()
+	if m.HasTag(KingSideCastle) {
+		toFile = FileH
+	} else if m.HasTag(QueenSideCastle) {
+		toFile = FileA
+	}
+
 	var encoded uint16
-	encoded |= uint16(int(m.S2().File()) & 0x7)                           // bits 0-2
+	encoded |= uint16(int(toFile) & 0x7)                                  // bits 0-2
 	encoded |= uint16((int(m.S2().Rank()) & 0x7) << 3)                    // bits 3-5
 	encoded |= uint16((int(m.S1().File()) & 0x7) << 6)                    // bits 6-8
 	encoded |= uint16((int(m.S1().Rank()) & 0x7) << 9)                    // bits 9-11
