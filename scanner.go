@@ -320,6 +320,7 @@ func processGameContent(data []byte, start int, atEOF bool) (int, []byte, error)
 	var i int                                   // Loop variable
 	var inBrackets, inComment, foundResult bool // State variables
 	resultStart := -1                           // Start position of result token
+	taglessGame := data[start] != '['
 
 	// Process the game content
 	for i = start; i < len(data); i++ {
@@ -327,12 +328,19 @@ func processGameContent(data []byte, start int, atEOF bool) (int, []byte, error)
 		inBrackets = updateBracketState(data[i], inBrackets, inComment)
 		inComment = updateCommentState(data[i], inComment)
 
+		if taglessGame && !inBrackets && !inComment && !foundResult && data[i] == '\n' {
+			if nextGame := findTaglessGameAfterBlankLine(data, i+1); nextGame != -1 {
+				return nextGame, bytes.TrimSpace(data[start:nextGame]), nil
+			}
+		}
+
 		// when we are not in brackets or comments, we can check for the result token
 		if foundResult && !inBrackets && !inComment && data[i] == '\n' {
-			nextGame := findNextGameStart(data[i:])
+			nextGame := findNextGameStart(data[i+1:])
 			if nextGame != -1 {
 				// return the next game start position and the current game content
-				return i + nextGame, bytes.TrimSpace(data[start:i]), nil
+				nextGame += i + 1
+				return nextGame, bytes.TrimSpace(data[start:nextGame]), nil
 			}
 		}
 
@@ -377,11 +385,58 @@ func updateCommentState(ch byte, inComment bool) bool {
 
 // Helper to find the next game start after a newline character.
 func findNextGameStart(data []byte) int {
+	start := skipLeadingWhitespace(data)
+	if isTaglessGameStart(data, start) {
+		return start
+	}
+
 	nextGame := bytes.Index(data, []byte("[Event "))
 	if nextGame != -1 {
 		return nextGame
 	}
 	return -1
+}
+
+// findTaglessGameAfterBlankLine finds a tagless game beginning after a blank
+// line. Requiring the blank line avoids treating ordinary wrapped movetext as
+// a new game.
+func findTaglessGameAfterBlankLine(data []byte, start int) int {
+	blankLine := false
+	for start < len(data) {
+		lineEnd := bytes.IndexByte(data[start:], '\n')
+		if lineEnd == -1 {
+			lineEnd = len(data)
+		} else {
+			lineEnd += start
+		}
+
+		line := data[start:lineEnd]
+		contentStart := 0
+		for contentStart < len(line) && isWhitespace(line[contentStart]) {
+			contentStart++
+		}
+
+		if contentStart == len(line) {
+			blankLine = true
+		} else {
+			if blankLine && isTaglessGameStart(line, contentStart) {
+				return start + contentStart
+			}
+			return -1
+		}
+
+		if lineEnd == len(data) {
+			break
+		}
+		start = lineEnd + 1
+	}
+
+	return -1
+}
+
+// Helper to check whether a line starts with an untagged game's first move.
+func isTaglessGameStart(data []byte, start int) bool {
+	return len(data)-start >= 2 && data[start] == '1' && data[start+1] == '.'
 }
 
 // Helper to check for game result tokens (e.g., "1-0", "0-1", "1/2-1/2", "*").
