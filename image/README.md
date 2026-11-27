@@ -2,9 +2,32 @@
 
 ## Introduction
 
-**image** is an chess image utility that converts board positions into [SVG](https://en.wikipedia.org/wiki/Scalable_Vector_Graphics), or Scalable Vector Graphics, images.  [svgo](https://github.com/ajstarks/svgo), the only outside dependency, is used to construct the SVG document.
+**image** is a chess image utility that converts board positions into [SVG](https://en.wikipedia.org/wiki/Scalable_Vector_Graphics) images and animated GIFs. [svgo](https://github.com/ajstarks/svgo) constructs SVG documents, while [oksvg](https://github.com/srwiley/oksvg) and [rasterx](https://github.com/srwiley/rasterx) rasterize the embedded piece SVGs for GIF output.
 
 ## Usage
+
+### Animated GIF
+
+`GIF` writes an animation from a sequence of board positions. The delay is measured in hundredths of a second; this example uses 50 hundredths (half a second) per frame. The animation loops indefinitely.
+
+```go
+game := chess.NewGame()
+boards := []*chess.Board{game.Position().Board()}
+if err := game.MoveStr("e4"); err != nil {
+	log.Fatal(err)
+}
+boards = append(boards, game.Position().Board())
+
+file, err := os.Create("game.gif")
+if err != nil {
+	log.Fatal(err)
+}
+defer file.Close()
+
+if err := image.GIF(file, boards, 50); err != nil {
+	log.Fatal(err)
+}
+```
 
 ### SVG 
 

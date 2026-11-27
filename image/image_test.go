@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	expectedMD5      = "08aaa6fcfde3bb900fc54bdfef3d5c81"
-	expectedMD5Black = "badac5ca5cfbdea9b98a1f9988ba54bc"
+	expectedMD5      = "149f0b93aa78a7fd414bbe23bf37f0e2"
+	expectedMD5Black = "480fb939477d59887b146d7140d2b6b9"
 )
 
 func TestSVG(t *testing.T) {
